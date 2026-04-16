@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Layout, Menu, Dropdown, Button, Badge, Avatar, Tooltip } from 'antd'
+import { Layout, Menu, Dropdown, Button, Badge, Avatar, Tooltip, Result, Select } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
@@ -21,6 +21,20 @@ import {
 import DesignDocFab from '../DesignDoc/DesignDocFab'
 import DesignDocPanel from '../DesignDoc/DesignDocPanel'
 import { getPageDesignDoc } from '../../docs/pageDocs'
+import {
+  canViewCurrentRoute,
+  getAccessibleProjects,
+  getCurrentProject,
+  getCurrentUser,
+  getOperationDeniedMessage,
+  getRoleLabel,
+  getUserRoleLabels,
+  hasMenuPermission,
+  setCurrentProject,
+  setCurrentUser,
+  usePermissionStore,
+} from '../../services/permissionStore'
+import { resolveRouteAccess } from '../../services/permissionCatalog'
 
 const { Header, Sider, Content } = Layout
 
@@ -28,9 +42,12 @@ interface AppLayoutProps {
   children: React.ReactNode
 }
 
+type MenuItemList = NonNullable<MenuProps['items']>
+
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const navigate = useNavigate()
   const location = useLocation()
+  const permissionState = usePermissionStore()
   const [collapsed, setCollapsed] = useState(false)
   const hideMainSider = location.pathname.startsWith('/docs')
   const [docPanelOpen, setDocPanelOpen] = useState(() => {
@@ -42,8 +59,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   })
   const hideDocPanel = location.pathname.startsWith('/docs')
   const currentDoc = getPageDesignDoc(location.pathname)
+  const currentUser = getCurrentUser(permissionState)
+  const currentProject = getCurrentProject(permissionState)
+  const accessibleProjects = getAccessibleProjects(permissionState)
+  const routeAccess = canViewCurrentRoute(location.pathname, permissionState)
 
-  const menuItems: MenuProps['items'] = [
+  const rawMenuItems: MenuItemList = [
     {
       key: '/home',
       icon: <HomeOutlined />,
@@ -125,6 +146,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         { key: '/admin/registry', label: '镜像管理' },
         { key: '/admin/base-model', label: '基础模型管理' },
         { key: '/admin/settings', label: '系统配置' },
+        { key: '/admin/permissions', label: '权限配置' },
       ],
     },
     {
@@ -134,6 +156,23 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     },
   ]
 
+  const filterMenuItems = (items: MenuItemList): MenuItemList =>
+    items
+      .map(item => {
+        if (!item) return null
+        if ('children' in item && item.children) {
+          const children = filterMenuItems(item.children)
+          return children.length ? { ...item, children } : null
+        }
+        if ('key' in item && typeof item.key === 'string' && item.key.startsWith('/')) {
+          return hasMenuPermission(item.key, permissionState) ? item : null
+        }
+        return item
+      })
+      .filter(Boolean) as MenuItemList
+
+  const menuItems: MenuItemList = filterMenuItems(rawMenuItems)
+
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     if (key.startsWith('/')) {
       navigate(key)
@@ -141,14 +180,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   }
 
   const getSelectedKeys = () => {
-    const path = location.pathname
-    return menuItems
-      .filter(item => item?.key === path)
-      .map(item => item!.key as string)
+    const selectedKey = resolveRouteAccess(location.pathname)?.menuKey
+    return selectedKey ? [selectedKey] : []
   }
 
   const getDefaultOpenKeys = () => {
-    const path = location.pathname
+    const path = resolveRouteAccess(location.pathname)?.menuKey ?? location.pathname
     const openKeys: string[] = []
 
     menuItems.forEach(item => {
@@ -191,6 +228,35 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const toggleDocPanel = () => {
     setDocPanelOpen(previous => !previous)
   }
+
+  const contentNode = routeAccess.allowed ? (
+    <div className={`app-shell ${docPanelOpen && !hideDocPanel ? 'app-shell--doc-open' : ''}`}>
+      <div className="app-shell__main">{children}</div>
+
+      {!hideDocPanel && (
+        <div className={`app-shell__doc-rail ${docPanelOpen ? 'app-shell__doc-rail--open' : ''}`}>
+          <DesignDocPanel doc={currentDoc} open={docPanelOpen} onClose={() => setDocPanelOpen(false)} />
+        </div>
+      )}
+    </div>
+  ) : (
+    <div style={{ padding: '48px 32px' }}>
+      <Result
+        status="403"
+        title={routeAccess.reason === 'no-project' ? '当前项目不可访问' : '无菜单权限'}
+        subTitle={
+          routeAccess.reason === 'no-project'
+            ? '当前账号没有项目数据权限，请在项目管理中分配项目权限后再访问。'
+            : getOperationDeniedMessage(routeAccess.reason)
+        }
+        extra={
+          <Button type="primary" onClick={() => navigate('/home')}>
+            返回首页
+          </Button>
+        }
+      />
+    </div>
+  )
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -322,11 +388,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           <Dropdown
             menu={{
               items: [
+                { key: 'switch-title', label: '切换身份', disabled: true },
+                ...permissionState.users.map(user => ({
+                  key: `switch:${user.account}`,
+                  label: `${user.account} · ${getUserRoleLabels(user.account, permissionState).join(' / ')}`,
+                })),
+                { type: 'divider' as const },
                 { key: 'profile', label: '个人中心' },
                 { key: 'settings', label: '设置' },
-                { type: 'divider' },
-                { key: 'logout', label: '退出登录', danger: true },
               ],
+              onClick: ({ key }) => {
+                if (key.startsWith('switch:')) {
+                  setCurrentUser(key.replace('switch:', ''))
+                }
+              },
             }}
             trigger={['click']}
           >
@@ -351,10 +426,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   fontSize: 13,
                 }}
               >
-                L
+                {currentUser.account.slice(0, 1).toUpperCase()}
               </Avatar>
               <div style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: 13, fontWeight: 500 }}>
-                lab1
+                {currentUser.account}
               </div>
             </div>
           </Dropdown>
@@ -413,12 +488,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   V1
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', lineHeight: 1.2 }}>
-                    V1.12测试项目
+                  <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.2, marginBottom: 6 }}>
+                    当前项目
                   </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.2, marginTop: 2 }}>
-                    已选择
-                  </div>
+                  <Select
+                    value={currentProject?.id}
+                    onChange={value => setCurrentProject(value)}
+                    placeholder={accessibleProjects.length ? '请选择项目' : '暂无项目权限'}
+                    options={accessibleProjects.map(project => ({
+                      value: project.id,
+                      label: project.name,
+                    }))}
+                    style={{ width: '100%' }}
+                    size="small"
+                    variant="borderless"
+                    styles={{
+                      popup: { root: { minWidth: 240 } },
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -450,15 +537,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             transition: 'margin-left 0.2s ease',
           }}
         >
-          <div className={`app-shell ${docPanelOpen && !hideDocPanel ? 'app-shell--doc-open' : ''}`}>
-            <div className="app-shell__main">{children}</div>
-
-            {!hideDocPanel && (
-              <div className={`app-shell__doc-rail ${docPanelOpen ? 'app-shell__doc-rail--open' : ''}`}>
-                <DesignDocPanel doc={currentDoc} open={docPanelOpen} onClose={() => setDocPanelOpen(false)} />
-              </div>
-            )}
-          </div>
+          {contentNode}
 
           {!hideDocPanel && (
             <DesignDocFab

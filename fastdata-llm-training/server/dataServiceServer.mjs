@@ -49,6 +49,24 @@ function nextVersionLabel(current) {
   return `V${num + 1}`
 }
 
+function normalizeDatasetUsage(value) {
+  switch (value) {
+    case '图像理解':
+      return 'SFT-图像理解'
+    case 'DPO-文本生成':
+    case 'DPO-图像理解':
+    case 'RFT-PPO-文本生成':
+    case 'RFT-PPO-图像理解':
+    case 'RFT-GRPO-文本生成':
+    case 'RFT-GRPO-图像理解':
+    case 'SFT-图像理解':
+    case 'SFT-文本生成':
+      return value
+    default:
+      return 'SFT-文本生成'
+  }
+}
+
 async function readBody(req) {
   const chunks = []
   for await (const chunk of req) {
@@ -159,7 +177,7 @@ const server = createServer(async (req, res) => {
       name: body.name,
       versionStatus: '处理完成',
       latestVersion: 'V1',
-      dataUsage: body.dataUsage === '图像理解' ? 'SFT-图像理解' : 'SFT-文本生成',
+      dataUsage: normalizeDatasetUsage(body.dataUsage),
       dataFormat: body.dataFormat === 'ROLE_BASED' ? 'role-based' : 'prompt-response',
       creator: 'deepexilab',
       createdAt,

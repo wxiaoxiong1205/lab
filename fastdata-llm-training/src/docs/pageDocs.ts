@@ -115,6 +115,7 @@ const pageDocs: PageDocEntry[] = [
       fields: [
         { name: '数据集名称', location: '列表与表单', type: '文本', required: '是', description: '唯一标识训练数据集。' },
         { name: '最新版本', location: '列表列', type: '版本号', required: '否', description: '显示当前数据集的最新版本。' },
+        { name: '数据用途', location: '列表列/表单', type: '单字段二级枚举', required: '是', description: '在同一个字段内先选文本生成/图像理解，再选 SFT、DPO、RFT-PPO、RFT-GRPO。' },
         { name: '数据格式', location: '列表列/表单', type: '枚举', required: '否', description: '例如 jsonl、csv、xlsx。' },
       ],
       actions: [
@@ -127,9 +128,9 @@ const pageDocs: PageDocEntry[] = [
         { name: '草稿', meaning: '数据集已创建但未发布', presentation: '版本状态为草稿', availableActions: '编辑、补充版本信息' },
         { name: '已发布', meaning: '数据集可用于训练', presentation: '列表状态强调可用', availableActions: '查看、选择用于训练' },
       ],
-      interactionNotes: ['列表筛选优先服务数据查找效率。', '详情页采用左侧版本切换、右侧信息与明细展示的结构。'],
+      interactionNotes: ['列表筛选优先服务数据查找效率。', '详情页采用左侧版本切换、右侧信息与明细展示的结构。', '本页已基于用户新增需求补充 DPO / RFT（PPO、GRPO）对应数据用途，并改为单字段内的二级选择。'],
       productionComparison: ['默认以生产环境训练数据管理为基线进行对齐。'],
-      userChanges: ['如果后续增加字段或操作，需要同步更新页面文档侧板与 PRD/RPD 理解。'],
+      userChanges: ['如果后续增加字段或操作，需要同步更新页面文档侧板与 PRD/RPD 理解。', '根据用户新增需求，训练数据用途扩展为 SFT、DPO、RFT-PPO、RFT-GRPO 的文本生成/图像理解组合。'],
     }),
   },
   {
@@ -148,6 +149,7 @@ const pageDocs: PageDocEntry[] = [
       structure: ['搜索过滤区', '测试数据列表', '独立创建页', '版本侧栏 + 基本信息卡 + 数据详情表'],
       fields: [
         { name: '测试数据集名称', location: '列表与表单', type: '文本', required: '是', description: '测试数据的主标识。' },
+        { name: '数据用途', location: '列表列/表单', type: '单字段二级枚举', required: '是', description: '在同一个字段内先选文本生成/图像理解，再选 SFT、DPO、RFT-PPO、RFT-GRPO。' },
         { name: '版本信息', location: '展开行/详情', type: '版本列表', required: '否', description: '记录各测试版本与说明。' },
       ],
       actions: [
@@ -159,9 +161,9 @@ const pageDocs: PageDocEntry[] = [
         { name: '有版本', meaning: '测试数据集存在历史版本', presentation: '支持展开查看版本', availableActions: '查看、补充版本' },
         { name: '无版本', meaning: '仅有初始版本', presentation: '列表只显示当前版本', availableActions: '新增版本' },
       ],
-      interactionNotes: ['版本信息需要与列表信息联动展示。', '详情页采用左侧版本切换、右侧信息与明细展示的结构。'],
+      interactionNotes: ['版本信息需要与列表信息联动展示。', '详情页采用左侧版本切换、右侧信息与明细展示的结构。', '本页已基于用户新增需求补充 DPO / RFT（PPO、GRPO）对应数据用途，并改为单字段内的二级选择。'],
       productionComparison: ['保持与生产环境测试数据管理一致，不扩展业务测试数据集能力。'],
-      userChanges: [],
+      userChanges: ['根据用户新增需求，测试数据用途扩展为 SFT、DPO、RFT-PPO、RFT-GRPO 的文本生成/图像理解组合。'],
     }),
   },
   {
@@ -447,6 +449,67 @@ const pageDocs: PageDocEntry[] = [
     }),
   },
   {
+    match: pathname => pathname === '/admin/projects',
+    doc: createDoc({
+      pageName: '项目管理',
+      pagePath: '/admin/projects',
+      module: '系统管理',
+      status: '已基于需求演进',
+      goal: '管理项目基本信息，并在项目维度配置数据权限。',
+      audience: '平台管理员、项目管理员',
+      problem: '让项目列表、成员角色、成员可选角色和项目数据权限形成统一入口。',
+      structure: ['项目列表', '新建项目弹窗', '项目权限弹窗', '成员添加区'],
+      fields: [
+        { name: '项目名称', location: '列表/表单', type: '文本', required: '是', description: '项目唯一显示名称。' },
+        { name: '绑定集群', location: '列表/表单', type: '下拉选择', required: '是', description: '项目关联的目标集群。' },
+        { name: '成员角色', location: '项目权限弹窗', type: '下拉选择', required: '是', description: '从该成员可拥有的角色中选择项目内生效角色。' },
+        { name: '数据权限', location: '项目权限弹窗', type: '开关', required: '是', description: '控制成员是否可查看该项目及其业务页面。' },
+      ],
+      actions: [
+        { name: '新建项目', entry: '右上角按钮', precondition: '具备菜单权限与操作权限', successFeedback: '项目写入列表，平台管理员默认拥有该项目数据权限', errorFeedback: '无操作权限时提示“无操作权限”' },
+        { name: '成员管理', entry: '列表行操作', precondition: '具备项目管理操作权限', successFeedback: '打开成员与权限配置弹窗', errorFeedback: '无操作权限时提示“无操作权限”' },
+        { name: '添加成员并选择角色', entry: '项目权限弹窗顶部表单', precondition: '成员存在且已选择一个可拥有角色', successFeedback: '成员加入项目并写入对应项目角色', errorFeedback: '缺少成员或角色时表单提示' },
+        { name: '项目权限配置', entry: '列表行操作', precondition: '具备项目权限配置操作权限', successFeedback: '成员数据权限保存成功', errorFeedback: '无操作权限时提示“无操作权限”' },
+      ],
+      states: [
+        { name: '有权限项目', meaning: '当前账号拥有该项目数据权限', presentation: '项目显示在列表与左侧项目选择区', availableActions: '查看、编辑、成员管理、项目权限配置' },
+        { name: '无权限项目', meaning: '当前账号无该项目数据权限', presentation: '项目不显示在当前账号项目上下文中', availableActions: '不可查看该项目业务页面' },
+      ],
+      interactionNotes: ['平台管理员默认拥有所有项目数据权限。', '项目管理员与训练工程师默认无新建项目数据权限，需要在项目管理中手动开通。', '一个用户可以拥有多个角色，加入项目时需要明确选择该项目内生效角色。'],
+      productionComparison: ['该页在生产环境基线之上新增了项目数据权限配置能力，用于承接本轮权限方案。'],
+      userChanges: ['根据用户新增需求，项目数据权限改为在项目管理中维护。', '根据用户新增需求，添加项目成员时必须从该成员可拥有的多个角色中选择一个项目内角色。'],
+    }),
+  },
+  {
+    match: pathname => pathname === '/admin/permissions',
+    doc: createDoc({
+      pageName: '权限配置',
+      pagePath: '/admin/permissions',
+      module: '系统管理',
+      status: '已基于需求演进',
+      goal: '集中查看角色的操作权限，并与菜单权限、项目权限组成完整权限体系。',
+      audience: '平台管理员',
+      problem: '让业务操作权限有独立可视化入口，并和项目数据权限拆开管理。',
+      structure: ['页面标题', '角色搜索区', '角色列表', '操作权限 Tab', '权限树'],
+      fields: [
+        { name: '角色名称', location: '左侧角色列表', type: '文本', required: '是', description: '展示角色名并支持检索。' },
+        { name: '操作权限搜索', location: '右侧顶部', type: '搜索框', required: '否', description: '按关键字过滤权限树。' },
+        { name: '操作权限树', location: '右侧主体', type: '树形多选', required: '是', description: '按菜单层级展示业务操作权限。' },
+      ],
+      actions: [
+        { name: '切换角色查看权限', entry: '左侧角色列表', precondition: '角色存在', successFeedback: '右侧权限树切换到对应角色权限', errorFeedback: '无匹配角色时保持原选择' },
+        { name: '搜索操作权限', entry: '右侧搜索框', precondition: '输入关键字', successFeedback: '树中过滤显示匹配权限节点', errorFeedback: '无匹配时展示空态' },
+      ],
+      states: [
+        { name: '初始化角色只读', meaning: '平台管理员、项目管理员、训练工程师角色名称和操作权限不可修改', presentation: '显示只读锁定标签，权限树不可编辑', availableActions: '查看权限' },
+        { name: '正常查看', meaning: '按角色查看现有操作权限', presentation: '树形权限节点按层级展开', availableActions: '检索、查看' },
+      ],
+      interactionNotes: ['当前只实现“操作权限”Tab。', '业务操作生效必须同时满足菜单权限、操作权限和项目权限。'],
+      productionComparison: ['该页为用户本轮新增能力，不以生产环境已有页面为唯一限制。'],
+      userChanges: ['新增系统管理下“权限配置”菜单，并按截图实现角色列表+操作权限树布局。'],
+    }),
+  },
+  {
     match: pathname => pathname === '/admin/base-model',
     doc: createDoc({
       pageName: '基础模型管理',
@@ -548,6 +611,7 @@ function customizeDocForPath(pathname: string, doc: PageDesignDoc): PageDesignDo
     '/admin/registry': { pageName: '镜像管理' },
     '/admin/base-model': { pageName: '基础模型管理' },
     '/admin/settings': { pageName: '系统配置' },
+    '/admin/permissions': { pageName: '权限配置' },
     '/admin/platform-management': { pageName: '平台管理员' },
   }
 

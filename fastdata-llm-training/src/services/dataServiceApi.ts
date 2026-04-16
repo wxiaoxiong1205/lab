@@ -10,6 +10,7 @@ import {
   type CleaningTaskRecord,
   useDataServiceStore,
 } from './dataServiceStore'
+import { type TrainingDatasetUsage } from './datasetUsage'
 
 export type DatasetKind = 'training' | 'validation' | 'test'
 export type AnnotationDatasetType = 'text-generation' | 'image-understanding'
@@ -22,7 +23,7 @@ export interface DatasetOption {
 
 export interface CreateDatasetParams {
   name: string
-  dataUsage: '文本生成' | '图像理解'
+  dataUsage: TrainingDatasetUsage | '文本生成' | '图像理解'
   dataFormat: 'PROMPT_RESPONSE' | 'ROLE_BASED'
 }
 

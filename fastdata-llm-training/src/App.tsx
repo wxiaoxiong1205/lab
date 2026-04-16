@@ -32,6 +32,7 @@ import ImageRegistry from './pages/Admin/ImageRegistry'
 import BaseModelManagement from './pages/Admin/BaseModelManagement'
 import SystemSettings from './pages/Admin/SystemSettings'
 import PlatformAdmin from './pages/Admin/PlatformAdmin'
+import PermissionConfig from './pages/Admin/PermissionConfig'
 import DocumentCenterLayout from './pages/Docs/DocumentCenterLayout'
 import UsageGuide from './pages/Docs/UsageGuide'
 import { useDataServiceBackendBootstrap } from './services/dataServiceApi'
@@ -100,6 +101,7 @@ const App: React.FC = () => {
               <Route path="/admin/registry" element={<ImageRegistry />} />
               <Route path="/admin/base-model" element={<BaseModelManagement />} />
               <Route path="/admin/settings" element={<SystemSettings />} />
+              <Route path="/admin/permissions" element={<PermissionConfig />} />
               <Route path="/admin/platform-management" element={<PlatformAdmin />} />
 
               <Route path="/docs" element={<DocumentCenterLayout />}>

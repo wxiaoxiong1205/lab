@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { message, Modal, Form, Input, Select, Upload, Button, Typography, Space, Divider, List, Descriptions, Tag, Progress, Table, Card, Dropdown, Switch, Radio } from 'antd'
+import { message, Modal, Form, Input, Select, Upload, Button, Typography, Space, Divider, List, Descriptions, Tag, Progress, Table, Card, Dropdown, Switch, Radio, Cascader } from 'antd'
 import { DatabaseOutlined, UploadOutlined, CheckCircleOutlined, PlusOutlined, DownloadOutlined, DeleteOutlined, FileTextOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import type { ColumnsType } from 'antd/es/table'
@@ -7,6 +7,12 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { nextVersionLabel, parseVersionNum } from './TrainingDataset'
 import type { PaginatedResult } from '../../services/dataServiceApi'
 import { dataServiceApi, selectDatasets, useDataServiceSnapshot } from '../../services/dataServiceApi'
+import {
+  DATASET_USAGE_CASCADER_OPTIONS,
+  DATASET_USAGE_TAGS,
+  getDatasetUsagePath,
+  resolveDatasetUsageFromPath,
+} from '../../services/datasetUsage'
 
 const { Text } = Typography
 
@@ -20,11 +26,6 @@ const versionStatusMap: Record<string, { color: string; label: string }> = {
   已发布: { color: 'green', label: '已发布' },
   草稿: { color: 'default', label: '草稿' },
   已归档: { color: 'orange', label: '已归档' },
-}
-
-const dataUsageTags: Record<string, { color: string; text: string }> = {
-  'SFT-文本生成': { color: 'blue', text: 'SFT-文本生成' },
-  'SFT-图像理解': { color: 'cyan', text: 'SFT-图像理解' },
 }
 
 type TestVersionRow = {
@@ -226,9 +227,10 @@ const TestDataset: React.FC = () => {
       await form.validateFields()
       const values = form.getFieldsValue()
       setCreating(true)
+      const datasetUsage = resolveDatasetUsageFromPath(values.dataUsage) ?? 'SFT-文本生成'
       await dataServiceApi.createDataset('test', {
         name: values.name,
-        dataUsage: values.dataUsage,
+        dataUsage: datasetUsage,
         dataFormat: values.dataFormat,
       })
       message.success('创建成功')
@@ -347,7 +349,7 @@ const TestDataset: React.FC = () => {
       key: 'dataUsage',
       width: 130,
       render: (val: string) => {
-        const t = dataUsageTags[val] || { color: 'default', text: val }
+        const t = DATASET_USAGE_TAGS[val as keyof typeof DATASET_USAGE_TAGS] || { color: 'default', text: val }
         return <Tag color={t.color}>{t.text}</Tag>
       },
     },
@@ -447,7 +449,11 @@ const TestDataset: React.FC = () => {
   }, [dataList, dataUsage, page, pageSize, searchValue])
 
   const createFormContent = (
-    <Form form={form} layout="vertical" initialValues={{ dataSource: 'local', dataUsage: '文本生成' }}>
+    <Form
+      form={form}
+      layout="vertical"
+      initialValues={{ dataSource: 'local', dataUsage: getDatasetUsagePath('SFT-文本生成') }}
+    >
       <Divider plain style={{ margin: '0 0 16px', color: '#64748b', fontSize: 12 }}>基本信息</Divider>
 
       <Form.Item label="数据集名称" name="name" rules={[{ required: true, message: '请输入数据集名称' }]}
@@ -467,20 +473,11 @@ const TestDataset: React.FC = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
         <Form.Item label="数据用途" name="dataUsage" rules={[{ required: true, message: '请选择数据用途' }]}>
-          <Select placeholder="请选择数据用途">
-            <Select.Option value="文本生成">
-              <Space>
-                <Text style={{ fontSize: 11, color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: 3, fontWeight: 500 }}>SFT</Text>
-                文本生成
-              </Space>
-            </Select.Option>
-            <Select.Option value="图像理解">
-              <Space>
-                <Text style={{ fontSize: 11, color: '#0891b2', background: 'rgba(8,145,178,0.08)', padding: '2px 6px', borderRadius: 3, fontWeight: 500 }}>VLM</Text>
-                图像理解
-              </Space>
-            </Select.Option>
-          </Select>
+          <Cascader
+            placeholder="请先选文本生成或图像理解，再选训练方式"
+            options={DATASET_USAGE_CASCADER_OPTIONS}
+            displayRender={labels => labels.join(' / ')}
+          />
         </Form.Item>
 
         <Form.Item label="数据属性" name="dataAttribute">
@@ -812,16 +809,14 @@ const TestDataset: React.FC = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Select
+            <Cascader
               placeholder="数据用途"
               allowClear
-              style={{ width: 150 }}
-              value={dataUsage}
-              onChange={val => setDataUsage(val)}
-              options={[
-                { value: 'SFT-文本生成', label: 'SFT-文本生成' },
-                { value: 'SFT-图像理解', label: 'SFT-图像理解' },
-              ]}
+              style={{ width: 220 }}
+              value={getDatasetUsagePath(dataUsage)}
+              onChange={value => setDataUsage(resolveDatasetUsageFromPath(value as string[]))}
+              options={DATASET_USAGE_CASCADER_OPTIONS}
+              displayRender={labels => labels.join(' / ')}
             />
             <Input
               prefix={<span style={{ color: '#94a3b8' }}>🔍</span>}

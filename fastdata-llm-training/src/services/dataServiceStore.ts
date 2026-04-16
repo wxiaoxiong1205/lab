@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
+import { normalizeDatasetUsage, type TrainingDatasetUsage } from './datasetUsage'
 
-export type DataUsage = 'SFT-文本生成' | 'SFT-图像理解'
+export type DataUsage = TrainingDatasetUsage
 export type DataFormat = 'prompt-response' | 'role-based'
 export type TaskLifecycleStatus =
   | '已创建'
@@ -202,6 +203,10 @@ const seedState: DataServiceState = {
   trainingDatasets: [
     makeDataset({ id: 'train-1', name: 'roleBased', latestVersion: 'V5', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'deepexilab', createdAt: '2026/03/11 14:43:09', sampleCount: 2, charCount: 3200, trainRatio: 80 }),
     makeDataset({ id: 'train-2', name: '训练测试-1', latestVersion: 'V8', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/08 14:30:00', sampleCount: 40, charCount: 125000, trainRatio: 80 }),
+    makeDataset({ id: 'train-6', name: '偏好对训练集-DPO-demo', latestVersion: 'V2', dataUsage: 'DPO-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/04 14:00:00', sampleCount: 18, charCount: 42000, trainRatio: 80 }),
+    makeDataset({ id: 'train-7', name: '视觉偏好训练集-DPO-VLM', latestVersion: 'V1', dataUsage: 'DPO-图像理解', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/03/03 18:20:00', sampleCount: 12, charCount: 18000, trainRatio: 80 }),
+    makeDataset({ id: 'train-8', name: '奖励反馈训练集-RFT-PPO', latestVersion: 'V3', dataUsage: 'RFT-PPO-文本生成', dataFormat: 'prompt-response', creator: 'deepexilab', createdAt: '2026/03/02 09:30:00', sampleCount: 24, charCount: 58000, trainRatio: 80 }),
+    makeDataset({ id: 'train-9', name: '群组反馈训练集-RFT-GRPO', latestVersion: 'V1', dataUsage: 'RFT-GRPO-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/01 16:10:00', sampleCount: 16, charCount: 36000, trainRatio: 80 }),
     makeDataset({ id: 'train-3', name: '222222222222222', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/07 09:15:00', sampleCount: 20, charCount: 56000, trainRatio: 80 }),
     makeDataset({ id: 'train-4', name: 'role_base', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/06 09:15:00', sampleCount: 12, charCount: 32000, trainRatio: 80, status: '处理失败' }),
     makeDataset({ id: 'train-5', name: '小量训练数据-xjh-test', latestVersion: 'V3', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/05 15:45:00', sampleCount: 28, charCount: 83000, trainRatio: 80 }),
@@ -209,10 +214,13 @@ const seedState: DataServiceState = {
   validationDatasets: [
     makeDataset({ id: 'val-1', name: '多轮---1', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/02/27 14:00:00', sampleCount: 20, charCount: 36000, trainRatio: 20 }),
     makeDataset({ id: 'val-2', name: '正常-2', latestVersion: 'V2', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/02/26 14:00:00', sampleCount: 16, charCount: 24000, trainRatio: 20 }),
+    makeDataset({ id: 'val-4', name: 'RFT-PPO-验证集-文本', latestVersion: 'V1', dataUsage: 'RFT-PPO-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/02/25 17:20:00', sampleCount: 20, charCount: 22000, trainRatio: 20 }),
     makeDataset({ id: 'val-3', name: '验证-xlsx-0001', latestVersion: 'V15', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/02/25 15:00:00', sampleCount: 40, charCount: 68000, trainRatio: 20 }),
   ],
   testDatasets: [
     makeDataset({ id: 'test-1', name: '多文件-10', latestVersion: 'V2', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/03/03 17:04:19', sampleCount: 40 }),
+    makeDataset({ id: 'test-5', name: '偏好对测试集-DPO-A', latestVersion: 'V1', dataUsage: 'DPO-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/03 08:10:00', sampleCount: 22 }),
+    makeDataset({ id: 'test-6', name: '强化评测集-RFT-GRPO', latestVersion: 'V2', dataUsage: 'RFT-GRPO-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/03/02 18:30:00', sampleCount: 18 }),
     makeDataset({ id: 'test-2', name: '乱码测试4', latestVersion: 'V7', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/02 14:30:00', sampleCount: 50 }),
     makeDataset({ id: 'test-3', name: '333333333', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'lab1', createdAt: '2026/03/01 11:00:00', sampleCount: 10, status: '处理失败' }),
     makeDataset({ id: 'test-4', name: '属性回归测试-22-333-444', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/04/09 10:00:00', sampleCount: 5 }),
@@ -314,7 +322,7 @@ function createDatasetVersion(
 export const dataServiceActions = {
   createDataset(
     kind: 'training' | 'validation' | 'test',
-    params: { name: string; dataUsage: '文本生成' | '图像理解'; dataFormat: 'PROMPT_RESPONSE' | 'ROLE_BASED' },
+    params: { name: string; dataUsage: TrainingDatasetUsage | '文本生成' | '图像理解'; dataFormat: 'PROMPT_RESPONSE' | 'ROLE_BASED' },
   ) {
     update(draft => {
       const createdAt = nowText()
@@ -323,7 +331,7 @@ export const dataServiceActions = {
         name: params.name,
         versionStatus: '处理完成',
         latestVersion: 'V1',
-        dataUsage: params.dataUsage === '图像理解' ? 'SFT-图像理解' : 'SFT-文本生成',
+        dataUsage: normalizeDatasetUsage(params.dataUsage),
         dataFormat: params.dataFormat === 'ROLE_BASED' ? 'role-based' : 'prompt-response',
         creator: 'deepexilab',
         createdAt,
