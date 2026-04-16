@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { App as AntApp, ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import AppLayout from './components/Layout/AppLayout'
+import ProjectSpace from './pages/ProjectSpace'
 import Home from './pages/Home'
 import TrainingList from './pages/Training/TrainingList'
 import CreateTraining from './pages/Training/CreateTraining'
@@ -46,7 +47,8 @@ const App: React.FC = () => {
         <BrowserRouter>
           <AppLayout>
             <Routes>
-              <Route path="/" element={<Navigate to="/home" replace />} />
+              <Route path="/" element={<Navigate to="/workspace" replace />} />
+              <Route path="/workspace" element={<ProjectSpace />} />
               <Route path="/home" element={<Home />} />
 
               {/* 数据服务 */}
@@ -107,7 +109,7 @@ const App: React.FC = () => {
                 <Route path="usage-guide" element={<UsageGuide />} />
               </Route>
 
-              <Route path="*" element={<Navigate to="/home" replace />} />
+              <Route path="*" element={<Navigate to="/workspace" replace />} />
             </Routes>
           </AppLayout>
         </BrowserRouter>

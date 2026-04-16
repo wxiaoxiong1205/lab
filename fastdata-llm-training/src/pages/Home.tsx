@@ -8,8 +8,10 @@ import {
   ThunderboltOutlined,
   BarChartOutlined,
   ArrowRightOutlined,
+  FolderOpenOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { getCurrentProject, usePermissionStore } from '../services/permissionStore'
 
 const { Title, Text } = Typography
 
@@ -94,6 +96,8 @@ const typePaths: Record<TaskType, string> = {
 
 const Home: React.FC = () => {
   const navigate = useNavigate()
+  const permissionState = usePermissionStore()
+  const currentProject = getCurrentProject(permissionState)
   const [detailModalVisible, setDetailModalVisible] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
@@ -122,33 +126,77 @@ const Home: React.FC = () => {
   return (
     <>
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        {/* 欢迎区域 */}
         <div style={{ marginBottom: 32 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+                  borderRadius: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 10px 24px rgba(37, 99, 235, 0.28)',
+                }}
+              >
+                <FolderOpenOutlined style={{ color: '#fff', fontSize: 24 }} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                  <Title level={2} style={{ margin: 0, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.8px' }}>
+                    {currentProject?.name ?? '项目概览'}
+                  </Title>
+                  <Tag color="blue" style={{ margin: 0 }}>
+                    已进入项目
+                  </Tag>
+                </div>
+                <Text style={{ color: '#64748b', fontSize: 14, display: 'block', marginBottom: 6 }}>
+                  {currentProject?.description || '当前项目暂无描述，以下为该项目空间中的快捷入口与最新任务。'}
+                </Text>
+                <Text style={{ color: '#94a3b8', fontSize: 12 }}>
+                  创建时间：{currentProject?.createdAt ?? '-'}
+                </Text>
+              </div>
+            </div>
+
+            <Button onClick={() => navigate('/workspace')}>返回项目空间</Button>
+          </div>
+        </div>
+
+        <Card
+          style={{
+            marginBottom: 24,
+            borderRadius: 16,
+            border: '1px solid #dbeafe',
+            background: 'linear-gradient(90deg, rgba(37,99,235,0.07) 0%, rgba(14,165,233,0.05) 100%)',
+          }}
+          styles={{ body: { padding: '18px 22px' } }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+            <div>
+              <Text style={{ color: '#0f172a', fontSize: 15, fontWeight: 700 }}>项目空间已建立当前项目上下文</Text>
+              <Text style={{ color: '#64748b', fontSize: 13, display: 'block', marginTop: 6 }}>
+                后续进入数据服务、模型训练、模型评估、模型服务等页面时，都会基于当前项目权限进行访问控制。
+              </Text>
+            </div>
             <div
               style={{
-                width: 48,
-                height: 48,
-                background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
-                borderRadius: 14,
+                width: 44,
+                height: 44,
+                background: 'rgba(255,255,255,0.8)',
+                borderRadius: 12,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 8px 20px rgba(37, 99, 235, 0.35)',
+                flexShrink: 0,
               }}
             >
-              <RocketOutlined style={{ color: '#fff', fontSize: 24 }} />
-            </div>
-            <div>
-              <Title level={2} style={{ margin: 0, fontWeight: 800, color: '#0f172a', letterSpacing: '-1px' }}>
-                欢迎使用 DeepexiLab
-              </Title>
-              <Text style={{ color: '#64748b', fontSize: 14 }}>
-                企业级 AI 开发与训练平台
-              </Text>
+              <RocketOutlined style={{ color: '#2563eb', fontSize: 20 }} />
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* 统计卡片 */}
         <Row gutter={[20, 20]} style={{ marginBottom: 28 }}>

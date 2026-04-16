@@ -3,12 +3,15 @@ import { Button, Input, Menu } from 'antd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeftOutlined, BookOutlined, SearchOutlined, FileTextOutlined } from '@ant-design/icons'
 import type { MenuProps } from 'antd'
+import { getCurrentProject, usePermissionStore } from '../../services/permissionStore'
 
 const SIDER_WIDTH = 280
 
 const DocumentCenterLayout: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const permissionState = usePermissionStore()
+  const currentProject = getCurrentProject(permissionState)
   const [search, setSearch] = useState('')
 
   const selectedKeys = useMemo(() => {
@@ -30,7 +33,7 @@ const DocumentCenterLayout: React.FC = () => {
   }
 
   const handleBackToApp = () => {
-    navigate('/home')
+    navigate(currentProject ? '/home' : '/workspace')
   }
 
   return (
@@ -59,7 +62,7 @@ const DocumentCenterLayout: React.FC = () => {
               fontWeight: 500,
             }}
           >
-            返回工作台
+            返回{currentProject ? '项目概览' : '项目空间'}
           </Button>
         </div>
         <div style={{ padding: '16px 16px 12px' }}>

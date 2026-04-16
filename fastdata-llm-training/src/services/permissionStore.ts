@@ -54,6 +54,7 @@ export type OperationDenyReason = 'no-menu' | 'no-operation' | 'no-project'
 const STORAGE_KEY = 'lab-coding:permission-store:v1'
 
 const projectAdminMenuPermissions = [
+  '/workspace',
   '/home',
   '/datasets',
   '/measurement',
@@ -77,6 +78,7 @@ const projectAdminMenuPermissions = [
 ] as const
 
 const trainingEngineerMenuPermissions = [
+  '/workspace',
   '/home',
   '/datasets',
   '/measurement',
@@ -156,7 +158,7 @@ const seedProjects: PermissionProject[] = [
 
 const seedState: PermissionState = {
   currentUserAccount: 'zhangsan',
-  currentProjectId: 'project-1',
+  currentProjectId: null,
   users: seedUsers,
   roles: seedRoles,
   projects: seedProjects,
@@ -264,6 +266,9 @@ export function getAccessibleProjects(sourceState = state): PermissionProject[] 
 }
 
 export function getCurrentProject(sourceState = state): PermissionProject | null {
+  if (!sourceState.currentProjectId) {
+    return null
+  }
   const accessibleProjects = getAccessibleProjects(sourceState)
   return accessibleProjects.find(item => item.id === sourceState.currentProjectId) ?? accessibleProjects[0] ?? null
 }
@@ -336,12 +341,7 @@ export function getOperationDeniedMessage(reason?: OperationDenyReason): string 
 export function setCurrentUser(account: string) {
   const nextState = cloneState(state)
   nextState.currentUserAccount = account
-  const currentUser = getCurrentUser(nextState)
-  const accessibleProjects = getAccessibleProjects(nextState)
-  nextState.currentProjectId =
-    currentUser.roleKeys.includes('platform_admin')
-      ? nextState.currentProjectId ?? nextState.projects[0]?.id ?? null
-      : accessibleProjects[0]?.id ?? null
+  nextState.currentProjectId = null
   persistState(nextState)
 }
 
@@ -374,7 +374,6 @@ export function createProject(input: { name: string; description: string; cluste
   }
 
   nextState.projects.unshift(project)
-  nextState.currentProjectId = project.id
   persistState(nextState)
 }
 

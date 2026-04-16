@@ -15,7 +15,7 @@ const UsageGuide: React.FC = () => {
 
       <Title level={4}>平台概览</Title>
       <Paragraph>
-        平台提供<strong>数据服务</strong>、<strong>数据处理</strong>、<strong>模型训练</strong>、<strong>模型评估</strong>、<strong>模型服务</strong>与<strong>机器学习</strong>等模块。您可在左侧主导航中切换功能；项目与资源以「项目空间」为边界进行管理。
+        平台当前采用<strong>项目空间</strong>与<strong>系统管理</strong>双入口结构。登录后默认进入项目空间，用户可先查看自己有权限访问的项目卡片，点击项目后再进入数据服务、模型训练、模型评估、模型服务与机器学习等业务模块；平台级治理能力统一从系统管理入口进入。
       </Paragraph>
 
       <Title level={4} style={{ marginTop: 28 }}>
@@ -37,7 +37,7 @@ const UsageGuide: React.FC = () => {
         权限与项目
       </Title>
       <Paragraph>
-        系统管理中的「项目管理」用于维护租户与项目成员。请确保当前顶部所选项目正确，以免在错误的项目下创建训练任务或访问存储资源。
+        系统管理中的「项目管理」用于维护项目成员和数据权限。登录后系统会自动匹配当前账号可访问的项目；请先从项目空间点击项目卡片进入，再在该项目上下文中执行训练、评估和部署等业务操作。
       </Paragraph>
 
       <Title level={4} style={{ marginTop: 28 }}>

@@ -71,15 +71,45 @@ function createDoc(doc: Omit<PageDesignDoc, 'updatedAt' | 'recentChanges'> & { r
 
 const pageDocs: PageDocEntry[] = [
   {
+    match: pathname => pathname === '/workspace',
+    doc: createDoc({
+      pageName: '项目空间',
+      pagePath: '/workspace',
+      module: '项目空间',
+      status: '已基于需求演进',
+      goal: '作为登录后的默认入口，展示当前用户有权限访问的项目列表。',
+      audience: '平台用户、算法工程师、项目管理员',
+      problem: '让用户先在项目空间中匹配并进入项目，再查看具体业务功能菜单。',
+      structure: ['顶部双 Tab 壳层', '项目空间标题区', '搜索与新增区', '项目卡片网格'],
+      fields: [
+        { name: '项目名称', location: '项目卡片', type: '文本', required: '是', description: '展示项目主标题。' },
+        { name: '项目描述', location: '项目卡片', type: '文本', required: '否', description: '展示项目简介。' },
+        { name: '创建人', location: '项目卡片底部', type: '文本', required: '否', description: '展示项目创建人。' },
+      ],
+      actions: [
+        { name: '搜索项目', entry: '顶部搜索框', precondition: '用户进入项目空间', successFeedback: '项目卡片按关键字过滤', errorFeedback: '无匹配结果显示空态' },
+        { name: '进入项目', entry: '项目卡片', precondition: '用户拥有该项目权限', successFeedback: '建立当前项目上下文并进入项目业务页', errorFeedback: '无项目权限则不展示该卡片' },
+        { name: '新增项目', entry: '右上角新增按钮', precondition: '具备系统管理中的新建项目权限', successFeedback: '项目加入项目空间列表', errorFeedback: '无操作权限时提示“无操作权限”' },
+      ],
+      states: [
+        { name: '默认', meaning: '正常展示当前用户可访问项目', presentation: '项目卡片网格可见', availableActions: '搜索、进入项目、新增项目' },
+        { name: '空态', meaning: '当前账号暂无可访问项目', presentation: '展示空态提示', availableActions: '等待分配项目或新建项目' },
+      ],
+      interactionNotes: ['登录后默认进入项目空间，而不是直接进入业务模块。', '点击项目卡片后才显示项目内具体功能菜单。', '顶部主导航只保留“项目空间”和“系统管理”两个 Tab。'],
+      productionComparison: ['该页为用户新增的信息架构调整，不是直接复刻当前生产环境首页。'],
+      userChanges: ['根据用户新增需求，项目选择改为登录后自动匹配项目卡片列表，点击项目后再进入具体功能菜单。'],
+    }),
+  },
+  {
     match: pathname => pathname === '/home',
     doc: createDoc({
-      pageName: '首页',
+      pageName: '项目概览',
       pagePath: '/home',
-      module: '首页',
-      status: '开发中',
-      goal: '集中呈现平台概览、快捷入口与关键任务动态，帮助用户快速进入主流程。',
+      module: '项目空间',
+      status: '已基于需求演进',
+      goal: '在进入具体项目后，集中呈现该项目下的平台概览、快捷入口与关键任务动态。',
       audience: '产品经理、算法工程师、平台使用者',
-      problem: '降低用户进入平台后的迷失感，缩短到主要模块的跳转路径。',
+      problem: '作为进入项目后的概览页，帮助用户在当前项目上下文中快速进入主流程。',
       structure: ['欢迎区', '统计卡片区', '快捷入口区', '任务动态区'],
       fields: [
         { name: '统计值', location: '顶部统计卡片', type: '只读数值', required: '否', description: '展示训练任务、评估任务、完成数与 GPU 使用率。' },
@@ -93,9 +123,9 @@ const pageDocs: PageDocEntry[] = [
         { name: '默认', meaning: '首页正常展示', presentation: '统计、快捷入口与任务动态同时可见', availableActions: '跳转、查看详情' },
         { name: '空态', meaning: '没有任务数据', presentation: '任务区显示空态说明', availableActions: '继续使用快捷入口' },
       ],
-      interactionNotes: ['页面默认展示业务概览，不承载复杂配置流程。', '统计卡片和快捷入口需要保持高可读性与快速可点击性。'],
-      productionComparison: ['当前首页是优化后的聚合仪表盘，较生产环境的欢迎页信息密度更高。'],
-      userChanges: ['后续若首页承载新的业务入口，需要同步更新快捷入口说明与跳转逻辑。'],
+      interactionNotes: ['该页不再作为登录后的默认首页，而是项目空间中点击项目后的项目概览页。', '统计卡片和快捷入口需要保持高可读性与快速可点击性。'],
+      productionComparison: ['当前概览页沿用原首页能力，但入口层已上移到项目空间。'],
+      userChanges: ['根据用户新增需求，默认首页切换为项目空间，本页下沉为项目内概览页。'],
     }),
   },
   {
@@ -597,6 +627,7 @@ const pageDocs: PageDocEntry[] = [
 
 function customizeDocForPath(pathname: string, doc: PageDesignDoc): PageDesignDoc {
   const routeTitleMap: Record<string, { pageName: string; module?: string }> = {
+    '/workspace': { pageName: '项目空间', module: '项目空间' },
     '/service/inference/hosted': { pageName: '大模型部署' },
     '/service/inference/external': { pageName: '在线推理服务' },
     '/machine-data-management': { pageName: '数据管理', module: '机器学习' },

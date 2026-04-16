@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { Layout, Menu, Dropdown, Button, Badge, Avatar, Tooltip, Result, Select } from 'antd'
+import React, { useEffect, useMemo, useState } from 'react'
+import { Layout, Menu, Dropdown, Button, Badge, Avatar, Tooltip, Result, Tag } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
@@ -16,20 +16,19 @@ import {
   MenuUnfoldOutlined,
   RocketOutlined,
   FileTextOutlined,
+  FolderOpenOutlined,
+  ApartmentOutlined,
 } from '@ant-design/icons'
 import DesignDocFab from '../DesignDoc/DesignDocFab'
 import DesignDocPanel from '../DesignDoc/DesignDocPanel'
 import { getPageDesignDoc } from '../../docs/pageDocs'
 import {
   canViewCurrentRoute,
-  getAccessibleProjects,
   getCurrentProject,
   getCurrentUser,
   getOperationDeniedMessage,
-  getRoleLabel,
   getUserRoleLabels,
   hasMenuPermission,
-  setCurrentProject,
   setCurrentUser,
   usePermissionStore,
 } from '../../services/permissionStore'
@@ -43,12 +42,97 @@ interface AppLayoutProps {
 
 type MenuItemList = NonNullable<MenuProps['items']>
 
+const projectMenuSource: MenuItemList = [
+  {
+    key: '/home',
+    icon: <HomeOutlined />,
+    label: '项目概览',
+  },
+  {
+    key: 'data-services',
+    icon: <DatabaseOutlined />,
+    label: '数据服务',
+    children: [
+      {
+        key: 'data-management',
+        label: '数据管理',
+        children: [
+          { key: '/datasets', label: '训练数据管理' },
+          { key: '/measurement', label: '测试数据管理' },
+          { key: '/inference', label: '推理结果集' },
+        ],
+      },
+      {
+        key: 'data-processing',
+        label: '数据处理',
+        children: [
+          { key: '/data-annotation', label: '数据标注' },
+          { key: '/data-cleaning', label: '数据清洗' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'model-training',
+    icon: <CloudServerOutlined />,
+    label: '模型训练',
+    children: [
+      { key: '/finetune/notebooks', label: '在线Notebook' },
+      { key: '/training', label: '大模型训练' },
+      { key: '/model', label: '我的模型' },
+    ],
+  },
+  {
+    key: 'evaluation',
+    icon: <BarChartOutlined />,
+    label: '模型评估',
+    children: [
+      { key: '/effect-evaluation', label: '效果评估' },
+      { key: '/evaluation-indicator', label: '评估指标' },
+    ],
+  },
+  {
+    key: 'model-service',
+    icon: <ExperimentOutlined />,
+    label: '模型服务',
+    children: [
+      { key: '/service/inference/hosted', label: '大模型部署' },
+      { key: '/service/inference/external', label: '在线推理服务' },
+    ],
+  },
+  {
+    key: 'machine-learning',
+    icon: <AppstoreOutlined />,
+    label: '机器学习',
+    children: [
+      { key: '/machine-data-management', label: '数据管理' },
+      { key: '/machine-annotation', label: '机器学习标注' },
+      { key: '/machine-model-management', label: '模型管理' },
+      { key: '/machine-model-deployment', label: '模型部署' },
+      { key: '/machine-notebook', label: '在线Notebook' },
+      { key: '/machine-annotation-service', label: '在线标注服务' },
+    ],
+  },
+]
+
+const systemMenuSource: MenuItemList = [
+  { key: '/admin/projects', icon: <FolderOpenOutlined />, label: '项目管理' },
+  { key: '/admin/kubernetes', icon: <ApartmentOutlined />, label: '集群管理' },
+  { key: '/admin/storage', icon: <DatabaseOutlined />, label: '存储管理' },
+  { key: '/admin/registry', icon: <AppstoreOutlined />, label: '镜像管理' },
+  { key: '/admin/base-model', icon: <CloudServerOutlined />, label: '模型仓库' },
+  { key: '/admin/settings', icon: <SettingOutlined />, label: '系统配置' },
+  { key: '/admin/permissions', icon: <FileTextOutlined />, label: '权限配置' },
+]
+
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const navigate = useNavigate()
   const location = useLocation()
   const permissionState = usePermissionStore()
   const [collapsed, setCollapsed] = useState(false)
-  const hideMainSider = location.pathname.startsWith('/docs')
+  const isDocsRoute = location.pathname.startsWith('/docs')
+  const isWorkspaceRoute = location.pathname === '/workspace'
+  const isAdminRoute = location.pathname.startsWith('/admin')
   const [docPanelOpen, setDocPanelOpen] = useState(() => {
     if (typeof window === 'undefined') {
       return false
@@ -56,99 +140,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
     return window.localStorage.getItem('design-doc-panel-open') === 'true'
   })
-  const hideDocPanel = location.pathname.startsWith('/docs')
   const currentDoc = getPageDesignDoc(location.pathname)
   const currentUser = getCurrentUser(permissionState)
   const currentProject = getCurrentProject(permissionState)
-  const accessibleProjects = getAccessibleProjects(permissionState)
   const routeAccess = canViewCurrentRoute(location.pathname, permissionState)
-
-  const rawMenuItems: MenuItemList = [
-    {
-      key: '/home',
-      icon: <HomeOutlined />,
-      label: '首页',
-    },
-    {
-      key: 'data-services',
-      icon: <DatabaseOutlined />,
-      label: '数据服务',
-      children: [
-        {
-          key: 'data-management',
-          label: '数据管理',
-          children: [
-            { key: '/datasets', label: '训练数据管理' },
-            { key: '/measurement', label: '测试数据管理' },
-            { key: '/inference', label: '推理结果集' },
-          ],
-        },
-        {
-          key: 'data-processing',
-          label: '数据处理',
-          children: [
-            { key: '/data-annotation', label: '数据标注' },
-            { key: '/data-cleaning', label: '数据清洗' },
-          ],
-        },
-      ],
-    },
-    {
-      key: 'model-training',
-      icon: <CloudServerOutlined />,
-      label: '模型训练',
-      children: [
-        { key: '/finetune/notebooks', label: '在线Notebook' },
-        { key: '/training', label: '大模型训练' },
-        { key: '/model', label: '我的模型' },
-      ],
-    },
-    {
-      key: 'evaluation',
-      icon: <BarChartOutlined />,
-      label: '模型评估',
-      children: [
-        { key: '/effect-evaluation', label: '效果评估' },
-        { key: '/evaluation-indicator', label: '评估指标' },
-      ],
-    },
-    {
-      key: 'model-service',
-      icon: <ExperimentOutlined />,
-      label: '模型服务',
-      children: [
-        { key: '/service/inference/hosted', label: '大模型部署' },
-        { key: '/service/inference/external', label: '在线推理服务' },
-      ],
-    },
-    {
-      key: 'machine-learning',
-      icon: <AppstoreOutlined />,
-      label: '机器学习',
-      children: [
-        { key: '/machine-data-management', label: '数据管理' },
-        { key: '/machine-annotation', label: '机器学习标注' },
-        { key: '/machine-model-management', label: '模型管理' },
-        { key: '/machine-model-deployment', label: '模型部署' },
-        { key: '/machine-notebook', label: '在线Notebook' },
-        { key: '/machine-annotation-service', label: '在线标注服务' },
-      ],
-    },
-    {
-      key: 'system-management',
-      icon: <SettingOutlined />,
-      label: '系统管理',
-      children: [
-        { key: '/admin/projects', label: '项目管理' },
-        { key: '/admin/kubernetes', label: '集群管理' },
-        { key: '/admin/storage', label: '存储配置' },
-        { key: '/admin/registry', label: '镜像管理' },
-        { key: '/admin/base-model', label: '模型仓库' },
-        { key: '/admin/settings', label: '系统配置' },
-        { key: '/admin/permissions', label: '权限配置' },
-      ],
-    },
-  ]
 
   const filterMenuItems = (items: MenuItemList): MenuItemList =>
     items
@@ -165,13 +160,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       })
       .filter(Boolean) as MenuItemList
 
-  const menuItems: MenuItemList = filterMenuItems(rawMenuItems)
+  const activeTopTab = isAdminRoute ? 'system' : 'workspace'
+  const activeMenuItems = useMemo(
+    () => filterMenuItems(isAdminRoute ? systemMenuSource : projectMenuSource),
+    [isAdminRoute, permissionState],
+  )
 
-  const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
-    if (key.startsWith('/')) {
-      navigate(key)
-    }
-  }
+  const showProjectMenus = !isDocsRoute && !isWorkspaceRoute && !isAdminRoute && Boolean(currentProject)
+  const showSystemMenus = !isDocsRoute && isAdminRoute
+  const showMainSider = showProjectMenus || showSystemMenus
 
   const getSelectedKeys = () => {
     const selectedKey = resolveRouteAccess(location.pathname)?.menuKey
@@ -182,7 +179,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     const path = resolveRouteAccess(location.pathname)?.menuKey ?? location.pathname
     const openKeys: string[] = []
 
-    menuItems.forEach(item => {
+    activeMenuItems.forEach(item => {
       if (!item) return
       if ('children' in item && item.children) {
         item.children.forEach(child => {
@@ -214,38 +211,38 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   }, [docPanelOpen])
 
   useEffect(() => {
-    if (hideDocPanel) {
+    if (isDocsRoute) {
       setDocPanelOpen(false)
     }
-  }, [hideDocPanel])
+  }, [isDocsRoute])
 
   const toggleDocPanel = () => {
     setDocPanelOpen(previous => !previous)
   }
 
   const contentNode = routeAccess.allowed ? (
-    <div className={`app-shell ${docPanelOpen && !hideDocPanel ? 'app-shell--doc-open' : ''}`}>
+    <div className={`app-shell ${docPanelOpen && !isDocsRoute ? 'app-shell--doc-open' : ''}`}>
       <div className="app-shell__main">{children}</div>
 
-      {!hideDocPanel && (
+      {!isDocsRoute && (
         <div className={`app-shell__doc-rail ${docPanelOpen ? 'app-shell__doc-rail--open' : ''}`}>
           <DesignDocPanel doc={currentDoc} open={docPanelOpen} onClose={() => setDocPanelOpen(false)} />
         </div>
       )}
     </div>
   ) : (
-    <div style={{ padding: '48px 32px' }}>
+    <div style={{ padding: '64px 36px' }}>
       <Result
         status="403"
-        title={routeAccess.reason === 'no-project' ? '当前项目不可访问' : '无菜单权限'}
+        title={routeAccess.reason === 'no-project' ? '请先进入项目空间' : '无菜单权限'}
         subTitle={
           routeAccess.reason === 'no-project'
-            ? '当前账号没有项目数据权限，请在项目管理中分配项目权限后再访问。'
+            ? '登录后已自动匹配可访问项目，请先在项目空间中点击项目卡片，再进入对应业务功能。'
             : getOperationDeniedMessage(routeAccess.reason)
         }
         extra={
-          <Button type="primary" onClick={() => navigate('/home')}>
-            返回首页
+          <Button type="primary" onClick={() => navigate('/workspace')}>
+            返回项目空间
           </Button>
         }
       />
@@ -261,58 +258,84 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           left: 0,
           right: 0,
           zIndex: 100,
-          height: 60,
-          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          height: 72,
+          background: 'linear-gradient(90deg, #ffffff 0%, #eef4ff 52%, #f1fbf7 100%)',
+          borderBottom: '1px solid rgba(148, 163, 184, 0.18)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 20px',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+          padding: '0 28px',
+          boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <Tooltip title={collapsed ? '展开菜单' : '收起菜单'}>
-            <Button
-              type="text"
-              icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-              onClick={() => setCollapsed(!collapsed)}
-              style={{
-                color: 'rgba(255, 255, 255, 0.7)',
-                fontSize: 18,
-                width: 40,
-                height: 40,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            />
-          </Tooltip>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          {showMainSider && (
+            <Tooltip title={collapsed ? '展开菜单' : '收起菜单'}>
+              <Button
+                type="text"
+                icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                onClick={() => setCollapsed(!collapsed)}
+                style={{
+                  color: '#475569',
+                  fontSize: 18,
+                  width: 40,
+                  height: 40,
+                }}
+              />
+            </Tooltip>
+          )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div
               style={{
-                width: 36,
-                height: 36,
-                background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
-                borderRadius: 10,
+                width: 42,
+                height: 42,
+                background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)',
+                borderRadius: 12,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)',
+                boxShadow: '0 6px 18px rgba(37, 99, 235, 0.28)',
               }}
             >
-              <RocketOutlined style={{ color: '#fff', fontSize: 18 }} />
+              <RocketOutlined style={{ color: '#fff', fontSize: 20 }} />
             </div>
             <div>
-              <div style={{ color: '#fff', fontSize: 17, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.3px' }}>
-                DeepexiLab
-              </div>
-              <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 11, lineHeight: 1.2 }}>
-                LLM Training Platform
-              </div>
+              <div style={{ color: '#0f172a', fontSize: 18, fontWeight: 800, lineHeight: 1.1 }}>FastAGI</div>
+              <div style={{ color: '#94a3b8', fontSize: 11, lineHeight: 1.2 }}>LLM Workspace</div>
             </div>
           </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Button
+            type={activeTopTab === 'workspace' ? 'primary' : 'text'}
+            icon={<FolderOpenOutlined />}
+            onClick={() => navigate('/workspace')}
+            style={{
+              height: 48,
+              paddingInline: 22,
+              borderRadius: 16,
+              fontWeight: 700,
+              boxShadow: activeTopTab === 'workspace' ? '0 10px 24px rgba(37, 99, 235, 0.18)' : 'none',
+            }}
+          >
+            项目空间
+          </Button>
+          <Button
+            type={activeTopTab === 'system' ? 'primary' : 'text'}
+            icon={<SettingOutlined />}
+            onClick={() => navigate('/admin/projects')}
+            style={{
+              height: 48,
+              paddingInline: 22,
+              borderRadius: 16,
+              fontWeight: 700,
+              boxShadow: activeTopTab === 'system' ? '0 10px 24px rgba(37, 99, 235, 0.18)' : 'none',
+            }}
+          >
+            系统管理
+          </Button>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -322,15 +345,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               icon={<FileTextOutlined />}
               onClick={() => navigate('/docs')}
               style={{
-                color: hideMainSider ? '#fff' : 'rgba(255, 255, 255, 0.7)',
+                color: isDocsRoute ? '#1d4ed8' : '#475569',
                 fontSize: 18,
                 width: 40,
                 height: 40,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
                 borderRadius: 10,
-                background: hideMainSider ? 'rgba(255, 255, 255, 0.12)' : undefined,
+                background: isDocsRoute ? 'rgba(37, 99, 235, 0.08)' : undefined,
               }}
             />
           </Tooltip>
@@ -341,13 +361,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 type="text"
                 icon={<BellOutlined />}
                 style={{
-                  color: 'rgba(255, 255, 255, 0.7)',
+                  color: '#475569',
                   fontSize: 18,
                   width: 40,
                   height: 40,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
                   borderRadius: 10,
                 }}
               />
@@ -367,7 +384,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               type="text"
               icon={<GlobalOutlined />}
               style={{
-                color: 'rgba(255, 255, 255, 0.7)',
+                color: '#475569',
                 fontSize: 14,
                 height: 36,
                 display: 'flex',
@@ -394,6 +411,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               onClick: ({ key }) => {
                 if (key.startsWith('switch:')) {
                   setCurrentUser(key.replace('switch:', ''))
+                  navigate('/workspace')
                 }
               },
             }}
@@ -406,134 +424,132 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 gap: 10,
                 padding: '6px 12px 6px 6px',
                 marginLeft: 8,
-                background: 'rgba(255, 255, 255, 0.05)',
-                borderRadius: 10,
+                background: 'rgba(255, 255, 255, 0.7)',
+                borderRadius: 14,
                 cursor: 'pointer',
-                transition: 'all 0.2s',
+                border: '1px solid rgba(148, 163, 184, 0.18)',
               }}
             >
               <Avatar
-                size={32}
+                size={34}
                 style={{
                   background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
-                  fontWeight: 600,
+                  fontWeight: 700,
                   fontSize: 13,
                 }}
               >
                 {currentUser.account.slice(0, 1).toUpperCase()}
               </Avatar>
-              <div style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: 13, fontWeight: 500 }}>
-                {currentUser.account}
+              <div>
+                <div style={{ color: '#0f172a', fontSize: 13, fontWeight: 600 }}>{currentUser.account}</div>
+                <div style={{ color: '#94a3b8', fontSize: 11 }}>{getUserRoleLabels(currentUser.account, permissionState).join(' / ')}</div>
               </div>
             </div>
           </Dropdown>
         </div>
       </Header>
 
-      <Layout style={{ marginTop: 60 }}>
-        {!hideMainSider && (
-        <Sider
-          width={collapsed ? 72 : 240}
-          style={{
-            background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-            boxShadow: '2px 0 12px rgba(0, 0, 0, 0.04)',
-            overflow: 'auto',
-            height: 'calc(100vh - 60px)',
-            position: 'fixed',
-            left: 0,
-            top: 60,
-            bottom: 0,
-            borderRight: '1px solid #e2e8f0',
-            transition: 'all 0.2s ease',
-          }}
-        >
-          {!collapsed && (
-            <div
-              style={{
-                padding: '16px 16px 12px',
-                borderBottom: '1px solid #f1f5f9',
-              }}
-            >
+      <Layout style={{ marginTop: 72 }}>
+        {showMainSider && (
+          <Sider
+            width={collapsed ? 72 : 248}
+            style={{
+              background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+              boxShadow: '2px 0 12px rgba(0, 0, 0, 0.04)',
+              overflow: 'auto',
+              height: 'calc(100vh - 72px)',
+              position: 'fixed',
+              left: 0,
+              top: 72,
+              bottom: 0,
+              borderRight: '1px solid #e2e8f0',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {!collapsed && (
               <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '10px 12px',
-                  background: '#f8fafc',
-                  borderRadius: 10,
-                  border: '1px solid #e2e8f0',
+                  padding: '16px 16px 12px',
+                  borderBottom: '1px solid #f1f5f9',
                 }}
               >
-                <div
-                  style={{
-                    width: 28,
-                    height: 28,
-                    background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-                    borderRadius: 6,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 12,
-                    color: '#fff',
-                    fontWeight: 600,
-                  }}
-                >
-                  V1
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.2, marginBottom: 6 }}>
-                    当前项目
-                  </div>
-                  <Select
-                    value={currentProject?.id}
-                    onChange={value => setCurrentProject(value)}
-                    placeholder={accessibleProjects.length ? '请选择项目' : '暂无项目权限'}
-                    options={accessibleProjects.map(project => ({
-                      value: project.id,
-                      label: project.name,
-                    }))}
-                    style={{ width: '100%' }}
-                    size="small"
-                    variant="borderless"
-                    styles={{
-                      popup: { root: { minWidth: 240 } },
+                {isAdminRoute ? (
+                  <div
+                    style={{
+                      padding: '14px 16px',
+                      background: '#f8fafc',
+                      borderRadius: 14,
+                      border: '1px solid #e2e8f0',
                     }}
-                  />
-                </div>
+                  >
+                    <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>当前域</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>系统管理</div>
+                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6 }}>平台级配置与资源治理</div>
+                  </div>
+                ) : currentProject ? (
+                  <div
+                    style={{
+                      padding: '14px 16px',
+                      background: '#f8fafc',
+                      borderRadius: 14,
+                      border: '1px solid #e2e8f0',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>当前项目</div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', wordBreak: 'break-all' }}>
+                          {currentProject.name}
+                        </div>
+                      </div>
+                      <Tag color="blue">已进入</Tag>
+                    </div>
+                    <Button
+                      type="link"
+                      size="small"
+                      style={{ paddingInline: 0, marginTop: 10 }}
+                      onClick={() => navigate('/workspace')}
+                    >
+                      返回项目空间
+                    </Button>
+                  </div>
+                ) : null}
               </div>
-            </div>
-          )}
+            )}
 
-          <Menu
-            mode="inline"
-            selectedKeys={getSelectedKeys()}
-            defaultOpenKeys={getDefaultOpenKeys()}
-            items={menuItems}
-            onClick={handleMenuClick}
-            inlineCollapsed={collapsed}
-            style={{
-              border: 'none',
-              padding: '12px 8px',
-              height: collapsed ? 'calc(100% - 73px)' : 'calc(100% - 85px)',
-              overflow: 'auto',
-            }}
-          />
-        </Sider>
+            <Menu
+              mode="inline"
+              selectedKeys={getSelectedKeys()}
+              defaultOpenKeys={getDefaultOpenKeys()}
+              items={activeMenuItems}
+              onClick={({ key }) => {
+                if (typeof key === 'string' && key.startsWith('/')) {
+                  navigate(key)
+                }
+              }}
+              inlineCollapsed={collapsed}
+              style={{
+                border: 'none',
+                padding: '12px 8px',
+                height: collapsed ? 'calc(100% - 73px)' : 'calc(100% - 92px)',
+                overflow: 'auto',
+              }}
+            />
+          </Sider>
         )}
 
         <Content
           style={{
-            marginLeft: hideMainSider ? 0 : collapsed ? 72 : 240,
+            marginLeft: showMainSider ? (collapsed ? 72 : 248) : 0,
             background: 'linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)',
-            minHeight: 'calc(100vh - 60px)',
+            minHeight: 'calc(100vh - 72px)',
             overflow: 'auto',
             transition: 'margin-left 0.2s ease',
           }}
         >
           {contentNode}
 
-          {!hideDocPanel && (
+          {!isDocsRoute && (
             <DesignDocFab
               open={docPanelOpen}
               onToggle={toggleDocPanel}

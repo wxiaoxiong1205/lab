@@ -18,6 +18,7 @@ export interface RouteAccessRule {
 }
 
 export const MENU_PERMISSION_TREE: PermissionTreeNode[] = [
+  { key: '/workspace', label: '项目空间' },
   { key: '/home', label: '首页' },
   {
     key: 'menu.data-services',
@@ -484,7 +485,8 @@ export const ALL_OPERATION_DEFINITIONS: OperationDefinition[] = collectLeafKeys(
 export const ALL_OPERATION_KEYS = ALL_OPERATION_DEFINITIONS.map(item => item.key)
 
 export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
-  { menuKey: '/home', requiresProject: false, match: pathname => pathname === '/home' },
+  { menuKey: '/workspace', requiresProject: false, match: pathname => pathname === '/workspace' },
+  { menuKey: '/home', requiresProject: true, match: pathname => pathname === '/home' },
   { menuKey: '/datasets', requiresProject: true, match: pathname => pathname === '/datasets' || pathname.startsWith('/datasets/') },
   { menuKey: '/measurement', requiresProject: true, match: pathname => pathname === '/measurement' || pathname.startsWith('/measurement/') },
   { menuKey: '/inference', requiresProject: true, match: pathname => pathname === '/inference' || pathname.startsWith('/inference/') },
