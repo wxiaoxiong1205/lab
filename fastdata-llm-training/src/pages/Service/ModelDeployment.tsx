@@ -163,7 +163,7 @@ const ModelDeployment: React.FC = () => {
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
           <Button icon={<ArrowLeftOutlined />} onClick={closeCreate}>返回</Button>
-          <Text type="secondary">模型部署 / 部署服务</Text>
+          <Text type="secondary">大模型部署 / 部署服务</Text>
         </div>
 
         <Card style={{ borderRadius: 18, border: '1px solid #e5e7eb' }}>
@@ -226,7 +226,7 @@ const ModelDeployment: React.FC = () => {
     <>
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
         <Card style={{ borderRadius: 20, border: '1px solid #e5e7eb' }}>
-          <Title level={2}>模型部署</Title>
+          <Title level={2}>大模型部署</Title>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
             <Input

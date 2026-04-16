@@ -325,7 +325,7 @@ const pageDocs: PageDocEntry[] = [
   {
     match: pathname => pathname === '/model',
     doc: createDoc({
-      pageName: '模型管理',
+      pageName: '我的模型',
       pagePath: '/model',
       module: '模型训练',
       status: '开发中',
@@ -512,16 +512,16 @@ const pageDocs: PageDocEntry[] = [
   {
     match: pathname => pathname === '/admin/base-model',
     doc: createDoc({
-      pageName: '基础模型管理',
+      pageName: '模型仓库',
       pagePath: '/admin/base-model',
       module: '系统管理',
       status: '开发中',
-      goal: '维护平台基础模型清单、提供商信息和状态流转。',
+      goal: '维护平台模型仓库清单、提供商信息和状态流转。',
       audience: '平台管理员',
-      problem: '统一管理基础模型资产及其运行状态。',
-      structure: ['筛选区', '基础模型列表', '新增弹窗', '详情弹窗'],
+      problem: '统一管理模型仓库资产及其运行状态。',
+      structure: ['筛选区', '模型仓库列表', '新增弹窗', '详情弹窗'],
       fields: [
-        { name: '模型Code', location: '列表/表单', type: '文本', required: '是', description: '基础模型唯一编码。' },
+        { name: '模型Code', location: '列表/表单', type: '文本', required: '是', description: '模型仓库条目的唯一编码。' },
         { name: '模型提供商', location: '列表/表单', type: '枚举', required: '是', description: '模型来源提供商。' },
         { name: '状态', location: '列表', type: '任务状态', required: '是', description: '遵循统一任务状态流转规则。' },
       ],
@@ -531,12 +531,12 @@ const pageDocs: PageDocEntry[] = [
         { name: '编辑/查看详情/删除', entry: '列表行操作', precondition: '状态允许对应动作', successFeedback: '打开详情或删除记录', errorFeedback: '按钮禁用' },
       ],
       states: [
-        { name: '已创建', meaning: '基础模型记录已创建未启动', presentation: '显示已创建标签', availableActions: '启动、编辑、查看详情、删除' },
-        { name: '运行中', meaning: '基础模型当前可供平台使用', presentation: '显示运行中标签', availableActions: '终止、查看详情' },
-        { name: '失败/已终止', meaning: '基础模型启动失败或被终止', presentation: '显示失败或已终止标签', availableActions: '重新提交、查看详情、删除' },
+        { name: '已创建', meaning: '模型仓库记录已创建未启动', presentation: '显示已创建标签', availableActions: '启动、编辑、查看详情、删除' },
+        { name: '运行中', meaning: '模型仓库条目当前可供平台使用', presentation: '显示运行中标签', availableActions: '终止、查看详情' },
+        { name: '失败/已终止', meaning: '模型仓库条目启动失败或被终止', presentation: '显示失败或已终止标签', availableActions: '重新提交、查看详情、删除' },
       ],
-      interactionNotes: ['基础模型管理已按用户提供的全局任务流转规则收口。'],
-      productionComparison: ['以生产环境基础模型管理页为基线，并补齐当前本地缺失的状态显隐逻辑。'],
+      interactionNotes: ['模型仓库页面已按用户提供的全局任务流转规则收口。'],
+      productionComparison: ['以生产环境基础模型管理页为基线，并按当前命名调整为模型仓库。'],
       userChanges: [],
     }),
   },
@@ -597,7 +597,7 @@ const pageDocs: PageDocEntry[] = [
 
 function customizeDocForPath(pathname: string, doc: PageDesignDoc): PageDesignDoc {
   const routeTitleMap: Record<string, { pageName: string; module?: string }> = {
-    '/service/inference/hosted': { pageName: '模型部署' },
+    '/service/inference/hosted': { pageName: '大模型部署' },
     '/service/inference/external': { pageName: '在线推理服务' },
     '/machine-data-management': { pageName: '数据管理', module: '机器学习' },
     '/machine-annotation': { pageName: '机器学习标注', module: '机器学习' },
@@ -609,10 +609,9 @@ function customizeDocForPath(pathname: string, doc: PageDesignDoc): PageDesignDo
     '/admin/kubernetes': { pageName: '集群管理' },
     '/admin/storage': { pageName: '存储配置' },
     '/admin/registry': { pageName: '镜像管理' },
-    '/admin/base-model': { pageName: '基础模型管理' },
+    '/admin/base-model': { pageName: '模型仓库' },
     '/admin/settings': { pageName: '系统配置' },
     '/admin/permissions': { pageName: '权限配置' },
-    '/admin/platform-management': { pageName: '平台管理员' },
   }
 
   const mapped = routeTitleMap[pathname]

@@ -143,7 +143,7 @@ const BaseModelManagement: React.FC = () => {
     <>
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
         <Card style={{ borderRadius: 20, border: '1px solid #e5e7eb' }}>
-          <Title level={2}>基础模型管理</Title>
+          <Title level={2}>模型仓库</Title>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
             <Space>
@@ -238,7 +238,7 @@ const BaseModelManagement: React.FC = () => {
       </Modal>
 
       <Modal
-        title="基础模型详情"
+        title="模型仓库详情"
         open={Boolean(detailRecord)}
         onCancel={() => setDetailRecord(null)}
         footer={<Button onClick={() => setDetailRecord(null)}>关闭</Button>}

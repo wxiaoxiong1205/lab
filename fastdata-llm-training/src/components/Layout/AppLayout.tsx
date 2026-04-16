@@ -9,7 +9,6 @@ import {
   ExperimentOutlined,
   BarChartOutlined,
   AppstoreOutlined,
-  UserOutlined,
   GlobalOutlined,
   BellOutlined,
   SettingOutlined,
@@ -101,7 +100,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       children: [
         { key: '/finetune/notebooks', label: '在线Notebook' },
         { key: '/training', label: '大模型训练' },
-        { key: '/model', label: '模型管理' },
+        { key: '/model', label: '我的模型' },
       ],
     },
     {
@@ -118,7 +117,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       icon: <ExperimentOutlined />,
       label: '模型服务',
       children: [
-        { key: '/service/inference/hosted', label: '模型部署' },
+        { key: '/service/inference/hosted', label: '大模型部署' },
         { key: '/service/inference/external', label: '在线推理服务' },
       ],
     },
@@ -144,15 +143,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         { key: '/admin/kubernetes', label: '集群管理' },
         { key: '/admin/storage', label: '存储配置' },
         { key: '/admin/registry', label: '镜像管理' },
-        { key: '/admin/base-model', label: '基础模型管理' },
+        { key: '/admin/base-model', label: '模型仓库' },
         { key: '/admin/settings', label: '系统配置' },
         { key: '/admin/permissions', label: '权限配置' },
       ],
-    },
-    {
-      key: '/admin/platform-management',
-      icon: <UserOutlined />,
-      label: '平台管理员',
     },
   ]
 

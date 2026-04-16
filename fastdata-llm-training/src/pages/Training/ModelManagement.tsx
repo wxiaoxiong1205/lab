@@ -132,7 +132,7 @@ const ModelManagement: React.FC = () => {
     return (
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
         <div style={{ marginBottom: 20 }}>
-          <Text type="secondary">模型管理 / 创建模型</Text>
+          <Text type="secondary">我的模型 / 创建模型</Text>
         </div>
         <Card style={{ borderRadius: 18, border: '1px solid #e5e7eb' }}>
           <Form form={form} layout="vertical">
@@ -194,7 +194,7 @@ const ModelManagement: React.FC = () => {
     <>
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
         <Card style={{ borderRadius: 20, border: '1px solid #e5e7eb' }}>
-          <Title level={2} style={{ marginBottom: 20 }}>模型管理</Title>
+          <Title level={2} style={{ marginBottom: 20 }}>我的模型</Title>
 
           <TabsPlaceholder />
 

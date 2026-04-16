@@ -48,7 +48,7 @@ export const MENU_PERMISSION_TREE: PermissionTreeNode[] = [
     children: [
       { key: '/finetune/notebooks', label: '在线Notebook' },
       { key: '/training', label: '大模型训练' },
-      { key: '/model', label: '模型管理' },
+      { key: '/model', label: '我的模型' },
     ],
   },
   {
@@ -63,7 +63,7 @@ export const MENU_PERMISSION_TREE: PermissionTreeNode[] = [
     key: 'menu.service',
     label: '模型服务',
     children: [
-      { key: '/service/inference/hosted', label: '模型部署' },
+      { key: '/service/inference/hosted', label: '大模型部署' },
       { key: '/service/inference/external', label: '在线推理服务' },
     ],
   },
@@ -87,12 +87,11 @@ export const MENU_PERMISSION_TREE: PermissionTreeNode[] = [
       { key: '/admin/kubernetes', label: '集群管理' },
       { key: '/admin/storage', label: '存储管理' },
       { key: '/admin/registry', label: '镜像管理' },
-      { key: '/admin/base-model', label: '基础模型管理' },
+      { key: '/admin/base-model', label: '模型仓库' },
       { key: '/admin/settings', label: '系统配置' },
       { key: '/admin/permissions', label: '权限配置' },
     ],
   },
-  { key: '/admin/platform-management', label: '平台管理员' },
 ]
 
 export const OPERATION_PERMISSION_TREE: PermissionTreeNode[] = [
@@ -185,7 +184,7 @@ export const OPERATION_PERMISSION_TREE: PermissionTreeNode[] = [
       },
       {
         key: '/model',
-        label: '模型管理',
+        label: '我的模型',
         children: [
           { key: 'model.create', label: '创建模型' },
           { key: 'model.start', label: '启动' },
@@ -230,7 +229,7 @@ export const OPERATION_PERMISSION_TREE: PermissionTreeNode[] = [
     children: [
       {
         key: '/service/inference/hosted',
-        label: '模型部署',
+        label: '大模型部署',
         children: [
           { key: 'service.deployment.create', label: '新建部署' },
           { key: 'service.deployment.start', label: '启动' },
@@ -345,7 +344,7 @@ export const OPERATION_PERMISSION_TREE: PermissionTreeNode[] = [
       },
       {
         key: '/admin/base-model',
-        label: '基础模型管理',
+        label: '模型仓库',
         children: [
           { key: 'admin.base-model.create', label: '新增模型' },
           { key: 'admin.base-model.edit', label: '编辑' },
@@ -364,14 +363,6 @@ export const OPERATION_PERMISSION_TREE: PermissionTreeNode[] = [
         label: '权限配置',
         children: [{ key: 'admin.permission.view', label: '查看操作权限' }],
       },
-    ],
-  },
-  {
-    key: '/admin/platform-management',
-    label: '平台管理员',
-    children: [
-      { key: 'admin.platform-user.create', label: '添加成员' },
-      { key: 'admin.platform-user.delete', label: '删除成员' },
     ],
   },
 ]
@@ -480,8 +471,6 @@ export const OPERATION_DEFINITION_MAP: Record<string, OperationDefinition> = {
   'admin.base-model.delete': { key: 'admin.base-model.delete', label: '删除基础模型', menuKey: '/admin/base-model', requiresProject: false },
   'admin.settings.manage': { key: 'admin.settings.manage', label: '管理系统配置', menuKey: '/admin/settings', requiresProject: false },
   'admin.permission.view': { key: 'admin.permission.view', label: '查看操作权限', menuKey: '/admin/permissions', requiresProject: false },
-  'admin.platform-user.create': { key: 'admin.platform-user.create', label: '添加平台管理员', menuKey: '/admin/platform-management', requiresProject: false },
-  'admin.platform-user.delete': { key: 'admin.platform-user.delete', label: '删除平台管理员', menuKey: '/admin/platform-management', requiresProject: false },
 }
 
 export const ALL_OPERATION_DEFINITIONS: OperationDefinition[] = collectLeafKeys(OPERATION_PERMISSION_TREE).map(key => {
@@ -521,7 +510,6 @@ export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   { menuKey: '/admin/base-model', requiresProject: false, match: pathname => pathname === '/admin/base-model' },
   { menuKey: '/admin/settings', requiresProject: false, match: pathname => pathname === '/admin/settings' },
   { menuKey: '/admin/permissions', requiresProject: false, match: pathname => pathname === '/admin/permissions' },
-  { menuKey: '/admin/platform-management', requiresProject: false, match: pathname => pathname === '/admin/platform-management' },
 ]
 
 export function resolveRouteAccess(pathname: string): RouteAccessRule | null {
