@@ -1,197 +1,225 @@
-import React, { useState } from 'react'
-import { message, Modal, Form, Input, Select, Button, Typography, Space, Divider, InputNumber, Tag } from 'antd'
+import React, { useMemo, useState } from 'react'
+import {
+  Button,
+  Card,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+  Divider,
+} from 'antd'
+import type { ColumnsType } from 'antd/es/table'
 import { CloudServerOutlined, PlusOutlined } from '@ant-design/icons'
-import SharedListPage from '../../components/Shared/SharedListPage'
+import {
+  canRunTaskLifecycleAction,
+  getPrimaryTaskLifecycleAction,
+  TASK_LIFECYCLE_TAG,
+  type TaskLifecycleStatus,
+} from '../../services/taskLifecycle'
 
-const { Text } = Typography
+const { Title, Text } = Typography
 
-interface MLDeploymentRecord {
+type MLDeploymentRecord = {
   id: string
   name: string
   modelName: string
-  modelType: string
-  instanceCount: number
-  status: 'running' | 'stopped' | 'error'
+  network: string
+  modelSource: string
+  instanceCount: string
+  status: TaskLifecycleStatus
   creator: string
   createdAt: string
 }
 
-const statusMap: Record<string, { color: string; label: string }> = {
-  running: { color: 'success', label: '运行中' },
-  stopped: { color: 'default', label: '已停止' },
-  error: { color: 'error', label: '异常' },
+const deployments: MLDeploymentRecord[] = [
+  {
+    id: '1',
+    name: 'hzj_单图多标签',
+    modelName: 'hzj_图片分类多标签',
+    network: 'resnet34',
+    modelSource: '机器模型',
+    instanceCount: '0/1',
+    status: '已终止',
+    creator: 'lab1',
+    createdAt: '2026/04/15 10:09:30',
+  },
+  {
+    id: '2',
+    name: 'basion-classification-single',
+    modelName: 'basion-图像分类-单标签',
+    network: '-',
+    modelSource: '机器模型',
+    instanceCount: '0/1',
+    status: '已终止',
+    creator: 'lab1',
+    createdAt: '2026/04/13 15:24:20',
+  },
+]
+
+function statusTag(status: MLDeploymentRecord['status']): React.ReactNode {
+  const config = TASK_LIFECYCLE_TAG[status]
+  return <Tag color={config.color}>{config.label}</Tag>
 }
 
-const mockDeployments: MLDeploymentRecord[] = [
-  { id: '1', name: '图像分类服务', modelName: '图像分类模型-v1', modelType: 'VLM', instanceCount: 2, status: 'running', creator: 'admin', createdAt: '2026/03/20 10:00:00' },
-  { id: '2', name: 'NER推理服务', modelName: 'NER命名实体识别', modelType: 'LLM', instanceCount: 1, status: 'running', creator: 'lab1', createdAt: '2026/03/18 14:30:00' },
-  { id: '3', name: '情感分析服务', modelName: '情感分析模型', modelType: 'LLM', instanceCount: 1, status: 'stopped', creator: 'admin', createdAt: '2026/03/15 09:00:00' },
-]
-
-const gpuTypes = [
-  { value: 'T4', label: 'NVIDIA T4' },
-  { value: 'V100', label: 'NVIDIA V100' },
-  { value: 'A100', label: 'NVIDIA A100' },
-]
-
 const MLModelDeployment: React.FC = () => {
-  const [data] = useState(mockDeployments)
-  const [createModalVisible, setCreateModalVisible] = useState(false)
   const [form] = Form.useForm()
+  const [statusFilter, setStatusFilter] = useState<string>()
+  const [createOpen, setCreateOpen] = useState(false)
+  const [rows, setRows] = useState(deployments)
 
-  const columns: any[] = [
+  const filteredRows = useMemo(
+    () => rows.filter(item => !statusFilter || item.status === statusFilter),
+    [rows, statusFilter],
+  )
+
+  const columns: ColumnsType<MLDeploymentRecord> = [
     { title: '服务名称', dataIndex: 'name', key: 'name' },
     { title: '模型名称', dataIndex: 'modelName', key: 'modelName' },
-    { title: '模型类型', dataIndex: 'modelType', key: 'modelType' },
-    { title: '实例数', dataIndex: 'instanceCount', key: 'instanceCount' },
+    { title: '网络架构', dataIndex: 'network', key: 'network' },
+    { title: '模型来源', dataIndex: 'modelSource', key: 'modelSource' },
+    { title: '实例数', dataIndex: 'instanceCount', key: 'instanceCount', width: 90 },
+    { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: value => statusTag(value) },
+    { title: '创建人', dataIndex: 'creator', key: 'creator', width: 100 },
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 170 },
     {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (val: string) => {
-        const s = statusMap[val] || { color: 'default', label: val }
-        return <Tag color={s.color}>{s.label}</Tag>
-      },
+      title: '操作',
+      key: 'action',
+      width: 220,
+      render: (_, record) => (
+        <Space size={0}>
+          {getPrimaryTaskLifecycleAction(record.status) && (
+            <Button
+              type="link"
+              size="small"
+              onClick={() =>
+                setRows(previous =>
+                  previous.map(item =>
+                    item.id === record.id
+                      ? {
+                          ...item,
+                          status: getPrimaryTaskLifecycleAction(item.status) === 'start' ? '启动中' : '已创建',
+                        }
+                      : item,
+                  ),
+                )
+              }
+            >
+              {getPrimaryTaskLifecycleAction(record.status) === 'start' ? '启动' : '重新提交'}
+            </Button>
+          )}
+          <Button
+            type="link"
+            size="small"
+            disabled={!canRunTaskLifecycleAction(record.status, 'edit')}
+          >
+            编辑
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            disabled={!canRunTaskLifecycleAction(record.status, 'terminate')}
+            onClick={() =>
+              setRows(previous =>
+                previous.map(item => (item.id === record.id ? { ...item, status: '已终止' } : item)),
+              )
+            }
+          >
+            终止
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            disabled={!canRunTaskLifecycleAction(record.status, 'delete')}
+            onClick={() => setRows(previous => previous.filter(item => item.id !== record.id))}
+          >
+            删除
+          </Button>
+          <Button type="link" size="small">访问信息</Button>
+        </Space>
+      ),
     },
-    { title: '创建人', dataIndex: 'creator', key: 'creator' },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt' },
   ]
 
-  const handleOpenCreate = () => {
-    form.resetFields()
-    setCreateModalVisible(true)
-  }
-
-  const handleSubmit = async () => {
+  const submitCreate = async () => {
     try {
-      const values = await form.validateFields()
-      console.log('部署服务:', values)
-      message.success('部署成功')
-      setCreateModalVisible(false)
-      form.resetFields()
-    } catch (error) {
-      console.error('表单验证失败:', error)
+      await form.validateFields()
+      setCreateOpen(false)
+    } catch {
+      return
     }
-  }
-
-  const handleCancel = () => {
-    setCreateModalVisible(false)
-    form.resetFields()
-  }
-
-  const handleStart = (record: MLDeploymentRecord) => {
-    message.success(`启动服务: ${record.name}`)
-  }
-
-  const handleStop = (record: MLDeploymentRecord) => {
-    message.info(`停止服务: ${record.name}`)
   }
 
   return (
     <>
-      <SharedListPage
-        title="机器学习模型部署"
-        titleIcon={<CloudServerOutlined style={{ color: '#fff', fontSize: 18 }} />}
-        subtitle="将机器学习模型部署为在线服务，提供推理能力"
-        searchPlaceholder="搜索服务名称"
-        searchField="name"
-        columns={columns}
-        dataSource={data}
-        createButtonText="部署服务"
-        onCreate={handleOpenCreate}
-        onRefresh={() => message.success('刷新成功')}
-        emptyText="暂无部署服务"
-        actionButtons={[
-          { label: '启动', onClick: handleStart, disabled: (record: MLDeploymentRecord) => record.status === 'running' },
-          { label: '停止', onClick: handleStop, disabled: (record: MLDeploymentRecord) => record.status !== 'running' },
-          { label: '删除', danger: true, onClick: () => message.success('删除成功') },
-        ]}
-      />
+      <div style={{ padding: '28px 32px', minHeight: '100%' }}>
+        <Card style={{ borderRadius: 20, border: '1px solid #e5e7eb' }}>
+          <Title level={2}>机器模型部署</Title>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+            <Space>
+              <Select
+                placeholder="状态"
+                allowClear
+                value={statusFilter}
+                onChange={value => setStatusFilter(value)}
+                style={{ width: 140 }}
+                options={[
+                  { value: '已终止', label: '已终止' },
+                  { value: '运行中', label: '运行中' },
+                  { value: '已创建', label: '已创建' },
+                  { value: '启动中', label: '启动中' },
+                ]}
+              />
+              <Button>搜索</Button>
+              <Button onClick={() => setStatusFilter(undefined)}>重置</Button>
+            </Space>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+              创建部署
+            </Button>
+          </div>
+
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={filteredRows}
+            pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条记录` }}
+          />
+        </Card>
+      </div>
 
       <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 32,
-              height: 32,
-              background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <PlusOutlined style={{ color: '#fff', fontSize: 16 }} />
-            </div>
-            <span style={{ fontWeight: 600 }}>部署服务</span>
-          </div>
-        }
-        open={createModalVisible}
-        onCancel={handleCancel}
-        width={640}
+        title="创建部署"
+        open={createOpen}
+        onCancel={() => setCreateOpen(false)}
+        width={680}
         footer={
           <Space>
-            <Button onClick={handleCancel}>取消</Button>
-            <Button type="primary" onClick={handleSubmit} style={{ background: '#4f46e5' }}>
-              部署
-            </Button>
+            <Button onClick={() => setCreateOpen(false)}>取消</Button>
+            <Button type="primary" onClick={submitCreate}>部署</Button>
           </Space>
         }
-        destroyOnClose
       >
         <Form form={form} layout="vertical">
-          <Divider orientation="horizontal" plain style={{ margin: '0 0 16px 0', color: '#64748b', fontSize: 12 }}>
-            基本信息
-          </Divider>
-
-          <Form.Item
-            label="服务名称"
-            name="name"
-            rules={[
-              { required: true, message: '请输入服务名称' },
-              { pattern: /^[\u4e00-\u9fa5a-zA-Z0-9_-]{2,64}$/, message: '支持中英文、数字、下划线、中划线，2-64字符' }
-            ]}
-          >
-            <Input placeholder="请输入服务名称" maxLength={64} showCount />
+          <Divider>基本信息</Divider>
+          <Form.Item label="服务名称" name="name" rules={[{ required: true, message: '请输入服务名称' }]}>
+            <Input placeholder="请输入服务名称" />
+          </Form.Item>
+          <Form.Item label="选择模型" name="model" rules={[{ required: true, message: '请选择模型' }]}>
+            <Select placeholder="请选择模型" />
           </Form.Item>
 
-          <Form.Item
-            label="选择模型"
-            name="model"
-            rules={[{ required: true, message: '请选择模型' }]}
-          >
-            <Select placeholder="请选择模型" showSearch>
-              <Select.Option value="model_1">图像分类模型-v1</Select.Option>
-              <Select.Option value="model_2">NER命名实体识别</Select.Option>
-              <Select.Option value="model_3">情感分析模型</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Divider orientation="horizontal" plain style={{ margin: '16px 0', color: '#64748b', fontSize: 12 }}>
-            资源配置
-          </Divider>
-
+          <Divider>资源配置</Divider>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Form.Item label="CPU请求" name="cpuRequest" rules={[{ required: true, message: '请输入CPU请求' }]}>
-              <InputNumber style={{ width: '100%' }} min={1} addonAfter="Core" placeholder="如: 4" />
-            </Form.Item>
-
-            <Form.Item label="内存请求" name="memoryRequest" rules={[{ required: true, message: '请输入内存请求' }]}>
-              <InputNumber style={{ width: '100%' }} min={1} addonAfter="GB" placeholder="如: 8" />
-            </Form.Item>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Form.Item label="显卡类型" name="gpuType" rules={[{ required: true, message: '请选择显卡类型' }]}>
-              <Select placeholder="请选择显卡类型">
-                {gpuTypes.map(g => (
-                  <Select.Option key={g.value} value={g.value}>{g.label}</Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-
-            <Form.Item label="实例数" name="instanceCount" rules={[{ required: true, message: '请输入实例数' }]}>
-              <InputNumber style={{ width: '100%' }} min={1} max={10} placeholder="如: 1" />
-            </Form.Item>
+            <Form.Item label="CPU请求" name="cpuRequest"><InputNumber style={{ width: '100%' }} addonAfter="Core" /></Form.Item>
+            <Form.Item label="内存请求" name="memoryRequest"><InputNumber style={{ width: '100%' }} addonAfter="GB" /></Form.Item>
+            <Form.Item label="显卡类型" name="gpuType"><Select placeholder="请选择显卡类型" /></Form.Item>
+            <Form.Item label="实例数" name="instanceCount"><InputNumber style={{ width: '100%' }} min={1} max={10} /></Form.Item>
           </div>
         </Form>
       </Modal>

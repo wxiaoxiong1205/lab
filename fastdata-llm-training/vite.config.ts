@@ -24,6 +24,12 @@ export default defineConfig({
   },
   server: {
     port: 5202,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:5203',
+        changeOrigin: true,
+      },
+    },
     headers: {
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',

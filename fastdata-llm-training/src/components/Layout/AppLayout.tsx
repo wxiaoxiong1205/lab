@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Layout, Menu, Select, Dropdown, Button, Badge, Avatar, Tooltip } from 'antd'
+import React, { useEffect, useState } from 'react'
+import { Layout, Menu, Dropdown, Button, Badge, Avatar, Tooltip } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
@@ -18,6 +18,9 @@ import {
   RocketOutlined,
   FileTextOutlined,
 } from '@ant-design/icons'
+import DesignDocFab from '../DesignDoc/DesignDocFab'
+import DesignDocPanel from '../DesignDoc/DesignDocPanel'
+import { getPageDesignDoc } from '../../docs/pageDocs'
 
 const { Header, Sider, Content } = Layout
 
@@ -30,6 +33,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
   const hideMainSider = location.pathname.startsWith('/docs')
+  const [docPanelOpen, setDocPanelOpen] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false
+    }
+
+    return window.localStorage.getItem('design-doc-panel-open') === 'true'
+  })
+  const hideDocPanel = location.pathname.startsWith('/docs')
+  const currentDoc = getPageDesignDoc(location.pathname)
 
   const menuItems: MenuProps['items'] = [
     {
@@ -99,6 +111,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         { key: '/machine-model-management', label: '模型管理' },
         { key: '/machine-model-deployment', label: '模型部署' },
         { key: '/machine-notebook', label: '在线Notebook' },
+        { key: '/machine-annotation-service', label: '在线标注服务' },
       ],
     },
     {
@@ -159,6 +172,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     })
 
     return openKeys
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    window.localStorage.setItem('design-doc-panel-open', String(docPanelOpen))
+  }, [docPanelOpen])
+
+  useEffect(() => {
+    if (hideDocPanel) {
+      setDocPanelOpen(false)
+    }
+  }, [hideDocPanel])
+
+  const toggleDocPanel = () => {
+    setDocPanelOpen(previous => !previous)
   }
 
   return (
@@ -419,7 +450,23 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             transition: 'margin-left 0.2s ease',
           }}
         >
-          {children}
+          <div className={`app-shell ${docPanelOpen && !hideDocPanel ? 'app-shell--doc-open' : ''}`}>
+            <div className="app-shell__main">{children}</div>
+
+            {!hideDocPanel && (
+              <div className={`app-shell__doc-rail ${docPanelOpen ? 'app-shell__doc-rail--open' : ''}`}>
+                <DesignDocPanel doc={currentDoc} open={docPanelOpen} onClose={() => setDocPanelOpen(false)} />
+              </div>
+            )}
+          </div>
+
+          {!hideDocPanel && (
+            <DesignDocFab
+              open={docPanelOpen}
+              onToggle={toggleDocPanel}
+              rightOffset={docPanelOpen ? 428 : 28}
+            />
+          )}
         </Content>
       </Layout>
     </Layout>

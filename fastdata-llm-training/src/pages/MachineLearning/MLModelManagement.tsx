@@ -1,10 +1,19 @@
-import React, { useState } from 'react'
-import { message, Modal, Form, Input, Select, Button, Typography, Space, Divider, Descriptions, Tag } from 'antd'
-import { BookOutlined, PlusOutlined, CloudUploadOutlined } from '@ant-design/icons'
-import SharedListPage from '../../components/Shared/SharedListPage'
+import React, { useMemo, useState } from 'react'
+import {
+  Button,
+  Card,
+  Descriptions,
+  Modal,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import { BookOutlined, CloudUploadOutlined } from '@ant-design/icons'
 
-const { Text } = Typography
+const { Title, Text } = Typography
 
 interface MLModelRecord {
   id: string
@@ -38,147 +47,117 @@ const mockModels: MLModelRecord[] = [
 ]
 
 const MLModelManagement: React.FC = () => {
-  const [data] = useState(mockModels)
-  const [detailModalVisible, setDetailModalVisible] = useState(false)
-  const [selectedRecord, setSelectedRecord] = useState<MLModelRecord | null>(null)
+  const [modelTypeFilter, setModelTypeFilter] = useState<string>()
+  const [detailRecord, setDetailRecord] = useState<MLModelRecord | null>(null)
+
+  const filteredData = useMemo(
+    () => mockModels.filter(item => !modelTypeFilter || item.modelType === modelTypeFilter),
+    [modelTypeFilter],
+  )
 
   const columns: ColumnsType<MLModelRecord> = [
-    {
-      title: '模型名称',
-      dataIndex: 'name',
-      key: 'name',
-      render: (name: string) => (
-        <Text strong style={{ color: '#0f172a' }}>{name}</Text>
-      ),
-    },
+    { title: '模型名称', dataIndex: 'name', key: 'name' },
     {
       title: '模型类型',
       dataIndex: 'modelType',
       key: 'modelType',
-      render: (val: string) => {
-        const t = modelTypeMap[val] || { color: 'default', label: val }
-        return <Tag color={t.color}>{t.label}</Tag>
+      render: value => {
+        const item = modelTypeMap[value]
+        return <Tag color={item.color}>{item.label}</Tag>
       },
     },
-    {
-      title: '基础模型',
-      dataIndex: 'baseModel',
-      key: 'baseModel',
-      render: (val: string) => <Text type="secondary">{val}</Text>,
-    },
+    { title: '基础模型', dataIndex: 'baseModel', key: 'baseModel' },
     {
       title: '版本数量',
       dataIndex: 'versionCount',
       key: 'versionCount',
-      render: (val: number) => (
-        <span style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minWidth: 32,
-          height: 28,
-          padding: '0 10px',
-          background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-          borderRadius: 14,
-          color: '#fff',
-          fontSize: 13,
-          fontWeight: 600,
-        }}>
-          {val} 个版本
-        </span>
-      ),
+      width: 120,
+      render: value => <Text strong>{value}</Text>,
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      render: (val: string) => {
-        const s = statusMap[val] || { color: 'default', label: val }
-        return <Tag color={s.color}>{s.label}</Tag>
+      width: 100,
+      render: value => {
+        const item = statusMap[value]
+        return <Tag color={item.color}>{item.label}</Tag>
       },
     },
-    { title: '创建人', dataIndex: 'creator', key: 'creator' },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt' },
+    { title: '创建人', dataIndex: 'creator', key: 'creator', width: 110 },
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+    {
+      title: '操作',
+      key: 'action',
+      width: 180,
+      render: (_, record) => (
+        <Space size={0}>
+          <Button type="link" size="small" disabled={record.status === 'deployed'}>部署</Button>
+          <Button type="link" size="small" onClick={() => setDetailRecord(record)}>查看详情</Button>
+          <Button type="link" size="small" danger>删除</Button>
+        </Space>
+      ),
+    },
   ]
-
-  const handleOpenDetail = (record: MLModelRecord) => {
-    setSelectedRecord(record)
-    setDetailModalVisible(true)
-  }
-
-  const handleCloseDetail = () => {
-    setDetailModalVisible(false)
-    setSelectedRecord(null)
-  }
-
-  const handleDeploy = (record: MLModelRecord) => {
-    message.success(`部署模型: ${record.name}`)
-  }
 
   return (
     <>
-      <SharedListPage
-        title="机器学习模型管理"
-        titleIcon={<BookOutlined style={{ color: '#fff', fontSize: 18 }} />}
-        subtitle="管理机器学习模块训练产生的模型，支持版本追溯和部署配置"
-        searchPlaceholder="搜索模型名称"
-        searchField="name"
-        columns={columns}
-        dataSource={data}
-        showCreateButton={false}
-        onRefresh={() => message.success('刷新成功')}
-        emptyText="暂无模型"
-        actionButtons={[
-          { label: '部署', onClick: handleDeploy, disabled: (record: MLModelRecord) => record.status === 'deployed' },
-          { label: '查看详情', onClick: handleOpenDetail },
-          { label: '删除', danger: true, onClick: () => message.success('删除成功') },
-        ]}
-      />
+      <div style={{ padding: '28px 32px', minHeight: '100%' }}>
+        <Card style={{ borderRadius: 20, border: '1px solid #e5e7eb' }}>
+          <Title level={2}>机器学习模型管理</Title>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 20 }}>
+            当前生产环境入口不稳定，先保留机器学习模型管理的可演示实现。
+          </Text>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+            <Space>
+              <Select
+                placeholder="模型类型"
+                allowClear
+                value={modelTypeFilter}
+                onChange={value => setModelTypeFilter(value)}
+                style={{ width: 160 }}
+                options={[
+                  { value: 'LLM', label: '大语言模型' },
+                  { value: 'VLM', label: '视觉语言模型' },
+                  { value: 'ASR', label: '语音识别' },
+                ]}
+              />
+              <Button>刷新</Button>
+            </Space>
+          </div>
+
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={filteredData}
+            pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条记录` }}
+          />
+        </Card>
+      </div>
 
       <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 32,
-              height: 32,
-              background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <BookOutlined style={{ color: '#fff', fontSize: 16 }} />
-            </div>
-            <span style={{ fontWeight: 600 }}>模型详情</span>
-          </div>
-        }
-        open={detailModalVisible}
-        onCancel={handleCloseDetail}
-        width={640}
+        title="模型详情"
+        open={Boolean(detailRecord)}
+        onCancel={() => setDetailRecord(null)}
         footer={
           <Space>
-            <Button onClick={handleCloseDetail}>关闭</Button>
-            {selectedRecord && selectedRecord.status !== 'deployed' && (
-              <Button type="primary" icon={<CloudUploadOutlined />} style={{ background: '#4f46e5' }} onClick={() => { handleCloseDetail(); handleDeploy(selectedRecord); }}>
-                部署
-              </Button>
+            <Button onClick={() => setDetailRecord(null)}>关闭</Button>
+            {detailRecord && detailRecord.status !== 'deployed' && (
+              <Button type="primary" icon={<CloudUploadOutlined />}>部署</Button>
             )}
           </Space>
         }
       >
-        {selectedRecord && (
+        {detailRecord && (
           <Descriptions column={2} bordered size="small">
-            <Descriptions.Item label="模型名称" span={2}>{selectedRecord.name}</Descriptions.Item>
-            <Descriptions.Item label="模型类型">
-              {modelTypeMap[selectedRecord.modelType]?.label || selectedRecord.modelType}
-            </Descriptions.Item>
-            <Descriptions.Item label="基础模型">{selectedRecord.baseModel}</Descriptions.Item>
-            <Descriptions.Item label="版本数量">{selectedRecord.versionCount}</Descriptions.Item>
-            <Descriptions.Item label="状态">
-              <Tag color={statusMap[selectedRecord.status]?.color}>{statusMap[selectedRecord.status]?.label}</Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="创建人">{selectedRecord.creator}</Descriptions.Item>
-            <Descriptions.Item label="创建时间" span={2}>{selectedRecord.createdAt}</Descriptions.Item>
+            <Descriptions.Item label="模型名称" span={2}>{detailRecord.name}</Descriptions.Item>
+            <Descriptions.Item label="模型类型">{modelTypeMap[detailRecord.modelType].label}</Descriptions.Item>
+            <Descriptions.Item label="基础模型">{detailRecord.baseModel}</Descriptions.Item>
+            <Descriptions.Item label="版本数量">{detailRecord.versionCount}</Descriptions.Item>
+            <Descriptions.Item label="状态">{statusMap[detailRecord.status].label}</Descriptions.Item>
+            <Descriptions.Item label="创建人">{detailRecord.creator}</Descriptions.Item>
+            <Descriptions.Item label="创建时间" span={2}>{detailRecord.createdAt}</Descriptions.Item>
           </Descriptions>
         )}
       </Modal>

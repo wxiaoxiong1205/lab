@@ -1,245 +1,285 @@
-import React, { useState } from 'react'
-import { message, Modal, Form, Input, Select, Button, Typography, Space, Divider, Tag } from 'antd'
-import { ExperimentOutlined, PlusOutlined, FileTextOutlined } from '@ant-design/icons'
-import SharedListPage from '../../components/Shared/SharedListPage'
+import React, { useMemo, useState } from 'react'
+import {
+  Button,
+  Card,
+  Divider,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Table,
+  Tabs,
+  Tag,
+  Typography,
+} from 'antd'
+import type { ColumnsType } from 'antd/es/table'
+import { ExperimentOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 
-const { Text } = Typography
+const { Title, Text } = Typography
 
-interface MLNotebookRecord {
+type MLNotebookStatus = '已创建' | '已终止' | '运行中'
+
+type MLNotebookRecord = {
   id: string
   name: string
   description: string
-  status: 'running' | 'stopped'
-  creator: string
+  image: string
+  sshSupported: boolean
+  status: MLNotebookStatus
+  spec: string
+  runtimeLimit: string
   createdAt: string
 }
 
-const statusMap: Record<string, { color: string; label: string }> = {
-  running: { color: 'success', label: '运行中' },
-  stopped: { color: 'default', label: '已停止' },
+type MLSquareRecord = {
+  id: string
+  name: string
+  description: string
 }
 
-const mockNotebooks: MLNotebookRecord[] = [
-  { id: '1', name: '图像分类数据探索', description: '用于探索图像分类数据集的特征分布和标签分布', status: 'running', creator: 'admin', createdAt: '2026/03/20 10:00:00' },
-  { id: '2', name: 'NER数据预处理', description: '对NER训练数据进行预处理和特征工程', status: 'stopped', creator: 'lab1', createdAt: '2026/03/18 14:30:00' },
-  { id: '3', name: '模型调参实验', description: '对比不同超参数下的模型效果', status: 'stopped', creator: 'admin', createdAt: '2026/03/15 09:00:00' },
-  { id: '4', name: '特征重要性分析', description: '分析各个特征对模型预测的贡献度', status: 'running', creator: 'lab2', createdAt: '2026/03/12 16:00:00' },
+const myNotebooks: MLNotebookRecord[] = [
+  {
+    id: 'ml-nb-1',
+    name: 'hzj_单图多标签-ml-dev',
+    description: 'ML 部署在线开发：hzj_单图多标签',
+    image: 'lab-cn-guangzhou.cr.volces.com/fs/jupyter/ml/deepexi-notebook:pytorch_2.5-cuda_12.1-py311-ubuntu22.04',
+    sshSupported: true,
+    status: '已终止',
+    spec: '1x GPU\nCPU: 0.5~16',
+    runtimeLimit: '-',
+    createdAt: '2026/4/15 09:58:34',
+  },
+  {
+    id: 'ml-nb-2',
+    name: 'basion-ml-dev',
+    description: 'ML 部署在线开发：basion',
+    image: 'lab-cn-guangzhou.cr.volces.com/fs/jupyter/ml/deepexi-notebook:pytorch_2.5-cuda_12.1-py311-ubuntu22.04',
+    sshSupported: true,
+    status: '已终止',
+    spec: '1x GPU\nCPU: 0.5~16',
+    runtimeLimit: '-',
+    createdAt: '2026/4/13 15:14:48',
+  },
 ]
 
+const squareNotebooks: MLSquareRecord[] = [
+  {
+    id: 'ml-square-1',
+    name: '图像分类开发案例',
+    description: '用于机器学习图像分类任务的在线开发模板。',
+  },
+  {
+    id: 'ml-square-2',
+    name: '实体识别开发案例',
+    description: '用于机器学习文本实体识别任务的在线开发模板。',
+  },
+]
+
+function statusTag(status: MLNotebookStatus): React.ReactNode {
+  if (status === '运行中') return <Tag color="success">运行中</Tag>
+  if (status === '已终止') return <Tag color="default">已终止</Tag>
+  return <Tag color="processing">已创建</Tag>
+}
+
 const MLNotebook: React.FC = () => {
-  const [data] = useState(mockNotebooks)
-  const [createModalVisible, setCreateModalVisible] = useState(false)
-  const [tab, setTab] = useState<'square' | 'mine'>('mine')
   const [form] = Form.useForm()
+  const [searchValue, setSearchValue] = useState('')
+  const [activeTab, setActiveTab] = useState<'mine' | 'square'>('mine')
+  const [createOpen, setCreateOpen] = useState(false)
 
-  const handleOpenCreate = () => {
-    form.resetFields()
-    setCreateModalVisible(true)
-  }
+  const filteredMine = useMemo(
+    () => myNotebooks.filter(item => item.name.toLowerCase().includes(searchValue.toLowerCase())),
+    [searchValue],
+  )
+  const filteredSquare = useMemo(
+    () => squareNotebooks.filter(item => item.name.toLowerCase().includes(searchValue.toLowerCase())),
+    [searchValue],
+  )
 
-  const handleSubmit = async () => {
+  const columns: ColumnsType<MLNotebookRecord> = [
+    { title: 'Notebook名称', dataIndex: 'name', key: 'name' },
+    { title: '镜像', dataIndex: 'image', key: 'image', ellipsis: true },
+    {
+      title: 'SSH配置',
+      dataIndex: 'sshSupported',
+      key: 'sshSupported',
+      width: 100,
+      render: value => (value ? <Text style={{ color: '#059669' }}>已支持</Text> : <Text type="secondary">未支持</Text>),
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: value => statusTag(value),
+    },
+    {
+      title: '资源规格',
+      dataIndex: 'spec',
+      key: 'spec',
+      width: 140,
+      render: value => <div style={{ whiteSpace: 'pre-line' }}>{value}</div>,
+    },
+    { title: '最大运行时长', dataIndex: 'runtimeLimit', key: 'runtimeLimit', width: 120 },
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+    {
+      title: '操作',
+      key: 'action',
+      width: 220,
+      render: () => (
+        <Space size={0}>
+          <Button type="link" size="small">启动</Button>
+          <Button type="link" size="small">查看详情</Button>
+          <Button type="link" size="small">发布为案例</Button>
+          <Button type="link" size="small">...</Button>
+        </Space>
+      ),
+    },
+  ]
+
+  const submitCreate = async () => {
     try {
-      const values = await form.validateFields()
-      console.log('创建Notebook:', values)
-      message.success('创建成功')
-      setCreateModalVisible(false)
-      form.resetFields()
-    } catch (error) {
-      console.error('表单验证失败:', error)
+      await form.validateFields()
+      setCreateOpen(false)
+    } catch {
+      return
     }
-  }
-
-  const handleCancel = () => {
-    setCreateModalVisible(false)
-    form.resetFields()
-  }
-
-  const handleOpen = (record: MLNotebookRecord) => {
-    message.loading('正在打开Notebook...', 1.5).then(() => {
-      message.info(`已打开: ${record.name}`)
-    })
-  }
-
-  const handleCopyTemplate = (record: MLNotebookRecord) => {
-    message.success(`已复制模板: ${record.name}`)
   }
 
   return (
     <>
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        {/* 页面标题 */}
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-                borderRadius: 12,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 14px rgba(79, 70, 229, 0.35)',
-              }}
-            >
-              <ExperimentOutlined style={{ color: '#fff', fontSize: 20 }} />
-            </div>
-            <Typography.Title level={3} style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
-              机器学习在线Notebook
-            </Typography.Title>
+        <Card style={{ borderRadius: 20, border: '1px solid #e5e7eb' }}>
+          <Title level={2}>在线Notebook</Title>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 20 }}>
+            Notebook 列表
+          </Text>
+
+          <Tabs
+            activeKey={activeTab}
+            onChange={key => setActiveTab(key as 'mine' | 'square')}
+            items={[
+              { key: 'mine', label: '我的Notebook' },
+              { key: 'square', label: 'Notebook广场' },
+            ]}
+          />
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+            <Space>
+              <Select
+                placeholder="状态"
+                style={{ width: 120 }}
+                options={[
+                  { value: 'all', label: '状态' },
+                ]}
+              />
+              <Input
+                placeholder="搜索"
+                value={searchValue}
+                onChange={e => setSearchValue(e.target.value)}
+                style={{ width: 220 }}
+              />
+              <Button>搜索</Button>
+              <Button onClick={() => setSearchValue('')}>重置</Button>
+              <Button onClick={() => setCreateOpen(true)}>创建Notebook</Button>
+              <Button>自定义镜像</Button>
+              <Button icon={<ReloadOutlined />}>刷新</Button>
+            </Space>
           </div>
-          <Text type="secondary" style={{ fontSize: 14, marginLeft: 52 }}>
-            交互式编程环境，支持 Python / Jupyter，提供即开即用的数据科学环境
-          </Text>
-        </div>
 
-        {/* Tab切换 */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <Button
-            type={tab === 'mine' ? 'primary' : 'default'}
-            onClick={() => setTab('mine')}
-            style={{ borderRadius: 8 }}
-          >
-            我的Notebook
-          </Button>
-          <Button
-            type={tab === 'square' ? 'primary' : 'default'}
-            onClick={() => setTab('square')}
-            style={{ borderRadius: 8 }}
-          >
-            Notebook广场
-          </Button>
-        </div>
-
-        {/* 工具栏 */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 16,
-          }}
-        >
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            共 {data.length} 个 Notebook
-          </Text>
-          <Space>
-            <Button icon={<PlusOutlined />} onClick={handleOpenCreate} style={{ borderRadius: 8 }}>
-              新建 Notebook
-            </Button>
-          </Space>
-        </div>
-
-        {/* Notebook卡片列表 */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: 16,
-          }}
-        >
-          {data.map((notebook) => (
-            <div
-              key={notebook.id}
-              style={{
-                background: '#fff',
-                borderRadius: 16,
-                border: '1px solid #e2e8f0',
-                padding: 20,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onClick={() => handleOpen(notebook)}
-            >
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    background: notebook.status === 'running' ? 'rgba(82, 196, 26, 0.1)' : 'rgba(0, 0, 0, 0.04)',
-                    borderRadius: 10,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <FileTextOutlined style={{ color: notebook.status === 'running' ? '#52c41a' : '#94a3b8', fontSize: 18 }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <Text strong style={{ fontSize: 15, color: '#0f172a', display: 'block', marginBottom: 4 }}>
-                    {notebook.name}
-                  </Text>
-                  <Text type="secondary" style={{ fontSize: 13 }}>
-                    {notebook.description}
-                  </Text>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <Tag color={statusMap[notebook.status].color}>{statusMap[notebook.status].label}</Tag>
-                  <Text type="secondary" style={{ fontSize: 12 }}>{notebook.creator}</Text>
-                </div>
-                <Space>
-                  {tab === 'square' && (
-                    <Button size="small" onClick={(e) => { e.stopPropagation(); handleCopyTemplate(notebook); }}>复制案例</Button>
-                  )}
-                </Space>
-              </div>
-            </div>
-          ))}
-        </div>
+          {activeTab === 'mine' ? (
+            <Table
+              rowKey="id"
+              columns={columns}
+              dataSource={filteredMine}
+              pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条数据` }}
+            />
+          ) : (
+            <Table
+              rowKey="id"
+              columns={[
+                { title: '案例名称', dataIndex: 'name', key: 'name' },
+                { title: '描述', dataIndex: 'description', key: 'description' },
+                {
+                  title: '操作',
+                  key: 'action',
+                  width: 140,
+                  render: () => (
+                    <Space size={0}>
+                      <Button type="link" size="small">查看详情</Button>
+                      <Button type="link" size="small">复制案例</Button>
+                    </Space>
+                  ),
+                },
+              ]}
+              dataSource={filteredSquare}
+              pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条数据` }}
+            />
+          )}
+        </Card>
       </div>
 
       <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 32,
-              height: 32,
-              background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <PlusOutlined style={{ color: '#fff', fontSize: 16 }} />
-            </div>
-            <span style={{ fontWeight: 600 }}>新建 Notebook</span>
-          </div>
-        }
-        open={createModalVisible}
-        onCancel={handleCancel}
-        width={520}
+        title="创建 Notebook"
+        open={createOpen}
+        onCancel={() => setCreateOpen(false)}
+        width={680}
         footer={
           <Space>
-            <Button onClick={handleCancel}>取消</Button>
-            <Button type="primary" onClick={handleSubmit} style={{ background: '#4f46e5' }}>
-              创建
-            </Button>
+            <Button onClick={() => setCreateOpen(false)}>取消</Button>
+            <Button type="primary" onClick={submitCreate}>创建</Button>
           </Space>
         }
-        destroyOnClose
       >
         <Form form={form} layout="vertical">
-          <Divider orientation="horizontal" plain style={{ margin: '0 0 16px 0', color: '#64748b', fontSize: 12 }}>
-            基本信息
-          </Divider>
+          <Divider>基本信息</Divider>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>设置Notebook基本信息。</Text>
 
-          <Form.Item
-            label="Notebook名称"
-            name="name"
-            rules={[
-              { required: true, message: '请输入Notebook名称' },
-              { pattern: /^[\u4e00-\u9fa5a-zA-Z0-9_-]{2,64}$/, message: '支持中英文、数字、下划线、中划线，2-64字符' }
-            ]}
-          >
-            <Input placeholder="请输入Notebook名称" maxLength={64} showCount />
+          <Form.Item label="名称" name="name" rules={[{ required: true, message: '请输入名称' }]}>
+            <Input maxLength={50} showCount />
           </Form.Item>
-
           <Form.Item label="描述" name="description">
-            <Input.TextArea rows={3} placeholder="请输入Notebook描述（可选）" maxLength={300} showCount />
+            <Input.TextArea rows={3} maxLength={300} showCount />
           </Form.Item>
+
+          <Divider>AI服务选择</Divider>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>选择你想使用的模型服务，可在Notebook任务中使用</Text>
+          <Form.Item label="在线推理服务" name="service">
+            <Select placeholder="请选择在线推理服务（可选）" />
+          </Form.Item>
+
+          <Divider>数据/模型选择</Divider>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>选择任务中需要的数据集或模型。</Text>
+          <Space style={{ marginBottom: 16 }}>
+            <Button>选择</Button>
+            <Button>模型</Button>
+          </Space>
+
+          <Divider>资源配置</Divider>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
+            <Form.Item label="CPU 请求" name="cpuRequest"><Input /></Form.Item>
+            <Form.Item label="CPU 限制" name="cpuLimit"><Input /></Form.Item>
+            <Form.Item label="内存请求" name="memoryRequest"><Input /></Form.Item>
+            <Form.Item label="内存限制" name="memoryLimit"><Input /></Form.Item>
+          </div>
+
+          <Form.Item label="显卡配置" name="gpuConfig">
+            <Select placeholder="请选择显卡配置" />
+          </Form.Item>
+
+          <Form.Item label="运行时长配置" name="runtimeLimit">
+            <Select placeholder="请选择最大运行时长" />
+          </Form.Item>
+
+          <Divider>选择Notebook镜像</Divider>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>选择适合您需求的预配置环境</Text>
+          <Space>
+            <Form.Item label="镜像" name="image" style={{ minWidth: 320 }}>
+              <Select placeholder="请选择镜像" />
+            </Form.Item>
+            <Button>添加镜像</Button>
+          </Space>
         </Form>
       </Modal>
     </>

@@ -1,319 +1,365 @@
-import React, { useState } from 'react'
-import { message, Modal, Form, Input, Select, Button, Typography, Space, Divider, DatePicker, Descriptions, Tabs, Switch } from 'antd'
-import { ToolOutlined, PlusOutlined } from '@ant-design/icons'
-import SharedListPage from '../../components/Shared/SharedListPage'
+import React, { useEffect, useMemo, useState } from 'react'
+import {
+  Button,
+  Card,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Table,
+  Tabs,
+  Typography,
+  Descriptions,
+} from 'antd'
+import type { ColumnsType } from 'antd/es/table'
+import { EditOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
+import { useLocation, useNavigate } from 'react-router-dom'
+import {
+  buildAnnotationDatasetOptions,
+  dataServiceApi,
+  type PaginatedResult,
+  selectAnnotationTasks,
+  useDataServiceSnapshot,
+} from '../../services/dataServiceApi'
 
-const { Text } = Typography
+const { Text, Title } = Typography
 
-// 数据集选项
-const mockDatasets = [
-  { value: 'ds_001', label: '多轮对话训练集', type: '文本生成', count: 5000 },
-  { value: 'ds_002', label: '医疗问答训练集', type: '文本生成', count: 8000 },
-  { value: 'ds_003', label: '意图识别训练集', type: '文本生成', count: 3000 },
-  { value: 'ds_004', label: '图像理解训练集', type: '图像理解', count: 2000 },
+type AnnotationTask = {
+  id: string
+  name: string
+  dataVolume: number
+  progress: number | null
+  preDataset: string
+  postDataset: string
+  creator: string
+  createdAt: string
+}
+
+type DatasetOption = {
+  value: string
+  label: string
+  count: number
+}
+
+const stepCards = [
+  {
+    title: '选择数据集',
+    description: '从已有数据集中选择或上传新数据',
+  },
+  {
+    title: '标注数据',
+    description: '使用工具对数据进行精确标注',
+  },
+  {
+    title: '发布数据集',
+    description: '完成标注后发布供模型训练使用',
+  },
+  {
+    title: '使用数据集',
+    description: '下载或直接调用标注完成的数据集',
+  },
 ]
 
-const mockData = [
-  { id: '1', name: '多轮对话标注-批次A', dataVolume: 1000, annotationProgress: '850/1000', preDataset: '多轮对话训练集', postDataset: '多轮对话标注后', creator: 'admin', createdAt: '2026/03/23 10:00:00' },
-  { id: '2', name: '意图识别标注-医疗', dataVolume: 2000, annotationProgress: '2000/2000', preDataset: '医疗问答训练集', postDataset: '医疗NER标注后', creator: 'lab1', createdAt: '2026/03/20 14:30:00' },
-  { id: '3', name: '情感分类标注-商品', dataVolume: 500, annotationProgress: '0/500', preDataset: '商品评论训练集', postDataset: '商品情感标注后', creator: 'lab2', createdAt: '2026/03/26 09:00:00' },
-]
+function getDatasetTypeFromSearch(search: string): 'text-generation' | 'image-understanding' {
+  const value = new URLSearchParams(search).get('dataset_type')
+  return value === 'image-understanding' ? 'image-understanding' : 'text-generation'
+}
 
 const DataAnnotation: React.FC = () => {
-  const [data] = useState(mockData)
-  const [createModalVisible, setCreateModalVisible] = useState(false)
-  const [detailModalVisible, setDetailModalVisible] = useState(false)
-  const [selectedRecord, setSelectedRecord] = useState<typeof mockData[0] | null>(null)
-  const [activeTab, setActiveTab] = useState<string>('online')
+  const location = useLocation()
+  const navigate = useNavigate()
+  const state = useDataServiceSnapshot()
+  const annotationTasks = selectAnnotationTasks(state)
   const [form] = Form.useForm()
-  const [selectedDataset, setSelectedDataset] = useState<typeof mockDatasets[0] | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<AnnotationTask | null>(null)
+  const [collaborationTab, setCollaborationTab] = useState<'online' | 'multi'>('online')
+  const [datasetType, setDatasetType] = useState<'text-generation' | 'image-understanding'>('text-generation')
+  const [selectedDatasetValue, setSelectedDatasetValue] = useState<string>()
+  const [creating, setCreating] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [listLoading, setListLoading] = useState(false)
+  const [listResult, setListResult] = useState<PaginatedResult<AnnotationTask>>({ items: [], total: 0 })
 
-  const scheduleEnabled = Form.useWatch('scheduleEnabled', form)
+  const datasetOptions = useMemo(
+    () => buildAnnotationDatasetOptions(state, datasetType),
+    [datasetType, state],
+  )
+  const selectedDataset = useMemo(
+    () => datasetOptions.find(item => item.value === selectedDatasetValue) ?? null,
+    [datasetOptions, selectedDatasetValue],
+  )
+
+  useEffect(() => {
+    const nextType = getDatasetTypeFromSearch(location.search)
+    setDatasetType(nextType)
+    form.setFieldValue('datasetType', nextType)
+  }, [form, location.search])
+
+  useEffect(() => {
+    let active = true
+    setListLoading(true)
+
+    void dataServiceApi
+      .listAnnotationTasks({ page, pageSize })
+      .then(result => {
+        if (!active) {
+          return
+        }
+        setListResult(result as PaginatedResult<AnnotationTask>)
+      })
+      .finally(() => {
+        if (active) {
+          setListLoading(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [annotationTasks, page, pageSize])
+
+  const handleDatasetTypeChange = (nextType: 'text-generation' | 'image-understanding') => {
+    navigate(`/data-annotation?dataset_type=${nextType}`)
+    setSelectedDatasetValue(undefined)
+    form.setFieldsValue({ dataset: undefined, datasetType: nextType, outputName: undefined })
+  }
 
   const handleOpenCreate = () => {
     form.resetFields()
-    setSelectedDataset(null)
-    setCreateModalVisible(true)
+    form.setFieldsValue({
+      datasetType,
+      outputMode: '新增版本',
+      sourceType: '已有数据集',
+    })
+    setSelectedDatasetValue(undefined)
+    setCreateOpen(true)
   }
 
-  const handleDatasetChange = (value: string) => {
-    const dataset = mockDatasets.find(ds => ds.value === value)
-    setSelectedDataset(dataset || null)
+  const handleCloseCreate = () => {
+    setCreateOpen(false)
+    setSelectedDatasetValue(undefined)
   }
 
-  const handleSubmit = async () => {
+  const handleSubmitCreate = async () => {
     try {
-      const values = await form.validateFields()
-      console.log('创建标注任务:', values)
-      message.success('创建成功')
-      setCreateModalVisible(false)
-      form.resetFields()
-      setSelectedDataset(null)
-    } catch (error) {
-      console.error('表单验证失败:', error)
+      await form.validateFields()
+      setCreateOpen(false)
+    } catch {
+      return
+    }
+
+    const datasetLabel = selectedDataset?.label ?? '-'
+    setCreating(true)
+    try {
+      await dataServiceApi.createAnnotationTask({
+        name: form.getFieldValue('name'),
+        dataVolume: selectedDataset?.count ?? 0,
+        preDataset: datasetLabel,
+      })
+    } finally {
+      setCreating(false)
     }
   }
 
-  const handleCancel = () => {
-    setCreateModalVisible(false)
-    form.resetFields()
-    setSelectedDataset(null)
-  }
-
-  const handleOpenDetail = (record: typeof mockData[0]) => {
-    setSelectedRecord(record)
-    setDetailModalVisible(true)
-  }
-
-  const handleCloseDetail = () => {
-    setDetailModalVisible(false)
-    setSelectedRecord(null)
-  }
+  const columns: ColumnsType<AnnotationTask> = [
+    { title: '任务名称', dataIndex: 'name', key: 'name' },
+    { title: '数据量', dataIndex: 'dataVolume', key: 'dataVolume', width: 88 },
+    {
+      title: '标注进度',
+      dataIndex: 'progress',
+      key: 'progress',
+      width: 110,
+      render: value => (value === null ? '-' : `${value}%`),
+    },
+    { title: '标注前数据集', dataIndex: 'preDataset', key: 'preDataset', ellipsis: true },
+    { title: '标注后数据集', dataIndex: 'postDataset', key: 'postDataset', ellipsis: true },
+    { title: '创建人', dataIndex: 'creator', key: 'creator', width: 120 },
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 176 },
+    {
+      title: '操作',
+      key: 'action',
+      width: 150,
+      render: (_, record) => (
+        <Space size={0}>
+          <Button type="link" size="small" onClick={() => { setSelectedTask(record); setDetailOpen(true) }}>
+            查看详情
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            onClick={async () => {
+              await dataServiceApi.deleteAnnotationTask(record.id)
+            }}
+          >
+            删除
+          </Button>
+        </Space>
+      ),
+    },
+  ]
 
   return (
     <>
-      {/* Tab切换区域 */}
-      <div style={{ padding: '28px 32px 0' }}>
+      <div style={{ padding: '28px 32px', minHeight: '100%' }}>
+        <div style={{ marginBottom: 24 }}>
+          <Title level={2} style={{ marginBottom: 8, color: '#0f172a' }}>数据标注</Title>
+          <Text type="secondary" style={{ fontSize: 14 }}>
+            支持数据集在线标注、多人协同,提升数据处理效率。
+          </Text>
+        </div>
+
         <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
+          activeKey={collaborationTab}
+          onChange={key => setCollaborationTab(key as 'online' | 'multi')}
           items={[
             { key: 'online', label: '在线标注' },
             { key: 'multi', label: '多人标注' },
           ]}
+          style={{ marginBottom: 18 }}
         />
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, marginBottom: 24 }}>
+          {stepCards.map(card => (
+            <Card
+              key={card.title}
+              style={{ borderRadius: 16, border: '1px solid #e2e8f0', minHeight: 156 }}
+              styles={{ body: { padding: 24 } }}
+            >
+              <EditOutlined style={{ fontSize: 24, color: '#0f172a', marginBottom: 20 }} />
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>{card.title}</div>
+              <Text type="secondary" style={{ lineHeight: 1.7 }}>{card.description}</Text>
+            </Card>
+          ))}
+        </div>
+
+        <Tabs
+          activeKey={datasetType}
+          onChange={key => handleDatasetTypeChange(key as 'text-generation' | 'image-understanding')}
+          items={[
+            { key: 'text-generation', label: '文本标注' },
+            { key: 'image-understanding', label: '图像标注' },
+          ]}
+          style={{ marginBottom: 16 }}
+        />
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
+          <Button icon={<ReloadOutlined />}>刷新</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenCreate}>
+            创建标注任务
+          </Button>
+        </div>
+
+        <Card
+          style={{ borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+          styles={{ body: { padding: 0 } }}
+        >
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={listResult.items}
+            loading={listLoading}
+            pagination={{
+              current: page,
+              pageSize,
+              total: listResult.total,
+              showSizeChanger: false,
+              showTotal: total => `共 ${total} 条记录`,
+              onChange: nextPage => setPage(nextPage),
+            }}
+            locale={{ emptyText: '暂无标注任务' }}
+          />
+        </Card>
       </div>
 
-      <SharedListPage
-        title="数据标注"
-        titleIcon={<ToolOutlined style={{ color: '#fff', fontSize: 18 }} />}
-        subtitle="对原始数据进行标注处理，生成高质量训练数据"
-        searchPlaceholder="搜索任务名称"
-        searchField="name"
-        columns={[
-          { title: '任务名称', dataIndex: 'name', key: 'name' },
-          { title: '数据量', dataIndex: 'dataVolume', key: 'dataVolume' },
-          { title: '标注进度', dataIndex: 'annotationProgress', key: 'annotationProgress' },
-          { title: '标注前数据集', dataIndex: 'preDataset', key: 'preDataset' },
-          { title: '标注后数据集', dataIndex: 'postDataset', key: 'postDataset' },
-          { title: '创建人', dataIndex: 'creator', key: 'creator' },
-          { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt' },
-        ]}
-        dataSource={data}
-        createButtonText="创建标注任务"
-        onCreate={handleOpenCreate}
-        onRefresh={() => message.success('刷新成功')}
-        emptyText="暂无标注任务"
-        cardStyle={{ marginTop: 0 }}
-        actionButtons={[
-          { label: '查看详情', onClick: handleOpenDetail },
-          { label: '删除', danger: true, onClick: () => message.success('删除成功') },
-        ]}
-      />
-
       <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 32,
-              height: 32,
-              background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <PlusOutlined style={{ color: '#fff', fontSize: 16 }} />
-            </div>
-            <span style={{ fontWeight: 600 }}>创建标注任务</span>
-          </div>
-        }
-        open={createModalVisible}
-        onCancel={handleCancel}
+        title="在线标注任务"
+        open={createOpen}
+        onCancel={handleCloseCreate}
         width={680}
+        destroyOnClose
         footer={
           <Space>
-            <Button onClick={handleCancel}>取消</Button>
-            <Button type="primary" onClick={handleSubmit} style={{ background: '#4f46e5' }}>
-              创建
-            </Button>
+            <Button onClick={handleCloseCreate}>取消</Button>
+            <Button type="primary" loading={creating} onClick={handleSubmitCreate}>确定</Button>
           </Space>
         }
-        destroyOnClose
       >
-        <Form
-          form={form}
-          layout="vertical"
-        >
-          <Divider orientation="horizontal" plain style={{ margin: '0 0 16px 0', color: '#64748b', fontSize: 12 }}>
-            基本信息
-          </Divider>
-
+        <Form form={form} layout="vertical" initialValues={{ sourceType: '已有数据集', outputMode: '新增版本', datasetType }}>
           <Form.Item
             label="任务名称"
             name="name"
-            rules={[
-              { required: true, message: '请输入任务名称' },
-              { pattern: /^[\u4e00-\u9fa5a-zA-Z0-9_-]{2,64}$/, message: '支持中英文、数字、下划线、中划线，2-64字符' }
-            ]}
+            rules={[{ required: true, message: '请输入任务名称' }]}
           >
-            <Input placeholder="请输入标注任务名称" maxLength={64} showCount />
+            <Input placeholder="请输入任务名称" />
           </Form.Item>
-
-          <Form.Item label="描述" name="description">
-            <Input.TextArea rows={2} placeholder="请输入任务描述（可选）" maxLength={300} showCount />
-          </Form.Item>
-
-          <Divider orientation="horizontal" plain style={{ margin: '16px 0', color: '#64748b', fontSize: 12 }}>
-            数据配置
-          </Divider>
 
           <Form.Item
             label="数据集类型"
             name="datasetType"
             rules={[{ required: true, message: '请选择数据集类型' }]}
           >
-            <Select placeholder="请选择数据集类型">
-              <Select.Option value="text">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: 3 }}>SFT</span>
-                  文本生成
-                </div>
-              </Select.Option>
-              <Select.Option value="vision">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: '#0891b2', background: 'rgba(8, 145, 178, 0.08)', padding: '2px 6px', borderRadius: 3 }}>VLM</span>
-                  图像理解
-                </div>
-              </Select.Option>
+            <Select onChange={value => handleDatasetTypeChange(value)}>
+              <Select.Option value="text-generation">文本生成</Select.Option>
+              <Select.Option value="image-understanding">图像理解</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item label="数据选择" name="sourceType">
+            <Select disabled>
+              <Select.Option value="已有数据集">已有数据集</Select.Option>
             </Select>
           </Form.Item>
 
           <Form.Item
-            label="数据选择"
+            label="选择数据集"
             name="dataset"
             rules={[{ required: true, message: '请选择数据集' }]}
           >
             <Select
-              placeholder="请选择数据集"
-              showSearch
-              onChange={handleDatasetChange}
-              filterOption={(input, option) =>
-                String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
-            >
-              {mockDatasets.map(ds => (
-                <Select.Option key={ds.value} value={ds.value} label={ds.label}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>{ds.label}</span>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{ds.count}条</Text>
-                  </div>
-                </Select.Option>
-              ))}
+              placeholder="选择"
+              onChange={value => setSelectedDatasetValue(value)}
+              options={datasetOptions.map(item => ({ value: item.value, label: item.label }))}
+            />
+          </Form.Item>
+
+          <div style={{ marginTop: -6, marginBottom: 16 }}>
+            <Text type="secondary">数据量:{selectedDataset?.count ?? 0}条</Text>
+          </div>
+
+          <Form.Item label="处理后数据集" name="outputMode">
+            <Select disabled>
+              <Select.Option value="新增版本">新增版本</Select.Option>
             </Select>
           </Form.Item>
 
-          {selectedDataset && (
-            <div style={{
-              background: '#f8fafc',
-              borderRadius: 8,
-              padding: '12px 16px',
-              marginBottom: 16,
-              border: '1px solid #e2e8f0'
-            }}>
-              <div style={{ display: 'flex', gap: 24 }}>
-                <div>
-                  <Text type="secondary" style={{ fontSize: 12 }}>数据类型</Text>
-                  <div style={{ marginTop: 4 }}>{selectedDataset.type}</div>
-                </div>
-                <div>
-                  <Text type="secondary" style={{ fontSize: 12 }}>数据条数</Text>
-                  <div style={{ marginTop: 4 }}>{selectedDataset.count} 条</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <Divider orientation="horizontal" plain style={{ margin: '16px 0', color: '#64748b', fontSize: 12 }}>
-            输出配置
-          </Divider>
-
-          <Form.Item
-            label="处理后数据集"
-            name="outputType"
-            rules={[{ required: true, message: '请选择输出方式' }]}
-          >
-            <Select placeholder="请选择">
-              <Select.Option value="new_version">新增版本</Select.Option>
-              <Select.Option value="new_dataset">新建数据集</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            label="数据集名称"
-            name="outputName"
-            rules={[
-              { required: true, message: '请输入数据集名称' },
-              { pattern: /^[\u4e00-\u9fa5a-zA-Z0-9_-]{2,64}$/, message: '支持中英文、数字、下划线、中划线，2-64字符' }
-            ]}
-            extra="标注完成后的数据集名称"
-          >
-            <Input placeholder="请输入数据集名称" maxLength={64} showCount />
-          </Form.Item>
-
-          <Divider orientation="horizontal" plain style={{ margin: '16px 0', color: '#64748b', fontSize: 12 }}>
-            任务配置
-          </Divider>
-
-          <Form.Item
-            label="任务定时配置"
-            tooltip="可选配置，支持定时启动标注任务"
-          >
-            <Space size={12}>
-              <Form.Item name="scheduleEnabled" valuePropName="checked" noStyle>
-                <Switch checkedChildren="开" unCheckedChildren="关" />
-              </Form.Item>
-              {scheduleEnabled && (
-                <Form.Item name="schedule" noStyle>
-                  <DatePicker showTime format="YYYY-MM-DD HH:mm" placeholder="选择时间" />
-                </Form.Item>
-              )}
-            </Space>
+          <Form.Item label="数据集名称">
+            <Input value={selectedDataset?.label ?? '-'} disabled />
           </Form.Item>
         </Form>
       </Modal>
 
       <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 32,
-              height: 32,
-              background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <ToolOutlined style={{ color: '#fff', fontSize: 16 }} />
-            </div>
-            <span style={{ fontWeight: 600 }}>标注任务详情</span>
-          </div>
-        }
-        open={detailModalVisible}
-        onCancel={handleCloseDetail}
-        width={640}
-        footer={<Button onClick={handleCloseDetail}>关闭</Button>}
+        title="标注任务详情"
+        open={detailOpen}
+        onCancel={() => setDetailOpen(false)}
+        footer={<Button onClick={() => setDetailOpen(false)}>关闭</Button>}
       >
-        {selectedRecord && (
+        {selectedTask && (
           <Descriptions column={2} bordered size="small">
-            <Descriptions.Item label="任务名称" span={2}>{selectedRecord.name}</Descriptions.Item>
-            <Descriptions.Item label="数据量">{selectedRecord.dataVolume}</Descriptions.Item>
-            <Descriptions.Item label="标注进度">{selectedRecord.annotationProgress}</Descriptions.Item>
-            <Descriptions.Item label="标注前数据集" span={2}>{selectedRecord.preDataset}</Descriptions.Item>
-            <Descriptions.Item label="标注后数据集" span={2}>{selectedRecord.postDataset}</Descriptions.Item>
-            <Descriptions.Item label="创建人">{selectedRecord.creator}</Descriptions.Item>
-            <Descriptions.Item label="创建时间">{selectedRecord.createdAt}</Descriptions.Item>
+            <Descriptions.Item label="任务名称" span={2}>{selectedTask.name}</Descriptions.Item>
+            <Descriptions.Item label="数据量">{selectedTask.dataVolume}</Descriptions.Item>
+            <Descriptions.Item label="标注进度">
+              {selectedTask.progress === null ? '-' : `${selectedTask.progress}%`}
+            </Descriptions.Item>
+            <Descriptions.Item label="标注前数据集" span={2}>{selectedTask.preDataset}</Descriptions.Item>
+            <Descriptions.Item label="标注后数据集" span={2}>{selectedTask.postDataset}</Descriptions.Item>
+            <Descriptions.Item label="创建人">{selectedTask.creator}</Descriptions.Item>
+            <Descriptions.Item label="创建时间">{selectedTask.createdAt}</Descriptions.Item>
           </Descriptions>
         )}
       </Modal>
