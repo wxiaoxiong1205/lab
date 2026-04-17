@@ -301,7 +301,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               <RocketOutlined style={{ color: '#fff', fontSize: 20 }} />
             </div>
             <div>
-              <div style={{ color: '#0f172a', fontSize: 18, fontWeight: 800, lineHeight: 1.1 }}>FastAGI</div>
+              <div style={{ color: '#0f172a', fontSize: 18, fontWeight: 800, lineHeight: 1.1 }}>Deepexilab</div>
               <div style={{ color: '#94a3b8', fontSize: 11, lineHeight: 1.2 }}>LLM Workspace</div>
             </div>
           </div>
@@ -422,12 +422,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 10,
-                padding: '6px 12px 6px 6px',
+                padding: '6px 14px 6px 6px',
                 marginLeft: 8,
                 background: 'rgba(255, 255, 255, 0.7)',
                 borderRadius: 14,
                 cursor: 'pointer',
                 border: '1px solid rgba(148, 163, 184, 0.18)',
+                minWidth: 150,
               }}
             >
               <Avatar
@@ -440,9 +441,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               >
                 {currentUser.account.slice(0, 1).toUpperCase()}
               </Avatar>
-              <div>
-                <div style={{ color: '#0f172a', fontSize: 13, fontWeight: 600 }}>{currentUser.account}</div>
-                <div style={{ color: '#94a3b8', fontSize: 11 }}>{getUserRoleLabels(currentUser.account, permissionState).join(' / ')}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.25 }}>
+                <div style={{ color: '#0f172a', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  {currentUser.account}
+                </div>
+                <div
+                  style={{
+                    color: '#94a3b8',
+                    fontSize: 11,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: 110,
+                  }}
+                >
+                  {getUserRoleLabels(currentUser.account, permissionState).join(' / ')}
+                </div>
               </div>
             </div>
           </Dropdown>
