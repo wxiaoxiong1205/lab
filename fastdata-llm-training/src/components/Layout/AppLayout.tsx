@@ -119,7 +119,15 @@ const systemMenuSource: MenuItemList = [
   { key: '/admin/projects', icon: <FolderOpenOutlined />, label: '项目管理' },
   { key: '/admin/kubernetes', icon: <ApartmentOutlined />, label: '集群管理' },
   { key: '/admin/storage', icon: <DatabaseOutlined />, label: '存储管理' },
-  { key: '/admin/registry', icon: <AppstoreOutlined />, label: '镜像管理' },
+  {
+    key: 'admin-images',
+    icon: <AppstoreOutlined />,
+    label: '镜像管理',
+    children: [
+      { key: '/admin/image-list', label: '镜像列表' },
+      { key: '/admin/registry', label: '镜像仓库' },
+    ],
+  },
   { key: '/admin/base-model', icon: <CloudServerOutlined />, label: '模型仓库' },
   { key: '/admin/settings', icon: <SettingOutlined />, label: '系统配置' },
   { key: '/admin/permissions', icon: <FileTextOutlined />, label: '权限配置' },
@@ -487,20 +495,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   borderBottom: '1px solid #f1f5f9',
                 }}
               >
-                {isAdminRoute ? (
-                  <div
-                    style={{
-                      padding: '14px 16px',
-                      background: '#f8fafc',
-                      borderRadius: 14,
-                      border: '1px solid #e2e8f0',
-                    }}
-                  >
-                    <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>当前域</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>系统管理</div>
-                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6 }}>平台级配置与资源治理</div>
-                  </div>
-                ) : currentProject ? (
+                {!isAdminRoute && currentProject ? (
                   <div
                     style={{
                       padding: '14px 16px',

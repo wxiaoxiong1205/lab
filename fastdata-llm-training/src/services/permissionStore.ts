@@ -92,6 +92,12 @@ const trainingEngineerMenuPermissions = [
   '/evaluation-indicator',
   '/service/inference/hosted',
   '/service/inference/external',
+  '/machine-data-management',
+  '/machine-annotation',
+  '/machine-model-management',
+  '/machine-model-deployment',
+  '/machine-notebook',
+  '/machine-annotation-service',
 ] as const
 
 const seedRoles: PermissionRole[] = [
@@ -109,7 +115,17 @@ const seedRoles: PermissionRole[] = [
     lockedName: true,
     lockedOperations: true,
     menuPermissions: [...projectAdminMenuPermissions],
-    operationPermissions: ALL_OPERATION_KEYS.filter(key => !key.startsWith('admin.permission.') && !key.startsWith('admin.platform-user.')),
+    operationPermissions: [
+      ...ALL_OPERATION_KEYS.filter(
+        key =>
+          !key.startsWith('admin.') &&
+          !key.startsWith('home.') &&
+          !key.startsWith('evaluation-indicator.'),
+      ),
+      'home.view',
+      'evaluation-indicator.detail',
+      'admin.project.members',
+    ],
   },
   {
     key: 'training_engineer',
@@ -374,6 +390,15 @@ export function createProject(input: { name: string; description: string; cluste
   }
 
   nextState.projects.unshift(project)
+  persistState(nextState)
+}
+
+export function deleteProject(projectId: string) {
+  const nextState = cloneState(state)
+  nextState.projects = nextState.projects.filter(project => project.id !== projectId)
+  if (nextState.currentProjectId === projectId) {
+    nextState.currentProjectId = null
+  }
   persistState(nextState)
 }
 

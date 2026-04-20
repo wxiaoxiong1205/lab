@@ -11,6 +11,7 @@ import {
   Table,
   Tag,
   Typography,
+  message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { CloudOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
@@ -37,11 +38,22 @@ function renderStatus(status: string): React.ReactNode {
   return <Tag>未知</Tag>
 }
 
+function renderMountStatus(status: string): React.ReactNode {
+  if (status === 'mounted') {
+    return <Tag color="success">已挂载</Tag>
+  }
+  if (status === 'unmounted') {
+    return <Tag color="default">未挂载</Tag>
+  }
+  return <Tag>未知</Tag>
+}
+
 const KubernetesClusterPage: React.FC = () => {
   const [form] = Form.useForm()
   const [createOpen, setCreateOpen] = useState(false)
   const [detailRecord, setDetailRecord] = useState<KubernetesCluster | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success'>('idle')
+  const [rows, setRows] = useState<KubernetesCluster[]>(mockKubernetesClusters)
 
   const columns: ColumnsType<KubernetesCluster> = [
     { title: '集群名称', dataIndex: 'name', key: 'name' },
@@ -72,14 +84,46 @@ const KubernetesClusterPage: React.FC = () => {
       render: value => renderStatus(value),
     },
     {
+      title: '挂载状态',
+      dataIndex: 'mountStatus',
+      key: 'mountStatus',
+      width: 110,
+      render: value => renderMountStatus(value),
+    },
+    {
+      title: '存储配置',
+      dataIndex: 'storageConfig',
+      key: 'storageConfig',
+      width: 140,
+      render: value => (value ? <Tag color="success">已配置</Tag> : <Tag>未配置</Tag>),
+    },
+    {
+      title: '镜像仓库',
+      dataIndex: 'imageRegistry',
+      key: 'imageRegistry',
+      width: 150,
+      render: value => (value ? <Tag color="success">已配置</Tag> : <Tag>未配置</Tag>),
+    },
+    {
       title: '操作',
       key: 'action',
-      width: 260,
+      width: 320,
       render: (_, record) => (
         <Space size={0}>
           <Button type="link" size="small">测试连接</Button>
           <Button type="link" size="small">绑定存储配置</Button>
           <Button type="link" size="small">绑定仓库配置</Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            onClick={() => {
+              setRows(previous => previous.filter(item => item.id !== record.id))
+              message.success(`已删除集群：${record.name}`)
+            }}
+          >
+            删除
+          </Button>
           <Button type="link" size="small" onClick={() => setDetailRecord(record)}>...</Button>
         </Space>
       ),
@@ -119,7 +163,7 @@ const KubernetesClusterPage: React.FC = () => {
           <Table
             rowKey="id"
             columns={columns}
-            dataSource={mockKubernetesClusters}
+            dataSource={rows}
             pagination={{ pageSize: 10, showTotal: total => `共 ${total} 个集群` }}
           />
         </Card>

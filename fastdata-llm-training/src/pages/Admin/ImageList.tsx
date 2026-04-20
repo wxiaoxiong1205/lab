@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { message, Tag } from 'antd'
 import {
   AppstoreOutlined,
-  PlusOutlined,
 } from '@ant-design/icons'
 import SharedListPage from '../../components/Shared/SharedListPage'
 import { mockImageRecords } from '../../data/mockDataAll'

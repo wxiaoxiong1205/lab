@@ -9,15 +9,15 @@ import {
   Space,
   Switch,
   Table,
-  Tag,
   Typography,
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { PlusOutlined, SettingOutlined, CloudServerOutlined } from '@ant-design/icons'
 import {
   canRunOperation,
   createProject,
+  deleteProject,
   getCurrentUser,
   getOperationDeniedMessage,
   getRoleLabel,
@@ -32,17 +32,31 @@ import {
 const { Title, Text } = Typography
 
 const clusterOptions = ['V1.12版本集群', '测试环境集群12', '生产环境集群A']
+const namespaceOptions = ['ai-infra', 'lab', 'fs']
+
+type SSHConfigRecord = {
+  enabled: boolean
+  username: string
+  password: string
+  sshKey: string
+}
 
 const ProjectManagement: React.FC = () => {
   const permissionState = usePermissionStore()
   const currentUser = getCurrentUser(permissionState)
   const [form] = Form.useForm()
   const [memberForm] = Form.useForm()
+  const [sshForm] = Form.useForm()
+  const [namespaceForm] = Form.useForm()
   const [createOpen, setCreateOpen] = useState(false)
   const [permissionOpen, setPermissionOpen] = useState(false)
+  const [sshOpen, setSshOpen] = useState(false)
+  const [namespaceOpen, setNamespaceOpen] = useState(false)
   const [selectedProject, setSelectedProject] = useState<PermissionProject | null>(null)
   const [draftMembers, setDraftMembers] = useState<ProjectPermissionMember[]>([])
   const [selectedMemberAccount, setSelectedMemberAccount] = useState<string>()
+  const [sshConfigs, setSshConfigs] = useState<Record<string, SSHConfigRecord>>({})
+  const [namespaceConfigs, setNamespaceConfigs] = useState<Record<string, string>>({})
 
   const visibleProjects = useMemo(() => {
     if (currentUser.roleKeys.includes('platform_admin')) {
@@ -78,26 +92,24 @@ const ProjectManagement: React.FC = () => {
     { title: '项目名称', dataIndex: 'name', key: 'name' },
     { title: '项目描述', dataIndex: 'description', key: 'description', render: value => value || '-' },
     { title: '绑定集群', dataIndex: 'cluster', key: 'cluster' },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt' },
     {
-      title: '项目成员',
-      key: 'members',
-      render: (_, record) => (
-        <Space wrap size={[6, 6]}>
-          {record.members
-            .filter(member => member.hasDataPermission || member.roleKey === 'platform_admin')
-            .map(member => (
-              <Tag key={`${record.id}-${member.account}`} color={member.roleKey === 'platform_admin' ? 'blue' : 'default'}>
-                {member.account}
-              </Tag>
-            ))}
-        </Space>
-      ),
+      title: 'SSH配置',
+      key: 'ssh',
+      render: (_, record) => {
+        const config = sshConfigs[record.id]
+        return config?.enabled ? '已配置' : '未配置'
+      },
     },
+    {
+      title: '镜像命名空间',
+      key: 'namespace',
+      render: (_, record) => namespaceConfigs[record.id] || '-',
+    },
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt' },
     {
       title: '操作',
       key: 'action',
-      width: 320,
+      width: 390,
       render: (_, record) => (
         <Space size={0}>
           <Button
@@ -110,6 +122,40 @@ const ProjectManagement: React.FC = () => {
             }
           >
             编辑
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<SettingOutlined />}
+            onClick={() =>
+              guardOperation('admin.project.edit', () => {
+                setSelectedProject(record)
+                const currentConfig = sshConfigs[record.id] ?? {
+                  enabled: false,
+                  username: '',
+                  password: '',
+                  sshKey: '',
+                }
+                sshForm.setFieldsValue(currentConfig)
+                setSshOpen(true)
+              })
+            }
+          >
+            SSH配置
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<CloudServerOutlined />}
+            onClick={() =>
+              guardOperation('admin.project.edit', () => {
+                setSelectedProject(record)
+                namespaceForm.setFieldsValue({ namespace: namespaceConfigs[record.id] })
+                setNamespaceOpen(true)
+              })
+            }
+          >
+            镜像命名空间配置
           </Button>
           <Button
             type="link"
@@ -129,18 +175,15 @@ const ProjectManagement: React.FC = () => {
           <Button
             type="link"
             size="small"
-            icon={<SafetyCertificateOutlined />}
+            danger
             onClick={() =>
-              guardOperation('admin.project.data-permission', () => {
-                setSelectedProject(record)
-                setDraftMembers(record.members)
-                memberForm.resetFields()
-                setSelectedMemberAccount(undefined)
-                setPermissionOpen(true)
+              guardOperation('admin.project.edit', () => {
+                deleteProject(record.id)
+                message.success(`已删除项目：${record.name}`)
               })
             }
           >
-            项目权限
+            删除
           </Button>
         </Space>
       ),
@@ -245,6 +288,47 @@ const ProjectManagement: React.FC = () => {
     message.success('项目权限已更新')
   }
 
+  const submitSSHConfig = async () => {
+    if (!selectedProject) {
+      return
+    }
+
+    try {
+      const values = await sshForm.validateFields()
+      setSshConfigs(previous => ({
+        ...previous,
+        [selectedProject.id]: {
+          enabled: Boolean(values.enabled),
+          username: values.username || '',
+          password: values.password || '',
+          sshKey: values.sshKey || '',
+        },
+      }))
+      setSshOpen(false)
+      message.success('SSH配置已保存')
+    } catch {
+      return
+    }
+  }
+
+  const submitNamespace = async () => {
+    if (!selectedProject) {
+      return
+    }
+
+    try {
+      const values = await namespaceForm.validateFields()
+      setNamespaceConfigs(previous => ({
+        ...previous,
+        [selectedProject.id]: values.namespace,
+      }))
+      setNamespaceOpen(false)
+      message.success('镜像命名空间已保存')
+    } catch {
+      return
+    }
+  }
+
   const submitMember = async () => {
     if (!selectedProject) {
       return
@@ -337,7 +421,7 @@ const ProjectManagement: React.FC = () => {
       </Modal>
 
       <Modal
-        title={selectedProject ? `${selectedProject.name} · 项目权限` : '项目权限'}
+        title={selectedProject ? `${selectedProject.name} · 成员管理` : '成员管理'}
         open={permissionOpen}
         onCancel={() => setPermissionOpen(false)}
         width={920}
@@ -395,6 +479,63 @@ const ProjectManagement: React.FC = () => {
           </Form>
         </Card>
         <Table rowKey="account" columns={permissionColumns} dataSource={draftMembers} pagination={false} />
+      </Modal>
+
+      <Modal
+        title={selectedProject ? `${selectedProject.name} · SSH配置` : 'SSH配置'}
+        open={sshOpen}
+        onCancel={() => setSshOpen(false)}
+        footer={
+          <Space>
+            <Button onClick={() => setSshOpen(false)}>取消</Button>
+            <Button type="primary" onClick={submitSSHConfig}>确定</Button>
+          </Space>
+        }
+      >
+        <Form form={sshForm} layout="vertical" initialValues={{ enabled: false }}>
+          <Form.Item label="ssh配置" name="enabled" valuePropName="checked">
+            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+          </Form.Item>
+          <Form.Item label="用户名" name="username">
+            <Input placeholder="请输入用户名" />
+          </Form.Item>
+          <Form.Item label="密码" name="password">
+            <Input.Password placeholder="请输入密码" />
+          </Form.Item>
+          <Form.Item label="SSH Key" name="sshKey">
+            <Input placeholder="可手动输入或生成 SSH Key" />
+          </Form.Item>
+          <Button
+            type="primary"
+            ghost
+            onClick={() =>
+              sshForm.setFieldValue(
+                'sshKey',
+                'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDeepexiLabGeneratedKey',
+              )
+            }
+          >
+            生成SSH Key
+          </Button>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={selectedProject ? `${selectedProject.name} · 编辑命名空间` : '编辑命名空间'}
+        open={namespaceOpen}
+        onCancel={() => setNamespaceOpen(false)}
+        footer={
+          <Space>
+            <Button onClick={() => setNamespaceOpen(false)}>取消</Button>
+            <Button type="primary" onClick={submitNamespace}>确定</Button>
+          </Space>
+        }
+      >
+        <Form form={namespaceForm} layout="vertical">
+          <Form.Item label="命名空间" name="namespace" rules={[{ required: true, message: '请选择命名空间' }]}>
+            <Select placeholder="请选择命名空间" options={namespaceOptions.map(item => ({ value: item, label: item }))} />
+          </Form.Item>
+        </Form>
       </Modal>
     </>
   )

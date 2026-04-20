@@ -1,187 +1,749 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
+  Alert,
   Button,
   Card,
+  Descriptions,
   Form,
   Input,
   InputNumber,
-  Modal,
+  message,
+  Radio,
   Select,
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
-  Divider,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { CloudServerOutlined, PlusOutlined } from '@ant-design/icons'
+import {
+  ArrowLeftOutlined,
+  CloudServerOutlined,
+  CodeOutlined,
+  PlusOutlined,
+} from '@ant-design/icons'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   canRunTaskLifecycleAction,
   getPrimaryTaskLifecycleAction,
+  STARTING_TERMINATE_BLOCKED_MESSAGE,
   TASK_LIFECYCLE_TAG,
   type TaskLifecycleStatus,
 } from '../../services/taskLifecycle'
+import {
+  machineDeploymentActions,
+  useMachineDeploymentStore,
+  type CustomDeploymentConfig,
+  type DeploymentType,
+  type MLDeploymentRecord,
+  type ResourceConfig,
+  type StandardDeploymentConfig,
+} from '../../services/machineDeploymentStore'
 
 const { Title, Text } = Typography
 
-type MLDeploymentRecord = {
-  id: string
-  name: string
-  modelName: string
-  network: string
-  modelSource: string
-  instanceCount: string
-  status: TaskLifecycleStatus
-  creator: string
-  createdAt: string
+interface CreateFormValues {
+  name?: string
+  standard: StandardDeploymentConfig
+  custom: CustomDeploymentConfig
 }
 
-const deployments: MLDeploymentRecord[] = [
-  {
-    id: '1',
-    name: 'hzj_单图多标签',
-    modelName: 'hzj_图片分类多标签',
-    network: 'resnet34',
-    modelSource: '机器模型',
-    instanceCount: '0/1',
-    status: '已终止',
-    creator: 'lab1',
-    createdAt: '2026/04/15 10:09:30',
-  },
-  {
-    id: '2',
-    name: 'basion-classification-single',
-    modelName: 'basion-图像分类-单标签',
-    network: '-',
-    modelSource: '机器模型',
-    instanceCount: '0/1',
-    status: '已终止',
-    creator: 'lab1',
-    createdAt: '2026/04/13 15:24:20',
-  },
+const modelOptions = [
+  { value: 'hzj_图片分类多标签', label: 'hzj_图片分类多标签', network: 'resnet34', versions: ['V3', 'V2'] },
+  { value: 'basion-图像分类-单标签', label: 'basion-图像分类-单标签', network: 'resnet50', versions: ['V2', 'V1'] },
+  { value: 'defect-detection-yolov8', label: 'defect-detection-yolov8', network: 'yolov8', versions: ['V5', 'V4'] },
 ]
 
-function statusTag(status: MLDeploymentRecord['status']): React.ReactNode {
+const gpuOptions = [
+  { value: 'NVIDIA Tesla T4', label: 'NVIDIA Tesla T4' },
+  { value: 'NVIDIA A10', label: 'NVIDIA A10' },
+  { value: 'NVIDIA V100', label: 'NVIDIA V100' },
+]
+
+const systemImageOptions = [
+  { value: 'python-inference:3.9-ubuntu2004', label: 'python-inference:3.9-ubuntu2004' },
+  { value: 'pytorch-inference:2.1-cuda12.1', label: 'pytorch-inference:2.1-cuda12.1' },
+  { value: 'sklearn-serving:1.4-ubuntu2204', label: 'sklearn-serving:1.4-ubuntu2204' },
+]
+
+const defaultCustomSpec = `{
+  "metadata": {
+    "name": "",
+    "instance": 1,
+    "workspace_id": "411740",
+    "disk": "30Gi"
+  },
+  "cloud": {
+    "computing": {
+      "instances": [
+        {
+          "type": "ecs.gn6e-c12g1.12xlarge"
+        }
+      ]
+    }
+  },
+  "containers": [
+    {
+      "image": "",
+      "script": "python app.py",
+      "port": 8000
+    }
+  ]
+}`
+
+function buildResourceSummary(resource: ResourceConfig) {
+  const cpu = resource.cpuRequest ? `${resource.cpuRequest}C` : '-'
+  const memory = resource.memoryRequest ? `${resource.memoryRequest}GB` : '-'
+  const gpu = resource.gpuType && resource.gpuCount ? `${resource.gpuType} x${resource.gpuCount}` : 'CPU'
+  return `${cpu} / ${memory} / ${gpu}`
+}
+
+function buildInstanceCount(resource: ResourceConfig) {
+  return `0/${resource.instanceCount ?? 1}`
+}
+
+function buildImageSummary(config: CustomDeploymentConfig) {
+  const imageName = config.imageSource === 'system' ? config.systemImage : config.customImage
+  return imageName ? `镜像部署 / ${imageName}` : '镜像部署'
+}
+
+function getStatusTag(status: TaskLifecycleStatus) {
   const config = TASK_LIFECYCLE_TAG[status]
   return <Tag color={config.color}>{config.label}</Tag>
 }
 
-const MLModelDeployment: React.FC = () => {
-  const [form] = Form.useForm()
-  const [statusFilter, setStatusFilter] = useState<string>()
-  const [createOpen, setCreateOpen] = useState(false)
-  const [rows, setRows] = useState(deployments)
+function getCreateInitialValues(): CreateFormValues {
+  return {
+    name: '',
+    standard: {
+      modelSource: '模型管理',
+      model: undefined,
+      modelVersion: undefined,
+      network: undefined,
+      resources: {
+        cpuRequest: 4,
+        cpuLimit: 8,
+        memoryRequest: 16,
+        memoryLimit: 32,
+        gpuType: 'NVIDIA Tesla T4',
+        gpuCount: 1,
+        instanceCount: 1,
+      },
+    },
+    custom: {
+      deployMode: '镜像部署',
+      imageSource: 'system',
+      systemImage: 'python-inference:3.9-ubuntu2004',
+      customImage: '',
+      command: 'python app.py',
+      port: 8000,
+      dependencies: [],
+      envs: [],
+      resources: {
+        cpuRequest: 6,
+        cpuLimit: 8,
+        memoryRequest: 24,
+        memoryLimit: 32,
+        gpuType: 'NVIDIA Tesla T4',
+        gpuCount: 1,
+        instanceCount: 1,
+      },
+      serviceConfig: {},
+      serviceConfigJson: defaultCustomSpec,
+    },
+  }
+}
 
-  const filteredRows = useMemo(
-    () => rows.filter(item => !statusFilter || item.status === statusFilter),
-    [rows, statusFilter],
+function buildFormValuesFromRecord(record: MLDeploymentRecord): CreateFormValues {
+  const initialValues = getCreateInitialValues()
+  return {
+    name: record.name,
+    standard: record.standardConfig ?? initialValues.standard,
+    custom: {
+      ...(record.customConfig ?? initialValues.custom),
+      serviceConfigJson: record.customConfig?.serviceConfigJson ?? defaultCustomSpec,
+    },
+  }
+}
+
+function buildDeploymentPayload(values: CreateFormValues, deploymentType: DeploymentType) {
+  if (deploymentType === 'standard') {
+    const standard = values.standard
+    return {
+      name: values.name?.trim() ?? '',
+      deploymentType,
+      targetSummary: `${standard.model ?? '-'} / ${standard.network ?? '-'}`,
+      resourceSummary: buildResourceSummary(standard.resources),
+      instanceCount: buildInstanceCount(standard.resources),
+      standardConfig: standard,
+      customConfig: undefined,
+    }
+  }
+
+  const custom = values.custom
+  return {
+    name: values.name?.trim() ?? '',
+    deploymentType,
+    targetSummary: buildImageSummary(custom),
+    resourceSummary: buildResourceSummary(custom.resources),
+    instanceCount: buildInstanceCount(custom.resources),
+    standardConfig: undefined,
+    customConfig: custom,
+  }
+}
+
+const sectionCardStyle: React.CSSProperties = {
+  borderRadius: 18,
+  border: '1px solid #e5e7eb',
+  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.04)',
+}
+
+const sectionTitleStyle: React.CSSProperties = {
+  marginBottom: 20,
+  fontSize: 18,
+  fontWeight: 600,
+}
+
+const ResourceFields: React.FC<{ prefix: (string | number)[] }> = ({ prefix }) => (
+  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 18px' }}>
+    <Form.Item label="CPU请求" name={[...prefix, 'cpuRequest']} rules={[{ required: true, message: '请输入 CPU 请求' }]}>
+      <InputNumber style={{ width: '100%' }} min={1} addonAfter="Core" />
+    </Form.Item>
+    <Form.Item label="CPU限制" name={[...prefix, 'cpuLimit']} rules={[{ required: true, message: '请输入 CPU 限制' }]}>
+      <InputNumber style={{ width: '100%' }} min={1} addonAfter="Core" />
+    </Form.Item>
+    <Form.Item label="内存请求" name={[...prefix, 'memoryRequest']} rules={[{ required: true, message: '请输入内存请求' }]}>
+      <InputNumber style={{ width: '100%' }} min={1} addonAfter="GB" />
+    </Form.Item>
+    <Form.Item label="内存限制" name={[...prefix, 'memoryLimit']} rules={[{ required: true, message: '请输入内存限制' }]}>
+      <InputNumber style={{ width: '100%' }} min={1} addonAfter="GB" />
+    </Form.Item>
+    <Form.Item label="显卡类型" name={[...prefix, 'gpuType']}>
+      <Select allowClear placeholder="可选，无 GPU 可留空" options={gpuOptions} />
+    </Form.Item>
+    <Form.Item label="显卡数量" name={[...prefix, 'gpuCount']}>
+      <InputNumber style={{ width: '100%' }} min={1} max={8} />
+    </Form.Item>
+    <Form.Item label="部署实例数" name={[...prefix, 'instanceCount']} rules={[{ required: true, message: '请输入部署实例数' }]}>
+      <InputNumber style={{ width: '100%' }} min={1} max={20} />
+    </Form.Item>
+  </div>
+)
+
+function createActionButton(label: string, options?: { danger?: boolean; disabled?: boolean; onClick?: () => void }) {
+  return (
+    <Button
+      type="link"
+      size="small"
+      danger={options?.danger}
+      disabled={options?.disabled}
+      onClick={options?.onClick}
+      style={{ paddingInline: 0, height: 'auto', fontWeight: 500 }}
+    >
+      {label}
+    </Button>
+  )
+}
+
+const MLModelDeployment: React.FC = () => {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [form] = Form.useForm<CreateFormValues>()
+  const machineDeploymentState = useMachineDeploymentStore()
+  const rows = machineDeploymentState.deployments
+  const [detailRecord, setDetailRecord] = useState<MLDeploymentRecord | null>(null)
+  const [searchValue, setSearchValue] = useState('')
+  const [statusFilter, setStatusFilter] = useState<TaskLifecycleStatus | undefined>()
+  const [deploymentTypeFilter, setDeploymentTypeFilter] = useState<DeploymentType | undefined>()
+  const [createType, setCreateType] = useState<DeploymentType>('standard')
+  const isCreateRoute = location.pathname === '/machine-model-deployment/create'
+  const editRouteMatch = location.pathname.match(/^\/machine-model-deployment\/([^/]+)\/edit$/)
+  const editId = editRouteMatch?.[1]
+  const isEditRoute = Boolean(editId)
+  const editingRecord = useMemo(
+    () => (editId ? rows.find(item => item.id === editId) ?? null : null),
+    [editId, rows],
+  )
+  const customImageSource = Form.useWatch(['custom', 'imageSource'], form) ?? 'system'
+  const selectedModel = Form.useWatch(['standard', 'model'], form)
+  const availableVersions = useMemo(
+    () => modelOptions.find(option => option.value === selectedModel)?.versions ?? [],
+    [selectedModel],
   )
 
-  const columns: ColumnsType<MLDeploymentRecord> = [
-    { title: '服务名称', dataIndex: 'name', key: 'name' },
-    { title: '模型名称', dataIndex: 'modelName', key: 'modelName' },
-    { title: '网络架构', dataIndex: 'network', key: 'network' },
-    { title: '模型来源', dataIndex: 'modelSource', key: 'modelSource' },
-    { title: '实例数', dataIndex: 'instanceCount', key: 'instanceCount', width: 90 },
-    { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: value => statusTag(value) },
-    { title: '创建人', dataIndex: 'creator', key: 'creator', width: 100 },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 170 },
-    {
-      title: '操作',
-      key: 'action',
-      width: 220,
-      render: (_, record) => (
-        <Space size={0}>
-          {getPrimaryTaskLifecycleAction(record.status) && (
-            <Button
-              type="link"
-              size="small"
-              onClick={() =>
-                setRows(previous =>
-                  previous.map(item =>
-                    item.id === record.id
-                      ? {
-                          ...item,
-                          status: getPrimaryTaskLifecycleAction(item.status) === 'start' ? '启动中' : '已创建',
-                        }
-                      : item,
-                  ),
-                )
-              }
-            >
-              {getPrimaryTaskLifecycleAction(record.status) === 'start' ? '启动' : '重新提交'}
-            </Button>
-          )}
-          <Button
-            type="link"
-            size="small"
-            disabled={!canRunTaskLifecycleAction(record.status, 'edit')}
-          >
-            编辑
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            disabled={!canRunTaskLifecycleAction(record.status, 'terminate')}
-            onClick={() =>
-              setRows(previous =>
-                previous.map(item => (item.id === record.id ? { ...item, status: '已终止' } : item)),
-              )
-            }
-          >
-            终止
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            disabled={!canRunTaskLifecycleAction(record.status, 'delete')}
-            onClick={() => setRows(previous => previous.filter(item => item.id !== record.id))}
-          >
-            删除
-          </Button>
-          <Button type="link" size="small">访问信息</Button>
-        </Space>
-      ),
-    },
-  ]
+  useEffect(() => {
+    if (isCreateRoute || isEditRoute) {
+      form.resetFields()
+      if (isEditRoute) {
+        if (!editingRecord) {
+          message.warning('未找到目标部署记录，已返回列表页。')
+          navigate('/machine-model-deployment', { replace: true })
+          return
+        }
 
-  const submitCreate = async () => {
+        setCreateType(editingRecord.deploymentType)
+        form.setFieldsValue(buildFormValuesFromRecord(editingRecord))
+        return
+      }
+
+      setCreateType('standard')
+      form.setFieldsValue(getCreateInitialValues())
+    }
+  }, [editingRecord, form, isCreateRoute, isEditRoute, navigate])
+
+  useEffect(() => {
+    if (!detailRecord) {
+      return
+    }
+
+    const nextRecord = rows.find(item => item.id === detailRecord.id) ?? null
+    setDetailRecord(nextRecord)
+  }, [detailRecord, rows])
+
+  const filteredRows = useMemo(
+    () =>
+      rows.filter(item => {
+        const modelName = item.standardConfig?.model ?? ''
+        const matchesKeyword =
+          !searchValue ||
+          item.name.toLowerCase().includes(searchValue.toLowerCase()) ||
+          modelName.toLowerCase().includes(searchValue.toLowerCase())
+        const matchesStatus = !statusFilter || item.status === statusFilter
+        const matchesType = !deploymentTypeFilter || item.deploymentType === deploymentTypeFilter
+        return matchesKeyword && matchesStatus && matchesType
+      }),
+    [deploymentTypeFilter, rows, searchValue, statusFilter],
+  )
+
+  const updateStatus = (record: MLDeploymentRecord) => {
+    const primaryAction = getPrimaryTaskLifecycleAction(record.status)
+    if (!primaryAction) {
+      return
+    }
+
+    machineDeploymentActions.setDeploymentStatus(record.id, primaryAction === 'start' ? '启动中' : '已创建')
+    message.success(primaryAction === 'start' ? '部署已进入启动中' : '部署已重新提交')
+  }
+
+  const openCreate = () => navigate('/machine-model-deployment/create')
+  const closeCreate = () => navigate('/machine-model-deployment')
+  const openEdit = (record: MLDeploymentRecord) => navigate(`/machine-model-deployment/${record.id}/edit`)
+
+  const submitForm = async () => {
     try {
-      await form.validateFields()
-      setCreateOpen(false)
+      const values = await form.validateFields()
+
+      if (createType === 'custom') {
+        try {
+          JSON.parse(values.custom.serviceConfigJson || '{}')
+        } catch {
+          message.error('服务配置 JSON 格式不正确')
+          return
+        }
+      }
+
+      const payload = buildDeploymentPayload(values, createType)
+
+      if (isEditRoute && editingRecord) {
+        machineDeploymentActions.updateDeployment(editingRecord.id, payload)
+        message.success('部署配置已更新')
+      } else {
+        machineDeploymentActions.createDeployment({
+          ...payload,
+          creator: 'deepexilab',
+        })
+        message.success(createType === 'standard' ? '标准部署已创建' : '自定义部署已创建')
+      }
+      closeCreate()
     } catch {
       return
     }
   }
 
+  const columns: ColumnsType<MLDeploymentRecord> = [
+    { title: '服务名称', dataIndex: 'name', key: 'name', width: 220 },
+    {
+      title: '模型名称',
+      key: 'modelName',
+      width: 220,
+      render: (_, record) =>
+        record.standardConfig?.model ??
+        (record.customConfig?.imageSource === 'system'
+          ? record.customConfig.systemImage
+          : record.customConfig?.customImage) ??
+        '-',
+    },
+    {
+      title: '网络架构',
+      key: 'network',
+      width: 140,
+      render: (_, record) => record.standardConfig?.network ?? '-',
+    },
+    {
+      title: '模型来源',
+      key: 'modelSource',
+      width: 120,
+      render: (_, record) => (record.deploymentType === 'standard' ? '模型管理' : '镜像部署'),
+    },
+    { title: '实例数', dataIndex: 'instanceCount', key: 'instanceCount', width: 90 },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: value => getStatusTag(value),
+    },
+    { title: '创建人', dataIndex: 'creator', key: 'creator', width: 100 },
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+    {
+      title: '操作',
+      key: 'action',
+      width: 280,
+      render: (_, record) => (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', alignItems: 'center' }}>
+          {getPrimaryTaskLifecycleAction(record.status) &&
+            createActionButton(getPrimaryTaskLifecycleAction(record.status) === 'start' ? '启动' : '重新提交', {
+              onClick: () => updateStatus(record),
+            })}
+          {createActionButton('编辑', {
+            disabled: !canRunTaskLifecycleAction(record.status, 'edit'),
+            onClick: () => openEdit(record),
+          })}
+          {createActionButton('访问信息', { onClick: () => setDetailRecord(record) })}
+          {createActionButton('删除', {
+            danger: true,
+            disabled: !canRunTaskLifecycleAction(record.status, 'delete'),
+            onClick: () => machineDeploymentActions.deleteDeployment(record.id),
+          })}
+          {createActionButton('终止', {
+            disabled: !canRunTaskLifecycleAction(record.status, 'terminate'),
+            onClick: () => {
+              if (record.status === '启动中') {
+                return message.warning(STARTING_TERMINATE_BLOCKED_MESSAGE)
+              }
+              machineDeploymentActions.setDeploymentStatus(record.id, '已终止')
+            },
+          })}
+        </div>
+      ),
+    },
+  ]
+
+  const createDescription =
+    createType === 'standard'
+      ? '配置机器学习标准部署任务，基于模型管理中的已发布模型快速生成在线服务。'
+      : '配置机器学习自定义部署任务，基于镜像与启动脚本直接生成机器学习在线服务。'
+
+  if (isCreateRoute || isEditRoute) {
+    return (
+      <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          <Button icon={<ArrowLeftOutlined />} onClick={closeCreate}>
+            返回
+          </Button>
+          <Text type="secondary">机器学习 / 模型部署 / {isEditRoute ? '编辑部署' : '创建部署'}</Text>
+        </div>
+
+        <div>
+          <div>
+            <Card style={{ ...sectionCardStyle, marginBottom: 20 }}>
+              <Title level={2} style={{ marginBottom: 8 }}>{isEditRoute ? '编辑部署' : '创建部署'}</Title>
+              <Text type="secondary">{createDescription}</Text>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 20 }}>
+                <Card
+                  hoverable
+                  onClick={() => setCreateType('standard')}
+                  style={{
+                    ...sectionCardStyle,
+                    cursor: 'pointer',
+                    borderColor: createType === 'standard' ? '#1677ff' : '#dfe4ea',
+                    background: createType === 'standard' ? 'linear-gradient(180deg, rgba(22, 119, 255, 0.05), #ffffff)' : '#ffffff',
+                  }}
+                >
+                  <Space align="start" size={14}>
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 12,
+                        display: 'grid',
+                        placeItems: 'center',
+                        background: createType === 'standard' ? '#1677ff' : '#f3f4f6',
+                        color: createType === 'standard' ? '#ffffff' : '#475569',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <CloudServerOutlined />
+                    </div>
+                    <div>
+                      <Space align="center" size={10} style={{ marginBottom: 8 }}>
+                        <Text strong style={{ fontSize: 18 }}>标准部署</Text>
+                        {createType === 'standard' && <Tag color="blue">当前选择</Tag>}
+                      </Space>
+                      <Text type="secondary">适合基于模型管理中的机器学习模型快速部署服务。</Text>
+                    </div>
+                  </Space>
+                </Card>
+
+                <Card
+                  hoverable
+                  onClick={() => setCreateType('custom')}
+                  style={{
+                    ...sectionCardStyle,
+                    cursor: 'pointer',
+                    borderColor: createType === 'custom' ? '#1677ff' : '#dfe4ea',
+                    background: createType === 'custom' ? 'linear-gradient(180deg, rgba(22, 119, 255, 0.05), #ffffff)' : '#ffffff',
+                  }}
+                >
+                  <Space align="start" size={14}>
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 12,
+                        display: 'grid',
+                        placeItems: 'center',
+                        background: createType === 'custom' ? '#1677ff' : '#f3f4f6',
+                        color: createType === 'custom' ? '#ffffff' : '#475569',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <CodeOutlined />
+                    </div>
+                    <div>
+                      <Space align="center" size={10} style={{ marginBottom: 8 }}>
+                        <Text strong style={{ fontSize: 18 }}>自定义部署</Text>
+                        {createType === 'custom' && <Tag color="blue">当前选择</Tag>}
+                      </Space>
+                      <Text type="secondary">适合基于镜像和部署配置直接生成机器学习在线服务。</Text>
+                    </div>
+                  </Space>
+                </Card>
+              </div>
+            </Card>
+
+            <Form form={form} layout="vertical">
+              <Card id="basic-info" style={{ ...sectionCardStyle, marginBottom: 20 }}>
+                <div style={sectionTitleStyle}>基本信息</div>
+                <Form.Item
+                  label="服务名称"
+                  name="name"
+                  rules={[
+                    { required: true, message: '请输入服务名称' },
+                    { max: 36, message: '服务名称不能超过 36 个字符' },
+                  ]}
+                >
+                  <Input placeholder="请输入服务名称" />
+                </Form.Item>
+
+                {createType === 'standard' && (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 18px' }}>
+                      <Form.Item label="模型来源" name={['standard', 'modelSource']} initialValue="模型管理">
+                        <Input readOnly />
+                      </Form.Item>
+                      <Form.Item
+                        label="选择模型"
+                        name={['standard', 'model']}
+                        rules={[{ required: true, message: '请选择模型' }]}
+                      >
+                        <Select
+                          placeholder="请选择待部署模型"
+                          options={modelOptions.map(item => ({ value: item.value, label: item.label }))}
+                          onChange={(value: string) => {
+                            const model = modelOptions.find(item => item.value === value)
+                            form.setFieldValue(['standard', 'network'], model?.network)
+                            form.setFieldValue(['standard', 'modelVersion'], undefined)
+                          }}
+                        />
+                      </Form.Item>
+                    </div>
+                    <Form.Item
+                      label="选择版本"
+                      name={['standard', 'modelVersion']}
+                      rules={[{ required: true, message: '请选择模型版本' }]}
+                    >
+                      <Select
+                        placeholder="请选择模型版本"
+                        options={availableVersions.map(value => ({ value, label: value }))}
+                      />
+                    </Form.Item>
+                  </>
+                )}
+              </Card>
+
+              {createType === 'standard' ? (
+                <Card id="resource-info" style={{ ...sectionCardStyle, marginBottom: 20 }}>
+                  <div style={sectionTitleStyle}>资源信息</div>
+                  <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+                    标准部署沿用资源申请方式，支持 CPU、内存、GPU 和实例数配置。
+                  </Text>
+                  <ResourceFields prefix={['standard', 'resources']} />
+                </Card>
+              ) : (
+                <>
+                  <Card id="environment-info" style={{ ...sectionCardStyle, marginBottom: 20 }}>
+                    <div style={sectionTitleStyle}>环境信息</div>
+                    <Alert
+                      type="info"
+                      showIcon
+                      message="自定义部署仅支持镜像部署"
+                      description="请配置镜像来源、镜像地址、启动命令和端口信息。"
+                      style={{ marginBottom: 18 }}
+                    />
+
+                    <Form.Item
+                      label="镜像配置"
+                      name={['custom', 'imageSource']}
+                      rules={[{ required: true, message: '请选择镜像配置' }]}
+                    >
+                      <Radio.Group optionType="button" buttonStyle="solid">
+                        <Radio.Button value="system">系统镜像</Radio.Button>
+                        <Radio.Button value="custom">自定义镜像</Radio.Button>
+                      </Radio.Group>
+                    </Form.Item>
+
+                    {customImageSource === 'system' ? (
+                      <Form.Item
+                        label="系统镜像"
+                        name={['custom', 'systemImage']}
+                        rules={[{ required: true, message: '请选择系统镜像' }]}
+                      >
+                        <Select placeholder="请选择系统镜像" options={systemImageOptions} />
+                      </Form.Item>
+                    ) : (
+                      <Form.Item
+                        label="自定义镜像"
+                        name={['custom', 'customImage']}
+                        rules={[{ required: true, message: '请输入自定义镜像地址' }]}
+                      >
+                        <Input placeholder="例如 registry.cn-shanghai.aliyuncs.com/ml/custom-serving:1.0.0" />
+                      </Form.Item>
+                    )}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 18px' }}>
+                      <Form.Item
+                        label="运行命令"
+                        name={['custom', 'command']}
+                        rules={[{ required: true, message: '请输入运行命令' }]}
+                      >
+                        <Input.TextArea rows={3} placeholder="例如 python app.py" />
+                      </Form.Item>
+                      <Form.Item
+                        label="端口号"
+                        name={['custom', 'port']}
+                        rules={[{ required: true, message: '请输入端口号' }]}
+                      >
+                        <InputNumber style={{ width: '100%' }} min={1} max={65535} />
+                      </Form.Item>
+                    </div>
+                  </Card>
+
+                  <Card id="resource-info" style={{ ...sectionCardStyle, marginBottom: 20 }}>
+                    <div style={sectionTitleStyle}>资源信息</div>
+                    <ResourceFields prefix={['custom', 'resources']} />
+                  </Card>
+
+                  <Card id="service-config" style={{ ...sectionCardStyle, marginBottom: 20 }}>
+                    <div style={sectionTitleStyle}>服务配置</div>
+                    <Form.Item
+                      name={['custom', 'serviceConfigJson']}
+                      rules={[{ required: true, message: '请填写部署配置 JSON' }]}
+                    >
+                      <Input.TextArea
+                        rows={14}
+                        style={{
+                          fontFamily: 'SFMono-Regular, Consolas, Monaco, monospace',
+                          fontSize: 13,
+                          borderRadius: 12,
+                        }}
+                      />
+                    </Form.Item>
+                  </Card>
+                </>
+              )}
+
+              <div
+                style={{
+                  position: 'sticky',
+                  bottom: 0,
+                  background: 'linear-gradient(180deg, rgba(255,255,255,0.78), #ffffff 30%)',
+                  paddingTop: 12,
+                }}
+              >
+                <div style={{ display: 'flex', gap: 12, paddingBottom: 6 }}>
+                  <Button onClick={closeCreate}>取消</Button>
+                  <Button type="primary" onClick={submitForm}>
+                    {isEditRoute
+                      ? '保存部署配置'
+                      : createType === 'standard'
+                        ? '提交标准部署'
+                        : '提交自定义部署'}
+                  </Button>
+                </div>
+              </div>
+            </Form>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        <Card style={{ borderRadius: 20, border: '1px solid #e5e7eb' }}>
-          <Title level={2}>机器模型部署</Title>
+        <Card style={sectionCardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20, marginBottom: 18 }}>
+            <div>
+              <Title level={2} style={{ marginBottom: 8 }}>机器模型部署</Title>
+              <Text type="secondary">
+                管理机器学习模型部署任务，支持标准部署和自定义部署两种方式。
+              </Text>
+            </div>
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              创建部署
+            </Button>
+          </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
-            <Space>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+            <Space wrap>
+              <Input
+                placeholder="搜索服务名称或模型名称"
+                value={searchValue}
+                onChange={event => setSearchValue(event.target.value)}
+                style={{ width: 260 }}
+              />
+              <Select
+                placeholder="部署方式"
+                allowClear
+                style={{ width: 160 }}
+                value={deploymentTypeFilter}
+                onChange={value => setDeploymentTypeFilter(value)}
+                options={[
+                  { value: 'standard', label: '标准部署' },
+                  { value: 'custom', label: '自定义部署' },
+                ]}
+              />
               <Select
                 placeholder="状态"
                 allowClear
+                style={{ width: 140 }}
                 value={statusFilter}
                 onChange={value => setStatusFilter(value)}
-                style={{ width: 140 }}
                 options={[
-                  { value: '已终止', label: '已终止' },
-                  { value: '运行中', label: '运行中' },
                   { value: '已创建', label: '已创建' },
                   { value: '启动中', label: '启动中' },
+                  { value: '运行中', label: '运行中' },
+                  { value: '已终止', label: '已终止' },
+                  { value: '失败', label: '失败' },
                 ]}
               />
-              <Button>搜索</Button>
-              <Button onClick={() => setStatusFilter(undefined)}>重置</Button>
+              <Button onClick={() => { setSearchValue(''); setDeploymentTypeFilter(undefined); setStatusFilter(undefined) }}>
+                重置
+              </Button>
             </Space>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-              创建部署
-            </Button>
           </div>
 
           <Table
@@ -193,37 +755,75 @@ const MLModelDeployment: React.FC = () => {
         </Card>
       </div>
 
-      <Modal
-        title="创建部署"
-        open={createOpen}
-        onCancel={() => setCreateOpen(false)}
-        width={680}
-        footer={
-          <Space>
-            <Button onClick={() => setCreateOpen(false)}>取消</Button>
-            <Button type="primary" onClick={submitCreate}>部署</Button>
-          </Space>
-        }
-      >
-        <Form form={form} layout="vertical">
-          <Divider>基本信息</Divider>
-          <Form.Item label="服务名称" name="name" rules={[{ required: true, message: '请输入服务名称' }]}>
-            <Input placeholder="请输入服务名称" />
-          </Form.Item>
-          <Form.Item label="选择模型" name="model" rules={[{ required: true, message: '请选择模型' }]}>
-            <Select placeholder="请选择模型" />
-          </Form.Item>
-
-          <Divider>资源配置</Divider>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Form.Item label="CPU请求" name="cpuRequest"><InputNumber style={{ width: '100%' }} addonAfter="Core" /></Form.Item>
-            <Form.Item label="内存请求" name="memoryRequest"><InputNumber style={{ width: '100%' }} addonAfter="GB" /></Form.Item>
-            <Form.Item label="显卡类型" name="gpuType"><Select placeholder="请选择显卡类型" /></Form.Item>
-            <Form.Item label="实例数" name="instanceCount"><InputNumber style={{ width: '100%' }} min={1} max={10} /></Form.Item>
-          </div>
-        </Form>
-      </Modal>
+      <DescriptionsModal record={detailRecord} onClose={() => setDetailRecord(null)} />
     </>
+  )
+}
+
+const DescriptionsModal: React.FC<{
+  record: MLDeploymentRecord | null
+  onClose: () => void
+}> = ({ record, onClose }) => {
+  return (
+    <CardModalLike open={Boolean(record)} title="部署详情" onClose={onClose}>
+      {record && (
+        <Descriptions column={2} bordered size="small">
+          <Descriptions.Item label="服务名称" span={2}>{record.name}</Descriptions.Item>
+          <Descriptions.Item label="状态">{getStatusTag(record.status)}</Descriptions.Item>
+          <Descriptions.Item label="部署方式">{record.deploymentType === 'standard' ? '标准部署' : '自定义部署'}</Descriptions.Item>
+          <Descriptions.Item label="模型名称">{record.standardConfig?.model ?? '-'}</Descriptions.Item>
+          <Descriptions.Item label="模型版本">{record.standardConfig?.modelVersion ?? '-'}</Descriptions.Item>
+          <Descriptions.Item label="网络架构">{record.standardConfig?.network ?? '-'}</Descriptions.Item>
+          <Descriptions.Item label="模型来源">{record.deploymentType === 'standard' ? '模型管理' : '镜像部署'}</Descriptions.Item>
+          <Descriptions.Item label="资源规格" span={2}>{record.resourceSummary}</Descriptions.Item>
+          <Descriptions.Item label="实例数">{record.instanceCount}</Descriptions.Item>
+          <Descriptions.Item label="创建人">{record.creator}</Descriptions.Item>
+          <Descriptions.Item label="创建时间" span={2}>{record.createdAt}</Descriptions.Item>
+          {record.customConfig && (
+            <Descriptions.Item label="部署配置" span={2}>
+              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'SFMono-Regular, Consolas, Monaco, monospace' }}>
+                {record.customConfig.serviceConfigJson || defaultCustomSpec}
+              </pre>
+            </Descriptions.Item>
+          )}
+        </Descriptions>
+      )}
+    </CardModalLike>
+  )
+}
+
+const CardModalLike: React.FC<{
+  open: boolean
+  title: string
+  onClose: () => void
+  children: React.ReactNode
+}> = ({ open, title, onClose, children }) => {
+  if (!open) {
+    return null
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15, 23, 42, 0.38)',
+        display: 'grid',
+        placeItems: 'center',
+        zIndex: 1000,
+        padding: 24,
+      }}
+      onClick={onClose}
+    >
+      <Card
+        title={title}
+        extra={<Button type="link" onClick={onClose}>关闭</Button>}
+        style={{ width: 820, maxWidth: '100%', ...sectionCardStyle }}
+        onClick={event => event.stopPropagation()}
+      >
+        {children}
+      </Card>
+    </div>
   )
 }
 

@@ -29,6 +29,7 @@ import MLAnnotationService from './pages/MachineLearning/MLAnnotationService'
 import ProjectManagement from './pages/Admin/ProjectManagement'
 import KubernetesCluster from './pages/Admin/KubernetesCluster'
 import StorageConfig from './pages/Admin/StorageConfig'
+import ImageList from './pages/Admin/ImageList'
 import ImageRegistry from './pages/Admin/ImageRegistry'
 import BaseModelManagement from './pages/Admin/BaseModelManagement'
 import SystemSettings from './pages/Admin/SystemSettings'
@@ -92,6 +93,8 @@ const App: React.FC = () => {
               <Route path="/machine-annotation" element={<MLAnnotation />} />
               <Route path="/machine-model-management" element={<MLModelManagement />} />
               <Route path="/machine-model-deployment" element={<MLModelDeployment />} />
+              <Route path="/machine-model-deployment/create" element={<MLModelDeployment />} />
+              <Route path="/machine-model-deployment/:id/edit" element={<MLModelDeployment />} />
               <Route path="/machine-notebook" element={<MLNotebook />} />
               <Route path="/machine-annotation-service" element={<MLAnnotationService />} />
 
@@ -99,6 +102,7 @@ const App: React.FC = () => {
               <Route path="/admin/projects" element={<ProjectManagement />} />
               <Route path="/admin/kubernetes" element={<KubernetesCluster />} />
               <Route path="/admin/storage" element={<StorageConfig />} />
+              <Route path="/admin/image-list" element={<ImageList />} />
               <Route path="/admin/registry" element={<ImageRegistry />} />
               <Route path="/admin/base-model" element={<BaseModelManagement />} />
               <Route path="/admin/settings" element={<SystemSettings />} />

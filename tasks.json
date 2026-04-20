@@ -1,7 +1,7 @@
 {
   "version": "1.0",
-  "phase": "phase2",
   "updated_at": "2026-04-20",
+  "phase": "phase2",
   "project": {
     "name": "lab-coding",
     "app_dir": "fastdata-llm-training",
@@ -9,45 +9,38 @@
   },
   "tracks": [
     {
-      "id": "phase2-foundation",
+      "id": "phase2-knowledge-base",
       "title": "第二阶段协作基线与知识库",
       "status": "done",
       "priority": "P0",
-      "summary": "第一阶段默认基线已下线，第二阶段规则、模板和 docs 知识库骨架已建立。"
+      "summary": "AGENTS、README、docs/ai 模板和 docs 知识库骨架已切换到第二阶段模式。"
     },
     {
-      "id": "project-space-shell",
+      "id": "shell-and-navigation",
       "title": "项目空间 / 系统管理双域壳层",
       "status": "in_progress",
       "priority": "P0",
-      "summary": "已完成默认入口、顶部双 Tab、项目空间页和项目概览落地；仍需继续做视觉和链路细化。"
+      "summary": "已完成默认入口、顶部双 Tab、项目空间页、项目概览页和基础项目上下文切换。"
     },
     {
-      "id": "system-management-hardening",
-      "title": "系统管理域稳定化",
-      "status": "todo",
-      "priority": "P1",
-      "summary": "统一系统管理页风格、补接口边界、收紧权限与导航关系。"
-    },
-    {
-      "id": "permission-project-context",
-      "title": "权限与项目上下文继续收敛",
-      "status": "todo",
-      "priority": "P1",
-      "summary": "继续强化菜单权限、操作权限、项目权限与项目空间进入链路的协同。"
+      "id": "admin-iteration-from-pdf",
+      "title": "系统管理待迭代项（来自待迭代项.pdf）",
+      "status": "in_progress",
+      "priority": "P0",
+      "summary": "项目管理、集群管理、存储管理、镜像管理、模型仓库、系统配置、权限配置均有明确待修正项。"
     },
     {
       "id": "data-services-continuous",
       "title": "数据服务持续迭代",
       "status": "in_progress",
       "priority": "P1",
-      "summary": "共享仓储、本地 API、本地后端已存在，后续继续按需求迭代字段、流程和状态。"
+      "summary": "共享数据层、本地 API 和最小后端已存在，后续继续按需求收口。"
     }
   ],
   "tasks": [
     {
-      "id": "H3-001",
-      "title": "运行 Harness Step 3 并建立跨对话状态文件",
+      "id": "DOC-001",
+      "title": "建立第二阶段长期状态文件",
       "status": "done",
       "priority": "P0",
       "type": "docs",
@@ -57,15 +50,15 @@
         "init.sh"
       ],
       "success_criteria": [
-        "根目录生成长期任务清单",
-        "根目录生成跨对话进度摘要",
-        "根目录生成可复用初始化脚本"
+        "支持跨对话持续记录当前阶段",
+        "支持长期任务列表维护",
+        "支持每次新对话初始化提示"
       ]
     },
     {
-      "id": "IA-001",
-      "title": "把项目空间作为登录默认入口",
-      "status": "done",
+      "id": "NAV-001",
+      "title": "维护项目空间与系统管理双域壳层",
+      "status": "in_progress",
       "priority": "P0",
       "type": "frontend",
       "scope": [
@@ -74,116 +67,149 @@
         "fastdata-llm-training/src/pages/ProjectSpace.tsx",
         "fastdata-llm-training/src/pages/Home.tsx"
       ],
-      "success_criteria": [
-        "默认路由进入 /workspace",
-        "点击项目卡片后建立 currentProjectId",
-        "项目概览页承接项目内默认视图"
+      "notes": "当前已支持 /workspace 默认入口、项目卡片进入项目概览、顶部双 Tab、系统管理独立菜单域。",
+      "next_focus": [
+        "继续优化项目空间页面视觉",
+        "继续收紧项目上下文与返回路径"
       ]
     },
     {
-      "id": "IA-002",
-      "title": "继续打磨项目空间页视觉与交互",
-      "status": "in_progress",
+      "id": "ADM-001",
+      "title": "项目管理页迭代",
+      "status": "todo",
       "priority": "P0",
       "type": "frontend",
+      "source": "待迭代项.pdf 第1页",
       "scope": [
-        "fastdata-llm-training/src/pages/ProjectSpace.tsx",
+        "fastdata-llm-training/src/pages/Admin/ProjectManagement.tsx",
+        "fastdata-llm-training/src/services/permissionStore.ts",
+        "fastdata-llm-training/src/docs/pageDocs.ts"
+      ],
+      "requirements": [
+        "删除左上角“当前域”展示",
+        "列表删除项目成员字段",
+        "操作删除项目权限入口",
+        "增加 SSH 配置",
+        "增加镜像命名空间配置"
+      ]
+    },
+    {
+      "id": "ADM-002",
+      "title": "集群管理页迭代",
+      "status": "blocked",
+      "priority": "P0",
+      "type": "frontend",
+      "source": "待迭代项.pdf 第2页",
+      "scope": [
+        "fastdata-llm-training/src/pages/Admin/KubernetesCluster.tsx"
+      ],
+      "requirements": [
+        "根据截图中红框内容调整列表字段和操作"
+      ],
+      "blocked_by": [
+        "截图中红框内的具体文字和目标字段分辨率不足，需用户确认"
+      ]
+    },
+    {
+      "id": "ADM-003",
+      "title": "存储管理页迭代",
+      "status": "blocked",
+      "priority": "P1",
+      "type": "frontend",
+      "source": "待迭代项.pdf 第3页",
+      "scope": [
+        "fastdata-llm-training/src/pages/Admin/StorageConfig.tsx"
+      ],
+      "requirements": [
+        "根据截图中标注项调整字段和操作"
+      ],
+      "blocked_by": [
+        "PDF 当前页只能清晰识别到模块标题，具体红字内容需要更高清截图或文字说明"
+      ]
+    },
+    {
+      "id": "ADM-004",
+      "title": "镜像管理拆分为镜像列表与镜像仓库",
+      "status": "todo",
+      "priority": "P0",
+      "type": "frontend",
+      "source": "待迭代项.pdf 第3页",
+      "scope": [
+        "fastdata-llm-training/src/pages/Admin/ImageRegistry.tsx",
+        "fastdata-llm-training/src/pages/Admin/ImageList.tsx",
+        "fastdata-llm-training/src/App.tsx",
         "fastdata-llm-training/src/components/Layout/AppLayout.tsx",
         "fastdata-llm-training/src/docs/pageDocs.ts"
       ],
-      "success_criteria": [
-        "项目空间页与最新截图风格持续对齐",
-        "搜索、卡片信息、页头信息和账户区布局稳定",
-        "相关页面文档侧板同步更新"
-      ],
-      "notes": "当前已去掉项目空间说明文案和新增按钮，仍可继续做视觉细节收口。"
-    },
-    {
-      "id": "IA-003",
-      "title": "明确项目内业务域的路径和返回策略",
-      "status": "todo",
-      "priority": "P1",
-      "type": "architecture",
-      "scope": [
-        "fastdata-llm-training/src/App.tsx",
-        "fastdata-llm-training/src/components/Layout/AppLayout.tsx",
-        "docs/architecture/routing.md"
-      ],
-      "success_criteria": [
-        "项目进入后的默认页和返回路径无歧义",
-        "文档中心返回路径符合项目空间模型",
-        "后续若引入带 projectId 的嵌套路由有明确迁移方向"
+      "requirements": [
+        "镜像管理拆分为镜像列表和镜像仓库",
+        "补开发镜像仓库页",
+        "镜像列表删除新建配置按钮"
       ]
     },
     {
-      "id": "SYS-001",
-      "title": "统一系统管理视觉和入口体验",
+      "id": "ADM-005",
+      "title": "模型仓库页迭代",
       "status": "todo",
-      "priority": "P1",
+      "priority": "P0",
       "type": "frontend",
+      "source": "待迭代项.pdf 第3-6页",
       "scope": [
-        "fastdata-llm-training/src/pages/Admin",
-        "fastdata-llm-training/src/components/Layout/AppLayout.tsx",
-        "docs/modules/system-management.md"
+        "fastdata-llm-training/src/pages/Admin/BaseModelManagement.tsx",
+        "fastdata-llm-training/src/docs/pageDocs.ts"
       ],
-      "success_criteria": [
-        "系统管理域下页面风格更统一",
-        "系统管理默认落点和左侧菜单关系清晰",
-        "页面标题和文档命名统一"
+      "requirements": [
+        "本地上传的模型操作中不带日志",
+        "新增模型时增加模型来源选择",
+        "模型来源支持本地和 ModelScope"
       ]
     },
     {
-      "id": "AUTH-001",
-      "title": "继续强化权限与项目上下文边界",
+      "id": "ADM-006",
+      "title": "系统配置页标签配置修正",
       "status": "todo",
-      "priority": "P1",
+      "priority": "P0",
       "type": "frontend",
+      "source": "待迭代项.pdf 第7页",
       "scope": [
-        "fastdata-llm-training/src/services/permissionCatalog.ts",
+        "fastdata-llm-training/src/pages/Admin/SystemSettings.tsx",
+        "fastdata-llm-training/src/docs/pageDocs.ts"
+      ],
+      "requirements": [
+        "标签配置当前开发有误",
+        "点击添加标签仅添加标签本身",
+        "增加标签值需要点击查看标签值后再添加"
+      ]
+    },
+    {
+      "id": "ADM-007",
+      "title": "权限配置默认权限修正",
+      "status": "todo",
+      "priority": "P0",
+      "type": "frontend",
+      "source": "待迭代项.pdf 第7页",
+      "scope": [
+        "fastdata-llm-training/src/pages/Admin/PermissionConfig.tsx",
         "fastdata-llm-training/src/services/permissionStore.ts",
-        "fastdata-llm-training/src/pages/Admin/ProjectManagement.tsx",
-        "docs/architecture/state-and-services.md"
+        "fastdata-llm-training/src/services/permissionCatalog.ts"
       ],
-      "success_criteria": [
-        "菜单权限、操作权限、项目权限边界更稳定",
-        "项目空间与项目管理职责继续分离",
-        "多角色用户在项目内角色生效规则更清晰"
+      "requirements": [
+        "项目管理员关于系统管理的默认权限只有项目成员管理，不能新增项目，其它系统管理功能无权限",
+        "训练工程师除了系统管理，其它功能都有权限"
       ]
     },
     {
       "id": "DATA-001",
-      "title": "持续整理数据服务接口与状态",
+      "title": "数据服务接口与共享状态持续收敛",
       "status": "in_progress",
       "priority": "P1",
       "type": "frontend-backend",
       "scope": [
         "fastdata-llm-training/src/services/dataServiceApi.ts",
         "fastdata-llm-training/src/services/dataServiceStore.ts",
-        "fastdata-llm-training/server/dataServiceServer.mjs",
-        "docs/architecture/api-boundaries.md",
-        "docs/modules/data-services.md"
+        "fastdata-llm-training/server/dataServiceServer.mjs"
       ],
-      "success_criteria": [
-        "数据服务新需求继续优先落在服务层边界",
-        "本地后端与前端 API 契约保持一致",
-        "任务状态规则与页面表现一致"
-      ]
-    },
-    {
-      "id": "DOC-001",
-      "title": "维持第二阶段知识库与页面侧板同步",
-      "status": "in_progress",
-      "priority": "P0",
-      "type": "docs",
-      "scope": [
-        "docs/",
-        "fastdata-llm-training/src/docs/pageDocs.ts"
-      ],
-      "success_criteria": [
-        "新页面和信息架构变化有长期文档",
-        "关键模块文档不落后于当前代码",
-        "页面内嵌设计文档与当前实现一致"
-      ]
+      "notes": "继续优先通过服务层承接需求，而不是把新逻辑散落到页面里。"
     }
   ]
 }

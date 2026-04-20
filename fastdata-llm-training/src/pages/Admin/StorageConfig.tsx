@@ -5,6 +5,7 @@ import {
   Card,
   Form,
   Input,
+  message,
   Modal,
   Select,
   Space,
@@ -43,10 +44,11 @@ const StorageConfig: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false)
   const [detailRecord, setDetailRecord] = useState<StorageConfigRecord | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success'>('idle')
+  const [rows, setRows] = useState<StorageConfigRecord[]>(mockStorageConfigs)
 
   const filteredData = useMemo(
     () =>
-      mockStorageConfigs.filter(item => {
+      rows.filter(item => {
         const matchSearch =
           !searchValue ||
           item.name.toLowerCase().includes(searchValue.toLowerCase()) ||
@@ -54,7 +56,7 @@ const StorageConfig: React.FC = () => {
         const matchType = !typeFilter || item.type === typeFilter
         return matchSearch && matchType
       }),
-    [searchValue, typeFilter],
+    [rows, searchValue, typeFilter],
   )
 
   const columns: ColumnsType<StorageConfigRecord> = [
@@ -73,12 +75,27 @@ const StorageConfig: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 220,
+      width: 280,
       render: (_, record) => (
         <Space size={0}>
           <Button type="link" size="small">测试连接</Button>
           <Button type="link" size="small" onClick={() => setDetailRecord(record)}>查看详情</Button>
           <Button type="link" size="small" danger>文件系统格式化</Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            onClick={() => {
+              if ((record.clusterCount ?? 0) > 0) {
+                message.warning('已绑定集群，不允许删除')
+                return
+              }
+              setRows(previous => previous.filter(item => item.id !== record.id))
+              message.success(`已删除存储配置：${record.name}`)
+            }}
+          >
+            删除
+          </Button>
         </Space>
       ),
     },

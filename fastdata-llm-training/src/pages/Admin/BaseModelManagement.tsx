@@ -27,12 +27,13 @@ const { Title } = Typography
 
 type BaseModelRow = Omit<BaseModelRecord, 'status'> & {
   status: TaskLifecycleStatus
+  modelSource: 'local' | 'modelscope'
 }
 
 const seedRows: BaseModelRow[] = [
-  { ...mockBaseModels[0], status: '运行中' },
-  { ...mockBaseModels[1], status: '已创建' },
-  { ...mockBaseModels[2], status: '失败' },
+  { ...mockBaseModels[0], status: '运行中', modelSource: 'modelscope' },
+  { ...mockBaseModels[1], status: '已创建', modelSource: 'modelscope' },
+  { ...mockBaseModels[2], status: '失败', modelSource: 'modelscope' },
 ]
 
 function statusTag(status: TaskLifecycleStatus): React.ReactNode {
@@ -47,6 +48,7 @@ const BaseModelManagement: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false)
   const [detailRecord, setDetailRecord] = useState<BaseModelRow | null>(null)
   const [rows, setRows] = useState(seedRows)
+  const [modelSource, setModelSource] = useState<'local' | 'modelscope'>('local')
 
   const filteredData = useMemo(
     () =>
@@ -79,10 +81,10 @@ const BaseModelManagement: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 300,
+      width: 360,
       render: (_, record) => (
         <Space size={0}>
-          {getPrimaryTaskLifecycleAction(record.status) && (
+          {getPrimaryTaskLifecycleAction(record.status) && canRunTaskLifecycleAction(record.status, 'start') && (
             <Button
               type="link"
               size="small"
@@ -99,11 +101,28 @@ const BaseModelManagement: React.FC = () => {
                 )
               }
             >
-              {getPrimaryTaskLifecycleAction(record.status) === 'start' ? '启动' : '重新提交'}
+              启动
             </Button>
           )}
-          <Button type="link" size="small" disabled={!canRunTaskLifecycleAction(record.status, 'edit')}>编辑</Button>
+          {(record.status === '失败' || record.status === '已终止') ? (
+            <Button
+              type="link"
+              size="small"
+              onClick={() =>
+                setRows(previous =>
+                  previous.map(item =>
+                    item.id === record.id ? { ...item, status: '已创建' } : item,
+                  ),
+                )
+              }
+            >
+              重新提交
+            </Button>
+          ) : (
+            <Button type="link" size="small" disabled={!canRunTaskLifecycleAction(record.status, 'edit')}>编辑</Button>
+          )}
           <Button type="link" size="small" onClick={() => setDetailRecord(record)}>查看详情</Button>
+          {record.modelSource !== 'local' && <Button type="link" size="small">日志</Button>}
           <Button
             type="link"
             size="small"
@@ -133,7 +152,25 @@ const BaseModelManagement: React.FC = () => {
   const submitCreate = async () => {
     try {
       await form.validateFields()
+      const values = form.getFieldsValue()
+      setRows(previous => [
+        {
+          id: `base-${Date.now()}`,
+          code: values.code,
+          name: values.code,
+          description: values.description,
+          type: values.type,
+          provider: values.provider,
+          capabilities: values.capabilities,
+          status: '已创建',
+          modelSource: values.modelSource,
+          createdAt: new Date().toISOString(),
+        },
+        ...previous,
+      ])
       setCreateOpen(false)
+      form.resetFields()
+      setModelSource('local')
     } catch {
       return
     }
@@ -165,8 +202,7 @@ const BaseModelManagement: React.FC = () => {
                 onChange={value => setProviderFilter(value)}
                 style={{ width: 180 }}
                 options={[
-                  { value: '阿里云', label: '阿里云' },
-                  { value: 'OpenAI', label: 'OpenAI' },
+                  { value: 'Qwen', label: 'Qwen' },
                 ]}
               />
               <Button>搜索</Button>
@@ -192,15 +228,30 @@ const BaseModelManagement: React.FC = () => {
       <Modal
         title="新增基础模型"
         open={createOpen}
-        onCancel={() => setCreateOpen(false)}
+        onCancel={() => {
+          setCreateOpen(false)
+          setModelSource('local')
+        }}
         footer={
           <Space>
-            <Button onClick={() => setCreateOpen(false)}>取消</Button>
+            <Button onClick={() => {
+              setCreateOpen(false)
+              setModelSource('local')
+            }}>取消</Button>
             <Button type="primary" onClick={submitCreate}>创建</Button>
           </Space>
         }
       >
         <Form form={form} layout="vertical">
+          <Form.Item label="模型来源" name="modelSource" initialValue="local" rules={[{ required: true, message: '请选择模型来源' }]}>
+              <Select
+              onChange={value => setModelSource(value)}
+              options={[
+                { value: 'local', label: '本地' },
+                { value: 'modelscope', label: 'ModelScope' },
+              ]}
+            />
+          </Form.Item>
           <Form.Item label="模型Code" name="code" rules={[{ required: true, message: '请输入模型Code' }]}>
             <Input placeholder="如：qwen2.5-7b-instruct" />
           </Form.Item>
@@ -218,19 +269,21 @@ const BaseModelManagement: React.FC = () => {
           <Form.Item label="模型提供商" name="provider" rules={[{ required: true, message: '请选择模型提供商' }]}>
             <Select
               options={[
-                { value: '阿里云', label: '阿里云' },
-                { value: 'OpenAI', label: 'OpenAI' },
-                { value: 'Anthropic', label: 'Anthropic' },
+                { value: 'Qwen', label: 'Qwen' },
               ]}
             />
           </Form.Item>
+          {modelSource === 'modelscope' && (
+            <Form.Item label="ModelScope链接" name="modelScopeUrl">
+              <Input placeholder="https://www.modelscope.cn/models" />
+            </Form.Item>
+          )}
           <Form.Item label="支持能力" name="capabilities" rules={[{ required: true, message: '请选择支持能力' }]}>
             <Select
               mode="multiple"
               options={[
-                { value: '文本生成', label: '文本生成' },
-                { value: '推理', label: '推理' },
                 { value: '训练', label: '训练' },
+                { value: '推理', label: '推理' },
               ]}
             />
           </Form.Item>
@@ -250,6 +303,7 @@ const BaseModelManagement: React.FC = () => {
             <Descriptions.Item label="模型类型">{detailRecord.type || '-'}</Descriptions.Item>
             <Descriptions.Item label="模型提供商">{detailRecord.provider || '-'}</Descriptions.Item>
             <Descriptions.Item label="状态">{statusTag(detailRecord.status)}</Descriptions.Item>
+            <Descriptions.Item label="模型来源">{detailRecord.modelSource === 'local' ? '本地' : 'ModelScope'}</Descriptions.Item>
             <Descriptions.Item label="支持能力" span={2}>{detailRecord.capabilities?.join('、') || '-'}</Descriptions.Item>
             <Descriptions.Item label="创建时间" span={2}>{detailRecord.createdAt}</Descriptions.Item>
             <Descriptions.Item label="描述" span={2}>{detailRecord.description || '-'}</Descriptions.Item>
