@@ -42,12 +42,20 @@ export interface CreateInferenceResultParams {
 export interface CreateAnnotationTaskParams {
   name: string
   dataVolume: number
+  collaborationMode?: 'online' | 'multi'
+  reviewerCount?: number
+  reviewMode?: string
+  datasetType?: AnnotationDatasetType
   preDataset: string
+  postDataset?: string
+  outputMode?: string
 }
 
 export interface CreateCleaningTaskParams {
   name: string
   preDataset: string
+  postDataset?: string
+  operatorValues?: string[]
 }
 
 export interface ListQueryParams {

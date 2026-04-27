@@ -159,6 +159,21 @@ const seedState: MachineDeploymentState = {
       status: '运行中',
       creator: 'admin',
       createdAt: '2026/04/18 16:22:00',
+      standardConfig: {
+        model: 'defect-detection-yolov8',
+        modelVersion: 'V5',
+        modelSource: '模型管理',
+        network: 'yolov8',
+        resources: {
+          cpuRequest: 6,
+          cpuLimit: 8,
+          memoryRequest: 24,
+          memoryLimit: 32,
+          gpuType: 'NVIDIA Tesla T4',
+          gpuCount: 1,
+          instanceCount: 2,
+        },
+      },
       customConfig: {
         deployMode: '镜像部署',
         imageSource: 'system',

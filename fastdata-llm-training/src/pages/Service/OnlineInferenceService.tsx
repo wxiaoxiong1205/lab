@@ -1,64 +1,283 @@
-import React, { useState } from 'react'
-import { message, Tag } from 'antd'
+import React, { useMemo, useState } from 'react'
 import {
-  ThunderboltOutlined,
-  PlusOutlined,
-  DeleteOutlined,
-  DisconnectOutlined,
-} from '@ant-design/icons'
-import SharedListPage from '../../components/Shared/SharedListPage'
+  Button,
+  Card,
+  Descriptions,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+  message,
+} from 'antd'
+import type { ColumnsType } from 'antd/es/table'
 
-const mockData = [
-  { id: '1', name: '实时推理-7B', modelName: 'Qwen2.5-7B-Instruct', modelSource: '基础模型', instanceCount: 2, status: 'running', creator: 'admin', createdAt: '2026/03/19 11:00:00' },
-  { id: '2', name: '实时推理-1.5B', modelName: 'Qwen2.5-1.5B-Instruct', modelSource: '基础模型', instanceCount: 1, status: 'running', creator: 'lab1', createdAt: '2026/03/17 08:30:00' },
-  { id: '3', name: '批量推理服务', modelName: 'Qwen3-8B', modelSource: '模型管理', instanceCount: 0, status: 'stopped', creator: 'lab2', createdAt: '2026/03/15 16:00:00' },
+const { Title, Text } = Typography
+
+type ConnectionStatus = '测试通过' | '测试失败'
+type ModelType = '文本生成' | '图像理解' | '图像理解/文本生成'
+
+type OnlineServiceRecord = {
+  id: string
+  name: string
+  connectionStatus: ConnectionStatus
+  description: string
+  modelType: ModelType
+  creator: string
+  createdAt: string
+}
+
+const seedServices: OnlineServiceRecord[] = [
+  {
+    id: 'svc-1',
+    name: 'qwen3-vl-plus-图像理解-在线推理服务',
+    connectionStatus: '测试通过',
+    description: '测试2',
+    modelType: '图像理解',
+    creator: 'deepexilab',
+    createdAt: '2026/03/19 14:04:46',
+  },
+  {
+    id: 'svc-2',
+    name: 'Qwen3-Next-80B-A3B-Instruct-文本生成-在线推理服务',
+    connectionStatus: '测试通过',
+    description: '测试',
+    modelType: '文本生成',
+    creator: 'deepexilab',
+    createdAt: '2026/03/19 14:04:43',
+  },
+  {
+    id: 'svc-3',
+    name: 'test2323243',
+    connectionStatus: '测试失败',
+    description: '文本生成',
+    modelType: '文本生成',
+    creator: 'system_admin',
+    createdAt: '2026/03/06 16:06:22',
+  },
 ]
 
-const statusMap: Record<string, { color: string; label: string }> = {
-  running: { color: 'green', label: '运行中' },
-  stopped: { color: 'default', label: '已停止' },
-  error: { color: 'red', label: '异常' },
+const sectionCardStyle: React.CSSProperties = {
+  borderRadius: 18,
+  border: '1px solid #e5e7eb',
+  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.04)',
+}
+
+const statusColorMap: Record<ConnectionStatus, string> = {
+  测试通过: 'green',
+  测试失败: 'red',
 }
 
 const OnlineInferenceService: React.FC = () => {
-  const [data] = useState(mockData)
+  const [form] = Form.useForm()
+  const [services, setServices] = useState(seedServices)
+  const [searchValue, setSearchValue] = useState('')
+  const [statusFilter, setStatusFilter] = useState<ConnectionStatus | undefined>()
+  const [modelTypeFilter, setModelTypeFilter] = useState<ModelType | undefined>()
+  const [detailRecord, setDetailRecord] = useState<OnlineServiceRecord | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+
+  const filteredData = useMemo(
+    () =>
+      services.filter(item => {
+        const matchSearch = !searchValue || item.name.toLowerCase().includes(searchValue.toLowerCase())
+        const matchStatus = !statusFilter || item.connectionStatus === statusFilter
+        const matchType = !modelTypeFilter || item.modelType === modelTypeFilter
+        return matchSearch && matchStatus && matchType
+      }),
+    [modelTypeFilter, searchValue, services, statusFilter],
+  )
+
+  const columns: ColumnsType<OnlineServiceRecord> = [
+    {
+      title: '服务名称',
+      dataIndex: 'name',
+      key: 'name',
+      render: value => <Button type="link" size="small" style={{ padding: 0 }}>{value}</Button>,
+    },
+    {
+      title: '连接状态',
+      dataIndex: 'connectionStatus',
+      key: 'connectionStatus',
+      width: 120,
+      render: (value: ConnectionStatus) => <Tag color={statusColorMap[value]}>{value}</Tag>,
+    },
+    { title: '描述', dataIndex: 'description', key: 'description', width: 160 },
+    { title: '模型类型', dataIndex: 'modelType', key: 'modelType', width: 150 },
+    { title: '创建人', dataIndex: 'creator', key: 'creator', width: 120 },
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 180 },
+    {
+      title: '操作',
+      key: 'action',
+      width: 260,
+      render: (_, record) => (
+        <Space size={0}>
+          <Button type="link" size="small" onClick={() => setDetailRecord(record)}>查看详情</Button>
+          <Button type="link" size="small" onClick={() => {
+            form.setFieldsValue(record)
+            setDetailRecord(null)
+            setCreateOpen(true)
+          }}>编辑</Button>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => {
+              setServices(previous =>
+                previous.map(item =>
+                  item.id === record.id ? { ...item, connectionStatus: item.connectionStatus === '测试通过' ? '测试失败' : '测试通过' } : item,
+                ),
+              )
+              message.success('连接测试已执行')
+            }}
+          >
+            连接测试
+          </Button>
+          <Button type="text" size="small">...</Button>
+        </Space>
+      ),
+    },
+  ]
+
+  const openCreate = () => {
+    form.resetFields()
+    setCreateOpen(true)
+  }
+
+  const submit = async () => {
+    try {
+      const values = await form.validateFields()
+      setServices(previous => [
+        {
+          id: `svc-${Date.now()}`,
+          name: values.name,
+          connectionStatus: '测试失败',
+          description: values.description,
+          modelType: values.modelType,
+          creator: 'zhangsan',
+          createdAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        },
+        ...previous,
+      ])
+      setCreateOpen(false)
+      form.resetFields()
+      message.success('在线推理服务已创建')
+    } catch {
+      return
+    }
+  }
 
   return (
-    <SharedListPage
-      title="在线推理服务"
-      titleIcon={<ThunderboltOutlined style={{ color: '#fff', fontSize: 18 }} />}
-      subtitle="提供在线推理能力，支持实时调用模型进行推理"
-      searchField="name"
-      showSearch={false}
-      columns={[
-        { title: '服务名称', dataIndex: 'name', key: 'name' },
-        { title: '模型名称', dataIndex: 'modelName', key: 'modelName' },
-        { title: '模型来源', dataIndex: 'modelSource', key: 'modelSource' },
-        { title: '实例数', dataIndex: 'instanceCount', key: 'instanceCount' },
-        { title: '状态', dataIndex: 'status', key: 'status', render: (val: string) => {
-          const s = statusMap[val] || { color: 'default', label: val }
-          return <Tag color={s.color}>{s.label}</Tag>
-        }},
-        { title: '创建人', dataIndex: 'creator', key: 'creator' },
-        { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt' },
-      ]}
-      dataSource={data}
-      showCreateButton={false}
-      onRefresh={() => message.success('刷新成功')}
-      emptyText="暂无推理服务"
-      actionButtons={[
-        {
-          label: '启动',
-          onClick: (record: typeof mockData[0]) => message.success(`启动服务: ${record.name}`),
-          disabled: (record: typeof mockData[0]) => record.status === 'running',
-        },
-        {
-          label: '停止',
-          onClick: (record: typeof mockData[0]) => message.info(`停止服务: ${record.name}`),
-          disabled: (record: typeof mockData[0]) => record.status !== 'running',
-        },
-      ]}
-    />
+    <>
+      <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
+        <Card style={sectionCardStyle}>
+          <Title level={2} style={{ marginBottom: 20 }}>在线推理服务</Title>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+            <Space wrap>
+              <Input
+                placeholder="请输入服务名称"
+                value={searchValue}
+                onChange={event => setSearchValue(event.target.value)}
+                style={{ width: 220 }}
+              />
+              <Select
+                placeholder="服务连接状态"
+                allowClear
+                value={statusFilter}
+                onChange={value => setStatusFilter(value)}
+                style={{ width: 160 }}
+                options={[
+                  { value: '测试通过', label: '测试通过' },
+                  { value: '测试失败', label: '测试失败' },
+                ]}
+              />
+              <Select
+                placeholder="模型类型"
+                allowClear
+                value={modelTypeFilter}
+                onChange={value => setModelTypeFilter(value)}
+                style={{ width: 160 }}
+                options={[
+                  { value: '文本生成', label: '文本生成' },
+                  { value: '图像理解', label: '图像理解' },
+                  { value: '图像理解/文本生成', label: '图像理解/文本生成' },
+                ]}
+              />
+              <Button onClick={() => message.success('搜索完成')}>搜索</Button>
+              <Button
+                onClick={() => {
+                  setSearchValue('')
+                  setStatusFilter(undefined)
+                  setModelTypeFilter(undefined)
+                }}
+              >
+                重置
+              </Button>
+            </Space>
+
+            <Button type="primary" onClick={openCreate}>新建服务</Button>
+          </div>
+
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={filteredData}
+            scroll={{ x: 1200 }}
+            tableLayout="fixed"
+            pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条数据` }}
+          />
+        </Card>
+      </div>
+
+      <Modal
+        title="在线推理服务详情"
+        open={Boolean(detailRecord)}
+        onCancel={() => setDetailRecord(null)}
+        footer={<Button onClick={() => setDetailRecord(null)}>关闭</Button>}
+      >
+        {detailRecord && (
+          <Descriptions column={1} bordered size="small">
+            <Descriptions.Item label="服务名称">{detailRecord.name}</Descriptions.Item>
+            <Descriptions.Item label="连接状态">
+              <Tag color={statusColorMap[detailRecord.connectionStatus]}>{detailRecord.connectionStatus}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="描述">{detailRecord.description}</Descriptions.Item>
+            <Descriptions.Item label="模型类型">{detailRecord.modelType}</Descriptions.Item>
+            <Descriptions.Item label="创建人">{detailRecord.creator}</Descriptions.Item>
+            <Descriptions.Item label="创建时间">{detailRecord.createdAt}</Descriptions.Item>
+          </Descriptions>
+        )}
+      </Modal>
+
+      <Modal
+        title="新建在线推理服务"
+        open={createOpen}
+        onCancel={() => setCreateOpen(false)}
+        onOk={submit}
+        okText="创建"
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item label="服务名称" name="name" rules={[{ required: true, message: '请输入服务名称' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item label="描述" name="description">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+          <Form.Item label="模型类型" name="modelType" rules={[{ required: true, message: '请选择模型类型' }]}>
+            <Select
+              options={[
+                { value: '文本生成', label: '文本生成' },
+                { value: '图像理解', label: '图像理解' },
+                { value: '图像理解/文本生成', label: '图像理解/文本生成' },
+              ]}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
   )
 }
 

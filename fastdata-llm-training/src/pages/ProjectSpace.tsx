@@ -4,8 +4,10 @@ import {
   Input,
   Typography,
   Empty,
+  Button,
+  Space,
 } from 'antd'
-import { SearchOutlined, FolderOpenOutlined, StarFilled } from '@ant-design/icons'
+import { SearchOutlined, FolderOpenOutlined, StarFilled, AppstoreOutlined, ClusterOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import {
   getAccessibleProjects,
@@ -22,6 +24,7 @@ const ProjectSpace: React.FC = () => {
   const currentUser = getCurrentUser(permissionState)
   const projects = getAccessibleProjects(permissionState)
   const [searchValue, setSearchValue] = useState('')
+  const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null)
 
   const filteredProjects = useMemo(
     () =>
@@ -36,9 +39,9 @@ const ProjectSpace: React.FC = () => {
     [projects, searchValue],
   )
 
-  const handleEnterProject = (projectId: string) => {
-    setCurrentProject(projectId)
-    navigate('/home')
+  const handleEnterProject = (projectId: string, mode: 'llm' | 'ml') => {
+    setCurrentProject(projectId, mode)
+    navigate(mode === 'llm' ? '/home' : '/machine-data-management')
   }
 
   return (
@@ -96,7 +99,8 @@ const ProjectSpace: React.FC = () => {
             <Card
               key={project.id}
               hoverable
-              onClick={() => handleEnterProject(project.id)}
+              onMouseEnter={() => setHoveredProjectId(project.id)}
+              onMouseLeave={() => setHoveredProjectId(current => (current === project.id ? null : current))}
               style={{
                 borderRadius: 24,
                 border: '1px solid rgba(226, 232, 240, 0.95)',
@@ -172,6 +176,39 @@ const ProjectSpace: React.FC = () => {
               >
                 创建人：{currentUser.account}
               </div>
+
+              {hoveredProjectId === project.id && (
+                <div
+                  style={{
+                    marginTop: 18,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  <Button
+                    type="primary"
+                    icon={<AppstoreOutlined />}
+                    style={{ flex: 1, borderRadius: 14, height: 42 }}
+                    onClick={event => {
+                      event.stopPropagation()
+                      handleEnterProject(project.id, 'llm')
+                    }}
+                  >
+                    大模型
+                  </Button>
+                  <Button
+                    icon={<ClusterOutlined />}
+                    style={{ flex: 1, borderRadius: 14, height: 42 }}
+                    onClick={event => {
+                      event.stopPropagation()
+                      handleEnterProject(project.id, 'ml')
+                    }}
+                  >
+                    机器学习
+                  </Button>
+                </div>
+              )}
             </Card>
           ))}
         </div>

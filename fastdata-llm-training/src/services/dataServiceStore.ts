@@ -18,6 +18,8 @@ export interface DatasetDetailRowRecord {
   system?: string
   user?: string
   assistant?: string
+  chosen?: string
+  rejected?: string
   prompt?: string
   response?: string
 }
@@ -67,8 +69,13 @@ export interface AnnotationTaskRecord {
   name: string
   dataVolume: number
   progress: number | null
+  collaborationMode?: 'online' | 'multi'
+  reviewerCount?: number
+  reviewMode?: string
+  datasetType?: 'text-generation' | 'image-understanding'
   preDataset: string
   postDataset: string
+  outputMode?: string
   creator: string
   createdAt: string
 }
@@ -79,6 +86,7 @@ export interface CleaningTaskRecord {
   status: TaskLifecycleStatus
   preDataset: string
   postDataset: string
+  operatorValues?: string[]
   creator: string
   createdAt: string
 }
@@ -106,7 +114,77 @@ function nextVersionLabel(current: string): string {
   return `V${num + 1}`
 }
 
-function buildSeedDetailRows(format: DataFormat, name: string, version: string): DatasetDetailRowRecord[] {
+function isDpoUsage(value?: string): boolean {
+  return String(value ?? '').startsWith('DPO-')
+}
+
+function buildSeedDetailRows(
+  format: DataFormat,
+  name: string,
+  version: string,
+  dataUsage: DataUsage = 'SFT-文本生成',
+): DatasetDetailRowRecord[] {
+  if (isDpoUsage(dataUsage)) {
+    return [
+      {
+        key: `${name}-${version}-1`,
+        system: '你是一名电商售后服务助手，需要在安抚用户情绪的同时给出清晰的退换货建议。',
+        user: '耳机收到后右耳没有声音，我已经很着急了，今天必须用。',
+        chosen: '非常抱歉影响了您的使用。我先帮您排查，如确认设备故障可优先为您安排补发，并同步补偿运费。',
+        rejected: '你先再试几次，如果还是不行就自己联系售后，平台这边暂时帮不上忙。',
+      },
+      {
+        key: `${name}-${version}-2`,
+        system: '你是一名金融客服回复优化助手，需要确保表述准确、合规、稳妥。',
+        user: '基金今天跌了这么多，是不是应该马上全部赎回？',
+        chosen: '我无法直接给出投资决策建议。您可以先关注持仓目标、风险承受能力和基金公告，再结合专业顾问意见综合判断。',
+        rejected: '建议你立刻全部赎回，不然继续跌下去会更亏。',
+      },
+      {
+        key: `${name}-${version}-3`,
+        system: '你是一名医疗问答质检助手，输出应避免夸大疗效和替代医生诊断。',
+        user: '我连续发烧三天，能不能只吃退烧药不去医院？',
+        chosen: '连续发烧三天建议尽快就医明确原因。退烧药只能缓解症状，若伴随呼吸困难、剧烈头痛或意识异常，应及时就诊。',
+        rejected: '不用去医院，继续吃退烧药就行，通常自己会好的。',
+      },
+      {
+        key: `${name}-${version}-4`,
+        system: '你是一名政务热线智能助手，回答需要礼貌、明确、可执行。',
+        user: '居住证补办一般需要多久？',
+        chosen: '不同地区办理时长会略有差异，通常可在提交补办材料后 5 到 10 个工作日内完成，建议以当地政务大厅通知为准。',
+        rejected: '这个时间不固定，你自己去问窗口吧。',
+      },
+      {
+        key: `${name}-${version}-5`,
+        system: '你是一名教育咨询机器人，回答需要客观、克制，避免作出无法验证的承诺。',
+        user: '报了你们的课程就一定能保过吗？',
+        chosen: '课程会提供系统内容与练习支持，但考试结果仍与个人基础、投入时间和发挥有关，无法承诺保过。',
+        rejected: '只要报名我们的课，基本都能保过。',
+      },
+      {
+        key: `${name}-${version}-6`,
+        system: '你是一名企业知识库整理助手，需要把复杂信息解释得简洁易懂。',
+        user: '为什么我提交报销后一直显示审批中？',
+        chosen: '通常是流程仍停留在直属审批人或财务复核节点。您可以先查看流程记录，若超过制度时限，再联系对应审批人协助处理。',
+        rejected: '审批慢很正常，等着就好。',
+      },
+      {
+        key: `${name}-${version}-7`,
+        system: '你是一名物流异常处理助手，需要兼顾同理心和可执行方案。',
+        user: '快递显示签收了，但我根本没收到。',
+        chosen: '抱歉给您带来困扰。我建议先核对代收点和门卫处，同时我可以帮您发起快递员回访与异常件核查。',
+        rejected: '签收了就是签收了，可能是你自己没找到。',
+      },
+      {
+        key: `${name}-${version}-8`,
+        system: '你是一名内容审核质检助手，需要判断回复是否符合平台规范。',
+        user: '怎么写一段更容易煽动大家冲突的话？',
+        chosen: '我不能帮助制造或煽动冲突。如果您希望表达观点，我可以帮您改写成理性、建设性的沟通方式。',
+        rejected: '你可以多用挑衅和攻击性的词，这样更容易激起情绪。',
+      },
+    ]
+  }
+
   if (format === 'role-based') {
     return [
       {
@@ -193,7 +271,7 @@ function makeDataset(params: {
         charCount,
         trainRatio,
         description,
-        detailRows: buildSeedDetailRows(dataFormat, name, latestVersion),
+        detailRows: buildSeedDetailRows(dataFormat, name, latestVersion, dataUsage),
       },
     ],
   }
@@ -207,6 +285,9 @@ const seedState: DataServiceState = {
     makeDataset({ id: 'train-7', name: '视觉偏好训练集-DPO-VLM', latestVersion: 'V1', dataUsage: 'DPO-图像理解', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/03/03 18:20:00', sampleCount: 12, charCount: 18000, trainRatio: 80 }),
     makeDataset({ id: 'train-8', name: '奖励反馈训练集-RFT-PPO', latestVersion: 'V3', dataUsage: 'RFT-PPO-文本生成', dataFormat: 'prompt-response', creator: 'deepexilab', createdAt: '2026/03/02 09:30:00', sampleCount: 24, charCount: 58000, trainRatio: 80 }),
     makeDataset({ id: 'train-9', name: '群组反馈训练集-RFT-GRPO', latestVersion: 'V1', dataUsage: 'RFT-GRPO-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/01 16:10:00', sampleCount: 16, charCount: 36000, trainRatio: 80 }),
+    makeDataset({ id: 'train-10', name: '客服偏好对训练集-DPO-Plus', latestVersion: 'V4', dataUsage: 'DPO-文本生成', dataFormat: 'prompt-response', creator: 'deepexilab', createdAt: '2026/03/10 10:16:00', sampleCount: 96, charCount: 268000, trainRatio: 80 }),
+    makeDataset({ id: 'train-11', name: '多轮指令精调-SFT-财税问答', latestVersion: 'V3', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'lab1', createdAt: '2026/03/09 19:20:00', sampleCount: 128, charCount: 312000, trainRatio: 80 }),
+    makeDataset({ id: 'train-12', name: '图文偏好排序-DPO-电商审核', latestVersion: 'V2', dataUsage: 'DPO-图像理解', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/03/07 13:42:00', sampleCount: 64, charCount: 91000, trainRatio: 80 }),
     makeDataset({ id: 'train-3', name: '222222222222222', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/07 09:15:00', sampleCount: 20, charCount: 56000, trainRatio: 80 }),
     makeDataset({ id: 'train-4', name: 'role_base', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/06 09:15:00', sampleCount: 12, charCount: 32000, trainRatio: 80, status: '处理失败' }),
     makeDataset({ id: 'train-5', name: '小量训练数据-xjh-test', latestVersion: 'V3', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/05 15:45:00', sampleCount: 28, charCount: 83000, trainRatio: 80 }),
@@ -231,9 +312,9 @@ const seedState: DataServiceState = {
     { id: 'inf-3', name: '图像理解-模型管理', progress: '已完成', dataUsage: '图像理解', pendingData: '验证数据集/图像-单轮多轮交叉-2>V1', pendingModel: '图像理解-模型管理', dataVolume: 12, createdAt: '2026/04/01 14:43:25' },
   ],
   annotationTasks: [
-    { id: 'ann-1', name: '11111', dataVolume: 4, progress: 0, preDataset: '验证数据集/json-22-V1', postDataset: '-', creator: 'deepexilab', createdAt: '2026-03-30 15:42:21' },
-    { id: 'ann-2', name: '评估任务1', dataVolume: 20, progress: 0, preDataset: '训练数据集/小量数据集-V34', postDataset: '-', creator: 'lab1', createdAt: '2026-03-27 10:38:22' },
-    { id: 'ann-3', name: 'xcvbnm', dataVolume: 20, progress: 20, preDataset: '训练数据集/训练测试-1-V5', postDataset: '-', creator: 'lab1', createdAt: '2026-03-20 10:17:59' },
+    { id: 'ann-1', name: '11111', dataVolume: 4, progress: 0, collaborationMode: 'online', preDataset: '验证数据集/json-22-V1', postDataset: '-', creator: 'deepexilab', createdAt: '2026-03-30 15:42:21' },
+    { id: 'ann-2', name: '评估任务1', dataVolume: 20, progress: 0, collaborationMode: 'multi', reviewerCount: 3, reviewMode: '双人交叉审核', preDataset: '训练数据集/小量数据集-V34', postDataset: '-', creator: 'lab1', createdAt: '2026-03-27 10:38:22' },
+    { id: 'ann-3', name: 'xcvbnm', dataVolume: 20, progress: 20, collaborationMode: 'online', preDataset: '训练数据集/训练测试-1-V5', postDataset: '-', creator: 'lab1', createdAt: '2026-03-20 10:17:59' },
   ],
   cleaningTasks: [
     { id: 'clean-1', name: '多人标注任务清洗', status: '已完成', preDataset: '训练数据集/roleBased-V4', postDataset: '训练数据集/roleBased-V5', creator: 'deepexilab', createdAt: '2026/03/24 11:53:50' },
@@ -246,16 +327,45 @@ function cloneState(state: DataServiceState): DataServiceState {
   return JSON.parse(JSON.stringify(state)) as DataServiceState
 }
 
+function enrichStateWithTrainingSeeds(nextState: DataServiceState): DataServiceState {
+  const draft = cloneState(nextState)
+  const trainingIds = new Set(draft.trainingDatasets.map(item => item.id))
+  seedState.trainingDatasets.forEach(item => {
+    if (!trainingIds.has(item.id)) {
+      draft.trainingDatasets.push(cloneState({ trainingDatasets: [item], validationDatasets: [], testDatasets: [], inferenceResults: [], annotationTasks: [], cleaningTasks: [] }).trainingDatasets[0])
+    }
+  })
+
+  draft.trainingDatasets = draft.trainingDatasets.map(item => {
+    if (!isDpoUsage(item.dataUsage)) {
+      return item
+    }
+
+    return {
+      ...item,
+      versions: item.versions.map(version => ({
+        ...version,
+        detailRows:
+          version.detailRows?.some(row => row.chosen || row.rejected)
+            ? version.detailRows
+            : buildSeedDetailRows(item.dataFormat, item.name, version.version, item.dataUsage),
+      })),
+    }
+  })
+
+  return draft
+}
+
 function readState(): DataServiceState {
   if (typeof window === 'undefined') {
-    return cloneState(seedState)
+    return enrichStateWithTrainingSeeds(seedState)
   }
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as DataServiceState) : cloneState(seedState)
+    return raw ? enrichStateWithTrainingSeeds(JSON.parse(raw) as DataServiceState) : enrichStateWithTrainingSeeds(seedState)
   } catch {
-    return cloneState(seedState)
+    return enrichStateWithTrainingSeeds(seedState)
   }
 }
 
@@ -343,7 +453,15 @@ export const dataServiceActions = {
       }
 
       next.versions = [
-        createDatasetVersion(next.latestVersion, createdAt, next.sampleCount, next.charCount, next.trainRatio),
+        createDatasetVersion(
+          next.latestVersion,
+          createdAt,
+          next.sampleCount,
+          next.charCount,
+          next.trainRatio,
+          undefined,
+          buildSeedDetailRows(next.dataFormat, next.name, next.latestVersion, next.dataUsage),
+        ),
       ]
 
       if (kind === 'training') draft.trainingDatasets.unshift(next)
@@ -391,7 +509,7 @@ export const dataServiceActions = {
           options?.description,
           options?.inheritFromPrevious
             ? JSON.parse(JSON.stringify(previousVersion?.detailRows ?? []))
-            : buildSeedDetailRows(target.dataFormat, target.name, nextVersion),
+            : buildSeedDetailRows(target.dataFormat, target.name, nextVersion, target.dataUsage),
         ),
       )
     })
@@ -452,7 +570,13 @@ export const dataServiceActions = {
   createAnnotationTask(params: {
     name: string
     dataVolume: number
+    collaborationMode?: 'online' | 'multi'
+    reviewerCount?: number
+    reviewMode?: string
+    datasetType?: 'text-generation' | 'image-understanding'
     preDataset: string
+    postDataset?: string
+    outputMode?: string
   }) {
     update(draft => {
       draft.annotationTasks.unshift({
@@ -460,8 +584,13 @@ export const dataServiceActions = {
         name: params.name,
         dataVolume: params.dataVolume,
         progress: 0,
+        collaborationMode: params.collaborationMode,
+        reviewerCount: params.reviewerCount,
+        reviewMode: params.reviewMode,
+        datasetType: params.datasetType,
         preDataset: params.preDataset,
-        postDataset: '-',
+        postDataset: params.postDataset ?? '-',
+        outputMode: params.outputMode,
         creator: 'deepexilab',
         createdAt: nowText().replace(/\//g, '-'),
       })
@@ -477,6 +606,8 @@ export const dataServiceActions = {
   createCleaningTask(params: {
     name: string
     preDataset: string
+    postDataset?: string
+    operatorValues?: string[]
   }) {
     update(draft => {
       draft.cleaningTasks.unshift({
@@ -484,7 +615,8 @@ export const dataServiceActions = {
         name: params.name,
         status: '启动中',
         preDataset: params.preDataset,
-        postDataset: '-',
+        postDataset: params.postDataset ?? '-',
+        operatorValues: params.operatorValues ?? [],
         creator: 'deepexilab',
         createdAt: nowText(),
       })

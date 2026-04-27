@@ -44,6 +44,7 @@ export interface PermissionProject {
 export interface PermissionState {
   currentUserAccount: string
   currentProjectId: string | null
+  currentProjectMode: 'llm' | 'ml'
   users: PermissionUser[]
   roles: PermissionRole[]
   projects: PermissionProject[]
@@ -175,6 +176,7 @@ const seedProjects: PermissionProject[] = [
 const seedState: PermissionState = {
   currentUserAccount: 'zhangsan',
   currentProjectId: null,
+  currentProjectMode: 'llm',
   users: seedUsers,
   roles: seedRoles,
   projects: seedProjects,
@@ -202,6 +204,7 @@ function loadState(): PermissionState {
     const parsed = JSON.parse(raw) as PermissionState
     return {
       ...parsed,
+      currentProjectMode: parsed.currentProjectMode ?? 'llm',
       users: parsed.users.map(user => ({
         ...user,
         roleKeys: user.roleKeys?.length ? user.roleKeys : [user.roleKey],
@@ -289,6 +292,10 @@ export function getCurrentProject(sourceState = state): PermissionProject | null
   return accessibleProjects.find(item => item.id === sourceState.currentProjectId) ?? accessibleProjects[0] ?? null
 }
 
+export function getCurrentProjectMode(sourceState = state): 'llm' | 'ml' {
+  return sourceState.currentProjectMode ?? 'llm'
+}
+
 export function canViewCurrentRoute(pathname: string, sourceState = state): { allowed: boolean; reason?: OperationDenyReason } {
   const route = resolveRouteAccess(pathname)
   if (!route) {
@@ -361,9 +368,10 @@ export function setCurrentUser(account: string) {
   persistState(nextState)
 }
 
-export function setCurrentProject(projectId: string | null) {
+export function setCurrentProject(projectId: string | null, mode: 'llm' | 'ml' = 'llm') {
   const nextState = cloneState(state)
   nextState.currentProjectId = projectId
+  nextState.currentProjectMode = mode
   persistState(nextState)
 }
 

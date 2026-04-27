@@ -161,6 +161,15 @@ body {
   transition: width var(--transition-slow), transform var(--transition-slow);
 }
 
+.app-shell__main .ant-card,
+.app-shell__main .ant-card-body,
+.app-shell__main .ant-table-wrapper,
+.app-shell__main .ant-table,
+.app-shell__main .ant-table-container,
+.app-shell__main .ant-table-content {
+  min-width: 0;
+}
+
 .app-shell__doc-rail {
   width: 0;
   flex: 0 0 auto;
@@ -761,15 +770,28 @@ body {
 .ant-pagination-item {
   border-radius: var(--radius-md);
   border-color: var(--color-border);
+  background: rgba(255, 255, 255, 0.92);
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ant-pagination-item a {
+  color: #334155;
+  font-weight: 600;
+}
+
+.ant-pagination-item:hover {
+  border-color: #2563eb;
+  background: rgba(239, 246, 255, 0.96);
 }
 
 .ant-pagination-item-active {
   background: var(--color-primary-gradient);
   border-color: var(--color-primary);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2);
 }
 
 .ant-pagination-item-active a {
-  color: white;
+  color: white !important;
 }
 
 /* ========================================

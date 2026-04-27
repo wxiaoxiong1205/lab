@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   Card,
   Form,
@@ -737,6 +737,35 @@ const CreateTraining: React.FC = () => {
     () => trainedModels.filter(m => m.type === trainingType),
     [trainingType],
   )
+
+  useEffect(() => {
+    if (mode !== 'create') {
+      return
+    }
+
+    const prefillDatasetName = searchParams.get('prefillDatasetName')
+    if (!prefillDatasetName) {
+      return
+    }
+
+    const prefillRow: TrainingDatasetRow = {
+      key: `${prefillDatasetName}__${searchParams.get('prefillDatasetVersion') ?? 'V1'}`,
+      name: prefillDatasetName,
+      version: searchParams.get('prefillDatasetVersion') ?? 'V1',
+      charCount: Number(searchParams.get('prefillCharCount') ?? 0),
+      sampleCount: Number(searchParams.get('prefillSampleCount') ?? 0),
+      sampleRate: Number(searchParams.get('prefillSampleRate') ?? 100),
+      trainRatio: Number(searchParams.get('prefillTrainRatio') ?? 100),
+    }
+
+    const currentRows = ((form.getFieldValue('trainingDatasets') as TrainingDatasetRow[] | undefined) ?? []).filter(Boolean)
+    const exists = currentRows.some(row => row.name === prefillRow.name && row.version === prefillRow.version)
+    if (exists) {
+      return
+    }
+
+    form.setFieldValue('trainingDatasets', [...currentRows, prefillRow])
+  }, [form, mode, searchParams])
 
   // 表单提交
   const handleSubmit = async () => {

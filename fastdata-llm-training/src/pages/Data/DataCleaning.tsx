@@ -2,9 +2,12 @@ import React, { useMemo, useState } from 'react'
 import {
   Button,
   Card,
+  Descriptions,
   Empty,
   Form,
   Input,
+  message,
+  Modal,
   Select,
   Space,
   Table,
@@ -32,6 +35,7 @@ type CleaningTask = {
   status: '已完成' | '启动中' | '已终止'
   preDataset: string
   postDataset: string
+  operatorValues?: string[]
   creator: string
   createdAt: string
 }
@@ -119,11 +123,13 @@ const DataCleaning: React.FC = () => {
   const cleaningTasks = selectCleaningTasks(state)
   const [form] = Form.useForm()
   const [selectedOperators, setSelectedOperators] = useState<string[]>([])
+  const [detailTask, setDetailTask] = useState<CleaningTask | null>(null)
   const isCreateRoute = location.pathname === '/data-cleaning/create'
   const scheduleEnabled = Form.useWatch('scheduleEnabled', form)
   const datasetOptions = useMemo(() => buildCleaningDatasetOptions(state), [state])
   const selectedDatasetValue = Form.useWatch('dataset', form)
   const [creating, setCreating] = useState(false)
+  const [searchValue, setSearchValue] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
@@ -133,6 +139,15 @@ const DataCleaning: React.FC = () => {
     const value = selectedDatasetValue
     return datasetOptions.find(item => item.value === value)?.label ?? '-'
   }, [selectedDatasetValue])
+
+  const filteredItems = useMemo(
+    () =>
+      listResult.items.filter(item => {
+        const matchSearch = !searchValue || item.name.toLowerCase().includes(searchValue.toLowerCase())
+        return matchSearch
+      }),
+    [listResult.items, searchValue],
+  )
 
   const listColumns: ColumnsType<CleaningTask> = [
     { title: '任务名称', dataIndex: 'name', key: 'name' },
@@ -150,13 +165,15 @@ const DataCleaning: React.FC = () => {
           <Button
             type="link"
             size="small"
+            disabled={record.status !== '已终止'}
             onClick={async () => {
               await dataServiceApi.startCleaningTask(record.id)
             }}
           >
             启动
           </Button>
-          <Button type="link" size="small">编辑</Button>
+          <Button type="link" size="small" onClick={() => setDetailTask(record)}>查看详情</Button>
+          <Button type="link" size="small" disabled={record.status !== '已终止'}>编辑</Button>
           <Button
             type="link"
             size="small"
@@ -195,6 +212,8 @@ const DataCleaning: React.FC = () => {
       await dataServiceApi.createCleaningTask({
         name: form.getFieldValue('name'),
         preDataset: selectedDatasetLabel,
+        postDataset: form.getFieldValue('outputName'),
+        operatorValues: selectedOperators,
       })
     } finally {
       setCreating(false)
@@ -204,7 +223,7 @@ const DataCleaning: React.FC = () => {
 
   React.useEffect(() => {
     setPage(1)
-  }, [statusFilter])
+  }, [searchValue, statusFilter])
 
   React.useEffect(() => {
     let active = true
@@ -340,8 +359,15 @@ const DataCleaning: React.FC = () => {
                 title="数据清洗流程配置"
                 extra={
                   <Space>
-                    <Button size="small">保存为模板</Button>
-                    <Button size="small">清空算子</Button>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        message.success(selectedOperators.length ? '模板已保存' : '请先选择清洗算子')
+                      }}
+                    >
+                      保存为模板
+                    </Button>
+                    <Button size="small" onClick={() => setSelectedOperators([])}>清空算子</Button>
                   </Space>
                 }
                 style={{ borderRadius: 14, minHeight: 680 }}
@@ -349,16 +375,75 @@ const DataCleaning: React.FC = () => {
                 <div style={{ marginBottom: 16 }}>
                   <Text strong>清洗模板</Text>
                 </div>
+                <div style={{ marginBottom: 16 }}>
+                  <Text type="secondary">已选择算子：{selectedOperators.length} 个</Text>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                  <Card size="small" style={{ borderRadius: 12, background: '#f8fafc' }}>
+                    <Text type="secondary">清洗后数据集</Text>
+                    <div style={{ marginTop: 6, fontWeight: 600 }}>{form.getFieldValue('outputName') || '待填写'}</div>
+                  </Card>
+                  <Card size="small" style={{ borderRadius: 12, background: '#f8fafc' }}>
+                    <Text type="secondary">流程结果预期</Text>
+                    <div style={{ marginTop: 6, fontWeight: 600 }}>{selectedOperators.length ? '将生成清洗结果集' : '待配置流程'}</div>
+                  </Card>
+                </div>
                 {selectedOperators.length ? (
                   <div style={{ display: 'grid', gap: 12 }}>
-                    {selectedOperators.map(operatorValue => {
+                    {selectedOperators.map((operatorValue, index) => {
                       const operator = categories.flatMap(item => item.operators).find(item => item.value === operatorValue)
                       if (!operator) {
                         return null
                       }
                       return (
-                        <Card key={operator.value} size="small" style={{ borderRadius: 12 }}>
-                          <div style={{ fontWeight: 600, marginBottom: 6 }}>{operator.label}</div>
+                        <Card
+                          key={operator.value}
+                          size="small"
+                          style={{ borderRadius: 12 }}
+                          extra={
+                            <Space size={4}>
+                              <Button
+                                type="link"
+                                size="small"
+                                disabled={index === 0}
+                                onClick={() =>
+                                  setSelectedOperators(previous => {
+                                    const next = [...previous]
+                                    ;[next[index - 1], next[index]] = [next[index], next[index - 1]]
+                                    return next
+                                  })
+                                }
+                              >
+                                上移
+                              </Button>
+                              <Button
+                                type="link"
+                                size="small"
+                                disabled={index === selectedOperators.length - 1}
+                                onClick={() =>
+                                  setSelectedOperators(previous => {
+                                    const next = [...previous]
+                                    ;[next[index + 1], next[index]] = [next[index], next[index + 1]]
+                                    return next
+                                  })
+                                }
+                              >
+                                下移
+                              </Button>
+                              <Button
+                                type="link"
+                                size="small"
+                                danger
+                                onClick={() =>
+                                  setSelectedOperators(previous => previous.filter(item => item !== operator.value))
+                                }
+                              >
+                                移除
+                              </Button>
+                            </Space>
+                          }
+                        >
+                          <div style={{ fontWeight: 600, marginBottom: 6 }}>{`${index + 1}. ${operator.label}`}</div>
                           <Text type="secondary">{operator.description}</Text>
                         </Card>
                       )
@@ -369,6 +454,19 @@ const DataCleaning: React.FC = () => {
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
                     description="请在左侧选择清洗算子，或直接拖拽算子到此区域"
                   />
+                )}
+
+                {!!selectedOperators.length && (
+                  <Card
+                    size="small"
+                    title="流程摘要"
+                    style={{ borderRadius: 12, marginTop: 16 }}
+                  >
+                    <Text type="secondary" style={{ lineHeight: 1.8 }}>
+                      当前流程将按照 {selectedOperators.length} 个算子的顺序执行，并将结果输出到
+                      {` ${form.getFieldValue('outputName') || '待填写的结果数据集'}。`}
+                    </Text>
+                  </Card>
                 )}
               </Card>
             </div>
@@ -404,6 +502,12 @@ const DataCleaning: React.FC = () => {
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12 }}>
         <Space>
+          <Input
+            placeholder="请输入任务名称"
+            value={searchValue}
+            onChange={event => setSearchValue(event.target.value)}
+            style={{ width: 210 }}
+          />
           <Select
             placeholder="清洗状态"
             allowClear
@@ -417,7 +521,10 @@ const DataCleaning: React.FC = () => {
             ]}
           />
           <Button onClick={() => setPage(1)}>搜索</Button>
-          <Button onClick={() => setStatusFilter(undefined)}>重置</Button>
+          <Button onClick={() => {
+            setSearchValue('')
+            setStatusFilter(undefined)
+          }}>重置</Button>
         </Space>
         <Space>
           <Button icon={<ReloadOutlined />}>刷新</Button>
@@ -431,18 +538,61 @@ const DataCleaning: React.FC = () => {
         <Table
           rowKey="id"
           columns={listColumns}
-          dataSource={listResult.items}
+          dataSource={filteredItems}
           loading={listLoading}
+          tableLayout="fixed"
+          scroll={{ x: 1100 }}
           pagination={{
             current: page,
             pageSize,
-            total: listResult.total,
+            total: filteredItems.length,
             showTotal: total => `共 ${total} 条记录`,
             onChange: nextPage => setPage(nextPage),
           }}
           locale={{ emptyText: '暂无清洗任务' }}
         />
       </Card>
+
+      <Modal
+        title="清洗任务详情"
+        open={Boolean(detailTask)}
+        onCancel={() => setDetailTask(null)}
+        footer={<Button onClick={() => setDetailTask(null)}>关闭</Button>}
+      >
+        {detailTask && (
+          <div style={{ display: 'grid', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <Card size="small">
+                <Text type="secondary">清洗状态</Text>
+                <div style={{ marginTop: 8 }}>{statusTag(detailTask.status)}</div>
+              </Card>
+              <Card size="small">
+                <Text type="secondary">清洗算子数量</Text>
+                <div style={{ marginTop: 8, fontSize: 18, fontWeight: 600 }}>{detailTask.operatorValues?.length ?? 0}</div>
+              </Card>
+              <Card size="small">
+                <Text type="secondary">输出结果</Text>
+                <div style={{ marginTop: 8, fontSize: 18, fontWeight: 600 }}>{detailTask.postDataset === '-' ? '待生成' : '已生成'}</div>
+              </Card>
+            </div>
+
+            <Descriptions column={1} bordered size="small">
+              <Descriptions.Item label="任务名称">{detailTask.name}</Descriptions.Item>
+              <Descriptions.Item label="清洗前数据集">{detailTask.preDataset}</Descriptions.Item>
+              <Descriptions.Item label="清洗后数据集">{detailTask.postDataset}</Descriptions.Item>
+              <Descriptions.Item label="清洗算子">
+                {(detailTask.operatorValues ?? []).length
+                  ? (detailTask.operatorValues ?? [])
+                      .map((value: string) => categories.flatMap(item => item.operators).find(operator => operator.value === value)?.label ?? value)
+                      .join('，')
+                  : '暂无'}
+              </Descriptions.Item>
+              <Descriptions.Item label="创建人">{detailTask.creator}</Descriptions.Item>
+              <Descriptions.Item label="创建时间">{detailTask.createdAt}</Descriptions.Item>
+            </Descriptions>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

@@ -131,9 +131,7 @@ const ModelManagement: React.FC = () => {
   if (isCreateRoute) {
     return (
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        <div style={{ marginBottom: 20 }}>
-          <Text type="secondary">我的模型 / 创建模型</Text>
-        </div>
+        <div style={{ marginBottom: 20 }} />
         <Card style={{ borderRadius: 18, border: '1px solid #e5e7eb' }}>
           <Form form={form} layout="vertical">
             <Title level={3}>基础信息</Title>

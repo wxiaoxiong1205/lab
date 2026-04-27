@@ -161,9 +161,14 @@ const ModelDeployment: React.FC = () => {
   if (isCreateRoute) {
     return (
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 20 }}>
           <Button icon={<ArrowLeftOutlined />} onClick={closeCreate}>返回</Button>
-          <Text type="secondary">大模型部署 / 部署服务</Text>
+          <div>
+            <Text strong style={{ display: 'block', fontSize: 26, color: '#0f172a', lineHeight: 1.15 }}>部署服务</Text>
+            <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 14, lineHeight: 1.7 }}>
+              配置模型、资源和镜像信息，完成部署发布。
+            </Text>
+          </div>
         </div>
 
         <Card style={{ borderRadius: 18, border: '1px solid #e5e7eb' }}>

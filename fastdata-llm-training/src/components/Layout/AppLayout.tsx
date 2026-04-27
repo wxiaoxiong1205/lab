@@ -12,8 +12,6 @@ import {
   GlobalOutlined,
   BellOutlined,
   SettingOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
   RocketOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
@@ -25,6 +23,7 @@ import { getPageDesignDoc } from '../../docs/pageDocs'
 import {
   canViewCurrentRoute,
   getCurrentProject,
+  getCurrentProjectMode,
   getCurrentUser,
   getOperationDeniedMessage,
   getUserRoleLabels,
@@ -43,11 +42,6 @@ interface AppLayoutProps {
 type MenuItemList = NonNullable<MenuProps['items']>
 
 const projectMenuSource: MenuItemList = [
-  {
-    key: '/home',
-    icon: <HomeOutlined />,
-    label: '项目概览',
-  },
   {
     key: 'data-services',
     icon: <DatabaseOutlined />,
@@ -106,7 +100,7 @@ const projectMenuSource: MenuItemList = [
     label: '机器学习',
     children: [
       { key: '/machine-data-management', label: '数据管理' },
-      { key: '/machine-annotation', label: '机器学习标注' },
+      { key: '/machine-annotation', label: '数据标注' },
       { key: '/machine-model-management', label: '模型管理' },
       { key: '/machine-model-deployment', label: '模型部署' },
       { key: '/machine-notebook', label: '在线Notebook' },
@@ -133,11 +127,22 @@ const systemMenuSource: MenuItemList = [
   { key: '/admin/permissions', icon: <FileTextOutlined />, label: '权限配置' },
 ]
 
+const llmTopNavItems = [
+  { key: '/home', label: '首页', icon: <HomeOutlined />, route: '/home' },
+  { key: 'data-services', label: '数据服务', icon: <DatabaseOutlined />, route: '/datasets' },
+  { key: 'model-training', label: '模型训练', icon: <CloudServerOutlined />, route: '/finetune/notebooks' },
+  { key: 'evaluation', label: '模型评估', icon: <BarChartOutlined />, route: '/effect-evaluation' },
+  { key: 'model-service', label: '模型服务', icon: <ExperimentOutlined />, route: '/service/inference/hosted' },
+] as const
+
+const mlTopNavItems = [
+  { key: 'machine-learning', label: '机器学习', icon: <AppstoreOutlined />, route: '/machine-data-management' },
+] as const
+
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const navigate = useNavigate()
   const location = useLocation()
   const permissionState = usePermissionStore()
-  const [collapsed, setCollapsed] = useState(false)
   const isDocsRoute = location.pathname.startsWith('/docs')
   const isWorkspaceRoute = location.pathname === '/workspace'
   const isAdminRoute = location.pathname.startsWith('/admin')
@@ -148,9 +153,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
     return window.localStorage.getItem('design-doc-panel-open') === 'true'
   })
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1440 : window.innerWidth))
   const currentDoc = getPageDesignDoc(location.pathname)
   const currentUser = getCurrentUser(permissionState)
   const currentProject = getCurrentProject(permissionState)
+  const currentProjectMode = getCurrentProjectMode(permissionState)
   const routeAccess = canViewCurrentRoute(location.pathname, permissionState)
 
   const filterMenuItems = (items: MenuItemList): MenuItemList =>
@@ -169,12 +176,71 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       .filter(Boolean) as MenuItemList
 
   const activeTopTab = isAdminRoute ? 'system' : 'workspace'
-  const activeMenuItems = useMemo(
-    () => filterMenuItems(isAdminRoute ? systemMenuSource : projectMenuSource),
-    [isAdminRoute, permissionState],
-  )
-
   const showProjectMenus = !isDocsRoute && !isWorkspaceRoute && !isAdminRoute && Boolean(currentProject)
+  const projectTopNavItems = showProjectMenus
+    ? (currentProjectMode === 'ml' ? mlTopNavItems : llmTopNavItems)
+    : []
+
+  const activeProjectTopKey = useMemo(() => {
+    if (!showProjectMenus) {
+      return null
+    }
+    const currentMenuKey = resolveRouteAccess(location.pathname)?.menuKey ?? location.pathname
+    if (currentProjectMode === 'ml') {
+      return 'machine-learning'
+    }
+    if (currentMenuKey === '/home') {
+      return '/home'
+    }
+    for (const item of projectMenuSource) {
+      if (!item || !('key' in item) || !('children' in item) || !item.children) continue
+      const group = item.children as MenuItemList
+      for (const child of group) {
+        if (!child) continue
+        if ('key' in child && child.key === currentMenuKey) {
+          return item.key as string
+        }
+        if ('children' in child && child.children) {
+          for (const subChild of child.children as MenuItemList) {
+            if (subChild && 'key' in subChild && subChild.key === currentMenuKey) {
+              return item.key as string
+            }
+          }
+        }
+      }
+    }
+    return '/home'
+  }, [currentProjectMode, location.pathname, showProjectMenus])
+
+  const activeMenuItems = useMemo(() => {
+    if (isAdminRoute) {
+      return filterMenuItems(systemMenuSource)
+    }
+    if (!showProjectMenus || !activeProjectTopKey || activeProjectTopKey === '/home') {
+      return []
+    }
+
+    const topItem = projectMenuSource.find(item => item && 'key' in item && item.key === activeProjectTopKey)
+    if (!topItem || !('children' in topItem) || !topItem.children) {
+      return []
+    }
+
+    const flattenedChildren = (topItem.children as MenuItemList).map(child => {
+      if (!child) return null
+      if ('children' in child && child.children) {
+        return {
+          type: 'group' as const,
+          key: `${topItem.key}-${String(child.key)}`,
+          label: child.label,
+          children: filterMenuItems(child.children as MenuItemList),
+        }
+      }
+      return child
+    }).filter(Boolean) as MenuItemList
+
+    return filterMenuItems(flattenedChildren)
+  }, [activeProjectTopKey, isAdminRoute, permissionState, showProjectMenus])
+
   const showSystemMenus = !isDocsRoute && isAdminRoute
   const showMainSider = showProjectMenus || showSystemMenus
 
@@ -184,6 +250,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   }
 
   const getDefaultOpenKeys = () => {
+    if (!isAdminRoute) {
+      return []
+    }
     const path = resolveRouteAccess(location.pathname)?.menuKey ?? location.pathname
     const openKeys: string[] = []
 
@@ -219,6 +288,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   }, [docPanelOpen])
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const handleResize = () => setViewportWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  useEffect(() => {
     if (isDocsRoute) {
       setDocPanelOpen(false)
     }
@@ -227,6 +306,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const toggleDocPanel = () => {
     setDocPanelOpen(previous => !previous)
   }
+
+  const compactHeader = viewportWidth < 1280
+  const compressedHeader = viewportWidth < 1180
+  const ultraCompactHeader = viewportWidth < 1080
+  const headerPaddingX = ultraCompactHeader ? 12 : compactHeader ? 18 : 28
+  const headerGap = ultraCompactHeader ? 10 : compactHeader ? 14 : 20
+  const navButtonPadding = ultraCompactHeader ? 10 : compactHeader ? 12 : 16
+  const navButtonHeight = ultraCompactHeader ? 40 : 44
+  const accountCardMinWidth = ultraCompactHeader ? 86 : compactHeader ? 126 : 150
+  const showBrandSubtitle = !compactHeader
+  const showLanguageLabel = !ultraCompactHeader
+  const showRoleSubtitle = !compressedHeader
+  const showAccountName = !ultraCompactHeader
+  const headerGridColumns = ultraCompactHeader
+    ? 'minmax(120px, auto) minmax(0, 1fr) minmax(64px, auto)'
+    : compactHeader
+      ? 'minmax(170px, auto) minmax(0, 1fr) minmax(160px, auto)'
+      : 'minmax(220px, 1fr) minmax(0, 760px) minmax(280px, 1fr)'
 
   const contentNode = routeAccess.allowed ? (
     <div className={`app-shell ${docPanelOpen && !isDocsRoute ? 'app-shell--doc-open' : ''}`}>
@@ -269,84 +366,111 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           height: 72,
           background: 'linear-gradient(90deg, #ffffff 0%, #eef4ff 52%, #f1fbf7 100%)',
           borderBottom: '1px solid rgba(148, 163, 184, 0.18)',
-          display: 'flex',
+          display: 'grid',
+          gridTemplateColumns: headerGridColumns,
           alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 28px',
+          columnGap: headerGap,
+          padding: `0 ${headerPaddingX}px`,
           boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          {showMainSider && (
-            <Tooltip title={collapsed ? '展开菜单' : '收起菜单'}>
-              <Button
-                type="text"
-                icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                onClick={() => setCollapsed(!collapsed)}
-                style={{
-                  color: '#475569',
-                  fontSize: 18,
-                  width: 40,
-                  height: 40,
-                }}
-              />
-            </Tooltip>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: headerGap, minWidth: 0, justifySelf: 'start' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: compactHeader ? 10 : 12, minWidth: 0 }}>
             <div
               style={{
-                width: 42,
-                height: 42,
+                width: compactHeader ? 38 : 42,
+                height: compactHeader ? 38 : 42,
                 background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)',
                 borderRadius: 12,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: '0 6px 18px rgba(37, 99, 235, 0.28)',
+                flexShrink: 0,
               }}
             >
-              <RocketOutlined style={{ color: '#fff', fontSize: 20 }} />
+              <RocketOutlined style={{ color: '#fff', fontSize: compactHeader ? 18 : 20 }} />
             </div>
-            <div>
-              <div style={{ color: '#0f172a', fontSize: 18, fontWeight: 800, lineHeight: 1.1 }}>Deepexilab</div>
-              <div style={{ color: '#94a3b8', fontSize: 11, lineHeight: 1.2 }}>LLM Workspace</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: '#0f172a', fontSize: compactHeader ? 16 : 18, fontWeight: 800, lineHeight: 1.1, whiteSpace: 'nowrap' }}>Deepexilab</div>
+              {showBrandSubtitle && <div style={{ color: '#94a3b8', fontSize: 11, lineHeight: 1.2 }}>LLM Workspace</div>}
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Button
-            type={activeTopTab === 'workspace' ? 'primary' : 'text'}
-            icon={<FolderOpenOutlined />}
-            onClick={() => navigate('/workspace')}
-            style={{
-              height: 48,
-              paddingInline: 22,
-              borderRadius: 16,
-              fontWeight: 700,
-              boxShadow: activeTopTab === 'workspace' ? '0 10px 24px rgba(37, 99, 235, 0.18)' : 'none',
-            }}
-          >
-            项目空间
-          </Button>
-          <Button
-            type={activeTopTab === 'system' ? 'primary' : 'text'}
-            icon={<SettingOutlined />}
-            onClick={() => navigate('/admin/projects')}
-            style={{
-              height: 48,
-              paddingInline: 22,
-              borderRadius: 16,
-              fontWeight: 700,
-              boxShadow: activeTopTab === 'system' ? '0 10px 24px rgba(37, 99, 235, 0.18)' : 'none',
-            }}
-          >
-            系统管理
-          </Button>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flexWrap: 'nowrap',
+            justifyContent: 'center',
+            width: '100%',
+            minWidth: 0,
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            paddingInline: 4,
+            justifySelf: 'center',
+          }}
+        >
+          {showProjectMenus ? (
+            projectTopNavItems.map(item => (
+              <Button
+                key={item.key}
+                type={activeProjectTopKey === item.key ? 'primary' : 'text'}
+                icon={item.icon}
+                onClick={() => navigate(item.route)}
+                style={{
+                  height: navButtonHeight,
+                  paddingInline: navButtonPadding,
+                  borderRadius: 16,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                  boxShadow: activeProjectTopKey === item.key ? '0 10px 24px rgba(37, 99, 235, 0.18)' : 'none',
+                }}
+              >
+                {item.label}
+              </Button>
+            ))
+          ) : (
+            <>
+              <Button
+                type={activeTopTab === 'workspace' ? 'primary' : 'text'}
+                icon={<FolderOpenOutlined />}
+                onClick={() => navigate('/workspace')}
+                style={{
+                  height: navButtonHeight,
+                  paddingInline: ultraCompactHeader ? 12 : 18,
+                  borderRadius: 16,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                  boxShadow: activeTopTab === 'workspace' ? '0 10px 24px rgba(37, 99, 235, 0.18)' : 'none',
+                }}
+              >
+                项目空间
+              </Button>
+              <Button
+                type={activeTopTab === 'system' ? 'primary' : 'text'}
+                icon={<SettingOutlined />}
+                onClick={() => navigate('/admin/projects')}
+                style={{
+                  height: navButtonHeight,
+                  paddingInline: ultraCompactHeader ? 12 : 18,
+                  borderRadius: 16,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                  boxShadow: activeTopTab === 'system' ? '0 10px 24px rgba(37, 99, 235, 0.18)' : 'none',
+                }}
+              >
+                系统管理
+              </Button>
+            </>
+          )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: ultraCompactHeader ? 4 : 8, minWidth: 0, justifySelf: 'end' }}>
           <Tooltip title="文档中心">
             <Button
               type="text"
@@ -398,9 +522,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
+                minWidth: ultraCompactHeader ? 36 : undefined,
+                paddingInline: ultraCompactHeader ? 8 : 12,
               }}
             >
-              zh
+              {showLanguageLabel ? 'zh' : null}
             </Button>
           </Dropdown>
 
@@ -436,11 +562,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 borderRadius: 14,
                 cursor: 'pointer',
                 border: '1px solid rgba(148, 163, 184, 0.18)',
-                minWidth: 150,
+                minWidth: accountCardMinWidth,
               }}
             >
               <Avatar
-                size={34}
+                size={compactHeader ? 30 : 34}
                 style={{
                   background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
                   fontWeight: 700,
@@ -449,23 +575,29 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               >
                 {currentUser.account.slice(0, 1).toUpperCase()}
               </Avatar>
-              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.25 }}>
-                <div style={{ color: '#0f172a', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                  {currentUser.account}
+              {(showAccountName || showRoleSubtitle) && (
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.25 }}>
+                  {showAccountName && (
+                    <div style={{ color: '#0f172a', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {currentUser.account}
+                    </div>
+                  )}
+                  {showRoleSubtitle && (
+                    <div
+                      style={{
+                        color: '#94a3b8',
+                        fontSize: 11,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: 110,
+                      }}
+                    >
+                      {getUserRoleLabels(currentUser.account, permissionState).join(' / ')}
+                    </div>
+                  )}
                 </div>
-                <div
-                  style={{
-                    color: '#94a3b8',
-                    fontSize: 11,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    maxWidth: 110,
-                  }}
-                >
-                  {getUserRoleLabels(currentUser.account, permissionState).join(' / ')}
-                </div>
-              </div>
+              )}
             </div>
           </Dropdown>
         </div>
@@ -474,7 +606,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       <Layout style={{ marginTop: 72 }}>
         {showMainSider && (
           <Sider
-            width={collapsed ? 72 : 248}
+            width={248}
             style={{
               background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
               boxShadow: '2px 0 12px rgba(0, 0, 0, 0.04)',
@@ -488,43 +620,41 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               transition: 'all 0.2s ease',
             }}
           >
-            {!collapsed && (
-              <div
-                style={{
-                  padding: '16px 16px 12px',
-                  borderBottom: '1px solid #f1f5f9',
-                }}
-              >
-                {!isAdminRoute && currentProject ? (
-                  <div
-                    style={{
-                      padding: '14px 16px',
-                      background: '#f8fafc',
-                      borderRadius: 14,
-                      border: '1px solid #e2e8f0',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>当前项目</div>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', wordBreak: 'break-all' }}>
-                          {currentProject.name}
-                        </div>
+            <div
+              style={{
+                padding: '16px 16px 12px',
+                borderBottom: '1px solid #f1f5f9',
+              }}
+            >
+              {!isAdminRoute && currentProject ? (
+                <div
+                  style={{
+                    padding: '14px 16px',
+                    background: '#f8fafc',
+                    borderRadius: 14,
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>当前项目</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', wordBreak: 'break-all' }}>
+                        {currentProject.name}
                       </div>
-                      <Tag color="blue">已进入</Tag>
                     </div>
-                    <Button
-                      type="link"
-                      size="small"
-                      style={{ paddingInline: 0, marginTop: 10 }}
-                      onClick={() => navigate('/workspace')}
-                    >
-                      返回项目空间
-                    </Button>
+                    <Tag color="blue">已进入</Tag>
                   </div>
-                ) : null}
-              </div>
-            )}
+                  <Button
+                    type="link"
+                    size="small"
+                    style={{ paddingInline: 0, marginTop: 10 }}
+                    onClick={() => navigate('/workspace')}
+                  >
+                    返回项目空间
+                  </Button>
+                </div>
+              ) : null}
+            </div>
 
             <Menu
               mode="inline"
@@ -536,11 +666,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   navigate(key)
                 }
               }}
-              inlineCollapsed={collapsed}
               style={{
                 border: 'none',
                 padding: '12px 8px',
-                height: collapsed ? 'calc(100% - 73px)' : 'calc(100% - 92px)',
+                height: 'calc(100% - 92px)',
                 overflow: 'auto',
               }}
             />
@@ -549,7 +678,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
         <Content
           style={{
-            marginLeft: showMainSider ? (collapsed ? 72 : 248) : 0,
+            marginLeft: showMainSider ? 248 : 0,
             background: 'linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)',
             minHeight: 'calc(100vh - 72px)',
             overflow: 'auto',

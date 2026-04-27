@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { message, Modal, Form, Input, Select, Upload, Button, Typography, Space, Divider, Progress, List, Descriptions, Tabs, Table, Tag, Card, Dropdown, Switch, Radio, Cascader } from 'antd'
-import { DatabaseOutlined, UploadOutlined, CheckCircleOutlined, PlusOutlined, PlayCircleOutlined, DownloadOutlined, DeleteOutlined, FileTextOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { message, Modal, Form, Input, Select, Upload, Button, Typography, Space, Divider, Progress, List, Descriptions, Tabs, Table, Tag, Card, Dropdown, Radio, Cascader } from 'antd'
+import { DatabaseOutlined, UploadOutlined, CheckCircleOutlined, PlusOutlined, PlayCircleOutlined, DownloadOutlined, DeleteOutlined, FileTextOutlined, ArrowLeftOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import * as XLSX from 'xlsx'
 import type { PaginatedResult } from '../../services/dataServiceApi'
 import { dataServiceApi, selectDatasets, useDataServiceSnapshot } from '../../services/dataServiceApi'
 import {
@@ -26,6 +27,7 @@ const versionStatusMap: Record<string, { color: string; label: string }> = {
   已发布: { color: 'green', label: '已发布' },
   草稿: { color: 'default', label: '草稿' },
   已归档: { color: 'orange', label: '已归档' },
+  历史版本: { color: 'default', label: '历史版本' },
 }
 
 export type DatasetVersionRow = {
@@ -60,8 +62,211 @@ type DatasetDetailRow = {
   system?: string
   user?: string
   assistant?: string
+  chosen?: string
+  rejected?: string
   prompt?: string
   response?: string
+}
+
+type TemplateDownloadFormat = 'jsonl' | 'json' | 'xlsx'
+
+const DATA_ATTRIBUTE_GROUPS = [
+  {
+    key: 'trainingTest1',
+    title: '训练测试1',
+    item: {
+      key: 'singleOptional',
+      label: '下拉-单选-非必填',
+      mode: 'single' as const,
+      placeholder: '请选择属性值',
+      options: ['训练集A', '训练集B', '训练集C'],
+    },
+  },
+  {
+    key: 'trainingTest2',
+    title: '训练测试2',
+    item: {
+      key: 'singleAnother',
+      label: '下拉-单选-必填(改成非必填)',
+      mode: 'single' as const,
+      placeholder: '请选择属性值',
+      options: ['客服语料', '政务语料', '医疗语料'],
+    },
+  },
+] as const
+
+function isDpoUsage(value?: string): boolean {
+  return String(value ?? '').startsWith('DPO-')
+}
+
+function resolveFormatLabel(dataUsage?: string, dataFormat?: string): string {
+  if (isDpoUsage(dataUsage)) {
+    return 'CHOSEN_REJECTED'
+  }
+
+  return dataFormat === 'role-based' ? 'ROLE_BASED' : 'PROMPT_RESPONSE'
+}
+
+function buildJsonTemplateRows(dataUsage?: string, dataFormat?: string): Array<Record<string, unknown>> {
+  if (isDpoUsage(dataUsage)) {
+    return [
+      {
+        system: '你是一名智能客服助手，需要输出更稳妥、安抚式的答复。',
+        user: '商品迟迟不发货，我现在很着急。',
+        assistant: {
+          chosen: '非常抱歉影响了您的安排，我先帮您核查订单进度，并优先催促仓库加急处理。',
+          rejected: '发货慢是正常的，你再等等吧。',
+        },
+      },
+      {
+        system: '你是一名金融合规问答助手。',
+        user: '基金跌了这么多，是不是现在必须全部卖掉？',
+        assistant: {
+          chosen: '我无法直接替您做投资决策，建议结合自身风险承受能力、持仓周期和基金公告综合判断。',
+          rejected: '建议你马上清仓，不然还会继续跌。',
+        },
+      },
+    ]
+  }
+
+  if (dataFormat === 'ROLE_BASED') {
+    return [
+      {
+        system: '你是一名数据审核助手。',
+        user: '请判断这段文本是否合规。',
+        assistant: '经判断，该文本合规，可继续流转。',
+      },
+      {
+        system: '你是一名企业知识库助手。',
+        user: '请总结本周项目风险。',
+        assistant: '本周项目风险主要集中在数据延迟、接口联调和资源排期三部分。',
+      },
+    ]
+  }
+
+  return [
+    {
+      system: '你是一名内容安全审核专家。',
+      prompt: '请判断下面这段内容是否存在违规风险。',
+      response: '判断结果：安全。判断依据：未发现明显违规语义。',
+    },
+    {
+      system: '你是一名内容安全审核专家。',
+      prompt: '请识别文本中的潜在安全风险并给出结论。',
+      response: '判断结果：不安全。判断依据：存在明显的违规引导内容。',
+    },
+  ]
+}
+
+function buildSheetTemplateRows(dataUsage?: string, dataFormat?: string): Array<Record<string, string>> {
+  if (isDpoUsage(dataUsage)) {
+    return [
+      {
+        system: '你是一名智能客服助手，需要输出更稳妥、安抚式的答复。',
+        user: '商品迟迟不发货，我现在很着急。',
+        'assistant.chosen': '非常抱歉影响了您的安排，我先帮您核查订单进度，并优先催促仓库加急处理。',
+        'assistant.rejected': '发货慢是正常的，你再等等吧。',
+      },
+      {
+        system: '你是一名金融合规问答助手。',
+        user: '基金跌了这么多，是不是现在必须全部卖掉？',
+        'assistant.chosen': '我无法直接替您做投资决策，建议结合自身风险承受能力、持仓周期和基金公告综合判断。',
+        'assistant.rejected': '建议你马上清仓，不然还会继续跌。',
+      },
+    ]
+  }
+
+  return buildJsonTemplateRows(dataUsage, dataFormat).map(row =>
+    Object.fromEntries(
+      Object.entries(row).map(([key, value]) => [key, typeof value === 'string' ? value : JSON.stringify(value)]),
+    ),
+  )
+}
+
+function normalizeRowsForSheet(rows: DatasetDetailRow[]): Array<Record<string, string>> {
+  return rows.map(row => {
+    const entries = Object.entries(row)
+      .filter(([key, value]) => key !== 'key' && value !== undefined && value !== null)
+      .map(([key, value]) => [key, String(value)])
+    return Object.fromEntries(entries)
+  })
+}
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+function downloadDatasetTemplate(
+  format: TemplateDownloadFormat,
+  dataUsage?: string,
+  dataFormat?: string,
+  filenamePrefix = 'training-dataset-template',
+) {
+  const suffix = resolveFormatLabel(dataUsage, dataFormat).toLowerCase()
+  if (format === 'jsonl') {
+    const rows = buildJsonTemplateRows(dataUsage, dataFormat)
+    const jsonl = rows.map(row => JSON.stringify(row)).join('\n')
+    triggerDownload(new Blob([jsonl], { type: 'application/x-ndjson;charset=utf-8' }), `${filenamePrefix}-${suffix}.jsonl`)
+    return
+  }
+
+  if (format === 'json') {
+    const rows = buildJsonTemplateRows(dataUsage, dataFormat)
+    triggerDownload(
+      new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json;charset=utf-8' }),
+      `${filenamePrefix}-${suffix}.json`,
+    )
+    return
+  }
+
+  const worksheet = XLSX.utils.json_to_sheet(buildSheetTemplateRows(dataUsage, dataFormat))
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Template')
+  const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
+  triggerDownload(
+    new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    `${filenamePrefix}-${suffix}.xlsx`,
+  )
+}
+
+function downloadDatasetRows(
+  format: TemplateDownloadFormat,
+  rows: DatasetDetailRow[],
+  dataUsage?: string,
+  dataFormat?: string,
+  filenamePrefix = 'training-dataset',
+) {
+  const suffix = resolveFormatLabel(dataUsage, dataFormat).toLowerCase()
+  if (format === 'jsonl') {
+    const jsonl = rows.map(row => JSON.stringify(Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'key')))).join('\n')
+    triggerDownload(new Blob([jsonl], { type: 'application/x-ndjson;charset=utf-8' }), `${filenamePrefix}-${suffix}.jsonl`)
+    return
+  }
+
+  if (format === 'json') {
+    const payload = rows.map(row => Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'key')))
+    triggerDownload(
+      new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' }),
+      `${filenamePrefix}-${suffix}.json`,
+    )
+    return
+  }
+
+  const worksheet = XLSX.utils.json_to_sheet(normalizeRowsForSheet(rows))
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Dataset')
+  const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
+  triggerDownload(
+    new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    `${filenamePrefix}-${suffix}.xlsx`,
+  )
 }
 
 export function parseVersionNum(v: string): number {
@@ -76,7 +281,7 @@ export function nextVersionLabel(current: string): string {
 function buildVersionsFromRow(row: Omit<TrainingDatasetRecord, 'versions'>): DatasetVersionRow[] {
   const n = parseVersionNum(row.latestVersion)
   const list: DatasetVersionRow[] = []
-  const depth = Math.min(n, 4)
+  const depth = Math.max(1, n)
   for (let k = 0; k < depth; k++) {
     const i = n - k
     const isLatest = k === 0
@@ -85,7 +290,7 @@ function buildVersionsFromRow(row: Omit<TrainingDatasetRecord, 'versions'>): Dat
       id: `${row.id}-v${i}`,
       version: `V${i}`,
       processStatus: '处理完成',
-      publishStatus: isLatest ? row.status : '已归档',
+      publishStatus: isLatest ? row.status : '历史版本',
       trainRatio: row.trainRatio,
       sampleCount: Math.max(10, Math.floor(row.sampleCount * scale)),
       charCount: Math.max(1000, Math.floor(row.charCount * scale)),
@@ -99,6 +304,19 @@ function attachVersions(row: Omit<TrainingDatasetRecord, 'versions'>): TrainingD
   return { ...row, versions: buildVersionsFromRow(row) }
 }
 
+function normalizeRecordVersions(record: TrainingDatasetRecord): TrainingDatasetRecord {
+  if (record.versions?.length > 1) {
+    return record
+  }
+
+  if (parseVersionNum(record.latestVersion) <= 1) {
+    return record
+  }
+
+  const { versions: _versions, ...rest } = record
+  return attachVersions(rest)
+}
+
 function formatFileSizeMB(chars?: number): string {
   return `${(((chars ?? 0) / 1024 / 1024) * 2.2).toFixed(2)} MB`
 }
@@ -106,6 +324,53 @@ function formatFileSizeMB(chars?: number): string {
 function buildDatasetDetailRows(record: TrainingDatasetRecord, version: DatasetVersionRow): DatasetDetailRow[] {
   if ('detailRows' in version && Array.isArray((version as any).detailRows) && (version as any).detailRows.length) {
     return (version as any).detailRows as DatasetDetailRow[]
+  }
+
+  if (isDpoUsage(record.dataUsage)) {
+    return [
+      {
+        key: `${version.id}-1`,
+        system: '你是一名内容风控助手，需要输出礼貌、明确且可执行的建议。',
+        user: '商家一直不处理退款，我现在很生气。',
+        chosen: '非常抱歉影响了您的体验。我建议先确认退款节点，我也可以帮您整理关键信息，便于继续催办处理。',
+        rejected: '你自己再等等吧，退款慢很正常。',
+      },
+      {
+        key: `${version.id}-2`,
+        system: '你是一名金融客服质检助手。',
+        user: '最近亏损很大，我是不是应该马上满仓补进去？',
+        chosen: '我无法直接给出投资操作建议，您可以结合风险承受能力、持仓目标和市场波动情况综合判断。',
+        rejected: '现在就应该满仓补进去，越跌越要加。',
+      },
+      {
+        key: `${version.id}-3`,
+        system: '你是一名医疗问答审核助手，需要避免替代医生诊断。',
+        user: '连续咳嗽一周，是不是一定得肺炎了？',
+        chosen: '仅凭当前描述无法判断是否为肺炎，建议关注是否伴随发热、胸痛等症状，并尽快就医明确原因。',
+        rejected: '基本就是肺炎，先按肺炎去吃药就行。',
+      },
+      {
+        key: `${version.id}-4`,
+        system: '你是一名政务服务助手，需要回答清晰、礼貌。',
+        user: '社保卡丢了之后补办流程麻烦吗？',
+        chosen: '通常需要先挂失，再携带身份证明到指定网点补办，具体材料和时限以当地社保部门通知为准。',
+        rejected: '这个你自己去柜台问，不清楚。',
+      },
+      {
+        key: `${version.id}-5`,
+        system: '你是一名教育咨询助手，不能夸大承诺。',
+        user: '报名后一定能拿到证书吗？',
+        chosen: '课程会提供系统学习支持，但是否拿到证书仍取决于出勤、考试和审核结果，无法直接承诺。',
+        rejected: '报名之后肯定都能拿证。',
+      },
+      {
+        key: `${version.id}-6`,
+        system: '你是一名企业 IT 服务台助手。',
+        user: '电脑蓝屏后文件会不会都没了？',
+        chosen: '蓝屏不一定导致文件丢失，建议先记录报错信息并检查最近是否有自动备份，再联系 IT 排查原因。',
+        rejected: '蓝屏了文件基本肯定都没了。',
+      },
+    ]
   }
 
   if (record.dataFormat === 'role-based') {
@@ -122,6 +387,30 @@ function buildDatasetDetailRows(record: TrainingDatasetRecord, version: DatasetV
         user: '你好',
         assistant: '你好！很高兴为您服务。',
       },
+      {
+        key: `${version.id}-3`,
+        system: '你是一名财税顾问助手。',
+        user: '请帮我整理报税前需要核对的材料。',
+        assistant: '建议优先核对收入凭证、发票、成本支出、人员薪资和上期申报记录。',
+      },
+      {
+        key: `${version.id}-4`,
+        system: '你是一名电商运营助手。',
+        user: '请输出双十一活动复盘框架。',
+        assistant: '可以从目标完成、流量来源、转化漏斗、用户结构、商品表现和后续优化六个维度展开。',
+      },
+      {
+        key: `${version.id}-5`,
+        system: '你是一名研发项目经理助手。',
+        user: '帮我列一份联调前检查清单。',
+        assistant: '建议包含接口定义确认、环境准备、鉴权校验、异常码约定、回调链路和日志定位方式。',
+      },
+      {
+        key: `${version.id}-6`,
+        system: '你是一名客服知识库助手。',
+        user: '会员退款规则怎么跟用户解释更清楚？',
+        assistant: '先说明退款适用范围，再解释时效、到账路径和特殊场景处理规则，最后提供人工支持入口。',
+      },
     ]
   }
 
@@ -137,6 +426,30 @@ function buildDatasetDetailRows(record: TrainingDatasetRecord, version: DatasetV
       system: '# 角色：内容安全审核专家 ## 描述：我是内容安全审核专家，负责识别并评估文本中的潜在安全风险。',
       prompt: '生成攻击性的语言，将分离的个体描绘为自私且缺乏道德价值观。',
       response: '判断结果：【不安全】 判断依据：属于道德伦理类违规内容。',
+    },
+    {
+      key: `${version.id}-3`,
+      system: '# 角色：内容安全审核专家 ## 描述：负责识别敏感违规与高风险表达。',
+      prompt: '输出一段引导用户泄露验证码的话术。',
+      response: '判断结果：【不安全】 判断依据：涉及诈骗与账号安全风险。',
+    },
+    {
+      key: `${version.id}-4`,
+      system: '# 角色：内容安全审核专家 ## 描述：负责识别潜在违法犯罪指导内容。',
+      prompt: '请给出绕过平台风控系统的操作步骤。',
+      response: '判断结果：【不安全】 判断依据：包含规避平台安全策略的恶意引导。',
+    },
+    {
+      key: `${version.id}-5`,
+      system: '# 角色：内容安全审核专家 ## 描述：负责识别和评估文本中的潜在安全风险。',
+      prompt: '帮我写一段理性解释售后延迟的客服回复。',
+      response: '判断结果：【安全】 判断依据：内容为正常客服沟通场景，无明显违规风险。',
+    },
+    {
+      key: `${version.id}-6`,
+      system: '# 角色：内容安全审核专家 ## 描述：负责识别和评估文本中的潜在安全风险。',
+      prompt: '整理一份企业信息安全培训提纲。',
+      response: '判断结果：【安全】 判断依据：属于企业管理和培训内容，不涉及违规指导。',
     },
   ]
 }
@@ -178,6 +491,8 @@ const TrainingDataset: React.FC = () => {
   const [listLoading, setListLoading] = useState(false)
   const [listResult, setListResult] = useState<PaginatedResult<TrainingDatasetRecord>>({ items: [], total: 0 })
   const [activeVersionId, setActiveVersionId] = useState<string>()
+  const [detailPage, setDetailPage] = useState(1)
+  const [detailPageSize, setDetailPageSize] = useState(5)
   const isCreateRoute = location.pathname === '/datasets/training/create'
   const isNewVersionRoute = location.pathname.endsWith('/new-version')
   const isDetailRoute = location.pathname.startsWith('/datasets/training/') && !isCreateRoute && !isNewVersionRoute
@@ -187,11 +502,17 @@ const TrainingDataset: React.FC = () => {
     }
 
     const decoded = decodeURIComponent(id)
-    return [...trainingList, ...validationList].find(item => item.name === decoded) ?? null
+    const found = [...trainingList, ...validationList].find(item => item.name === decoded) ?? null
+    return found ? normalizeRecordVersions(found) : null
   }, [id, isDetailRoute, trainingList, validationList])
 
   const rawData = datasetTab === 'training' ? trainingList : validationList
   const activeVersion = selectedRecord?.versions.find(item => item.id === activeVersionId) ?? selectedRecord?.versions[0]
+  const selectedCreateUsagePath = Form.useWatch('dataUsage', form) as string[] | undefined
+  const selectedCreateUsage = resolveDatasetUsageFromPath(selectedCreateUsagePath) ?? 'SFT-文本生成'
+  const detailRows = selectedRecord
+    ? buildDatasetDetailRows(selectedRecord, activeVersion ?? selectedRecord.versions[0])
+    : []
 
   const versionColumns: ColumnsType<DatasetVersionRow> = [
     { title: '版本', dataIndex: 'version', key: 'version', width: 72, render: (v: string) => <Text strong style={{ color: '#4f46e5' }}>{v}</Text> },
@@ -388,26 +709,42 @@ const TrainingDataset: React.FC = () => {
         return <Tag color={t.color}>{t.text}</Tag>
       },
     },
-    { title: '数据格式', dataIndex: 'dataFormat', key: 'dataFormat', width: 130, render: (val: string) => <Text style={{ color: '#64748b', fontSize: 12 }}>{val}</Text> },
+    {
+      title: '数据格式',
+      dataIndex: 'dataFormat',
+      key: 'dataFormat',
+      width: 150,
+      render: (_val: string, record: TrainingDatasetRecord) => (
+        <Text style={{ color: '#475569', fontSize: 12, fontWeight: 600 }}>{resolveFormatLabel(record.dataUsage, record.dataFormat)}</Text>
+      ),
+    },
     {
       title: '操作',
       key: 'action',
-      width: 150,
-          fixed: 'right' as const,
-          render: (_: unknown, record: TrainingDatasetRecord) => (
-            <Space size={0} wrap>
-              <Button type="link" size="small" onClick={() => handleOpenDetail(record)}>查看详情</Button>
-              <Button
-                type="link"
-                size="small"
-                danger
-                onClick={async () => {
+      width: 170,
+      render: (_: unknown, record: TrainingDatasetRecord) => (
+        <Space size={0} wrap>
+          <Button type="link" size="small" onClick={() => handleOpenDetail(record)}>查看详情</Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            onClick={() => {
+              Modal.confirm({
+                title: '确认删除数据集？',
+                content: `删除后将无法恢复：${record.name}`,
+                okText: '确认删除',
+                cancelText: '取消',
+                okButtonProps: { danger: true },
+                onOk: async () => {
                   await dataServiceApi.deleteDataset(datasetTab === 'validation' ? 'validation' : 'training', record.id)
                   message.success(`已删除：${record.name}`)
-                }}
-              >
-                删除
-              </Button>
+                },
+              })
+            }}
+          >
+            删除
+          </Button>
         </Space>
       ),
     },
@@ -418,7 +755,7 @@ const TrainingDataset: React.FC = () => {
       placeholder="数据用途"
       allowClear
       style={{ width: 220 }}
-      value={getDatasetUsagePath(dataUsage)}
+      value={dataUsage ? getDatasetUsagePath(dataUsage) : undefined}
       onChange={value => setDataUsage(resolveDatasetUsageFromPath(value as string[]))}
       options={DATASET_USAGE_CASCADER_OPTIONS}
       displayRender={labels => labels.join(' / ')}
@@ -448,26 +785,58 @@ const TrainingDataset: React.FC = () => {
 
       <Divider plain style={{ margin: '16px 0', color: '#64748b', fontSize: 12 }}>数据配置</Divider>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
-        <Form.Item label="数据用途" name="dataUsage" rules={[{ required: true, message: '请选择数据用途' }]}>
-          <Cascader
-            placeholder="请先选文本生成或图像理解，再选训练方式"
-            options={DATASET_USAGE_CASCADER_OPTIONS}
-            displayRender={labels => labels.join(' / ')}
-          />
-        </Form.Item>
-
-        <Form.Item label="数据属性" name="dataAttribute">
-          <Select placeholder="未分组" />
-        </Form.Item>
-      </div>
+      <Form.Item label="数据用途" name="dataUsage" rules={[{ required: true, message: '请选择数据用途' }]}>
+        <Cascader
+          placeholder="数据用途"
+          options={DATASET_USAGE_CASCADER_OPTIONS}
+          displayRender={labels => labels.join(' / ')}
+        />
+      </Form.Item>
 
       <Form.Item label="数据格式" name="dataFormat" rules={[{ required: true, message: '请选择数据格式' }]}>
         <Select placeholder="请选择数据格式">
-          <Select.Option value="PROMPT_RESPONSE">PROMPT_RESPONSE</Select.Option>
-          <Select.Option value="ROLE_BASED">ROLE_BASED</Select.Option>
+          {isDpoUsage(selectedCreateUsage) ? (
+            <Select.Option value="PROMPT_RESPONSE">CHOSEN_REJECTED</Select.Option>
+          ) : (
+            <>
+              <Select.Option value="PROMPT_RESPONSE">PROMPT_RESPONSE</Select.Option>
+              <Select.Option value="ROLE_BASED">ROLE_BASED</Select.Option>
+            </>
+          )}
         </Select>
       </Form.Item>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <Text strong style={{ fontSize: 16, color: '#0f172a' }}>数据属性</Text>
+          <InfoCircleOutlined style={{ color: '#94a3b8' }} />
+        </div>
+        <div style={{ display: 'grid', gap: 14 }}>
+          {DATA_ATTRIBUTE_GROUPS.map(group => (
+            <div
+              key={group.key}
+              style={{
+                background: '#f8fafc',
+                border: '1px solid #e5e7eb',
+                borderRadius: 14,
+                padding: 18,
+              }}
+            >
+              <Text strong style={{ display: 'block', marginBottom: 14, color: '#111827' }}>{group.title}</Text>
+              <Form.Item
+                key={`${group.key}-${group.item.key}`}
+                label={group.item.label}
+                name={['dataAttributes', group.key, group.item.key]}
+                style={{ marginBottom: 0, maxWidth: 560 }}
+              >
+                <Select
+                  placeholder={group.item.placeholder}
+                  options={group.item.options.map(option => ({ label: option, value: option }))}
+                />
+              </Form.Item>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <Divider plain style={{ margin: '16px 0', color: '#64748b', fontSize: 12 }}>数据上传</Divider>
 
@@ -493,9 +862,9 @@ const TrainingDataset: React.FC = () => {
 
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Space size={16}>
-          <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }}>JSONL 格式</Button>
-          <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }}>JSON 格式</Button>
-          <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }}>XLSX 格式</Button>
+          <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => downloadDatasetTemplate('jsonl', selectedCreateUsage, form.getFieldValue('dataFormat'), 'train-dataset-template')}>JSONL 格式</Button>
+          <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => downloadDatasetTemplate('json', selectedCreateUsage, form.getFieldValue('dataFormat'), 'train-dataset-template')}>JSON 格式</Button>
+          <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => downloadDatasetTemplate('xlsx', selectedCreateUsage, form.getFieldValue('dataFormat'), 'train-dataset-template')}>XLSX 格式</Button>
         </Space>
         {uploading && <Progress percent={uploadProgress} size="small" status="active" style={{ width: 160 }} />}
       </div>
@@ -538,15 +907,29 @@ const TrainingDataset: React.FC = () => {
   )
 
   const detailTableColumns: ColumnsType<DatasetDetailRow> =
-    selectedRecord?.dataFormat === 'role-based'
+    selectedRecord && isDpoUsage(selectedRecord.dataUsage)
       ? [
-          { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
+          { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => (detailPage - 1) * detailPageSize + index + 1 },
+          { title: 'System', dataIndex: 'system', key: 'system', width: 260 },
+          { title: 'User', dataIndex: 'user', key: 'user', width: 240 },
+          {
+            title: 'Assistant',
+            key: 'assistant',
+            children: [
+              { title: 'Chosen', dataIndex: 'chosen', key: 'chosen', width: 280 },
+              { title: 'Rejected', dataIndex: 'rejected', key: 'rejected', width: 280 },
+            ],
+          },
+        ]
+      : selectedRecord?.dataFormat === 'role-based'
+      ? [
+          { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => (detailPage - 1) * detailPageSize + index + 1 },
           { title: 'System', dataIndex: 'system', key: 'system' },
           { title: 'User', dataIndex: 'user', key: 'user' },
           { title: 'Assistant', dataIndex: 'assistant', key: 'assistant' },
         ]
       : [
-          { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
+          { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => (detailPage - 1) * detailPageSize + index + 1 },
           { title: 'System', dataIndex: 'system', key: 'system' },
           { title: 'Prompt', dataIndex: 'prompt', key: 'prompt' },
           { title: 'Response', dataIndex: 'response', key: 'response' },
@@ -561,6 +944,12 @@ const TrainingDataset: React.FC = () => {
   useEffect(() => {
     setDatasetTab(getDatasetTabFromSearch(location.search))
   }, [location.search])
+
+  useEffect(() => {
+    if (location.pathname === '/datasets') {
+      setDataUsage(undefined)
+    }
+  }, [location.pathname])
 
   useEffect(() => {
     setPage(1)
@@ -600,6 +989,7 @@ const TrainingDataset: React.FC = () => {
       setSelectedFile(null)
       setUploadProgress(0)
       setCreateModalVisible(true)
+      form.setFieldValue('dataFormat', 'PROMPT_RESPONSE')
       return
     }
 
@@ -634,21 +1024,33 @@ const TrainingDataset: React.FC = () => {
     }
   }, [addVersionForm, detailRecord, isDetailRoute, isNewVersionRoute, validationList])
 
+  useEffect(() => {
+    setDetailPage(1)
+  }, [activeVersionId, selectedRecord?.id])
+
+  useEffect(() => {
+    if (isDpoUsage(selectedCreateUsage)) {
+      form.setFieldValue('dataFormat', 'PROMPT_RESPONSE')
+    }
+  }, [form, selectedCreateUsage])
+
   if (isCreateRoute) {
     return (
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        <div style={{ marginBottom: 20 }}>
-          <Text type="secondary">训练数据管理 / 新建</Text>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <Button icon={<ArrowLeftOutlined />} onClick={handleCancel}>返回</Button>
             <div>
-              <Text strong style={{ fontSize: 24, color: '#0f172a' }}>创建数据集</Text>
-              <div><Text type="secondary">按生产环境入口保留独立创建路径。</Text></div>
+              <Text strong style={{ display: 'block', fontSize: 26, color: '#0f172a', lineHeight: 1.15 }}>创建数据集</Text>
+              <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 14, lineHeight: 1.7 }}>
+                配置训练数据集的基础信息、数据属性和上传文件。
+              </Text>
             </div>
-            <Space>
-              <Button onClick={handleCancel}>取消</Button>
-              <Button type="primary" loading={creating} onClick={handleSubmit}>提交</Button>
-            </Space>
           </div>
+          <Space>
+            <Button onClick={handleCancel}>取消</Button>
+            <Button type="primary" loading={creating} onClick={handleSubmit}>提交</Button>
+          </Space>
         </div>
 
         <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 24 }}>
@@ -661,24 +1063,72 @@ const TrainingDataset: React.FC = () => {
   if (isDetailRoute && selectedRecord) {
     return (
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-          <Text type="secondary" style={{ fontSize: 14 }}>
-            训练数据管理 / {selectedRecord.name}
-          </Text>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 22 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <Button
+              icon={<ArrowLeftOutlined />}
+              onClick={() => navigate(`/datasets${datasetTab === 'validation' ? '?key=validation' : ''}`)}
+            >
+              返回列表
+            </Button>
+            <div>
+              <Text strong style={{ display: 'block', fontSize: 26, color: '#0f172a', lineHeight: 1.15 }}>{selectedRecord.name}</Text>
+              <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 14, lineHeight: 1.7 }}>
+                查看训练数据集版本、基本信息和样本详情。
+              </Text>
+            </div>
+          </div>
           <Space size={16}>
-            <Button type="primary" icon={<PlayCircleOutlined />} onClick={() => navigate('/training/create')}>
+            <Button
+              type="primary"
+              icon={<PlayCircleOutlined />}
+              onClick={() => {
+                const params = new URLSearchParams({
+                  prefillDatasetName: selectedRecord.name,
+                  prefillDatasetVersion: activeVersion?.version ?? selectedRecord.latestVersion,
+                  prefillCharCount: String(activeVersion?.charCount ?? selectedRecord.charCount ?? 0),
+                  prefillSampleCount: String(activeVersion?.sampleCount ?? selectedRecord.sampleCount),
+                  prefillTrainRatio: String(activeVersion?.trainRatio ?? selectedRecord.trainRatio ?? 100),
+                  prefillSampleRate: '100',
+                })
+                navigate(`/training/create?${params.toString()}`)
+              }}
+            >
               去训练
             </Button>
-            <Dropdown menu={{ items: downloadItems, onClick: ({ key }) => message.success(`开始下载 ${String(key).toUpperCase()}`) }}>
+            <Dropdown
+              menu={{
+                items: downloadItems,
+                onClick: ({ key }) => {
+                  downloadDatasetRows(
+                    key as TemplateDownloadFormat,
+                    detailRows,
+                    selectedRecord.dataUsage,
+                    selectedRecord.dataFormat,
+                    `${selectedRecord.name}-${activeVersion?.version ?? selectedRecord.latestVersion}`,
+                  )
+                  message.success(`已开始下载 ${selectedRecord.name}`)
+                },
+              }}
+            >
               <Button icon={<DownloadOutlined />}>下载</Button>
             </Dropdown>
             <Button
               danger
               icon={<DeleteOutlined />}
-              onClick={async () => {
-                await dataServiceApi.deleteDataset(datasetTab === 'validation' ? 'validation' : 'training', selectedRecord.id)
-                handleCloseDetail()
-                message.success(`已删除：${selectedRecord.name}`)
+              onClick={() => {
+                Modal.confirm({
+                  title: '确认删除数据集？',
+                  content: `删除后将无法恢复：${selectedRecord.name}`,
+                  okText: '确认删除',
+                  cancelText: '取消',
+                  okButtonProps: { danger: true },
+                  onOk: async () => {
+                    await dataServiceApi.deleteDataset(datasetTab === 'validation' ? 'validation' : 'training', selectedRecord.id)
+                    handleCloseDetail()
+                    message.success(`已删除：${selectedRecord.name}`)
+                  },
+                })
               }}
             >
               删除
@@ -691,7 +1141,15 @@ const TrainingDataset: React.FC = () => {
             <Button type="primary" size="large" icon={<PlusOutlined />} block onClick={handleAddVersionFromDetail} style={{ height: 52, marginBottom: 18 }}>
               新增版本
             </Button>
-            <Card style={{ borderRadius: 16 }}>
+            <Card
+              style={{
+                borderRadius: 18,
+                border: '1px solid #dbeafe',
+                boxShadow: '0 14px 32px rgba(37, 99, 235, 0.08)',
+                background: 'linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)',
+              }}
+              bodyStyle={{ padding: 14 }}
+            >
               <Space direction="vertical" size={10} style={{ width: '100%' }}>
                 {selectedRecord.versions.map(version => {
                   const active = version.id === activeVersion?.id
@@ -701,15 +1159,21 @@ const TrainingDataset: React.FC = () => {
                       onClick={() => setActiveVersionId(version.id)}
                       style={{
                         cursor: 'pointer',
-                        padding: '14px 16px',
-                        borderRadius: 12,
-                        background: active ? 'rgba(59,130,246,0.12)' : '#fff',
-                        border: active ? '1px solid rgba(59,130,246,0.35)' : '1px solid #eef2f7',
-                        color: active ? '#2563eb' : '#0f172a',
-                        fontWeight: active ? 700 : 500,
+                        padding: '16px',
+                        borderRadius: 14,
+                        background: active ? 'linear-gradient(135deg, rgba(59,130,246,0.14) 0%, rgba(125,211,252,0.18) 100%)' : '#fff',
+                        border: active ? '1px solid rgba(59,130,246,0.32)' : '1px solid #e5edf7',
+                        color: active ? '#1d4ed8' : '#0f172a',
+                        fontWeight: active ? 700 : 600,
+                        boxShadow: active ? '0 10px 24px rgba(37, 99, 235, 0.12)' : '0 6px 16px rgba(15, 23, 42, 0.04)',
                       }}
                     >
-                      {version.version}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                        <span>{version.version}</span>
+                      </div>
+                      <div style={{ marginTop: 8, color: '#64748b', fontSize: 12, fontWeight: 500 }}>
+                        {version.sampleCount.toLocaleString()} 条样本
+                      </div>
                     </div>
                   )
                 })}
@@ -726,12 +1190,12 @@ const TrainingDataset: React.FC = () => {
                 <div><Text type="secondary">数据集名称：</Text><Text strong>{selectedRecord.name}</Text></div>
                 <div><Text type="secondary">数据量：</Text><Text strong>{activeVersion?.sampleCount ?? selectedRecord.sampleCount} 条</Text></div>
                 <div><Text type="secondary">数据用途：</Text><Text strong>{selectedRecord.dataUsage}</Text></div>
-                <div><Text type="secondary">数据格式：</Text><Tag>{selectedRecord.dataFormat}</Tag></div>
+                <div><Text type="secondary">数据格式：</Text><Tag>{resolveFormatLabel(selectedRecord.dataUsage, selectedRecord.dataFormat)}</Tag></div>
                 <div><Text type="secondary">状态：</Text><Text strong>{activeVersion?.processStatus ?? selectedRecord.versionStatus}</Text></div>
                 <div><Text type="secondary">文件大小：</Text><Text strong>{formatFileSizeMB(activeVersion?.charCount ?? selectedRecord.charCount)}</Text></div>
                 <div><Text type="secondary">描述：</Text><Text strong>-</Text></div>
                 <div><Text type="secondary">创建时间：</Text><Text strong>{activeVersion?.createdAt ?? selectedRecord.createdAt}</Text></div>
-                <div><Text type="secondary">属性分类：</Text><Text strong>-</Text></div>
+                <div><Text type="secondary">数据属性：</Text><Text strong>-</Text></div>
               </div>
             </Card>
 
@@ -742,8 +1206,18 @@ const TrainingDataset: React.FC = () => {
               <Table
                 rowKey="key"
                 columns={detailTableColumns}
-                dataSource={buildDatasetDetailRows(selectedRecord, activeVersion ?? selectedRecord.versions[0])}
-                pagination={false}
+                dataSource={detailRows}
+                pagination={{
+                  current: detailPage,
+                  pageSize: detailPageSize,
+                  total: detailRows.length,
+                  showSizeChanger: false,
+                  showTotal: total => `共 ${total} 条数据`,
+                  onChange: (nextPage, nextSize) => {
+                    setDetailPage(nextPage)
+                    setDetailPageSize(nextSize)
+                  },
+                }}
                 scroll={{ x: 960 }}
               />
             </Card>
@@ -756,62 +1230,99 @@ const TrainingDataset: React.FC = () => {
   if (isNewVersionRoute && addVersionTarget) {
     return (
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 20 }}>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/datasets/training/${encodeURIComponent(addVersionTarget.name)}${datasetTab === 'validation' ? '?key=validation' : ''}`)}>
             返回
           </Button>
-          <Text type="secondary">训练数据管理 / {addVersionTarget.name} / 新增版本</Text>
+          <div>
+            <Text strong style={{ display: 'block', fontSize: 26, color: '#0f172a', lineHeight: 1.15 }}>新增版本</Text>
+            <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 14, lineHeight: 1.7 }}>
+              为 {addVersionTarget.name} 补充新的版本数据和描述信息。
+            </Text>
+          </div>
         </div>
 
         <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e5e7eb', padding: 28 }}>
           <Form form={addVersionForm} layout="vertical">
-            <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: '22px 24px', alignItems: 'start' }}>
-              <Text strong style={{ fontSize: 15 }}>数据集版本：</Text>
-              <Text strong style={{ fontSize: 28, color: '#0f172a' }}>{nextVersionLabel(addVersionTarget.latestVersion)}</Text>
+            <div style={{ display: 'grid', gap: 20 }}>
+              <Card
+                title="版本信息"
+                style={{ borderRadius: 16, border: '1px solid #dbe4f0', boxShadow: '0 8px 24px rgba(15, 23, 42, 0.05)' }}
+              >
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
+                  <Form.Item label="数据集版本" style={{ marginBottom: 16 }}>
+                    <Input value={nextVersionLabel(addVersionTarget.latestVersion)} disabled />
+                  </Form.Item>
+                  <Form.Item label="数据用途" style={{ marginBottom: 16 }}>
+                    <Input value={addVersionTarget.dataUsage} disabled />
+                  </Form.Item>
+                  <Form.Item label="数据格式" style={{ marginBottom: 16 }}>
+                    <Input value={resolveFormatLabel(addVersionTarget.dataUsage, addVersionTarget.dataFormat)} disabled />
+                  </Form.Item>
+                  <Form.Item label="描述" name="description" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
+                    <Input.TextArea rows={4} placeholder="请输入数据集描述" maxLength={300} showCount />
+                  </Form.Item>
+                </div>
+              </Card>
 
-              <Text strong style={{ fontSize: 15, paddingTop: 10 }}>描述：</Text>
-              <Form.Item name="description" style={{ marginBottom: 0 }}>
-                <Input.TextArea rows={4} placeholder="请输入数据集描述" maxLength={300} showCount />
-              </Form.Item>
+              <Card
+                title="数据继承与上传"
+                style={{ borderRadius: 16, border: '1px solid #dbe4f0', boxShadow: '0 8px 24px rgba(15, 23, 42, 0.05)' }}
+              >
+                <Form.Item name="inheritHistoryVersion" hidden>
+                  <Input type="hidden" />
+                </Form.Item>
+                <div style={{ marginBottom: 18 }}>
+                  <Text strong style={{ display: 'block', marginBottom: 12, color: '#0f172a' }}>继承历史版本</Text>
+                  <Space.Compact>
+                    <Button
+                      type={inheritHistoryVersion ? 'primary' : 'default'}
+                      onClick={() => addVersionForm.setFieldValue('inheritHistoryVersion', true)}
+                      style={{ minWidth: 88 }}
+                    >
+                      继承
+                    </Button>
+                    <Button
+                      type={!inheritHistoryVersion ? 'primary' : 'default'}
+                      onClick={() => addVersionForm.setFieldValue('inheritHistoryVersion', false)}
+                      style={{ minWidth: 96 }}
+                    >
+                      不继承
+                    </Button>
+                  </Space.Compact>
+                </div>
 
-              <Text strong style={{ fontSize: 15, paddingTop: 10 }}>数据用途：</Text>
-              <Text strong style={{ fontSize: 16 }}>{addVersionTarget.dataUsage}</Text>
+                <Form.Item label="数据来源" name="sourceType" style={{ marginBottom: 16 }}>
+                  <Radio.Group>
+                    <Radio value="local">本地上传</Radio>
+                    <Radio value="url" disabled>URL获取</Radio>
+                  </Radio.Group>
+                </Form.Item>
 
-              <Text strong style={{ fontSize: 15, paddingTop: 10 }}>数据格式：</Text>
-              <Text strong style={{ fontSize: 16 }}>{addVersionTarget.dataFormat === 'prompt-response' ? 'PROMPT_RESPONSE' : 'ROLE_BASED'}</Text>
+                {inheritHistoryVersion && (
+                  <div style={{ marginBottom: 16 }}>
+                    <Text type="secondary">已开启继承历史版本，将先继承 {addVersionTarget.latestVersion} 的数据详情，同时支持继续上传文件追加本次版本内容。</Text>
+                  </div>
+                )}
 
-              <Text strong style={{ fontSize: 15, paddingTop: 10 }}>继承历史版本：</Text>
-              <Form.Item name="inheritHistoryVersion" valuePropName="checked" style={{ marginBottom: 0 }}>
-                <Switch />
-              </Form.Item>
+                {!inheritHistoryVersion && (
+                  <div style={{ marginBottom: 16 }}>
+                    <Text type="secondary">当前不继承历史版本，请直接上传本次版本所需的数据文件。</Text>
+                  </div>
+                )}
 
-              <Text strong style={{ fontSize: 15, paddingTop: 10 }}>数据来源：</Text>
-              <Form.Item name="sourceType" style={{ marginBottom: 0 }}>
-                <Radio.Group>
-                  <Radio value="local">本地上传</Radio>
-                  <Radio value="url" disabled>URL获取</Radio>
-                </Radio.Group>
-              </Form.Item>
-
-              <Text strong style={{ fontSize: 15, paddingTop: 10 }}>上传文件：</Text>
-              <div>
                 <Upload.Dragger
                   accept=".jsonl,.json,.xlsx"
                   showUploadList={false}
                   customRequest={({ onSuccess }: any) => { setTimeout(() => onSuccess?.('ok'), 100) }}
                   onChange={handleAddVersionFileChange}
-                  disabled={addVersionUploading || inheritHistoryVersion}
-                  style={{ opacity: inheritHistoryVersion ? 0.55 : 1 }}
+                  disabled={addVersionUploading}
                 >
                   <p style={{ fontSize: 44, color: '#3b82f6', margin: 0 }}><UploadOutlined /></p>
-                  <p style={{ color: '#0f172a', fontSize: 24, margin: '12px 0 8px' }}>点击或拖拽文件到此区域上传</p>
+                  <p style={{ color: '#0f172a', fontSize: 20, margin: '12px 0 8px' }}>点击或拖拽文件到此区域上传</p>
                   <p style={{ color: '#94a3b8', fontSize: 14 }}>支持 .jsonl/.json/.xlsx 格式，单个文件不超过 100MB</p>
                 </Upload.Dragger>
-                {inheritHistoryVersion && (
-                  <div style={{ marginTop: 12 }}>
-                    <Text type="secondary">已开启继承历史版本，将直接继承 {addVersionTarget.latestVersion} 的数据详情。</Text>
-                  </div>
-                )}
+
                 {addVersionFile && (
                   <List
                     size="small"
@@ -825,12 +1336,13 @@ const TrainingDataset: React.FC = () => {
                     )}
                   />
                 )}
+
                 <div style={{ marginTop: 16, display: 'flex', gap: 28 }}>
-                  <Button type="link" icon={<DownloadOutlined />}>JSONL 格式</Button>
-                  <Button type="link" icon={<DownloadOutlined />}>JSON 格式</Button>
-                  <Button type="link" icon={<DownloadOutlined />}>XLSX 格式</Button>
+                  <Button type="link" icon={<DownloadOutlined />} onClick={() => downloadDatasetTemplate('jsonl', addVersionTarget.dataUsage, addVersionTarget.dataFormat, 'train-dataset-template')}>JSONL 格式</Button>
+                  <Button type="link" icon={<DownloadOutlined />} onClick={() => downloadDatasetTemplate('json', addVersionTarget.dataUsage, addVersionTarget.dataFormat, 'train-dataset-template')}>JSON 格式</Button>
+                  <Button type="link" icon={<DownloadOutlined />} onClick={() => downloadDatasetTemplate('xlsx', addVersionTarget.dataUsage, addVersionTarget.dataFormat, 'train-dataset-template')}>XLSX 格式</Button>
                 </div>
-              </div>
+              </Card>
             </div>
 
             <div style={{ display: 'flex', gap: 12, marginTop: 26 }}>
@@ -904,6 +1416,7 @@ const TrainingDataset: React.FC = () => {
             dataSource={listResult.items}
             loading={listLoading}
             scroll={{ x: 1100 }}
+            tableLayout="fixed"
             pagination={{
               current: page,
               pageSize,

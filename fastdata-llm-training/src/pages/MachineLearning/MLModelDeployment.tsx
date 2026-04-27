@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-  Alert,
   Button,
   Card,
   Descriptions,
@@ -65,6 +64,12 @@ const systemImageOptions = [
   { value: 'python-inference:3.9-ubuntu2004', label: 'python-inference:3.9-ubuntu2004' },
   { value: 'pytorch-inference:2.1-cuda12.1', label: 'pytorch-inference:2.1-cuda12.1' },
   { value: 'sklearn-serving:1.4-ubuntu2204', label: 'sklearn-serving:1.4-ubuntu2204' },
+]
+
+const customImageOptions = [
+  { value: 'registry.cn-shanghai.aliyuncs.com/ml/custom-serving:1.0.0', label: 'registry.cn-shanghai.aliyuncs.com/ml/custom-serving:1.0.0' },
+  { value: 'registry.cn-beijing.aliyuncs.com/ml/yolov8-serving:2.1.0', label: 'registry.cn-beijing.aliyuncs.com/ml/yolov8-serving:2.1.0' },
+  { value: 'harbor.example.com/ml/classifier-runtime:latest', label: 'harbor.example.com/ml/classifier-runtime:latest' },
 ]
 
 const defaultCustomSpec = `{
@@ -168,8 +173,9 @@ function buildFormValuesFromRecord(record: MLDeploymentRecord): CreateFormValues
 }
 
 function buildDeploymentPayload(values: CreateFormValues, deploymentType: DeploymentType) {
+  const standard = values.standard
+
   if (deploymentType === 'standard') {
-    const standard = values.standard
     return {
       name: values.name?.trim() ?? '',
       deploymentType,
@@ -188,7 +194,7 @@ function buildDeploymentPayload(values: CreateFormValues, deploymentType: Deploy
     targetSummary: buildImageSummary(custom),
     resourceSummary: buildResourceSummary(custom.resources),
     instanceCount: buildInstanceCount(custom.resources),
-    standardConfig: undefined,
+    standardConfig: standard,
     customConfig: custom,
   }
 }
@@ -206,28 +212,39 @@ const sectionTitleStyle: React.CSSProperties = {
 }
 
 const ResourceFields: React.FC<{ prefix: (string | number)[] }> = ({ prefix }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 18px' }}>
-    <Form.Item label="CPU请求" name={[...prefix, 'cpuRequest']} rules={[{ required: true, message: '请输入 CPU 请求' }]}>
-      <InputNumber style={{ width: '100%' }} min={1} addonAfter="Core" />
-    </Form.Item>
-    <Form.Item label="CPU限制" name={[...prefix, 'cpuLimit']} rules={[{ required: true, message: '请输入 CPU 限制' }]}>
-      <InputNumber style={{ width: '100%' }} min={1} addonAfter="Core" />
-    </Form.Item>
-    <Form.Item label="内存请求" name={[...prefix, 'memoryRequest']} rules={[{ required: true, message: '请输入内存请求' }]}>
-      <InputNumber style={{ width: '100%' }} min={1} addonAfter="GB" />
-    </Form.Item>
-    <Form.Item label="内存限制" name={[...prefix, 'memoryLimit']} rules={[{ required: true, message: '请输入内存限制' }]}>
-      <InputNumber style={{ width: '100%' }} min={1} addonAfter="GB" />
-    </Form.Item>
-    <Form.Item label="显卡类型" name={[...prefix, 'gpuType']}>
-      <Select allowClear placeholder="可选，无 GPU 可留空" options={gpuOptions} />
-    </Form.Item>
-    <Form.Item label="显卡数量" name={[...prefix, 'gpuCount']}>
-      <InputNumber style={{ width: '100%' }} min={1} max={8} />
-    </Form.Item>
-    <Form.Item label="部署实例数" name={[...prefix, 'instanceCount']} rules={[{ required: true, message: '请输入部署实例数' }]}>
-      <InputNumber style={{ width: '100%' }} min={1} max={20} />
-    </Form.Item>
+  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
+    <Card size="small" style={{ borderRadius: 14, background: '#f8fafc', borderColor: '#e2e8f0' }}>
+      <div style={{ fontWeight: 600, marginBottom: 16 }}>CPU 与内存请求</div>
+      <Form.Item label="CPU请求" name={[...prefix, 'cpuRequest']} rules={[{ required: true, message: '请输入 CPU 请求' }]}>
+        <InputNumber style={{ width: '100%' }} min={1} addonAfter="Core" />
+      </Form.Item>
+      <Form.Item label="内存请求" name={[...prefix, 'memoryRequest']} rules={[{ required: true, message: '请输入内存请求' }]}>
+        <InputNumber style={{ width: '100%' }} min={1} addonAfter="GB" />
+      </Form.Item>
+    </Card>
+
+    <Card size="small" style={{ borderRadius: 14, background: '#f8fafc', borderColor: '#e2e8f0' }}>
+      <div style={{ fontWeight: 600, marginBottom: 16 }}>CPU 与内存限制</div>
+      <Form.Item label="CPU限制" name={[...prefix, 'cpuLimit']} rules={[{ required: true, message: '请输入 CPU 限制' }]}>
+        <InputNumber style={{ width: '100%' }} min={1} addonAfter="Core" />
+      </Form.Item>
+      <Form.Item label="内存限制" name={[...prefix, 'memoryLimit']} rules={[{ required: true, message: '请输入内存限制' }]}>
+        <InputNumber style={{ width: '100%' }} min={1} addonAfter="GB" />
+      </Form.Item>
+    </Card>
+
+    <Card size="small" style={{ borderRadius: 14, background: '#f8fafc', borderColor: '#e2e8f0' }}>
+      <div style={{ fontWeight: 600, marginBottom: 16 }}>GPU 与实例</div>
+      <Form.Item label="显卡类型" name={[...prefix, 'gpuType']}>
+        <Select allowClear placeholder="可选，无 GPU 可留空" options={gpuOptions} />
+      </Form.Item>
+      <Form.Item label="显卡数量" name={[...prefix, 'gpuCount']}>
+        <InputNumber style={{ width: '100%' }} min={1} max={8} />
+      </Form.Item>
+      <Form.Item label="部署实例数" name={[...prefix, 'instanceCount']} rules={[{ required: true, message: '请输入部署实例数' }]}>
+        <InputNumber style={{ width: '100%' }} min={1} max={20} />
+      </Form.Item>
+    </Card>
   </div>
 )
 
@@ -384,7 +401,7 @@ const MLModelDeployment: React.FC = () => {
       title: '模型来源',
       key: 'modelSource',
       width: 120,
-      render: (_, record) => (record.deploymentType === 'standard' ? '模型管理' : '镜像部署'),
+      render: (_, record) => record.standardConfig?.modelSource ?? '模型管理',
     },
     { title: '实例数', dataIndex: 'instanceCount', key: 'instanceCount', width: 90 },
     {
@@ -442,7 +459,6 @@ const MLModelDeployment: React.FC = () => {
           <Button icon={<ArrowLeftOutlined />} onClick={closeCreate}>
             返回
           </Button>
-          <Text type="secondary">机器学习 / 模型部署 / {isEditRoute ? '编辑部署' : '创建部署'}</Text>
         </div>
 
         <div>
@@ -538,40 +554,52 @@ const MLModelDeployment: React.FC = () => {
                   <Input placeholder="请输入服务名称" />
                 </Form.Item>
 
-                {createType === 'standard' && (
-                  <>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 18px' }}>
-                      <Form.Item label="模型来源" name={['standard', 'modelSource']} initialValue="模型管理">
-                        <Input readOnly />
-                      </Form.Item>
-                      <Form.Item
-                        label="选择模型"
-                        name={['standard', 'model']}
-                        rules={[{ required: true, message: '请选择模型' }]}
-                      >
-                        <Select
-                          placeholder="请选择待部署模型"
-                          options={modelOptions.map(item => ({ value: item.value, label: item.label }))}
-                          onChange={(value: string) => {
-                            const model = modelOptions.find(item => item.value === value)
-                            form.setFieldValue(['standard', 'network'], model?.network)
-                            form.setFieldValue(['standard', 'modelVersion'], undefined)
-                          }}
-                        />
-                      </Form.Item>
-                    </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 18px' }}>
+                  <Form.Item label="模型来源" name={['standard', 'modelSource']} initialValue="模型管理">
+                    <Input readOnly />
+                  </Form.Item>
+                  <div />
+                </div>
+                <div
+                  style={{
+                    marginTop: 6,
+                    padding: '16px 18px',
+                    borderRadius: 14,
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 12 }}>模型与版本</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(0, 1fr)', gap: 16 }}>
+                    <Form.Item
+                      label="选择模型"
+                      name={['standard', 'model']}
+                      rules={[{ required: true, message: '请选择模型' }]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Select
+                        placeholder="请选择待部署模型"
+                        options={modelOptions.map(item => ({ value: item.value, label: item.label }))}
+                        onChange={(value: string) => {
+                          const model = modelOptions.find(item => item.value === value)
+                          form.setFieldValue(['standard', 'network'], model?.network)
+                          form.setFieldValue(['standard', 'modelVersion'], undefined)
+                        }}
+                      />
+                    </Form.Item>
                     <Form.Item
                       label="选择版本"
                       name={['standard', 'modelVersion']}
                       rules={[{ required: true, message: '请选择模型版本' }]}
+                      style={{ marginBottom: 0 }}
                     >
                       <Select
                         placeholder="请选择模型版本"
                         options={availableVersions.map(value => ({ value, label: value }))}
                       />
                     </Form.Item>
-                  </>
-                )}
+                  </div>
+                </div>
               </Card>
 
               {createType === 'standard' ? (
@@ -586,14 +614,6 @@ const MLModelDeployment: React.FC = () => {
                 <>
                   <Card id="environment-info" style={{ ...sectionCardStyle, marginBottom: 20 }}>
                     <div style={sectionTitleStyle}>环境信息</div>
-                    <Alert
-                      type="info"
-                      showIcon
-                      message="自定义部署仅支持镜像部署"
-                      description="请配置镜像来源、镜像地址、启动命令和端口信息。"
-                      style={{ marginBottom: 18 }}
-                    />
-
                     <Form.Item
                       label="镜像配置"
                       name={['custom', 'imageSource']}
@@ -619,26 +639,36 @@ const MLModelDeployment: React.FC = () => {
                         name={['custom', 'customImage']}
                         rules={[{ required: true, message: '请输入自定义镜像地址' }]}
                       >
-                        <Input placeholder="例如 registry.cn-shanghai.aliyuncs.com/ml/custom-serving:1.0.0" />
+                        <Select placeholder="请选择自定义镜像" options={customImageOptions} />
                       </Form.Item>
                     )}
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 18px' }}>
-                      <Form.Item
-                        label="运行命令"
-                        name={['custom', 'command']}
-                        rules={[{ required: true, message: '请输入运行命令' }]}
-                      >
-                        <Input.TextArea rows={3} placeholder="例如 python app.py" />
-                      </Form.Item>
-                      <Form.Item
-                        label="端口号"
-                        name={['custom', 'port']}
-                        rules={[{ required: true, message: '请输入端口号' }]}
-                      >
-                        <InputNumber style={{ width: '100%' }} min={1} max={65535} />
-                      </Form.Item>
-                    </div>
+                    <Form.Item
+                      label="运行命令"
+                      name={['custom', 'command']}
+                      rules={[{ required: true, message: '请输入运行命令' }]}
+                    >
+                      <Input.TextArea
+                        id="custom_command"
+                        rows={5}
+                        placeholder="例如 python app.py"
+                        spellCheck={false}
+                        style={{
+                          fontFamily: 'SFMono-Regular, Consolas, Monaco, monospace',
+                          fontSize: 13,
+                          borderRadius: 12,
+                          background: '#0f172a',
+                          color: '#e2e8f0',
+                        }}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      label="端口号"
+                      name={['custom', 'port']}
+                      rules={[{ required: true, message: '请输入端口号' }]}
+                    >
+                      <InputNumber style={{ width: '100%' }} min={1} max={65535} />
+                    </Form.Item>
                   </Card>
 
                   <Card id="resource-info" style={{ ...sectionCardStyle, marginBottom: 20 }}>
@@ -646,22 +676,6 @@ const MLModelDeployment: React.FC = () => {
                     <ResourceFields prefix={['custom', 'resources']} />
                   </Card>
 
-                  <Card id="service-config" style={{ ...sectionCardStyle, marginBottom: 20 }}>
-                    <div style={sectionTitleStyle}>服务配置</div>
-                    <Form.Item
-                      name={['custom', 'serviceConfigJson']}
-                      rules={[{ required: true, message: '请填写部署配置 JSON' }]}
-                    >
-                      <Input.TextArea
-                        rows={14}
-                        style={{
-                          fontFamily: 'SFMono-Regular, Consolas, Monaco, monospace',
-                          fontSize: 13,
-                          borderRadius: 12,
-                        }}
-                      />
-                    </Form.Item>
-                  </Card>
                 </>
               )}
 
@@ -774,7 +788,7 @@ const DescriptionsModal: React.FC<{
           <Descriptions.Item label="模型名称">{record.standardConfig?.model ?? '-'}</Descriptions.Item>
           <Descriptions.Item label="模型版本">{record.standardConfig?.modelVersion ?? '-'}</Descriptions.Item>
           <Descriptions.Item label="网络架构">{record.standardConfig?.network ?? '-'}</Descriptions.Item>
-          <Descriptions.Item label="模型来源">{record.deploymentType === 'standard' ? '模型管理' : '镜像部署'}</Descriptions.Item>
+          <Descriptions.Item label="模型来源">{record.standardConfig?.modelSource ?? '模型管理'}</Descriptions.Item>
           <Descriptions.Item label="资源规格" span={2}>{record.resourceSummary}</Descriptions.Item>
           <Descriptions.Item label="实例数">{record.instanceCount}</Descriptions.Item>
           <Descriptions.Item label="创建人">{record.creator}</Descriptions.Item>

@@ -4,7 +4,9 @@ import {
   Card,
   Form,
   Input,
+  message,
   Modal,
+  Progress,
   Select,
   Space,
   Table,
@@ -30,8 +32,13 @@ type AnnotationTask = {
   name: string
   dataVolume: number
   progress: number | null
+  collaborationMode?: 'online' | 'multi'
+  reviewerCount?: number
+  reviewMode?: string
+  datasetType?: 'text-generation' | 'image-understanding'
   preDataset: string
   postDataset: string
+  outputMode?: string
   creator: string
   createdAt: string
 }
@@ -79,6 +86,7 @@ const DataAnnotation: React.FC = () => {
   const [datasetType, setDatasetType] = useState<'text-generation' | 'image-understanding'>('text-generation')
   const [selectedDatasetValue, setSelectedDatasetValue] = useState<string>()
   const [creating, setCreating] = useState(false)
+  const [searchValue, setSearchValue] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [listLoading, setListLoading] = useState(false)
@@ -91,6 +99,16 @@ const DataAnnotation: React.FC = () => {
   const selectedDataset = useMemo(
     () => datasetOptions.find(item => item.value === selectedDatasetValue) ?? null,
     [datasetOptions, selectedDatasetValue],
+  )
+
+  const filteredItems = useMemo(
+    () =>
+      listResult.items.filter(item => {
+        const matchMode = !item.collaborationMode || item.collaborationMode === collaborationTab
+        const matchSearch = !searchValue || item.name.toLowerCase().includes(searchValue.toLowerCase())
+        return matchMode && matchSearch
+      }),
+    [collaborationTab, listResult.items, searchValue],
   )
 
   useEffect(() => {
@@ -153,12 +171,19 @@ const DataAnnotation: React.FC = () => {
     }
 
     const datasetLabel = selectedDataset?.label ?? '-'
+    const outputMode = form.getFieldValue('outputMode')
     setCreating(true)
     try {
       await dataServiceApi.createAnnotationTask({
         name: form.getFieldValue('name'),
         dataVolume: selectedDataset?.count ?? 0,
+        collaborationMode: collaborationTab,
+        reviewerCount: collaborationTab === 'multi' ? form.getFieldValue('reviewerCount') : undefined,
+        reviewMode: collaborationTab === 'multi' ? form.getFieldValue('reviewMode') : undefined,
+        datasetType: form.getFieldValue('datasetType'),
         preDataset: datasetLabel,
+        postDataset: outputMode === '新增版本' ? `${datasetLabel}-标注结果` : '-',
+        outputMode,
       })
     } finally {
       setCreating(false)
@@ -169,11 +194,18 @@ const DataAnnotation: React.FC = () => {
     { title: '任务名称', dataIndex: 'name', key: 'name' },
     { title: '数据量', dataIndex: 'dataVolume', key: 'dataVolume', width: 88 },
     {
+      title: '协作模式',
+      dataIndex: 'collaborationMode',
+      key: 'collaborationMode',
+      width: 110,
+      render: value => (value === 'multi' ? '多人标注' : '在线标注'),
+    },
+    {
       title: '标注进度',
       dataIndex: 'progress',
       key: 'progress',
       width: 110,
-      render: value => (value === null ? '-' : `${value}%`),
+      render: value => (value === null ? '-' : <Progress percent={value} size="small" showInfo={false} />),
     },
     { title: '标注前数据集', dataIndex: 'preDataset', key: 'preDataset', ellipsis: true },
     { title: '标注后数据集', dataIndex: 'postDataset', key: 'postDataset', ellipsis: true },
@@ -248,7 +280,14 @@ const DataAnnotation: React.FC = () => {
         />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
-          <Button icon={<ReloadOutlined />}>刷新</Button>
+          <Input
+            placeholder="请输入任务名称"
+            value={searchValue}
+            onChange={event => setSearchValue(event.target.value)}
+            style={{ width: 220, marginRight: 'auto' }}
+          />
+          <Button icon={<ReloadOutlined />} onClick={() => message.success('刷新成功')}>刷新</Button>
+          <Button onClick={() => setSearchValue('')}>重置</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenCreate}>
             创建标注任务
           </Button>
@@ -261,12 +300,14 @@ const DataAnnotation: React.FC = () => {
           <Table
             rowKey="id"
             columns={columns}
-            dataSource={listResult.items}
+            dataSource={filteredItems}
             loading={listLoading}
+            tableLayout="fixed"
+            scroll={{ x: 1280 }}
             pagination={{
               current: page,
               pageSize,
-              total: listResult.total,
+              total: filteredItems.length,
               showSizeChanger: false,
               showTotal: total => `共 ${total} 条记录`,
               onChange: nextPage => setPage(nextPage),
@@ -277,7 +318,7 @@ const DataAnnotation: React.FC = () => {
       </div>
 
       <Modal
-        title="在线标注任务"
+        title={collaborationTab === 'online' ? '在线标注任务' : '多人标注任务'}
         open={createOpen}
         onCancel={handleCloseCreate}
         width={680}
@@ -337,8 +378,35 @@ const DataAnnotation: React.FC = () => {
             </Select>
           </Form.Item>
 
+          {collaborationTab === 'multi' && (
+            <>
+              <Form.Item label="协作人数" name="reviewerCount" rules={[{ required: true, message: '请输入协作人数' }]}>
+                <Select
+                  options={[
+                    { value: 2, label: '2人' },
+                    { value: 3, label: '3人' },
+                    { value: 5, label: '5人' },
+                  ]}
+                />
+              </Form.Item>
+              <Form.Item label="审核方式" name="reviewMode" rules={[{ required: true, message: '请选择审核方式' }]}>
+                <Select
+                  options={[
+                    { value: '双人交叉审核', label: '双人交叉审核' },
+                    { value: '组长复核', label: '组长复核' },
+                    { value: '全量复核', label: '全量复核' },
+                  ]}
+                />
+              </Form.Item>
+            </>
+          )}
+
           <Form.Item label="数据集名称">
             <Input value={selectedDataset?.label ?? '-'} disabled />
+          </Form.Item>
+
+          <Form.Item label="标注后数据集预览">
+            <Input value={selectedDataset ? `${selectedDataset.label}-标注结果` : '-'} disabled />
           </Form.Item>
         </Form>
       </Modal>
@@ -354,8 +422,17 @@ const DataAnnotation: React.FC = () => {
             <Descriptions.Item label="任务名称" span={2}>{selectedTask.name}</Descriptions.Item>
             <Descriptions.Item label="数据量">{selectedTask.dataVolume}</Descriptions.Item>
             <Descriptions.Item label="标注进度">
-              {selectedTask.progress === null ? '-' : `${selectedTask.progress}%`}
+              {selectedTask.progress === null ? '-' : <Progress percent={selectedTask.progress} size="small" showInfo={false} />}
             </Descriptions.Item>
+            <Descriptions.Item label="协作模式">{selectedTask.collaborationMode === 'multi' ? '多人标注' : '在线标注'}</Descriptions.Item>
+            <Descriptions.Item label="数据集类型">
+              {selectedTask.datasetType === 'image-understanding' ? '图像理解' : '文本生成'}
+            </Descriptions.Item>
+            <Descriptions.Item label="协作人数">
+              {selectedTask.collaborationMode === 'multi' ? `${selectedTask.reviewerCount ?? '-'}人` : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="审核方式">{selectedTask.reviewMode ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label="输出方式">{selectedTask.outputMode ?? '新增版本'}</Descriptions.Item>
             <Descriptions.Item label="标注前数据集" span={2}>{selectedTask.preDataset}</Descriptions.Item>
             <Descriptions.Item label="标注后数据集" span={2}>{selectedTask.postDataset}</Descriptions.Item>
             <Descriptions.Item label="创建人">{selectedTask.creator}</Descriptions.Item>

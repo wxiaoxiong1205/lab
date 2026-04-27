@@ -357,30 +357,35 @@ const TestDataset: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 220,
-      fixed: 'right' as const,
-          render: (_: unknown, record: TestDatasetRecord) => (
-            <Space size={0} wrap>
-              <Button type="link" size="small" onClick={() => handleOpenDetail(record)}>查看详情</Button>
-              <Button
-                type="link"
-                size="small"
-                danger
-                onClick={async () => {
-                  await dataServiceApi.deleteDataset('test', record.id)
-                  message.success(`已删除：${record.name}`)
-                }}
-              >
-                删除
-              </Button>
-            </Space>
-          ),
-        },
-      ]
+      width: 170,
+      render: (_: unknown, record: TestDatasetRecord) => (
+        <Space size={0} wrap>
+          <Button type="link" size="small" onClick={() => handleOpenDetail(record)}>查看详情</Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            onClick={async () => {
+              await dataServiceApi.deleteDataset('test', record.id)
+              message.success(`已删除：${record.name}`)
+            }}
+          >
+            删除
+          </Button>
+        </Space>
+      ),
+    },
+  ]
 
   useEffect(() => {
     setPage(1)
   }, [dataUsage, searchValue])
+
+  useEffect(() => {
+    if (location.pathname === '/measurement') {
+      setDataUsage(undefined)
+    }
+  }, [location.pathname])
 
   useEffect(() => {
     if (isCreateRoute) {
@@ -584,18 +589,20 @@ const TestDataset: React.FC = () => {
   if (isCreateRoute) {
     return (
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        <div style={{ marginBottom: 20 }}>
-          <Text type="secondary">测试数据管理 / 新建</Text>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <Button icon={<ArrowLeftOutlined />} onClick={handleCancel}>返回</Button>
             <div>
-              <Text strong style={{ fontSize: 24, color: '#0f172a' }}>创建数据集</Text>
-              <div><Text type="secondary">当前已对齐生产环境创建路由，继续复用已有表单结构。</Text></div>
+              <Text strong style={{ display: 'block', fontSize: 26, color: '#0f172a', lineHeight: 1.15 }}>创建数据集</Text>
+              <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 14, lineHeight: 1.7 }}>
+                配置测试数据集的基础信息、用途和上传文件。
+              </Text>
             </div>
-            <Space>
-              <Button onClick={handleCancel}>取消</Button>
-              <Button type="primary" loading={creating} onClick={handleSubmit}>提交</Button>
-            </Space>
           </div>
+          <Space>
+            <Button onClick={handleCancel}>取消</Button>
+            <Button type="primary" loading={creating} onClick={handleSubmit}>提交</Button>
+          </Space>
         </div>
 
         <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 24 }}>
@@ -608,10 +615,16 @@ const TestDataset: React.FC = () => {
   if (isDetailRoute && selectedRecord) {
     return (
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-          <Text type="secondary" style={{ fontSize: 14 }}>
-            测试数据管理 / {selectedRecord.name}
-          </Text>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 22 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/measurement')}>返回列表</Button>
+            <div>
+              <Text strong style={{ display: 'block', fontSize: 26, color: '#0f172a', lineHeight: 1.15 }}>{selectedRecord.name}</Text>
+              <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 14, lineHeight: 1.7 }}>
+                查看测试数据集版本、基本信息和样本详情。
+              </Text>
+            </div>
+          </div>
           <Space size={16}>
             <Dropdown menu={{ items: downloadItems, onClick: ({ key }) => message.success(`开始下载 ${String(key).toUpperCase()}`) }}>
               <Button icon={<DownloadOutlined />}>下载</Button>
@@ -700,11 +713,16 @@ const TestDataset: React.FC = () => {
   if (isNewVersionRoute && addVersionTarget) {
     return (
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 20 }}>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/measurement/testing/${encodeURIComponent(addVersionTarget.name)}`)}>
             返回
           </Button>
-          <Text type="secondary">测试数据管理 / {addVersionTarget.name} / 新增版本</Text>
+          <div>
+            <Text strong style={{ display: 'block', fontSize: 26, color: '#0f172a', lineHeight: 1.15 }}>新增版本</Text>
+            <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 14, lineHeight: 1.7 }}>
+              为 {addVersionTarget.name} 补充新的测试数据版本。
+            </Text>
+          </div>
         </div>
 
         <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e5e7eb', padding: 28 }}>
@@ -790,48 +808,62 @@ const TestDataset: React.FC = () => {
   return (
     <>
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
             <div style={{
-              width: 40, height: 40,
-              background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-              borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(79, 70, 229, 0.35)',
+              width: 44, height: 44,
+              background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)',
+              borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 10px 20px rgba(20, 184, 166, 0.2)',
+              flexShrink: 0,
             }}>
               <DatabaseOutlined style={{ color: '#fff', fontSize: 18 }} />
             </div>
-            <Text strong style={{ fontSize: 18, color: '#0f172a' }}>测试数据管理</Text>
+            <div style={{ minWidth: 0 }}>
+              <Text strong style={{ display: 'block', fontSize: 30, color: '#0f172a', lineHeight: 1.15 }}>测试数据管理</Text>
+              <Text type="secondary" style={{ display: 'block', marginTop: 8, fontSize: 14, lineHeight: 1.75 }}>
+                管理用于模型效果评估与回归验证的测试数据集，统一查看版本状态、数据格式与样本规模。
+              </Text>
+            </div>
           </div>
-          <Text type="secondary" style={{ fontSize: 13, marginLeft: 52 }}>
-            管理测试数据集，适用于模型效果评估场景。
-          </Text>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Cascader
-              placeholder="数据用途"
-              allowClear
-              style={{ width: 220 }}
-              value={getDatasetUsagePath(dataUsage)}
-              onChange={value => setDataUsage(resolveDatasetUsageFromPath(value as string[]))}
-              options={DATASET_USAGE_CASCADER_OPTIONS}
-              displayRender={labels => labels.join(' / ')}
-            />
-            <Input
-              prefix={<span style={{ color: '#94a3b8' }}>🔍</span>}
-              placeholder="搜索"
-              value={searchValue}
-              onChange={e => setSearchValue(e.target.value)}
-              allowClear
-              style={{ borderRadius: 8, width: 200 }}
-            />
-            <Button onClick={() => { setSearchValue(''); setDataUsage(undefined) }}>重置</Button>
+        <div
+          style={{
+            marginBottom: 16,
+            padding: '16px 18px',
+            borderRadius: 18,
+            border: '1px solid #e2e8f0',
+            background: '#ffffff',
+            boxShadow: '0 8px 20px rgba(15, 23, 42, 0.04)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', flex: '1 1 520px', minWidth: 0 }}>
+              <Cascader
+                placeholder="数据用途"
+                allowClear
+                style={{ width: 220 }}
+                value={dataUsage ? getDatasetUsagePath(dataUsage) : undefined}
+                onChange={value => setDataUsage(resolveDatasetUsageFromPath(value as string[]))}
+                options={DATASET_USAGE_CASCADER_OPTIONS}
+                displayRender={labels => labels.join(' / ')}
+              />
+              <Input
+                prefix={<span style={{ color: '#94a3b8' }}>🔍</span>}
+                placeholder="搜索数据集名称"
+                value={searchValue}
+                onChange={e => setSearchValue(e.target.value)}
+                allowClear
+                style={{ borderRadius: 10, width: 240, maxWidth: '100%' }}
+              />
+              <Button onClick={() => { setSearchValue(''); setDataUsage(undefined) }}>重置</Button>
+            </div>
+            <Space wrap size={10}>
+              <Button icon={<span>🔄</span>} onClick={() => message.success('刷新成功')}>刷新</Button>
+              <Button type="primary" icon={<span>➕</span>} onClick={handleOpenCreate}>创建数据集</Button>
+            </Space>
           </div>
-          <Space>
-            <Button icon={<span>🔄</span>} onClick={() => message.success('刷新成功')}>刷新</Button>
-            <Button type="primary" icon={<span>➕</span>} onClick={handleOpenCreate}>创建数据集</Button>
-          </Space>
         </div>
 
         <div style={{
@@ -844,6 +876,7 @@ const TestDataset: React.FC = () => {
             dataSource={listResult.items}
             loading={listLoading}
             scroll={{ x: 1000 }}
+            tableLayout="fixed"
             pagination={{
               current: page,
               pageSize,

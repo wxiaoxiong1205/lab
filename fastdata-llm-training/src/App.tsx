@@ -71,6 +71,10 @@ const App: React.FC = () => {
               {/* 大模型训练 */}
               <Route path="/finetune/notebooks" element={<OnlineNotebook />} />
               <Route path="/finetune/notebooks/create" element={<OnlineNotebook />} />
+              <Route path="/finetune/notebooks/:notebookId/publish-case" element={<OnlineNotebook />} />
+              <Route path="/finetune/notebooks/cases/:caseId/edit" element={<OnlineNotebook />} />
+              <Route path="/finetune/notebooks/cases/:caseId" element={<OnlineNotebook />} />
+              <Route path="/finetune/notebooks/:id" element={<OnlineNotebook />} />
               <Route path="/training" element={<TrainingList />} />
               <Route path="/training/create" element={<CreateTraining />} />
               <Route path="/training/detail/:id" element={<TrainingDetail />} />
@@ -81,6 +85,8 @@ const App: React.FC = () => {
               {/* 模型评估 */}
               <Route path="/effect-evaluation" element={<EffectEvaluation />} />
               <Route path="/effect-evaluation/create" element={<EffectEvaluation />} />
+              <Route path="/effect-evaluation/report/:id" element={<EffectEvaluation />} />
+              <Route path="/effect-evaluation/manual-review/:id" element={<EffectEvaluation />} />
               <Route path="/evaluation-indicator" element={<EvaluationIndicator />} />
 
               {/* 模型服务 */}
@@ -96,6 +102,11 @@ const App: React.FC = () => {
               <Route path="/machine-model-deployment/create" element={<MLModelDeployment />} />
               <Route path="/machine-model-deployment/:id/edit" element={<MLModelDeployment />} />
               <Route path="/machine-notebook" element={<MLNotebook />} />
+              <Route path="/machine-notebook/create" element={<MLNotebook />} />
+              <Route path="/machine-notebook/:notebookId/publish-case" element={<MLNotebook />} />
+              <Route path="/machine-notebook/cases/:caseId/edit" element={<MLNotebook />} />
+              <Route path="/machine-notebook/cases/:caseId" element={<MLNotebook />} />
+              <Route path="/machine-notebook/:id" element={<MLNotebook />} />
               <Route path="/machine-annotation-service" element={<MLAnnotationService />} />
 
               {/* 系统管理 */}
