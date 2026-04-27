@@ -10,8 +10,10 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  SyncOutlined,
 } from '@ant-design/icons'
 import {
+  Alert,
   Button,
   Cascader,
   Card,
@@ -95,6 +97,10 @@ type MLSquareRecord = {
   creator: string
   createdAt: string
   sourceNotebookId?: string
+  sourceNotebookName?: string
+  publishStatus?: 'processing' | 'published' | 'failed'
+  publishStartedAt?: number
+  highlightUntil?: number
 }
 
 type OpenPortFormValue = {
@@ -306,6 +312,9 @@ const codeBlockStyle: React.CSSProperties = {
   wordBreak: 'break-all',
 }
 
+const CASE_PUBLISH_READY_DELAY = 4800
+const CASE_HIGHLIGHT_DURATION = 5000
+
 function statusTag(status: NotebookStatus): React.ReactNode {
   const config = TASK_LIFECYCLE_TAG[status]
   return <Tag color={config.color}>{config.label}</Tag>
@@ -448,6 +457,19 @@ const MLNotebook: React.FC = () => {
   }, [form, isCreateRoute])
 
   useEffect(() => {
+    if (
+      !isCreateRoute &&
+      !isPublishCaseRoute &&
+      !isCaseEditRoute &&
+      !isCaseDetailRoute &&
+      new URLSearchParams(location.search).get('tab') === 'square'
+    ) {
+      setActiveTab('square')
+      setSearchValue('')
+    }
+  }, [isCaseDetailRoute, isCaseEditRoute, isCreateRoute, isPublishCaseRoute, location.search])
+
+  useEffect(() => {
     if (isPublishCaseRoute && sourceNotebook) {
       caseForm.setFieldsValue({
         name: sourceNotebook.name,
@@ -470,6 +492,53 @@ const MLNotebook: React.FC = () => {
     }
   }, [filteredImageOptions, previewImageValue])
 
+  useEffect(() => {
+    const processingRows = squareRows.filter(item => item.publishStatus === 'processing')
+    if (!processingRows.length) return
+
+    const timer = window.setTimeout(() => {
+      const now = Date.now()
+      let completedCount = 0
+
+      setSquareRows(previous =>
+        previous.map(item => {
+          if (item.publishStatus !== 'processing') return item
+          if (now - (item.publishStartedAt ?? now) < CASE_PUBLISH_READY_DELAY) return item
+
+          completedCount += 1
+          return {
+            ...item,
+            publishStatus: 'published',
+            createdAt: nowText(),
+            highlightUntil: now + CASE_HIGHLIGHT_DURATION,
+          }
+        }),
+      )
+
+      if (completedCount) {
+        message.success('案例已生成，可在 Notebook 广场查看')
+      }
+    }, 1500)
+
+    return () => window.clearTimeout(timer)
+  }, [squareRows])
+
+  useEffect(() => {
+    const now = Date.now()
+    const activeHighlightRows = squareRows.filter(item => (item.highlightUntil ?? 0) > now)
+    if (!activeHighlightRows.length) return
+
+    const nextClearAt = Math.min(...activeHighlightRows.map(item => item.highlightUntil ?? now))
+    const timer = window.setTimeout(() => {
+      const current = Date.now()
+      setSquareRows(previous =>
+        previous.map(item => ((item.highlightUntil ?? 0) <= current ? { ...item, highlightUntil: undefined } : item)),
+      )
+    }, Math.max(nextClearAt - now, 0))
+
+    return () => window.clearTimeout(timer)
+  }, [squareRows])
+
   const notebookList = useMemo(
     () => rows.filter(item => item.name.toLowerCase().includes(searchValue.toLowerCase())),
     [rows, searchValue],
@@ -479,6 +548,7 @@ const MLNotebook: React.FC = () => {
     () => squareRows.filter(item => item.name.toLowerCase().includes(searchValue.toLowerCase())),
     [searchValue, squareRows],
   )
+  const processingCaseCount = squareRows.filter(item => item.publishStatus === 'processing').length
 
   const canManageSquareCase = Boolean(
     caseDetail &&
@@ -752,17 +822,22 @@ const MLNotebook: React.FC = () => {
       }
 
       const nextRecord: MLSquareRecord = {
-        id: `ml-square-${Date.now()}`,
+        id: `ml-square-pending-${Date.now()}`,
         name: values.name,
         description: values.description,
         creatorAccount: currentUser.account,
         creator: currentUser.username,
         createdAt: nowText(),
         sourceNotebookId: sourceNotebook.id,
+        sourceNotebookName: sourceNotebook.name,
+        publishStatus: 'processing',
+        publishStartedAt: Date.now(),
       }
       setSquareRows(previous => [nextRecord, ...previous])
-      message.success('案例已发布')
-      navigate(`/machine-notebook/cases/${nextRecord.id}`)
+      setActiveTab('square')
+      setSearchValue('')
+      message.success('案例发布任务已提交，正在生成案例')
+      navigate('/machine-notebook?tab=square')
     } catch {
       return
     }
@@ -1505,29 +1580,74 @@ const MLNotebook: React.FC = () => {
             />
           ) : (
             <>
+              {processingCaseCount > 0 && (
+                <Alert
+                  showIcon
+                  type="info"
+                  style={{ marginBottom: 16 }}
+                  message={`有 ${processingCaseCount} 个案例正在生成`}
+                  description="发布任务已提交，系统会自动刷新 Notebook 广场；生成完成后新案例会高亮展示。"
+                />
+              )}
               {squareList.length ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 18 }}>
-                  {squareList.map(item => (
-                    <Card key={item.id} style={{ borderRadius: 18, minHeight: 212 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                        <Title level={4} style={{ margin: 0, fontSize: 18 }}>
-                          {item.name}
-                        </Title>
-                        <Button type="text" danger icon={<DeleteOutlined />} />
-                      </div>
-                      <Paragraph type="secondary" style={{ minHeight: 84 }}>
-                        {item.description || '暂无说明'}
-                      </Paragraph>
-                      <Space>
-                        <Button icon={<EyeOutlined />} onClick={() => navigate(`/machine-notebook/cases/${item.id}`)}>
-                          查看详情
-                        </Button>
-                        <Button type="primary" icon={<CopyOutlined />}>
-                          复制案例
-                        </Button>
-                      </Space>
-                    </Card>
-                  ))}
+                  {squareList.map(item => {
+                    const isProcessing = item.publishStatus === 'processing'
+                    const isHighlighted = item.publishStatus === 'published' && (item.highlightUntil ?? 0) > Date.now()
+
+                    return (
+                      <Card
+                        key={item.id}
+                        style={{
+                          borderRadius: 18,
+                          minHeight: 212,
+                          border: isProcessing
+                            ? '1px solid #93c5fd'
+                            : isHighlighted
+                              ? '1px solid #22c55e'
+                              : undefined,
+                          background: isProcessing
+                            ? 'linear-gradient(180deg, #eff6ff 0%, #ffffff 72%)'
+                            : isHighlighted
+                              ? 'linear-gradient(180deg, #f0fdf4 0%, #ffffff 72%)'
+                              : undefined,
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 12 }}>
+                          <Title level={4} style={{ margin: 0, fontSize: 18 }}>
+                            {item.name}
+                          </Title>
+                          {isProcessing ? (
+                            <Tag icon={<SyncOutlined spin />} color="processing">
+                              生成中
+                            </Tag>
+                          ) : (
+                            <Button type="text" danger icon={<DeleteOutlined />} />
+                          )}
+                        </div>
+                        {item.sourceNotebookName && (
+                          <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+                            来源：{item.sourceNotebookName}
+                          </Text>
+                        )}
+                        <Paragraph type="secondary" style={{ minHeight: 72 }}>
+                          {item.description || '暂无说明'}
+                        </Paragraph>
+                        <Space>
+                          <Button
+                            icon={<EyeOutlined />}
+                            disabled={isProcessing}
+                            onClick={() => navigate(`/machine-notebook/cases/${item.id}`)}
+                          >
+                            查看详情
+                          </Button>
+                          <Button type="primary" icon={<CopyOutlined />} disabled={isProcessing}>
+                            复制案例
+                          </Button>
+                        </Space>
+                      </Card>
+                    )
+                  })}
                 </div>
               ) : (
                 <Empty description="暂无案例" />
