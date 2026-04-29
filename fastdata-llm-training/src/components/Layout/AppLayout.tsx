@@ -159,6 +159,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const currentProject = getCurrentProject(permissionState)
   const currentProjectMode = getCurrentProjectMode(permissionState)
   const routeAccess = canViewCurrentRoute(location.pathname, permissionState)
+  const shouldRedirectToWorkspace = routeAccess.reason === 'no-project' && !isWorkspaceRoute
 
   const filterMenuItems = (items: MenuItemList): MenuItemList =>
     items
@@ -303,6 +304,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     }
   }, [isDocsRoute])
 
+  useEffect(() => {
+    if (shouldRedirectToWorkspace) {
+      navigate('/workspace', { replace: true })
+    }
+  }, [navigate, shouldRedirectToWorkspace])
+
   const toggleDocPanel = () => {
     setDocPanelOpen(previous => !previous)
   }
@@ -335,7 +342,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         </div>
       )}
     </div>
-  ) : (
+  ) : shouldRedirectToWorkspace ? null : (
     <div style={{ padding: '64px 36px' }}>
       <Result
         status="403"

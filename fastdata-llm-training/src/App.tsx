@@ -65,6 +65,8 @@ const App: React.FC = () => {
               <Route path="/inference/create" element={<InferenceResult />} />
               <Route path="/inference/:id" element={<InferenceResult />} />
               <Route path="/data-annotation" element={<DataAnnotation />} />
+              <Route path="/data-annotation/multi/create" element={<DataAnnotation />} />
+              <Route path="/data-annotation/:id" element={<DataAnnotation />} />
               <Route path="/data-cleaning" element={<DataCleaning />} />
               <Route path="/data-cleaning/create" element={<DataCleaning />} />
 

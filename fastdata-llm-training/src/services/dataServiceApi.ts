@@ -218,7 +218,7 @@ export function buildAnnotationDatasetOptions(
   state: DataServiceState,
   datasetType: AnnotationDatasetType,
 ): DatasetOption[] {
-  const targetUsage = datasetType === 'image-understanding' ? 'SFT-图像理解' : 'SFT-文本生成'
+  const targetScene = datasetType === 'image-understanding' ? '图像理解' : '文本生成'
   const groups = [
     { prefix: '训练数据集', list: state.trainingDatasets },
     { prefix: '验证数据集', list: state.validationDatasets },
@@ -227,7 +227,7 @@ export function buildAnnotationDatasetOptions(
 
   return groups.flatMap(group =>
     group.list
-      .filter(item => item.dataUsage === targetUsage)
+      .filter(item => String(item.dataUsage).includes(targetScene))
       .map<DatasetOption>(item => ({
         value: item.id,
         label: `${group.prefix}/${item.name}-${item.latestVersion}`,

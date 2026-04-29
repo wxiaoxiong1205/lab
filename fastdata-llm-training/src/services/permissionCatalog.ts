@@ -509,7 +509,7 @@ export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   { menuKey: '/datasets', requiresProject: true, match: pathname => pathname === '/datasets' || pathname.startsWith('/datasets/') },
   { menuKey: '/measurement', requiresProject: true, match: pathname => pathname === '/measurement' || pathname.startsWith('/measurement/') },
   { menuKey: '/inference', requiresProject: true, match: pathname => pathname === '/inference' || pathname.startsWith('/inference/') },
-  { menuKey: '/data-annotation', requiresProject: true, match: pathname => pathname === '/data-annotation' },
+  { menuKey: '/data-annotation', requiresProject: true, match: pathname => pathname === '/data-annotation' || pathname.startsWith('/data-annotation/') },
   { menuKey: '/data-cleaning', requiresProject: true, match: pathname => pathname === '/data-cleaning' || pathname.startsWith('/data-cleaning/') },
   { menuKey: '/finetune/notebooks', requiresProject: true, match: pathname => pathname === '/finetune/notebooks' || pathname.startsWith('/finetune/notebooks/') },
   { menuKey: '/training', requiresProject: true, match: pathname => pathname === '/training' || pathname.startsWith('/training/') },

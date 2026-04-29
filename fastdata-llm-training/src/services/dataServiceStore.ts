@@ -69,6 +69,7 @@ export interface AnnotationTaskRecord {
   name: string
   dataVolume: number
   progress: number | null
+  status?: '未开始' | '标注中' | '待审核' | '已完成' | '已提交' | '失败'
   collaborationMode?: 'online' | 'multi'
   reviewerCount?: number
   reviewMode?: string
@@ -312,9 +313,14 @@ const seedState: DataServiceState = {
     { id: 'inf-3', name: '图像理解-模型管理', progress: '已完成', dataUsage: '图像理解', pendingData: '验证数据集/图像-单轮多轮交叉-2>V1', pendingModel: '图像理解-模型管理', dataVolume: 12, createdAt: '2026/04/01 14:43:25' },
   ],
   annotationTasks: [
-    { id: 'ann-1', name: '11111', dataVolume: 4, progress: 0, collaborationMode: 'online', preDataset: '验证数据集/json-22-V1', postDataset: '-', creator: 'deepexilab', createdAt: '2026-03-30 15:42:21' },
-    { id: 'ann-2', name: '评估任务1', dataVolume: 20, progress: 0, collaborationMode: 'multi', reviewerCount: 3, reviewMode: '双人交叉审核', preDataset: '训练数据集/小量数据集-V34', postDataset: '-', creator: 'lab1', createdAt: '2026-03-27 10:38:22' },
-    { id: 'ann-3', name: 'xcvbnm', dataVolume: 20, progress: 20, collaborationMode: 'online', preDataset: '训练数据集/训练测试-1-V5', postDataset: '-', creator: 'lab1', createdAt: '2026-03-20 10:17:59' },
+    { id: 'ann-1', name: '财税问答-人工标注-未开始', dataVolume: 12, progress: 0, status: '未开始', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '训练数据集/多轮指令精调-SFT-财税问答-V3', postDataset: '-', creator: 'deepexilab', createdAt: '2026-04-29 09:10:21' },
+    { id: 'ann-2', name: '客服意图识别-在线标注中', dataVolume: 36, progress: 45, status: '标注中', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '训练数据集/训练测试-1-V8', postDataset: '-', creator: 'lab1', createdAt: '2026-04-28 16:38:22' },
+    { id: 'ann-3', name: 'DPO偏好对-待审核', dataVolume: 24, progress: 80, status: '待审核', collaborationMode: 'multi', reviewerCount: 3, reviewMode: '双人交叉审核', datasetType: 'text-generation', preDataset: '训练数据集/偏好对训练集-DPO-demo-V2', postDataset: '-', creator: 'lab1', createdAt: '2026-04-27 14:17:59' },
+    { id: 'ann-4', name: 'RFT-PPO反馈标注-已完成', dataVolume: 30, progress: 100, status: '已完成', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '训练数据集/奖励反馈训练集-RFT-PPO-V3', postDataset: '训练数据集/奖励反馈训练集-RFT-PPO-标注结果-V1', creator: 'deepexilab', createdAt: '2026-04-26 11:22:13' },
+    { id: 'ann-5', name: '多轮对话质量复核-已提交', dataVolume: 18, progress: 100, status: '已提交', collaborationMode: 'multi', reviewerCount: 2, reviewMode: '组长复核', datasetType: 'text-generation', preDataset: '验证数据集/多轮---1-V1', postDataset: '验证数据集/多轮---1-标注结果-V2', creator: 'admin', createdAt: '2026-04-25 17:05:46' },
+    { id: 'ann-6', name: '图文审核-图像标注中', dataVolume: 16, progress: 35, status: '标注中', collaborationMode: 'online', datasetType: 'image-understanding', preDataset: '训练数据集/视觉偏好训练集-DPO-VLM-V1', postDataset: '-', creator: 'deepexilab', createdAt: '2026-04-24 10:26:08' },
+    { id: 'ann-7', name: '电商图片偏好-失败', dataVolume: 8, progress: null, status: '失败', collaborationMode: 'multi', reviewerCount: 2, reviewMode: '全量复核', datasetType: 'image-understanding', preDataset: '训练数据集/图文偏好排序-DPO-电商审核-V2', postDataset: '-', creator: 'lab1', createdAt: '2026-04-23 19:41:30' },
+    { id: 'ann-8', name: '文本生成-标注服务失败', dataVolume: 10, progress: null, status: '失败', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '测试数据集/偏好对测试集-DPO-A-V1', postDataset: '-', creator: 'lab1', createdAt: '2026-04-22 13:09:18' },
   ],
   cleaningTasks: [
     { id: 'clean-1', name: '多人标注任务清洗', status: '已完成', preDataset: '训练数据集/roleBased-V4', postDataset: '训练数据集/roleBased-V5', creator: 'deepexilab', createdAt: '2026/03/24 11:53:50' },
@@ -333,6 +339,16 @@ function enrichStateWithTrainingSeeds(nextState: DataServiceState): DataServiceS
   seedState.trainingDatasets.forEach(item => {
     if (!trainingIds.has(item.id)) {
       draft.trainingDatasets.push(cloneState({ trainingDatasets: [item], validationDatasets: [], testDatasets: [], inferenceResults: [], annotationTasks: [], cleaningTasks: [] }).trainingDatasets[0])
+    }
+  })
+
+  const annotationIds = new Map(draft.annotationTasks.map(item => [item.id, item]))
+  seedState.annotationTasks.forEach(item => {
+    const existing = annotationIds.get(item.id)
+    if (existing) {
+      Object.assign(existing, cloneState({ trainingDatasets: [], validationDatasets: [], testDatasets: [], inferenceResults: [], annotationTasks: [item], cleaningTasks: [] }).annotationTasks[0])
+    } else {
+      draft.annotationTasks.push(cloneState({ trainingDatasets: [], validationDatasets: [], testDatasets: [], inferenceResults: [], annotationTasks: [item], cleaningTasks: [] }).annotationTasks[0])
     }
   })
 
@@ -584,6 +600,7 @@ export const dataServiceActions = {
         name: params.name,
         dataVolume: params.dataVolume,
         progress: 0,
+        status: '未开始',
         collaborationMode: params.collaborationMode,
         reviewerCount: params.reviewerCount,
         reviewMode: params.reviewMode,

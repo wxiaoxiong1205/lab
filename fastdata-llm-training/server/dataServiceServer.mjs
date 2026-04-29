@@ -79,7 +79,16 @@ const seedState = {
     makeDataset({ id: 'test-4', name: '属性回归测试-22-333-444', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/04/09 10:00:00', sampleCount: 5 }),
   ],
   inferenceResults: [],
-  annotationTasks: [],
+  annotationTasks: [
+    { id: 'ann-1', name: '财税问答-人工标注-未开始', dataVolume: 12, progress: 0, status: '未开始', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '训练数据集/多轮指令精调-SFT-财税问答-V3', postDataset: '-', creator: 'deepexilab', createdAt: '2026-04-29 09:10:21' },
+    { id: 'ann-2', name: '客服意图识别-在线标注中', dataVolume: 36, progress: 45, status: '标注中', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '训练数据集/训练测试-1-V8', postDataset: '-', creator: 'lab1', createdAt: '2026-04-28 16:38:22' },
+    { id: 'ann-3', name: 'DPO偏好对-待审核', dataVolume: 24, progress: 80, status: '待审核', collaborationMode: 'multi', reviewerCount: 3, reviewMode: '双人交叉审核', datasetType: 'text-generation', preDataset: '训练数据集/偏好对训练集-DPO-demo-V2', postDataset: '-', creator: 'lab1', createdAt: '2026-04-27 14:17:59' },
+    { id: 'ann-4', name: 'RFT-PPO反馈标注-已完成', dataVolume: 30, progress: 100, status: '已完成', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '训练数据集/奖励反馈训练集-RFT-PPO-V3', postDataset: '训练数据集/奖励反馈训练集-RFT-PPO-标注结果-V1', creator: 'deepexilab', createdAt: '2026-04-26 11:22:13' },
+    { id: 'ann-5', name: '多轮对话质量复核-已提交', dataVolume: 18, progress: 100, status: '已提交', collaborationMode: 'multi', reviewerCount: 2, reviewMode: '组长复核', datasetType: 'text-generation', preDataset: '验证数据集/多轮---1-V1', postDataset: '验证数据集/多轮---1-标注结果-V2', creator: 'admin', createdAt: '2026-04-25 17:05:46' },
+    { id: 'ann-6', name: '图文审核-图像标注中', dataVolume: 16, progress: 35, status: '标注中', collaborationMode: 'online', datasetType: 'image-understanding', preDataset: '训练数据集/视觉偏好训练集-DPO-VLM-V1', postDataset: '-', creator: 'deepexilab', createdAt: '2026-04-24 10:26:08' },
+    { id: 'ann-7', name: '电商图片偏好-失败', dataVolume: 8, progress: null, status: '失败', collaborationMode: 'multi', reviewerCount: 2, reviewMode: '全量复核', datasetType: 'image-understanding', preDataset: '训练数据集/图文偏好排序-DPO-电商审核-V2', postDataset: '-', creator: 'lab1', createdAt: '2026-04-23 19:41:30' },
+    { id: 'ann-8', name: '文本生成-标注服务失败', dataVolume: 10, progress: null, status: '失败', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '测试数据集/偏好对测试集-DPO-A-V1', postDataset: '-', creator: 'lab1', createdAt: '2026-04-22 13:09:18' },
+  ],
   cleaningTasks: [],
 }
 
@@ -115,6 +124,17 @@ async function readDb() {
   for (const item of seedState.testDatasets) {
     if (!existingTestIds.has(item.id)) {
       state.testDatasets.push(clone(item))
+    }
+  }
+
+  state.annotationTasks = state.annotationTasks || []
+  const existingAnnotationMap = new Map(state.annotationTasks.map(item => [item.id, item]))
+  for (const item of seedState.annotationTasks) {
+    const existing = existingAnnotationMap.get(item.id)
+    if (existing) {
+      Object.assign(existing, clone(item))
+    } else {
+      state.annotationTasks.push(clone(item))
     }
   }
 
@@ -412,8 +432,14 @@ const server = createServer(async (req, res) => {
       name: body.name,
       dataVolume: body.dataVolume,
       progress: 0,
+      status: '未开始',
+      collaborationMode: body.collaborationMode,
+      reviewerCount: body.reviewerCount,
+      reviewMode: body.reviewMode,
+      datasetType: body.datasetType,
       preDataset: body.preDataset,
-      postDataset: '-',
+      postDataset: body.postDataset || '-',
+      outputMode: body.outputMode,
       creator: 'deepexilab',
       createdAt: nowText().replace(/\//g, '-'),
     })

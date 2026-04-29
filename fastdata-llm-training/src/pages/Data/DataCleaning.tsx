@@ -2,30 +2,42 @@ import React, { useMemo, useState } from 'react'
 import {
   Button,
   Card,
-  Descriptions,
+  DatePicker,
   Empty,
   Form,
   Input,
   message,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Table,
+  Tabs,
   Tag,
   Typography,
   Switch,
   Divider,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { FilterOutlined, ReloadOutlined, PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import {
+  ArrowLeftOutlined,
+  CheckCircleOutlined,
+  DatabaseOutlined,
+  DownloadOutlined,
+  EllipsisOutlined,
+  FilterOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  ToolOutlined,
+} from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  buildCleaningDatasetOptions,
   dataServiceApi,
   type PaginatedResult,
   selectCleaningTasks,
   useDataServiceSnapshot,
 } from '../../services/dataServiceApi'
+import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
 
 const { Text, Title } = Typography
 
@@ -38,6 +50,11 @@ type CleaningTask = {
   operatorValues?: string[]
   creator: string
   createdAt: string
+}
+
+type CleaningFieldOption = {
+  value: string
+  label: string
 }
 
 type CleaningOperator = {
@@ -55,18 +72,22 @@ const stepCards = [
   {
     title: '选择数据集',
     description: '从平台数据管理中选择需要清洗的数据集。',
+    icon: <DatabaseOutlined />,
   },
   {
     title: '清洗能力选择',
     description: '根据数据特性及目标，选择合适的数据清洗算子。',
+    icon: <ToolOutlined />,
   },
   {
     title: '清洗流程配置',
     description: '在选择的清洗算子基础上，配置清洗流程。',
+    icon: <FilterOutlined />,
   },
   {
     title: '清洗结果查看',
     description: '清洗完成后，点击详情即可查看清洗结果。',
+    icon: <CheckCircleOutlined />,
   },
 ]
 
@@ -110,10 +131,116 @@ const categories: CleaningCategory[] = [
   },
 ]
 
+const cleaningFieldOptionsByFormat: Record<string, CleaningFieldOption[]> = {
+  PROMPT_RESPONSE: [
+    { value: 'prompt', label: 'Prompt' },
+    { value: 'response', label: 'Response' },
+  ],
+  ROLE_BASED: [
+    { value: 'system', label: 'System' },
+    { value: 'user', label: 'User' },
+    { value: 'assistant', label: 'Assistant' },
+  ],
+  Chosen_Rejected: [
+    { value: 'system', label: 'System' },
+    { value: 'user', label: 'User' },
+    { value: 'assistant.chosen', label: 'Assistant Chosen' },
+    { value: 'assistant.rejected', label: 'Assistant Rejected' },
+  ],
+  Completion_Reward: [
+    { value: 'completion', label: 'Completion' },
+    { value: 'reward', label: 'Reward' },
+  ],
+}
+
+function getCleaningFieldOptions(dataset?: SelectedDatasetVersionRow | null): CleaningFieldOption[] {
+  if (!dataset) {
+    return []
+  }
+  return cleaningFieldOptionsByFormat[dataset.dataFormat] ?? [
+    { value: 'content', label: 'Content' },
+  ]
+}
+
+function buildNextVersionDatasetName(dataset?: SelectedDatasetVersionRow | null): string {
+  if (!dataset) {
+    return ''
+  }
+
+  const match = /^V(\d+)$/i.exec(dataset.version)
+  const nextVersion = match ? `V${Number(match[1]) + 1}` : `${dataset.version}-清洗后`
+  return `${dataset.dataType}/${dataset.datasetName}-${nextVersion}`
+}
+
 function statusTag(status: CleaningTask['status']) {
   if (status === '已完成') return <Tag color="success">已完成</Tag>
   if (status === '启动中') return <Tag color="processing">启动中</Tag>
   return <Tag color="default">已终止</Tag>
+}
+
+function getOperatorMeta(value: string) {
+  return categories.flatMap(item => item.operators).find(item => item.value === value)
+}
+
+function getDetailOperators(task: CleaningTask) {
+  const configuredOperators = task.operatorValues?.length
+    ? task.operatorValues
+    : ['blank', 'html', 'length', 'exact', 'contact']
+
+  return configuredOperators.map((value, index) => {
+    const operator = getOperatorMeta(value)
+    return {
+      value,
+      index: index + 1,
+      label: operator?.label ?? value,
+      description: operator?.description ?? '-',
+    }
+  })
+}
+
+function getCleaningResultRows(task: CleaningTask) {
+  return [
+    {
+      id: 'sample-1',
+      index: 1,
+      before: [
+        '{"messages":[',
+        '  {"role":"system","content":"你是数据清洗助手。"},',
+        '  {"role":"user","content":"请概括这段包含重复换行和噪声的文本。"}',
+        ']}',
+      ].join('\n'),
+      after: task.status === '已完成'
+        ? [
+            '{"messages":[',
+            '  {"role":"system","content":"你是数据清洗助手。"},',
+            '  {"role":"user","content":"请概括这段文本。"}',
+            ']}',
+          ].join('\n')
+        : '待清洗任务完成后生成结果',
+    },
+    {
+      id: 'sample-2',
+      index: 2,
+      before: [
+        '{"prompt":"这是一条含有联系方式 138****0000 的训练样本",',
+        ' "response":"需要进行敏感信息脱敏。"}',
+      ].join('\n'),
+      after: task.status === '已完成'
+        ? [
+            '{"prompt":"这是一条含有联系方式 [PHONE] 的训练样本",',
+            ' "response":"需要进行敏感信息脱敏。"}',
+          ].join('\n')
+        : '待清洗任务完成后生成结果',
+    },
+    {
+      id: 'sample-3',
+      index: 3,
+      before: '重复低质量样本，内容不完整……',
+      after: task.status === '已完成'
+        ? '[已过滤]\n原因：数据在清洗过程中被过滤'
+        : '待清洗任务完成后生成结果',
+    },
+  ]
 }
 
 const DataCleaning: React.FC = () => {
@@ -124,10 +251,11 @@ const DataCleaning: React.FC = () => {
   const [form] = Form.useForm()
   const [selectedOperators, setSelectedOperators] = useState<string[]>([])
   const [detailTask, setDetailTask] = useState<CleaningTask | null>(null)
+  const [datasetPickerOpen, setDatasetPickerOpen] = useState(false)
+  const [selectedCleaningDataset, setSelectedCleaningDataset] = useState<SelectedDatasetVersionRow | null>(null)
   const isCreateRoute = location.pathname === '/data-cleaning/create'
   const scheduleEnabled = Form.useWatch('scheduleEnabled', form)
-  const datasetOptions = useMemo(() => buildCleaningDatasetOptions(state), [state])
-  const selectedDatasetValue = Form.useWatch('dataset', form)
+  const selectedCleaningField = Form.useWatch('cleaningField', form)
   const [creating, setCreating] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>()
@@ -135,10 +263,13 @@ const DataCleaning: React.FC = () => {
   const [pageSize, setPageSize] = useState(20)
   const [listLoading, setListLoading] = useState(false)
   const [listResult, setListResult] = useState<PaginatedResult<CleaningTask>>({ items: [], total: 0 })
-  const selectedDatasetLabel = useMemo(() => {
-    const value = selectedDatasetValue
-    return datasetOptions.find(item => item.value === value)?.label ?? '-'
-  }, [selectedDatasetValue])
+  const selectedDatasetLabel = selectedCleaningDataset
+    ? `${selectedCleaningDataset.dataType}/${selectedCleaningDataset.datasetName}-${selectedCleaningDataset.version}`
+    : '-'
+  const cleaningFieldOptions = useMemo(
+    () => getCleaningFieldOptions(selectedCleaningDataset),
+    [selectedCleaningDataset],
+  )
 
   const filteredItems = useMemo(
     () =>
@@ -159,31 +290,33 @@ const DataCleaning: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 180,
+      width: 220,
       render: (_, record) => (
         <Space size={0}>
           <Button
             type="link"
             size="small"
-            disabled={record.status !== '已终止'}
-            onClick={async () => {
-              await dataServiceApi.startCleaningTask(record.id)
-            }}
+            disabled
+            onClick={() => message.info('当前状态暂不支持启动')}
           >
             启动
           </Button>
           <Button type="link" size="small" onClick={() => setDetailTask(record)}>查看详情</Button>
           <Button type="link" size="small" disabled={record.status !== '已终止'}>编辑</Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            onClick={async () => {
-              await dataServiceApi.deleteCleaningTask(record.id)
-            }}
-          >
-            删除
-          </Button>
+          {record.status === '启动中' && <Button type="link" size="small" disabled>终止</Button>}
+          {record.status !== '启动中' && (
+            <Popconfirm
+              title="确认删除该清洗任务？"
+              okText="删除"
+              cancelText="取消"
+              onConfirm={async () => {
+                await dataServiceApi.deleteCleaningTask(record.id)
+              }}
+            >
+              <Button type="link" size="small" danger>删除</Button>
+            </Popconfirm>
+          )}
+          <Button type="link" size="small" icon={<EllipsisOutlined />} onClick={() => setDetailTask(record)} />
         </Space>
       ),
     },
@@ -192,11 +325,13 @@ const DataCleaning: React.FC = () => {
   const handleOpenCreate = () => {
     form.resetFields()
     form.setFieldsValue({ sourceType: '已有数据集', outputMode: '新增版本' })
+    setSelectedCleaningDataset(null)
     setSelectedOperators([])
     navigate('/data-cleaning/create')
   }
 
   const handleCancelCreate = () => {
+    setDatasetPickerOpen(false)
     navigate('/data-cleaning')
   }
 
@@ -278,14 +413,24 @@ const DataCleaning: React.FC = () => {
             </Form.Item>
 
             <Form.Item label="选择数据集" name="dataset" rules={[{ required: true, message: '请选择数据集' }]}>
-              <Select
-                placeholder="选择"
-                options={datasetOptions.map(item => ({ value: item.value, label: item.label }))}
+              <Input
+                readOnly
+                placeholder="请选择数据集分类、数据集和版本"
+                value={selectedDatasetLabel === '-' ? undefined : selectedDatasetLabel}
+                addonAfter={
+                  <Button type="link" size="small" onClick={() => setDatasetPickerOpen(true)}>
+                    选择
+                  </Button>
+                }
               />
             </Form.Item>
 
-            <Form.Item label="清洗字段">
-              <Input value="暂无可用字段" disabled />
+            <Form.Item label="清洗字段" name="cleaningField" rules={[{ required: true, message: '请选择清洗字段' }]}>
+              <Select
+                placeholder={selectedCleaningDataset ? '请选择清洗字段' : '请先选择数据集'}
+                disabled={!selectedCleaningDataset}
+                options={cleaningFieldOptions}
+              />
             </Form.Item>
 
             <Form.Item label="处理后数据集" name="outputMode">
@@ -295,19 +440,25 @@ const DataCleaning: React.FC = () => {
             </Form.Item>
 
             <Form.Item label="清洗后数据集名称" name="outputName" rules={[{ required: true, message: '请输入清洗后数据集名称' }]}>
-              <Input placeholder="清洗后数据集名称：" />
-            </Form.Item>
-
-            <Form.Item label="数据集名称">
-              <Input value={selectedDatasetLabel} disabled />
+              <Input placeholder="默认根据所选数据集生成，可编辑" />
             </Form.Item>
 
             <Form.Item label="任务定时配置">
-              <Space size={12}>
+              <Space direction="vertical" size={12} style={{ width: '100%' }}>
                 <Form.Item name="scheduleEnabled" valuePropName="checked" noStyle>
                   <Switch checkedChildren="开" unCheckedChildren="关" />
                 </Form.Item>
-                {scheduleEnabled && <Text type="secondary">当前版本先保留入口，调度细节后续接入</Text>}
+                {scheduleEnabled && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr)', gap: 16 }}>
+                    <Form.Item
+                      label="定时执行时间"
+                      name="scheduleTime"
+                      rules={[{ required: true, message: '请选择定时执行时间' }]}
+                    >
+                      <DatePicker showTime style={{ width: '100%' }} placeholder="请选择执行时间" />
+                    </Form.Item>
+                  </div>
+                )}
               </Space>
             </Form.Item>
 
@@ -378,16 +529,6 @@ const DataCleaning: React.FC = () => {
                 <div style={{ marginBottom: 16 }}>
                   <Text type="secondary">已选择算子：{selectedOperators.length} 个</Text>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                  <Card size="small" style={{ borderRadius: 12, background: '#f8fafc' }}>
-                    <Text type="secondary">清洗后数据集</Text>
-                    <div style={{ marginTop: 6, fontWeight: 600 }}>{form.getFieldValue('outputName') || '待填写'}</div>
-                  </Card>
-                  <Card size="small" style={{ borderRadius: 12, background: '#f8fafc' }}>
-                    <Text type="secondary">流程结果预期</Text>
-                    <div style={{ marginTop: 6, fontWeight: 600 }}>{selectedOperators.length ? '将生成清洗结果集' : '待配置流程'}</div>
-                  </Card>
-                </div>
                 {selectedOperators.length ? (
                   <div style={{ display: 'grid', gap: 12 }}>
                     {selectedOperators.map((operatorValue, index) => {
@@ -456,18 +597,6 @@ const DataCleaning: React.FC = () => {
                   />
                 )}
 
-                {!!selectedOperators.length && (
-                  <Card
-                    size="small"
-                    title="流程摘要"
-                    style={{ borderRadius: 12, marginTop: 16 }}
-                  >
-                    <Text type="secondary" style={{ lineHeight: 1.8 }}>
-                      当前流程将按照 {selectedOperators.length} 个算子的顺序执行，并将结果输出到
-                      {` ${form.getFieldValue('outputName') || '待填写的结果数据集'}。`}
-                    </Text>
-                  </Card>
-                )}
               </Card>
             </div>
 
@@ -477,6 +606,34 @@ const DataCleaning: React.FC = () => {
             </div>
           </Form>
         </Card>
+
+        <DatasetSelectModal
+          open={datasetPickerOpen}
+          title="选择清洗数据集"
+          mode="single"
+          trainingType="text"
+          defaultDataType="训练数据集"
+          detailedDataUsage
+          defaultSelectedKeys={selectedCleaningDataset ? [selectedCleaningDataset.key] : []}
+          onCancel={() => setDatasetPickerOpen(false)}
+          onConfirm={selectedRows => {
+            const selected = selectedRows[0]
+            if (!selected) {
+              setSelectedCleaningDataset(null)
+              form.setFieldsValue({ dataset: undefined, cleaningField: undefined, outputName: undefined })
+              setDatasetPickerOpen(false)
+              return
+            }
+
+            setSelectedCleaningDataset(selected)
+            form.setFieldsValue({
+              dataset: selected.key,
+              cleaningField: undefined,
+              outputName: buildNextVersionDatasetName(selected),
+            })
+            setDatasetPickerOpen(false)
+          }}
+        />
       </div>
     )
   }
@@ -490,15 +647,20 @@ const DataCleaning: React.FC = () => {
         </Text>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, marginBottom: 24 }}>
-        {stepCards.map(card => (
-          <Card key={card.title} style={{ borderRadius: 16, border: '1px solid #e2e8f0', minHeight: 156 }}>
-            <FilterOutlined style={{ fontSize: 24, color: '#0f172a', marginBottom: 20 }} />
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>{card.title}</div>
-            <Text type="secondary" style={{ lineHeight: 1.7 }}>{card.description}</Text>
-          </Card>
-        ))}
-      </div>
+      <Card style={{ borderRadius: 12, border: '1px solid #eef2f7', marginBottom: 24 }} styles={{ body: { padding: '24px 28px' } }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 18 }}>
+          {stepCards.map((card, index) => (
+            <div key={card.title}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                <span style={{ fontSize: 20, color: '#1677ff' }}>{card.icon}</span>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>{card.title}</div>
+                {index < stepCards.length - 1 && <div style={{ flex: 1, height: 1, background: '#1677ff', opacity: 0.85 }} />}
+              </div>
+              <Text type="secondary" style={{ lineHeight: 1.7, paddingLeft: 32, display: 'block' }}>{card.description}</Text>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12 }}>
         <Space>
@@ -545,9 +707,12 @@ const DataCleaning: React.FC = () => {
           pagination={{
             current: page,
             pageSize,
-            total: filteredItems.length,
+            total: listResult.total,
             showTotal: total => `共 ${total} 条记录`,
-            onChange: nextPage => setPage(nextPage),
+            onChange: (nextPage, nextPageSize) => {
+              setPage(nextPage)
+              setPageSize(nextPageSize)
+            },
           }}
           locale={{ emptyText: '暂无清洗任务' }}
         />
@@ -558,39 +723,136 @@ const DataCleaning: React.FC = () => {
         open={Boolean(detailTask)}
         onCancel={() => setDetailTask(null)}
         footer={<Button onClick={() => setDetailTask(null)}>关闭</Button>}
+        width={1040}
       >
         {detailTask && (
-          <div style={{ display: 'grid', gap: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-              <Card size="small">
-                <Text type="secondary">清洗状态</Text>
-                <div style={{ marginTop: 8 }}>{statusTag(detailTask.status)}</div>
-              </Card>
-              <Card size="small">
-                <Text type="secondary">清洗算子数量</Text>
-                <div style={{ marginTop: 8, fontSize: 18, fontWeight: 600 }}>{detailTask.operatorValues?.length ?? 0}</div>
-              </Card>
-              <Card size="small">
-                <Text type="secondary">输出结果</Text>
-                <div style={{ marginTop: 8, fontSize: 18, fontWeight: 600 }}>{detailTask.postDataset === '-' ? '待生成' : '已生成'}</div>
-              </Card>
-            </div>
+          <Tabs
+            items={[
+              {
+                key: 'detail',
+                label: '清洗详情',
+                children: (
+                  <div style={{ display: 'grid', gap: 18 }}>
+                    <Card
+                      title="基本信息"
+                      size="small"
+                      style={{ borderRadius: 14 }}
+                      styles={{ body: { padding: 0 } }}
+                    >
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '140px minmax(0, 1fr) 140px minmax(0, 1fr)',
+                          borderTop: '1px solid #f1f5f9',
+                        }}
+                      >
+                        {[
+                          ['任务名称', detailTask.name, '任务状态', statusTag(detailTask.status)],
+                          ['数据来源', '已有数据集', '清洗前数据集', detailTask.preDataset],
+                          ['清洗后数据集', detailTask.postDataset, '创建人', detailTask.creator],
+                          ['创建时间', detailTask.createdAt, '完成时间', detailTask.status === '已完成' ? detailTask.createdAt : '-'],
+                        ].map((row, rowIndex) => (
+                          <React.Fragment key={`${row[0]}-${rowIndex}`}>
+                            <div style={{ padding: '12px 14px', background: '#f8fafc', borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', color: '#64748b' }}>
+                              {row[0]}
+                            </div>
+                            <div style={{ padding: '12px 14px', borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', minWidth: 0, wordBreak: 'break-word' }}>
+                              {row[1]}
+                            </div>
+                            <div style={{ padding: '12px 14px', background: '#f8fafc', borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', color: '#64748b' }}>
+                              {row[2]}
+                            </div>
+                            <div style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9', minWidth: 0, wordBreak: 'break-word' }}>
+                              {row[3]}
+                            </div>
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    </Card>
 
-            <Descriptions column={1} bordered size="small">
-              <Descriptions.Item label="任务名称">{detailTask.name}</Descriptions.Item>
-              <Descriptions.Item label="清洗前数据集">{detailTask.preDataset}</Descriptions.Item>
-              <Descriptions.Item label="清洗后数据集">{detailTask.postDataset}</Descriptions.Item>
-              <Descriptions.Item label="清洗算子">
-                {(detailTask.operatorValues ?? []).length
-                  ? (detailTask.operatorValues ?? [])
-                      .map((value: string) => categories.flatMap(item => item.operators).find(operator => operator.value === value)?.label ?? value)
-                      .join('，')
-                  : '暂无'}
-              </Descriptions.Item>
-              <Descriptions.Item label="创建人">{detailTask.creator}</Descriptions.Item>
-              <Descriptions.Item label="创建时间">{detailTask.createdAt}</Descriptions.Item>
-            </Descriptions>
-          </div>
+                    <Card
+                      size="small"
+                      title="清洗结果"
+                      style={{ borderRadius: 14 }}
+                      extra={
+                        <Button icon={<DownloadOutlined />} disabled={detailTask.status !== '已完成'}>
+                          下载数据
+                        </Button>
+                      }
+                    >
+                      <Space direction="vertical" size={14} style={{ width: '100%' }}>
+                        <div>
+                          <Text type="secondary">清洗算子：</Text>
+                          <Space wrap size={[8, 8]} style={{ marginLeft: 8 }}>
+                            {getDetailOperators(detailTask).map(operator => (
+                              <Tag key={operator.value} color="blue">
+                                {operator.label}
+                              </Tag>
+                            ))}
+                          </Space>
+                        </div>
+                        <Text type="secondary">单次随机展示 50 条数据，如需查看完整数据可下载数据集。</Text>
+                        <Table
+                          rowKey="id"
+                          size="small"
+                          pagination={false}
+                          tableLayout="fixed"
+                          scroll={{ x: 900 }}
+                          columns={[
+                            { title: '序号', dataIndex: 'index', key: 'index', width: 72, align: 'center' },
+                            {
+                              title: '清洗前',
+                              dataIndex: 'before',
+                              key: 'before',
+                              render: value => (
+                                <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, color: '#334155' }}>{value}</div>
+                              ),
+                            },
+                            {
+                              title: '清洗后',
+                              dataIndex: 'after',
+                              key: 'after',
+                              render: value => (
+                                <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, color: '#334155' }}>{value}</div>
+                              ),
+                            },
+                          ]}
+                          dataSource={getCleaningResultRows(detailTask)}
+                        />
+                      </Space>
+                    </Card>
+                  </div>
+                ),
+              },
+              {
+                key: 'logs',
+                label: '清洗日志',
+                children: (
+                  <div
+                    style={{
+                      background: '#0f172a',
+                      color: '#dbeafe',
+                      borderRadius: 12,
+                      padding: 16,
+                      fontFamily: 'Menlo, Consolas, monospace',
+                      fontSize: 12,
+                      lineHeight: 1.8,
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {[
+                      `[${detailTask.createdAt}] 创建清洗任务：${detailTask.name}`,
+                      `[${detailTask.createdAt}] 读取清洗前数据集：${detailTask.preDataset}`,
+                      `[${detailTask.createdAt}] 加载清洗算子：${(detailTask.operatorValues ?? []).length || 0} 个`,
+                      detailTask.status === '已完成'
+                        ? `[${detailTask.createdAt}] 清洗完成，输出数据集：${detailTask.postDataset}`
+                        : `[${detailTask.createdAt}] 当前状态：${detailTask.status}`,
+                    ].join('\n')}
+                  </div>
+                ),
+              },
+            ]}
+          />
         )}
       </Modal>
     </div>

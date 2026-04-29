@@ -25,6 +25,7 @@ export interface DatasetPickerResolvedRow {
   key: string
   datasetId: string
   datasetName: string
+  dataType: DatasetPickerDataType
   version: string
   versionId: string
   dataUsage: string
@@ -226,6 +227,7 @@ export function resolveDatasetVersionRow(key: string): DatasetPickerResolvedRow 
     key,
     datasetId: ds.id,
     datasetName: ds.name,
+    dataType: ds.dataType,
     version: ver.label,
     versionId: ver.id,
     dataUsage: ds.dataUsage,
