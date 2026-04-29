@@ -1,32 +1,12 @@
 import React, { useState } from 'react'
-import {
-  Alert,
-  Button,
-  Card,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-  message,
-} from 'antd'
+import { Button, Card, Form, Input, Modal, Space, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { CloudOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
+import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import { mockKubernetesClusters } from '../../data/mockDataAll'
 import type { KubernetesCluster } from '../../types/shared'
 
 const { Title, Text } = Typography
-
-const labelPresets = [
-  { value: 'dev', label: '开发环境' },
-  { value: 'test', label: '测试环境' },
-  { value: 'prod', label: '生产环境' },
-  { value: 'gpu', label: 'GPU集群' },
-  { value: 'high-memory', label: '高内存' },
-]
+const { TextArea } = Input
 
 function renderStatus(status: string): React.ReactNode {
   if (status === 'connected') {
@@ -35,7 +15,7 @@ function renderStatus(status: string): React.ReactNode {
   if (status === 'disconnected') {
     return <Tag color="error">连接失败</Tag>
   }
-  return <Tag>未知</Tag>
+  return <Tag>未测试</Tag>
 }
 
 function renderMountStatus(status: string): React.ReactNode {
@@ -51,22 +31,60 @@ function renderMountStatus(status: string): React.ReactNode {
 const KubernetesClusterPage: React.FC = () => {
   const [form] = Form.useForm()
   const [createOpen, setCreateOpen] = useState(false)
-  const [detailRecord, setDetailRecord] = useState<KubernetesCluster | null>(null)
-  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success'>('idle')
+  const [editingRecord, setEditingRecord] = useState<KubernetesCluster | null>(null)
+  const [editingKubeconfig, setEditingKubeconfig] = useState('')
   const [rows, setRows] = useState<KubernetesCluster[]>(mockKubernetesClusters)
 
+  const openCreate = () => {
+    setEditingRecord(null)
+    setEditingKubeconfig('')
+    form.resetFields()
+    setCreateOpen(true)
+  }
+
+  const openEdit = (record: KubernetesCluster) => {
+    setEditingRecord(record)
+    setEditingKubeconfig(record.kubeconfig ?? '')
+    form.setFieldsValue({
+      name: record.name,
+      description: record.description,
+      kubeconfig: record.kubeconfig,
+    })
+    setCreateOpen(true)
+  }
+
+  const closeCreate = () => {
+    setCreateOpen(false)
+    setEditingRecord(null)
+    setEditingKubeconfig('')
+    form.resetFields()
+  }
+
+  const extractApiServer = (kubeconfig?: string) => {
+    const matched = kubeconfig?.match(/server:\s*(\S+)/)
+    return matched?.[1] ?? '待解析'
+  }
+
+  const formatCreatedAt = () => {
+    const now = new Date()
+    const pad = (value: number) => String(value).padStart(2, '0')
+    return `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+  }
+
   const columns: ColumnsType<KubernetesCluster> = [
-    { title: '集群名称', dataIndex: 'name', key: 'name' },
+    { title: '集群名称', dataIndex: 'name', key: 'name', width: 160 },
     {
       title: 'API Server',
       dataIndex: 'apiServer',
       key: 'apiServer',
-      render: value => <Text code style={{ fontSize: 11 }}>{value}</Text>,
+      width: 260,
+      render: value => <Text code style={{ fontSize: 11, whiteSpace: 'normal' }}>{value}</Text>,
     },
     {
       title: '标签',
       dataIndex: 'labels',
       key: 'labels',
+      width: 220,
       render: value => (
         <Space wrap size={6}>
           {value?.map((item: string) => (
@@ -107,10 +125,13 @@ const KubernetesClusterPage: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 320,
+      width: 380,
       render: (_, record) => (
-        <Space size={0}>
+        <Space size={0} style={{ whiteSpace: 'nowrap' }}>
           <Button type="link" size="small">测试连接</Button>
+          <Button type="link" size="small" onClick={() => openEdit(record)}>
+            编辑
+          </Button>
           <Button type="link" size="small">绑定存储配置</Button>
           <Button type="link" size="small">绑定仓库配置</Button>
           <Button
@@ -124,21 +145,50 @@ const KubernetesClusterPage: React.FC = () => {
           >
             删除
           </Button>
-          <Button type="link" size="small" onClick={() => setDetailRecord(record)}>...</Button>
         </Space>
       ),
     },
   ]
 
-  const testCurrentConnection = () => {
-    setConnectionStatus('testing')
-    window.setTimeout(() => setConnectionStatus('success'), 1200)
-  }
-
   const submitCreate = async () => {
     try {
-      await form.validateFields()
-      setCreateOpen(false)
+      const values = await form.validateFields()
+      if (editingRecord) {
+        setRows(previous =>
+          previous.map(item =>
+            item.id === editingRecord.id
+              ? {
+                  ...item,
+                  name: values.name,
+                  description: values.description,
+                  kubeconfig: values.kubeconfig,
+                  apiServer: extractApiServer(values.kubeconfig),
+                  connectionStatus: 'untested',
+                }
+              : item,
+          ),
+        )
+        message.success('集群已更新，连接状态已重置为未测试')
+      } else {
+        const kubeconfig = values.kubeconfig ?? ''
+        setRows(previous => [
+          {
+            id: `cluster-${Date.now()}`,
+            name: values.name,
+            description: values.description,
+            apiServer: extractApiServer(kubeconfig),
+            kubeconfig,
+            labels: [],
+            nodeCount: 0,
+            connectionStatus: 'untested',
+            mountStatus: 'unmounted',
+            createdAt: formatCreatedAt(),
+          },
+          ...previous,
+        ])
+        message.success('集群已导入，连接状态为未测试')
+      }
+      closeCreate()
     } catch {
       return
     }
@@ -154,7 +204,7 @@ const KubernetesClusterPage: React.FC = () => {
           </Text>
 
           <Space style={{ marginBottom: 16 }}>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
               导入集群
             </Button>
             <Button>刷新</Button>
@@ -165,18 +215,20 @@ const KubernetesClusterPage: React.FC = () => {
             columns={columns}
             dataSource={rows}
             pagination={{ pageSize: 10, showTotal: total => `共 ${total} 个集群` }}
+            scroll={{ x: 1620 }}
           />
         </Card>
       </div>
 
       <Modal
-        title="导入Kubernetes集群"
+        title={editingRecord ? '编辑集群信息' : '导入Kubernetes集群'}
         open={createOpen}
-        onCancel={() => setCreateOpen(false)}
+        onCancel={closeCreate}
+        width={editingRecord ? 680 : 860}
         footer={
           <Space>
-            <Button onClick={() => setCreateOpen(false)}>取消</Button>
-            <Button type="primary" onClick={submitCreate}>导入</Button>
+            <Button onClick={closeCreate}>取消</Button>
+            <Button type="primary" onClick={submitCreate}>{editingRecord ? '更新' : '导入'}</Button>
           </Space>
         }
       >
@@ -184,64 +236,56 @@ const KubernetesClusterPage: React.FC = () => {
           <Form.Item label="集群名称" name="name" rules={[{ required: true, message: '请输入集群名称' }]}>
             <Input placeholder="请输入集群名称" />
           </Form.Item>
-          <Form.Item label="描述" name="description">
-            <Input.TextArea rows={2} placeholder="请输入集群描述（可选）" />
+          <Form.Item label="集群描述" name="description">
+            <Input placeholder="请输入集群描述" />
           </Form.Item>
-          <Form.Item label="Kubeconfig文件" name="kubeconfig" rules={[{ required: true, message: '请上传Kubeconfig文件' }]}>
-            <Button icon={<UploadOutlined />} style={{ width: '100%', height: 80 }}>
-              点击或拖拽上传文件
-            </Button>
-          </Form.Item>
-          <Form.Item label="API Server地址" name="apiServer" rules={[{ required: true, message: '请输入API Server地址' }]}>
-            <Input placeholder="https://192.168.1.1:6443" />
-          </Form.Item>
-          <Space style={{ marginBottom: 12 }}>
-            <Button icon={<CloudOutlined />} loading={connectionStatus === 'testing'} onClick={testCurrentConnection}>
-              测试连接
-            </Button>
-            {connectionStatus === 'success' && <Tag color="success">连接成功</Tag>}
-          </Space>
-          <Form.Item label="集群标签" name="labels">
-            <Select
-              mode="tags"
-              placeholder="输入标签名称，可添加多个"
-              options={labelPresets.map(item => ({ value: item.value, label: item.label }))}
-            />
-          </Form.Item>
-          {connectionStatus === 'success' && (
-            <Alert message="连接测试成功" description="集群连接正常，可以进行导入操作。" type="success" showIcon />
+          {editingRecord ? (
+            <Form.Item label="集群配置 (YAML格式)" name="kubeconfig">
+              <TextArea
+                rows={14}
+                value={editingKubeconfig}
+                placeholder="请输入集群配置信息，支持YAML格式..."
+                onChange={event => {
+                  setEditingKubeconfig(event.target.value)
+                  form.setFieldValue('kubeconfig', event.target.value)
+                }}
+              />
+            </Form.Item>
+          ) : (
+            <>
+              <div style={{ marginBottom: 12 }}>
+                <Text>导入方式</Text>
+              </div>
+              <div style={{ borderBottom: '1px solid #f0f0f0', marginBottom: 18 }}>
+                <Button type="link" style={{ paddingLeft: 0, borderBottom: '2px solid #1677ff', borderRadius: 0 }}>
+                  文本输入
+                </Button>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 14,
+                  padding: '20px 24px',
+                  border: '1px solid #91caff',
+                  borderRadius: 8,
+                  background: '#e6f4ff',
+                  marginBottom: 16,
+                }}
+              >
+                <InfoCircleOutlined style={{ color: '#1677ff', fontSize: 24, marginTop: 3 }} />
+                <div>
+                  <Text style={{ display: 'block', marginBottom: 12 }}>请粘贴您的kubeconfig文件内容</Text>
+                  <Text type="secondary">支持标准的YAML格式kubeconfig文件</Text>
+                </div>
+              </div>
+              <Form.Item name="kubeconfig" rules={[{ required: true, message: '请粘贴kubeconfig文件内容' }]}>
+                <TextArea rows={14} placeholder="请粘贴kubeconfig文件内容..." />
+              </Form.Item>
+            </>
           )}
         </Form>
       </Modal>
 
-      <Modal
-        title="集群详情"
-        open={Boolean(detailRecord)}
-        onCancel={() => setDetailRecord(null)}
-        footer={<Button onClick={() => setDetailRecord(null)}>关闭</Button>}
-      >
-        {detailRecord && (
-          <Table
-            rowKey="key"
-            pagination={false}
-            columns={[
-              { title: '字段', dataIndex: 'label', key: 'label', width: 120 },
-              { title: '内容', dataIndex: 'value', key: 'value' },
-            ]}
-            dataSource={[
-              { key: 'name', label: '集群名称', value: detailRecord.name },
-              { key: 'api', label: 'API Server', value: detailRecord.apiServer },
-              { key: 'labels', label: '标签', value: detailRecord.labels?.join(', ') || '-' },
-              { key: 'nodes', label: '节点数', value: detailRecord.nodeCount ?? '-' },
-              { key: 'connect', label: '连接状态', value: detailRecord.connectionStatus },
-              { key: 'mount', label: '挂载状态', value: detailRecord.mountStatus },
-              { key: 'storage', label: '存储配置', value: detailRecord.storageConfig || '未配置' },
-              { key: 'registry', label: '镜像仓库', value: detailRecord.imageRegistry || '未配置' },
-              { key: 'createdAt', label: '创建时间', value: detailRecord.createdAt },
-            ]}
-          />
-        )}
-      </Modal>
     </>
   )
 }

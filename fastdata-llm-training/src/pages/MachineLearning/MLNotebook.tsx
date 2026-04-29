@@ -17,9 +17,10 @@ import {
   Button,
   Cascader,
   Card,
+  Checkbox,
   Descriptions,
-  Drawer,
   Dropdown,
+  Drawer,
   Empty,
   Form,
   Input,
@@ -43,6 +44,7 @@ import {
   type TaskLifecycleStatus,
 } from '../../services/taskLifecycle'
 import { getCurrentUser, usePermissionStore } from '../../services/permissionStore'
+import { useOnlineInferenceServices } from '../../services/onlineInferenceServiceStore'
 
 const { Text, Title, Paragraph } = Typography
 
@@ -72,6 +74,7 @@ type MLNotebookRecord = {
   runtimeLimit: string
   createdAt: string
   updatedAt: string
+  creator: string
   aiService?: string
   dataset?: string
   model?: string
@@ -109,17 +112,37 @@ type OpenPortFormValue = {
   purpose?: string
 }
 
-type NotebookImageOption = {
-  value: string
-  label: string
-  source: 'system' | 'custom'
+type CustomMirrorRecord = {
+  id: string
   namespace: string
   imageName: string
   version: string
-  imageType: string
+  description: string
+  status: '已完成' | '生成中' | '失败'
+  taskSource: string
+  tags: string[]
+  creator: string
   createdAt: string
-  pythonVersion: string
-  framework: string
+}
+
+type SaveEnvironmentFormValues = {
+  includePackages?: boolean
+  includeWorkspace?: boolean
+  imageName?: string
+  imageDescription?: string
+}
+
+type CustomMirrorFormValues = {
+  namespace?: string
+  imageName?: string
+  description?: string
+}
+
+type CustomMirrorTagFormValues = {
+  test?: string
+  framework?: string
+  pythonVersion?: string
+  source?: string
 }
 
 interface CreateFormValues {
@@ -142,28 +165,30 @@ interface CreateFormValues {
   openPorts?: OpenPortFormValue[]
 }
 
-const aiServiceOptions = [
-  {
-    value: '在线推理服务',
-    label: '在线推理服务',
-    children: [
-      { value: '在线推理服务-A', label: '在线推理服务-A' },
-      { value: '在线推理服务-B', label: '在线推理服务-B' },
-    ],
-  },
-]
-
-const mlDatasetOptions = [
+const datasetOptions = [
   { value: '图像分类-多-1', label: '图像分类-多-1' },
   { value: 'basion-文本实体识别', label: 'basion-文本实体识别' },
   { value: 'basion-图像分类-单标签-无标注', label: 'basion-图像分类-单标签-无标注' },
 ]
 
-const mlModelOptions = [
+const modelOptions = [
   { value: '图像分类模型-v1', label: '图像分类模型-v1' },
   { value: '情感分析模型', label: '情感分析模型' },
   { value: 'NER命名实体识别', label: 'NER命名实体识别' },
 ]
+
+type NotebookImageOption = {
+  value: string
+  label: string
+  source: 'system' | 'custom'
+  namespace: string
+  imageName: string
+  version: string
+  imageType: string
+  createdAt: string
+  pythonVersion: string
+  framework: string
+}
 
 const imageOptions: NotebookImageOption[] = [
   {
@@ -216,12 +241,13 @@ const myNotebooksSeed: MLNotebookRecord[] = [
     description: 'ML 部署在线开发：hzj_单图多标签',
     image: 'lab-cn-guangzhou.cr.volces.com/fs/jupyter/ml/deepexi-notebook:pytorch_2.5-cuda_12.1-py311-ubuntu22.04',
     sshSupported: true,
-    status: '已创建',
+    status: '运行中',
     spec: '1x GPU\nCPU: 4 Core / 内存: 16 GB',
     runtimeLimit: '-',
     createdAt: '2026/4/15 09:58:34',
     updatedAt: '2026/4/21 11:03:18',
-    aiService: '在线推理服务 / 在线推理服务-A',
+    creator: 'deepexilab',
+    aiService: '在线推理服务 / qwen3-vl-plus-图像理解-在线推理服务',
     dataset: '图像分类-多-1',
     model: '图像分类模型-v1',
     cpuRequest: '4 Core',
@@ -246,13 +272,14 @@ const myNotebooksSeed: MLNotebookRecord[] = [
     id: 'ml-nb-2',
     name: 'basion-ml-dev',
     description: 'ML 部署在线开发：basion',
-    image: 'lab-cn-guangzhou.cr.volces.com/fs/jupyter/ml/deepexi-notebook:pytorch_2.5-cuda_12.1-py311-ubuntu22.04',
+    image: 'lab-cn-guangzhou.cr.volces.com/fs/jupyter/ml/deepexi-notebook:datascience-cpu-python312-ubuntu24.04',
     sshSupported: false,
     status: '已终止',
     spec: 'CPU Only\nCPU: 2 Core / 内存: 8 GB',
     runtimeLimit: '2小时30分钟',
     createdAt: '2026/4/13 15:14:48',
     updatedAt: '2026/4/20 09:21:10',
+    creator: 'lab1',
     aiService: '-',
     dataset: 'basion-文本实体识别',
     model: 'NER命名实体识别',
@@ -285,6 +312,76 @@ const squareNotebooks: MLSquareRecord[] = [
     creator: 'lab5',
     createdAt: '2026/03/23 11:08:00',
   },
+]
+
+const customMirrorSeed: CustomMirrorRecord[] = [
+  {
+    id: 'mirror-1',
+    namespace: 'fs',
+    imageName: 'jupyter/ml/deepexi-notebook',
+    version: 'datascience-cpu-python312-ubuntu24.04-noconda',
+    description: 'ai镜像',
+    status: '已完成',
+    taskSource: '-',
+    tags: [],
+    creator: 'lab1',
+    createdAt: '2026-04-16 17:54:17',
+  },
+  {
+    id: 'mirror-2',
+    namespace: 'lab',
+    imageName: 'jupyter/ml/deepexi-notebook',
+    version: 'datascience-cpu-python3223-2',
+    description: '暂无描述',
+    status: '已完成',
+    taskSource: '新建 Notebook 6',
+    tags: ['Pytorch 2.x', 'python3.11'],
+    creator: 'lab1',
+    createdAt: '2026-03-04 10:26:57',
+  },
+  {
+    id: 'mirror-3',
+    namespace: 'lab',
+    imageName: 'jupyter/ml/deepexi-notebook',
+    version: 'datascience-cpu-python312-ubuntu24.01',
+    description: '暂无描述',
+    status: '已完成',
+    taskSource: '新建 Notebook -2',
+    tags: ['python3.12'],
+    creator: 'lab1',
+    createdAt: '2026-03-03 09:43:48',
+  },
+  {
+    id: 'mirror-4',
+    namespace: 'lab',
+    imageName: 'jupyter/ml/deepexi-notebook',
+    version: 'datascience-cpu-python312-ubuntu24.02',
+    description: '暂无描述',
+    status: '失败',
+    taskSource: '新建 Notebook -1',
+    tags: [],
+    creator: 'lab1',
+    createdAt: '2026-03-02 17:50:43',
+  },
+]
+
+const namespaceOptions = [
+  { value: 'fs', label: 'fs' },
+  { value: 'lab', label: 'lab' },
+  { value: 'custom', label: 'custom' },
+]
+
+const mirrorNameOptions = [
+  { value: 'jupyter/ml/deepexi-notebook', label: 'jupyter/ml/deepexi-notebook' },
+  { value: 'ml/notebook/custom-runtime', label: 'ml/notebook/custom-runtime' },
+  { value: 'runtime/notebook-lab', label: 'runtime/notebook-lab' },
+]
+
+const mirrorTagGroups: Array<{ key: keyof CustomMirrorTagFormValues; title: string; options: string[] }> = [
+  { key: 'test', title: 'test', options: ['test1'] },
+  { key: 'framework', title: '框架', options: ['aa', 'torch 2.x', 'Pytorch 2.x'] },
+  { key: 'pythonVersion', title: 'python版本', options: ['python3.12', 'python3.11'] },
+  { key: 'source', title: '测试', options: ['添加的镜像', '保存的镜像'] },
 ]
 
 const cardStyle: React.CSSProperties = {
@@ -327,10 +424,10 @@ function getCreateInitialValues(): CreateFormValues {
     aiService: undefined,
     dataset: undefined,
     model: undefined,
-    cpuRequest: 4,
-    cpuLimit: 8,
-    memoryRequest: 16,
-    memoryLimit: 32,
+    cpuRequest: 0.5,
+    cpuLimit: 16,
+    memoryRequest: 0.5,
+    memoryLimit: 16,
     gpuEnabled: false,
     runtimeEnabled: false,
     image: imageOptions[0].value,
@@ -340,7 +437,7 @@ function getCreateInitialValues(): CreateFormValues {
 
 function buildSpecSummary(values: CreateFormValues) {
   const computeLine = values.gpuEnabled ? `${values.gpuCount || 1}x GPU` : 'CPU Only'
-  return `${computeLine}\nCPU: ${values.cpuRequest || '-'} Core / 内存: ${values.memoryRequest || '-'} GB`
+  return `${computeLine}\n${values.cpuRequest || '-'}~${values.cpuLimit || '-'} Cores`
 }
 
 function buildRuntimeLimit(values: CreateFormValues) {
@@ -355,7 +452,7 @@ function toPortRecords(values?: OpenPortFormValue[]): OpenPortRecord[] {
   return (values ?? [])
     .filter(item => item.protocol && item.port)
     .map((item, index) => ({
-      id: `ml-port-${Date.now()}-${index}`,
+      id: `port-${Date.now()}-${index}`,
       protocol: item.protocol as 'TCP' | 'UDP',
       port: Number(item.port),
       purpose: item.purpose?.trim() || '-',
@@ -368,6 +465,30 @@ function formatAiServiceLabel(values?: string[]) {
   }
 
   return values.join(' / ')
+}
+
+function renderNotebookImageSummary(image: string) {
+  const option = imageOptions.find(item => item.value === image)
+  if (!option) {
+    return <Text ellipsis>{image}</Text>
+  }
+
+  return (
+    <div style={{ fontSize: 12, lineHeight: 1.65 }}>
+      <div>
+        <Text type="secondary">命名空间：</Text>
+        <Text strong>{option.namespace}</Text>
+      </div>
+      <div>
+        <Text type="secondary">名称：</Text>
+        <Text strong>{option.imageName}</Text>
+      </div>
+      <div>
+        <Text type="secondary">镜像版本：</Text>
+        <Text strong>{option.version}</Text>
+      </div>
+    </div>
+  )
 }
 
 function nowText(): string {
@@ -400,28 +521,44 @@ function getNotebookStatusAfterRefresh(status: NotebookStatus): NotebookStatus {
 const MLNotebook: React.FC = () => {
   const permissionState = usePermissionStore()
   const currentUser = getCurrentUser(permissionState)
+  const onlineInferenceServices = useOnlineInferenceServices()
   const location = useLocation()
   const navigate = useNavigate()
   const { id, notebookId, caseId } = useParams()
   const [form] = Form.useForm<CreateFormValues>()
   const [caseForm] = Form.useForm<{ name: string; description: string }>()
   const [portForm] = Form.useForm<OpenPortFormValue>()
+  const [saveEnvForm] = Form.useForm<SaveEnvironmentFormValues>()
+  const [customMirrorForm] = Form.useForm<CustomMirrorFormValues>()
+  const [mirrorTagForm] = Form.useForm<CustomMirrorTagFormValues>()
   const [searchValue, setSearchValue] = useState('')
   const [activeTab, setActiveTab] = useState<'mine' | 'square'>('mine')
   const [rows, setRows] = useState(myNotebooksSeed)
   const [squareRows, setSquareRows] = useState(squareNotebooks)
+  const [customMirrorRows, setCustomMirrorRows] = useState(customMirrorSeed)
   const [imageDrawerOpen, setImageDrawerOpen] = useState(false)
   const [portModalOpen, setPortModalOpen] = useState(false)
+  const [saveEnvModalOpen, setSaveEnvModalOpen] = useState(false)
+  const [savingNotebook, setSavingNotebook] = useState<MLNotebookRecord | null>(null)
+  const [saveEnvShouldStop, setSaveEnvShouldStop] = useState(false)
+  const [stopModalOpen, setStopModalOpen] = useState(false)
+  const [stoppingNotebook, setStoppingNotebook] = useState<MLNotebookRecord | null>(null)
+  const [shouldSaveBeforeStop, setShouldSaveBeforeStop] = useState(true)
+  const [customMirrorModalOpen, setCustomMirrorModalOpen] = useState(false)
+  const [mirrorTagModalOpen, setMirrorTagModalOpen] = useState(false)
+  const [editingMirror, setEditingMirror] = useState<CustomMirrorRecord | null>(null)
+  const [customMirrorSearch, setCustomMirrorSearch] = useState('')
   const [editingPortId, setEditingPortId] = useState<string | null>(null)
   const [imageSource, setImageSource] = useState<'system' | 'custom'>('system')
   const [pythonVersionFilter, setPythonVersionFilter] = useState('python3.11')
   const [frameworkFilter, setFrameworkFilter] = useState('Pytorch 2.x')
   const [previewImageValue, setPreviewImageValue] = useState<string>()
   const isCreateRoute = location.pathname === '/machine-notebook/create'
+  const isMirrorRoute = location.pathname === '/machine-notebook/mirror'
   const isPublishCaseRoute = /^\/machine-notebook\/[^/]+\/publish-case$/.test(location.pathname)
   const isCaseEditRoute = /^\/machine-notebook\/cases\/[^/]+\/edit$/.test(location.pathname)
   const isCaseDetailRoute = /^\/machine-notebook\/cases\/[^/]+$/.test(location.pathname)
-  const isDetailRoute = Boolean(id) && !isCreateRoute && !isPublishCaseRoute && !isCaseDetailRoute && !isCaseEditRoute
+  const isDetailRoute = Boolean(id) && !isMirrorRoute && !isCreateRoute && !isPublishCaseRoute && !isCaseDetailRoute && !isCaseEditRoute
   const gpuEnabled = Form.useWatch('gpuEnabled', form)
   const runtimeEnabled = Form.useWatch('runtimeEnabled', form)
   const notebookDetail = useMemo(() => (id ? rows.find(item => item.id === id) ?? null : null), [id, rows])
@@ -433,7 +570,6 @@ const MLNotebook: React.FC = () => {
     () => (caseId ? squareRows.find(item => item.id === caseId) ?? null : null),
     [caseId, squareRows],
   )
-
   const filteredImageOptions = useMemo(
     () =>
       imageOptions.filter(
@@ -449,6 +585,20 @@ const MLNotebook: React.FC = () => {
     () => imageOptions.find(item => item.value === previewImageValue) ?? filteredImageOptions[0] ?? null,
     [filteredImageOptions, previewImageValue],
   )
+  const aiServiceOptions = useMemo(
+    () => [
+      {
+        value: '在线推理服务',
+        label: '在线推理服务',
+        children: onlineInferenceServices.map(item => ({
+          value: item.name,
+          label: item.connectionStatus === '测试通过' ? item.name : `${item.name}（测试失败）`,
+          disabled: item.connectionStatus !== '测试通过',
+        })),
+      },
+    ],
+    [onlineInferenceServices],
+  )
 
   useEffect(() => {
     if (isCreateRoute) {
@@ -459,6 +609,7 @@ const MLNotebook: React.FC = () => {
   useEffect(() => {
     if (
       !isCreateRoute &&
+      !isMirrorRoute &&
       !isPublishCaseRoute &&
       !isCaseEditRoute &&
       !isCaseDetailRoute &&
@@ -467,7 +618,7 @@ const MLNotebook: React.FC = () => {
       setActiveTab('square')
       setSearchValue('')
     }
-  }, [isCaseDetailRoute, isCaseEditRoute, isCreateRoute, isPublishCaseRoute, location.search])
+  }, [isCaseDetailRoute, isCaseEditRoute, isCreateRoute, isMirrorRoute, isPublishCaseRoute, location.search])
 
   useEffect(() => {
     if (isPublishCaseRoute && sourceNotebook) {
@@ -549,6 +700,20 @@ const MLNotebook: React.FC = () => {
     [searchValue, squareRows],
   )
   const processingCaseCount = squareRows.filter(item => item.publishStatus === 'processing').length
+  const mirrorNamespace = Form.useWatch('namespace', customMirrorForm)
+  const customMirrorList = useMemo(
+    () =>
+      customMirrorRows.filter(item => {
+        const keyword = customMirrorSearch.trim().toLowerCase()
+        if (!keyword) return true
+        return (
+          item.imageName.toLowerCase().includes(keyword) ||
+          item.version.toLowerCase().includes(keyword) ||
+          item.description.toLowerCase().includes(keyword)
+        )
+      }),
+    [customMirrorRows, customMirrorSearch],
+  )
 
   const canManageSquareCase = Boolean(
     caseDetail &&
@@ -569,6 +734,177 @@ const MLNotebook: React.FC = () => {
   const deleteNotebook = (notebookId: string) => {
     setRows(previous => previous.filter(item => item.id !== notebookId))
     message.success('Notebook 已删除')
+  }
+
+  const stopNotebook = (notebookId: string, options?: { silent?: boolean }) => {
+    setRows(previous =>
+      previous.map(item => (item.id === notebookId ? { ...item, status: '已终止', updatedAt: nowText() } : item)),
+    )
+    if (!options?.silent) {
+      message.success('Notebook 已停止')
+    }
+  }
+
+  const saveNotebookEnvironment = (record: MLNotebookRecord, values: SaveEnvironmentFormValues) => {
+    setCustomMirrorRows(previous => [
+      {
+        id: `mirror-${Date.now()}`,
+        namespace: 'lab',
+        imageName: 'jupyter/ml/deepexi-notebook',
+        version: values.imageName?.trim() || `${record.name}-env`,
+        description: values.imageDescription?.trim() || '暂无描述',
+        status: '已完成',
+        taskSource: record.name,
+        tags: values.includeWorkspace ? ['包+依赖库', '/lab/work'] : ['包+依赖库'],
+        creator: currentUser.account,
+        createdAt: nowText(),
+      },
+      ...previous,
+    ])
+  }
+
+  const setSaveEnvironmentDefaults = (record: MLNotebookRecord) => {
+    saveEnvForm.setFieldsValue({
+      includePackages: true,
+      includeWorkspace: false,
+      imageName: `${record.name}-env`,
+      imageDescription: '',
+    })
+  }
+
+  const openSaveEnvironment = (record: MLNotebookRecord, options?: { stopAfterSave?: boolean }) => {
+    setSavingNotebook(record)
+    setSaveEnvShouldStop(Boolean(options?.stopAfterSave))
+    setSaveEnvironmentDefaults(record)
+    setSaveEnvModalOpen(true)
+  }
+
+  const submitSaveEnvironment = async () => {
+    if (!savingNotebook) return
+
+    try {
+      const values = await saveEnvForm.validateFields()
+      saveNotebookEnvironment(savingNotebook, values)
+      setSaveEnvModalOpen(false)
+      if (saveEnvShouldStop) {
+        stopNotebook(savingNotebook.id, { silent: true })
+      }
+      setSavingNotebook(null)
+      setSaveEnvShouldStop(false)
+      saveEnvForm.resetFields()
+      message.success(saveEnvShouldStop ? '环境已保存，Notebook 已停止' : 'Notebook 环境已保存为自定义镜像')
+    } catch {
+      return
+    }
+  }
+
+  const openStopNotebook = (record: MLNotebookRecord) => {
+    setStoppingNotebook(record)
+    setShouldSaveBeforeStop(true)
+    setSaveEnvironmentDefaults(record)
+    setStopModalOpen(true)
+  }
+
+  const submitStopNotebook = async () => {
+    if (!stoppingNotebook) return
+
+    const targetNotebook = stoppingNotebook
+
+    if (shouldSaveBeforeStop) {
+      try {
+        const values = await saveEnvForm.validateFields()
+        saveNotebookEnvironment(targetNotebook, values)
+        stopNotebook(targetNotebook.id, { silent: true })
+        setStopModalOpen(false)
+        setStoppingNotebook(null)
+        saveEnvForm.resetFields()
+        message.success('环境已保存，Notebook 已停止')
+      } catch {
+        return
+      }
+      return
+    }
+
+    setStopModalOpen(false)
+    setStoppingNotebook(null)
+    stopNotebook(targetNotebook.id)
+  }
+
+  const submitCustomMirror = async () => {
+    try {
+      const values = await customMirrorForm.validateFields()
+      setCustomMirrorRows(previous => [
+        {
+          id: `mirror-${Date.now()}`,
+          namespace: values.namespace || 'lab',
+          imageName: values.imageName || 'jupyter/ml/deepexi-notebook',
+          version: `custom-${Date.now()}`,
+          description: values.description?.trim() || '暂无描述',
+          status: '已完成',
+          taskSource: '-',
+          tags: [],
+          creator: currentUser.account,
+          createdAt: nowText(),
+        },
+        ...previous,
+      ])
+      setCustomMirrorModalOpen(false)
+      customMirrorForm.resetFields()
+      message.success('镜像已添加')
+    } catch {
+      return
+    }
+  }
+
+  const deleteCustomMirror = (mirrorId: string) => {
+    Modal.confirm({
+      title: '确认删除镜像？',
+      content: '删除后该镜像将从自定义镜像列表移除。',
+      okText: '删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: () => {
+        setCustomMirrorRows(previous => previous.filter(item => item.id !== mirrorId))
+        message.success('镜像已删除')
+      },
+    })
+  }
+
+  const openMirrorTagEditor = (record: CustomMirrorRecord) => {
+    const nextValues = mirrorTagGroups.reduce<CustomMirrorTagFormValues>((acc, group) => {
+      const selectedTag = group.options.find(option => record.tags.includes(option))
+      if (selectedTag) {
+        acc[group.key] = selectedTag
+      }
+      return acc
+    }, {})
+    setEditingMirror(record)
+    mirrorTagForm.setFieldsValue(nextValues)
+    setMirrorTagModalOpen(true)
+  }
+
+  const submitMirrorTags = async () => {
+    if (!editingMirror) return
+
+    const values = await mirrorTagForm.validateFields()
+    const tags = mirrorTagGroups
+      .map(group => values[group.key])
+      .filter((value): value is string => Boolean(value))
+
+    setCustomMirrorRows(previous =>
+      previous.map(item => (item.id === editingMirror.id ? { ...item, tags } : item)),
+    )
+    setMirrorTagModalOpen(false)
+    setEditingMirror(null)
+    mirrorTagForm.resetFields()
+    message.success('镜像标签已更新')
+  }
+
+  const canStartNotebookTask = (status: NotebookStatus) => !['启动中', '排队中', '运行中'].includes(status)
+
+  const startNotebookTask = (notebookId: string) => {
+    setRows(previous => previous.map(item => (item.id === notebookId ? { ...item, status: '启动中' } : item)))
+    message.success('Notebook 已进入启动中')
   }
 
   const openPortEditor = (port?: OpenPortRecord) => {
@@ -607,7 +943,7 @@ const MLNotebook: React.FC = () => {
     try {
       const values = await portForm.validateFields()
       const nextPort: OpenPortRecord = {
-        id: editingPortId ?? `ml-port-${Date.now()}`,
+        id: editingPortId ?? `port-${Date.now()}`,
         protocol: values.protocol as 'TCP' | 'UDP',
         port: Number(values.port),
         purpose: values.purpose?.trim() || '-',
@@ -633,7 +969,13 @@ const MLNotebook: React.FC = () => {
 
   const notebookColumns: ColumnsType<MLNotebookRecord> = [
     { title: 'Notebook名称', dataIndex: 'name', key: 'name', width: 240, ellipsis: true },
-    { title: '镜像', dataIndex: 'image', key: 'image', width: 300, ellipsis: true },
+    {
+      title: '镜像',
+      dataIndex: 'image',
+      key: 'image',
+      width: 330,
+      render: value => renderNotebookImageSummary(value),
+    },
     {
       title: 'SSH配置',
       dataIndex: 'sshSupported',
@@ -657,66 +999,67 @@ const MLNotebook: React.FC = () => {
     },
     { title: '最大运行时长', dataIndex: 'runtimeLimit', key: 'runtimeLimit', width: 140 },
     { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+    { title: '创建人', dataIndex: 'creator', key: 'creator', width: 120 },
     {
       title: '操作',
       key: 'action',
-      width: 300,
+      width: 430,
       render: (_, record) => (
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 12,
-            minWidth: 260,
+            minWidth: 390,
             whiteSpace: 'nowrap',
           }}
         >
-          <Button
-            type="link"
-            size="small"
-            disabled={!canRunTaskLifecycleAction(record.status, 'start') && !canRunTaskLifecycleAction(record.status, 'resubmit')}
-            onClick={() => {
-              setRows(previous =>
-                previous.map(item =>
-                  item.id === record.id
-                    ? { ...item, status: canRunTaskLifecycleAction(item.status, 'start') ? '启动中' : '已创建' }
-                    : item,
-                ),
-              )
-              message.success(
-                canRunTaskLifecycleAction(record.status, 'start') ? 'Notebook 已进入启动中' : 'Notebook 已重新提交',
-              )
-            }}
-          >
-            {canRunTaskLifecycleAction(record.status, 'start')
-              ? '启动'
-              : canRunTaskLifecycleAction(record.status, 'resubmit')
-                ? '重新提交'
-                : '启动'}
-          </Button>
-          <Button type="link" size="small" onClick={() => navigate(`/machine-notebook/${record.id}`)}>
-            查看详情
-          </Button>
-          <Button type="link" size="small" onClick={() => navigate(`/machine-notebook/${record.id}/publish-case`)}>
-            发布为案例
-          </Button>
+          {record.status === '运行中' ? (
+            <>
+              <Button type="link" size="small" disabled={!canOpenNotebook(record.status)} onClick={() => message.success('正在打开 Notebook')}>
+                打开
+              </Button>
+              <Button type="link" size="small" onClick={() => openSaveEnvironment(record)}>
+                保存环境
+              </Button>
+              <Button
+                type="link"
+                size="small"
+                disabled={!canRunTaskLifecycleAction(record.status, 'terminate')}
+                onClick={() => openStopNotebook(record)}
+              >
+                停止
+              </Button>
+              <Button type="link" size="small" onClick={() => navigate(`/machine-notebook/${record.id}`)}>
+                查看详情
+              </Button>
+              <Button type="link" size="small" onClick={() => navigate(`/machine-notebook/${record.id}/publish-case`)}>
+                发布为案例
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                type="link"
+                size="small"
+                disabled={!canStartNotebookTask(record.status)}
+                onClick={() => startNotebookTask(record.id)}
+              >
+                启动
+              </Button>
+              <Button type="link" size="small" onClick={() => navigate(`/machine-notebook/${record.id}`)}>
+                查看详情
+              </Button>
+              <Button type="link" size="small" onClick={() => navigate(`/machine-notebook/${record.id}/publish-case`)}>
+                发布为案例
+              </Button>
+            </>
+          )}
           <Dropdown
             trigger={['click']}
             menu={{
-              items: [
-                { key: 'duplicate', label: '复制Notebook' },
-                { key: 'edit', label: '编辑配置' },
-                { key: 'delete', label: '删除', danger: true },
-              ],
-              onClick: ({ key }) => {
-                if (key === 'duplicate') {
-                  message.success('已复制 Notebook 配置')
-                  return
-                }
-                if (key === 'edit') {
-                  message.info('当前版本暂未开放 Notebook 编辑页')
-                  return
-                }
+              items: [{ key: 'delete', label: '删除', danger: true }],
+              onClick: () => {
                 deleteNotebook(record.id)
               },
             }}
@@ -775,6 +1118,7 @@ const MLNotebook: React.FC = () => {
         runtimeLimit: buildRuntimeLimit(values),
         createdAt: nowText(),
         updatedAt: nowText(),
+        creator: currentUser.username,
         aiService: formatAiServiceLabel(values.aiService),
         dataset: values.dataset,
         model: values.model,
@@ -822,7 +1166,7 @@ const MLNotebook: React.FC = () => {
       }
 
       const nextRecord: MLSquareRecord = {
-        id: `ml-square-pending-${Date.now()}`,
+        id: `ml-sq-pending-${Date.now()}`,
         name: values.name,
         description: values.description,
         creatorAccount: currentUser.account,
@@ -843,6 +1187,101 @@ const MLNotebook: React.FC = () => {
     }
   }
 
+  const notebookWorkflowModals = (
+    <>
+      <Modal
+        title="停止 Notebook"
+        open={stopModalOpen}
+        okText="确定"
+        cancelText="取消"
+        onOk={submitStopNotebook}
+        onCancel={() => {
+          setStopModalOpen(false)
+          setStoppingNotebook(null)
+          saveEnvForm.resetFields()
+        }}
+      >
+        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Text>停止前是否保存当前最新环境？</Text>
+          <Radio.Group
+            value={shouldSaveBeforeStop}
+            onChange={event => setShouldSaveBeforeStop(event.target.value)}
+          >
+            <Space>
+              <Radio value={true}>是，保存当前最新环境</Radio>
+              <Radio value={false}>否，直接停止</Radio>
+            </Space>
+          </Radio.Group>
+          {shouldSaveBeforeStop && (
+            <Form form={saveEnvForm} layout="vertical" style={{ width: '100%', paddingTop: 8 }}>
+              <div style={{ marginBottom: 16 }}>
+                <Text type="secondary">选择需要保存到自定义镜像的内容，并填写镜像信息。</Text>
+              </div>
+              <Form.Item name="includePackages" valuePropName="checked" style={{ marginBottom: 8 }}>
+                <Checkbox disabled>包+依赖库</Checkbox>
+              </Form.Item>
+              <Form.Item name="includeWorkspace" valuePropName="checked">
+                <Checkbox>工作目录（/lab/work）</Checkbox>
+              </Form.Item>
+              <Form.Item
+                label="镜像名称"
+                name="imageName"
+                rules={[
+                  { required: true, message: '请输入镜像名称' },
+                  { max: 64, message: '镜像名称不能超过 64 个字符' },
+                ]}
+              >
+                <Input placeholder="请输入镜像名称" />
+              </Form.Item>
+              <Form.Item label="镜像描述" name="imageDescription">
+                <Input.TextArea rows={4} placeholder="请输入镜像描述" maxLength={300} showCount />
+              </Form.Item>
+            </Form>
+          )}
+        </Space>
+      </Modal>
+
+      <Modal
+        title="保存环境"
+        open={saveEnvModalOpen}
+        okText="保存"
+        cancelText="取消"
+        onOk={submitSaveEnvironment}
+        onCancel={() => {
+          setSaveEnvModalOpen(false)
+          setSavingNotebook(null)
+          setSaveEnvShouldStop(false)
+          saveEnvForm.resetFields()
+        }}
+      >
+        <Form form={saveEnvForm} layout="vertical">
+          <div style={{ marginBottom: 16 }}>
+            <Text type="secondary">选择需要保存到自定义镜像的内容，并填写镜像信息。</Text>
+          </div>
+          <Form.Item name="includePackages" valuePropName="checked" style={{ marginBottom: 8 }}>
+            <Checkbox disabled>包+依赖库</Checkbox>
+          </Form.Item>
+          <Form.Item name="includeWorkspace" valuePropName="checked">
+            <Checkbox>工作目录（/lab/work）</Checkbox>
+          </Form.Item>
+          <Form.Item
+            label="镜像名称"
+            name="imageName"
+            rules={[
+              { required: true, message: '请输入镜像名称' },
+              { max: 64, message: '镜像名称不能超过 64 个字符' },
+            ]}
+          >
+            <Input placeholder="请输入镜像名称" />
+          </Form.Item>
+          <Form.Item label="镜像描述" name="imageDescription">
+            <Input.TextArea rows={4} placeholder="请输入镜像描述" maxLength={300} showCount />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
+  )
+
   if (isCreateRoute) {
     return (
       <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
@@ -853,72 +1292,71 @@ const MLNotebook: React.FC = () => {
         </div>
 
         <Card style={cardStyle}>
-          <div
-            style={{
-              padding: '24px 26px',
-              borderRadius: 18,
-              marginBottom: 24,
-              background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(15, 23, 42, 0.03))',
-              border: '1px solid rgba(148, 163, 184, 0.28)',
-            }}
-          >
-            <Title level={2} style={{ marginBottom: 8 }}>
-              创建 Notebook
-            </Title>
-            <Text type="secondary">
-              统一配置 Notebook 的基础信息、资源、镜像和开放端口，创建后可在详情页查看完整配置。
-            </Text>
-          </div>
-
           <Form form={form} layout="vertical" initialValues={getCreateInitialValues()}>
             <div style={{ display: 'grid', gap: 18 }}>
               <Card size="small" style={sectionCardStyle}>
-                <Title level={4} style={{ marginBottom: 18 }}>
+                <Title level={5} style={{ marginBottom: 6 }}>
                   基本信息
                 </Title>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <Form.Item label="名称" name="name" rules={[{ required: true, message: '请输入名称' }]}>
-                    <Input maxLength={50} showCount placeholder="请输入 Notebook 名称" />
-                  </Form.Item>
-                  <Form.Item label="AI服务" name="aiService">
-                    <Cascader allowClear placeholder="请选择 AI 服务" options={aiServiceOptions} />
-                  </Form.Item>
-                </div>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 18 }}>设置Notebook基本信息。</Text>
+                <Form.Item label="名称" name="name" rules={[{ required: true, message: '请输入名称' }]}>
+                  <Input maxLength={50} showCount placeholder="请输入Notebook名称" />
+                </Form.Item>
                 <Form.Item label="描述" name="description">
-                  <Input.TextArea rows={4} maxLength={300} showCount placeholder="请输入 Notebook 描述" />
+                  <Input.TextArea rows={4} maxLength={300} showCount placeholder="请输入描述（可选）" />
                 </Form.Item>
               </Card>
 
               <Card size="small" style={sectionCardStyle}>
-                <Title level={4} style={{ marginBottom: 18 }}>
-                  数据与模型
+                <Title level={5} style={{ marginBottom: 6 }}>
+                  AI服务选择
                 </Title>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <Form.Item label="数据集" name="dataset">
-                    <Select allowClear placeholder="请选择数据集" options={mlDatasetOptions} />
-                  </Form.Item>
-                  <Form.Item label="大模型" name="model">
-                    <Select allowClear placeholder="请选择模型" options={mlModelOptions} />
-                  </Form.Item>
-                </div>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 18 }}>选择你想使用的模型服务，可在Notebook任务中使用</Text>
+                <Form.Item label="AI服务" name="aiService">
+                  <Cascader allowClear placeholder="请选择在线推理服务（可选）" options={aiServiceOptions} />
+                </Form.Item>
               </Card>
 
               <Card size="small" style={sectionCardStyle}>
-                <Title level={4} style={{ marginBottom: 18 }}>
+                <Title level={5} style={{ marginBottom: 6 }}>
+                  数据/模型选择
+                </Title>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 18 }}>选择任务中需要的数据集或模型。</Text>
+                <Radio checked style={{ display: 'block', marginBottom: 16 }}>机器学习</Radio>
+                <Form.Item label="数据集">
+                  <Input.Group compact>
+                    <Form.Item name="dataset" noStyle>
+                      <Select allowClear placeholder="请选择1-3个数据集（展开行勾选版本）" options={datasetOptions} style={{ width: 'calc(100% - 72px)' }} />
+                    </Form.Item>
+                    <Button type="primary">选择</Button>
+                  </Input.Group>
+                </Form.Item>
+                <Form.Item label="模型" name="model">
+                  <Select allowClear placeholder="请输入模型" options={modelOptions} />
+                </Form.Item>
+              </Card>
+
+              <Card size="small" style={sectionCardStyle}>
+                <Title level={5} style={{ marginBottom: 6 }}>
                   资源配置
                 </Title>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 18 }}>配置CPU、内存和显卡资源。</Text>
+                <Text strong style={{ display: 'block', marginBottom: 12 }}>CPU配置</Text>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <Form.Item label="CPU请求" name="cpuRequest" rules={[{ required: true, message: '请输入 CPU 请求' }]}>
-                    <InputNumber style={{ width: '100%' }} min={1} addonAfter="Core" />
+                    <InputNumber style={{ width: '100%' }} min={0.5} step={0.5} addonAfter="Core" />
                   </Form.Item>
                   <Form.Item label="CPU限制" name="cpuLimit" rules={[{ required: true, message: '请输入 CPU 限制' }]}>
-                    <InputNumber style={{ width: '100%' }} min={1} addonAfter="Core" />
+                    <InputNumber style={{ width: '100%' }} min={0.5} step={0.5} addonAfter="Core" />
                   </Form.Item>
+                </div>
+                <Text strong style={{ display: 'block', marginBottom: 12 }}>内存配置</Text>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <Form.Item label="内存请求" name="memoryRequest" rules={[{ required: true, message: '请输入内存请求' }]}>
-                    <InputNumber style={{ width: '100%' }} min={1} addonAfter="GB" />
+                    <InputNumber style={{ width: '100%' }} min={0.5} step={0.5} addonAfter="GB" />
                   </Form.Item>
                   <Form.Item label="内存限制" name="memoryLimit" rules={[{ required: true, message: '请输入内存限制' }]}>
-                    <InputNumber style={{ width: '100%' }} min={1} addonAfter="GB" />
+                    <InputNumber style={{ width: '100%' }} min={0.5} step={0.5} addonAfter="GB" />
                   </Form.Item>
                 </div>
 
@@ -928,9 +1366,7 @@ const MLNotebook: React.FC = () => {
                     gridTemplateColumns: '1fr auto',
                     gap: 12,
                     alignItems: 'center',
-                    padding: '14px 16px',
-                    borderRadius: 14,
-                    background: '#f8fafc',
+                    padding: '8px 0',
                     marginBottom: 16,
                   }}
                 >
@@ -962,9 +1398,7 @@ const MLNotebook: React.FC = () => {
                     gridTemplateColumns: '1fr auto',
                     gap: 12,
                     alignItems: 'center',
-                    padding: '14px 16px',
-                    borderRadius: 14,
-                    background: '#f8fafc',
+                    padding: '8px 0',
                   }}
                 >
                   <div>
@@ -992,9 +1426,10 @@ const MLNotebook: React.FC = () => {
               </Card>
 
               <Card size="small" style={sectionCardStyle}>
-                <Title level={4} style={{ marginBottom: 18 }}>
-                  Notebook 镜像
+                <Title level={5} style={{ marginBottom: 6 }}>
+                  选择Notebook镜像
                 </Title>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 18 }}>选择适合您需求的预配置环境</Text>
                 <Form.Item name="image" rules={[{ required: true, message: '请选择镜像' }]} hidden>
                   <Input />
                 </Form.Item>
@@ -1005,14 +1440,14 @@ const MLNotebook: React.FC = () => {
                   help={form.getFieldError('image')[0]}
                 >
                   <Button icon={<PlusOutlined />} onClick={openImagePicker} style={{ width: 160 }}>
-                    选择镜像
+                    添加镜像
                   </Button>
                 </Form.Item>
               </Card>
 
               <Card size="small" style={sectionCardStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-                  <Title level={4} style={{ margin: 0 }}>
+                  <Title level={5} style={{ margin: 0 }}>
                     开放端口
                   </Title>
                   <Form.List name="openPorts">
@@ -1092,11 +1527,12 @@ const MLNotebook: React.FC = () => {
                   )}
                 </Form.List>
               </Card>
+
             </div>
 
             <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
               <Button type="primary" onClick={submitCreate}>
-                创建 Notebook
+                创建
               </Button>
               <Button onClick={closeCreate}>取消</Button>
             </div>
@@ -1274,6 +1710,178 @@ const MLNotebook: React.FC = () => {
     )
   }
 
+  if (isMirrorRoute) {
+    const mirrorColumns: ColumnsType<CustomMirrorRecord> = [
+      {
+        title: '镜像',
+        key: 'image',
+        width: 260,
+        render: (_, record) => (
+          <div style={{ fontSize: 12, lineHeight: 1.7 }}>
+            <div><Text type="secondary">命名空间：</Text><Text strong>{record.namespace}</Text></div>
+            <div><Text type="secondary">名称：</Text><Text strong>{record.imageName}</Text></div>
+            <div><Text type="secondary">镜像版本：</Text><Text strong>{record.version}</Text></div>
+          </div>
+        ),
+      },
+      { title: '描述', dataIndex: 'description', key: 'description', width: 180 },
+      {
+        title: '状态',
+        dataIndex: 'status',
+        key: 'status',
+        width: 110,
+        render: value => <Tag color={value === '已完成' ? 'green' : value === '失败' ? 'red' : 'processing'}>{value}</Tag>,
+      },
+      { title: '任务来源', dataIndex: 'taskSource', key: 'taskSource', width: 160 },
+      {
+        title: '标签',
+        key: 'tags',
+        width: 180,
+        render: (_, record) =>
+          record.tags.length ? (
+            <Space size={6} wrap>
+              {record.tags.map(tag => <Tag key={tag}>{tag}</Tag>)}
+            </Space>
+          ) : (
+            <Text type="secondary">暂无标签</Text>
+          ),
+      },
+      { title: '创建人', dataIndex: 'creator', key: 'creator', width: 110 },
+      { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+      {
+        title: '操作',
+        key: 'action',
+        width: 190,
+        fixed: 'right',
+        render: (_, record) => (
+          <Space size={10}>
+            <Button
+              type="link"
+              size="small"
+              disabled={record.status === '失败'}
+              onClick={() => openMirrorTagEditor(record)}
+            >
+              编辑标签
+            </Button>
+            <Button type="link" size="small" danger onClick={() => deleteCustomMirror(record.id)}>
+              删除
+            </Button>
+            <Button type="link" size="small" onClick={() => message.info('暂无镜像构建日志')}>
+              日志
+            </Button>
+          </Space>
+        ),
+      },
+    ]
+
+    return (
+      <div style={{ padding: '28px 32px', minHeight: '100%' }}>
+        <Card style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 18, alignItems: 'center', marginBottom: 18 }}>
+            <div>
+              <Title level={2} style={{ marginBottom: 8 }}>自定义镜像</Title>
+              <Text type="secondary">管理 Notebook 保存环境或手动添加的自定义镜像。</Text>
+            </div>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/machine-notebook')}>
+              返回Notebook
+            </Button>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+            <Space wrap>
+              <Input
+                placeholder="请输入镜像名称"
+                value={customMirrorSearch}
+                onChange={event => setCustomMirrorSearch(event.target.value)}
+                style={{ width: 260 }}
+              />
+              <Button type="primary" icon={<SearchOutlined />}>
+                搜索
+              </Button>
+            </Space>
+            <Space wrap>
+              <Button icon={<ReloadOutlined />} onClick={() => message.success('自定义镜像列表已刷新')}>
+                刷新
+              </Button>
+              <Button type="primary" onClick={() => setCustomMirrorModalOpen(true)}>
+                添加镜像
+              </Button>
+            </Space>
+          </div>
+
+          <Table
+            rowKey="id"
+            columns={mirrorColumns}
+            dataSource={customMirrorList}
+            scroll={{ x: 1450 }}
+            tableLayout="fixed"
+            pagination={{ pageSize: 10, showTotal: total => `第 1-${total} 条，共 ${total} 条` }}
+          />
+        </Card>
+
+        <Modal
+          title="添加镜像"
+          open={customMirrorModalOpen}
+          okText="确定"
+          cancelText="取消"
+          onOk={submitCustomMirror}
+          onCancel={() => {
+            setCustomMirrorModalOpen(false)
+            customMirrorForm.resetFields()
+          }}
+        >
+          <Form form={customMirrorForm} layout="vertical">
+            <Form.Item label="命名空间" name="namespace" rules={[{ required: true, message: '请选择命名空间' }]}>
+              <Select placeholder="请选择命名空间" options={namespaceOptions} />
+            </Form.Item>
+            <Form.Item label="镜像名称" name="imageName" rules={[{ required: true, message: '请选择镜像名称' }]}>
+              <Select
+                disabled={!mirrorNamespace}
+                placeholder={mirrorNamespace ? '请选择镜像名称' : '请先选择命名空间'}
+                options={mirrorNameOptions}
+              />
+            </Form.Item>
+            <Form.Item label="描述" name="description">
+              <Input.TextArea rows={4} placeholder="请输入描述（选填）" />
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        <Modal
+          title="编辑标签"
+          open={mirrorTagModalOpen}
+          okText="确定"
+          cancelText="取消"
+          onOk={submitMirrorTags}
+          onCancel={() => {
+            setMirrorTagModalOpen(false)
+            setEditingMirror(null)
+            mirrorTagForm.resetFields()
+          }}
+        >
+          <Form form={mirrorTagForm} layout="vertical">
+            <Text type="secondary" style={{ display: 'block', marginBottom: 18 }}>
+              每个标签类型最多选择一种，保存后同步展示在镜像列表。
+            </Text>
+            {mirrorTagGroups.map(group => (
+              <Form.Item key={group.key} label={group.title} name={group.key}>
+                <Radio.Group optionType="button">
+                  <Space wrap>
+                    {group.options.map(option => (
+                      <Radio.Button key={option} value={option}>
+                        {option}
+                      </Radio.Button>
+                    ))}
+                  </Space>
+                </Radio.Group>
+              </Form.Item>
+            ))}
+          </Form>
+        </Modal>
+      </div>
+    )
+  }
+
   if (isCaseDetailRoute && caseDetail) {
     return (
       <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
@@ -1344,14 +1952,7 @@ const MLNotebook: React.FC = () => {
             <Button
               icon={<PauseCircleOutlined />}
               disabled={!canRunTaskLifecycleAction(notebookDetail.status, 'terminate')}
-              onClick={() => {
-                setRows(previous =>
-                  previous.map(item =>
-                    item.id === notebookDetail.id ? { ...item, status: '已终止', updatedAt: nowText() } : item,
-                  ),
-                )
-                message.success('Notebook 已停止')
-              }}
+              onClick={() => openStopNotebook(notebookDetail)}
             >
               停止
             </Button>
@@ -1406,15 +2007,53 @@ const MLNotebook: React.FC = () => {
               </div>
             </Card>
 
-            <Card title="资源配置" size="small" style={sectionCardStyle}>
-              <div style={{ display: 'grid', gap: 16, fontSize: 16 }}>
-                <div><Text strong>CPU：</Text>{`${notebookDetail.cpuRequest.replace(' Core', '')} ~ ${notebookDetail.cpuLimit.replace(' Core', '')} Cores`}</div>
-                <div><Text strong>内存：</Text>{`${notebookDetail.memoryRequest.replace(' GB', '')} ~ ${notebookDetail.memoryLimit.replace(' GB', '')} GB`}</div>
-                <div><Text strong>显卡类型：</Text>{notebookDetail.gpuEnabled ? notebookDetail.gpuType || '-' : '未启用'}</div>
-                <div><Text strong>显卡数量：</Text>{notebookDetail.gpuEnabled ? notebookDetail.gpuCount || '-' : '-'}</div>
-                <div><Text strong>实例ID：</Text>{getNotebookInstanceId(notebookDetail.id)}</div>
-              </div>
-            </Card>
+            <div style={{ display: 'grid', gap: 18 }}>
+              <Card title="资源配置" size="small" style={sectionCardStyle}>
+                <div style={{ display: 'grid', gap: 16, fontSize: 16 }}>
+                  <div><Text strong>CPU：</Text>{`${notebookDetail.cpuRequest.replace(' Core', '')} ~ ${notebookDetail.cpuLimit.replace(' Core', '')} Cores`}</div>
+                  <div><Text strong>内存：</Text>{`${notebookDetail.memoryRequest.replace(' GB', '')} ~ ${notebookDetail.memoryLimit.replace(' GB', '')} GB`}</div>
+                  <div><Text strong>显卡类型：</Text>{notebookDetail.gpuEnabled ? notebookDetail.gpuType || '-' : '未启用'}</div>
+                  <div><Text strong>显卡数量：</Text>{notebookDetail.gpuEnabled ? notebookDetail.gpuCount || '-' : '-'}</div>
+                  <div><Text strong>实例ID：</Text>{getNotebookInstanceId(notebookDetail.id)}</div>
+                </div>
+              </Card>
+
+              {notebookDetail.sshConfig && (
+                <Card title="SSH 配置信息" size="small" style={sectionCardStyle}>
+                  <div style={{ display: 'grid', gap: 14 }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <Text strong>用户名</Text>
+                        <Button type="link" size="small" onClick={() => handleCopy(notebookDetail.sshConfig?.username || '', '用户名')}>
+                          复制
+                        </Button>
+                      </div>
+                      <pre style={codeBlockStyle}>{notebookDetail.sshConfig.username}</pre>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <Text strong>SSH Key</Text>
+                        <Button type="link" size="small" onClick={() => handleCopy(notebookDetail.sshConfig?.sshKey || '', 'SSH Key')}>
+                          复制
+                        </Button>
+                      </div>
+                      <pre style={codeBlockStyle}>{notebookDetail.sshConfig.sshKey}</pre>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <Text strong>SSH 命令</Text>
+                        <Button type="link" size="small" onClick={() => handleCopy(notebookDetail.sshConfig?.sshCommand || '', 'SSH 命令')}>
+                          复制
+                        </Button>
+                      </div>
+                      <pre style={codeBlockStyle}>{notebookDetail.sshConfig.sshCommand}</pre>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </div>
           </div>
 
           <Card
@@ -1459,44 +2098,6 @@ const MLNotebook: React.FC = () => {
             )}
           </Card>
 
-          {notebookDetail.sshConfig && (
-            <Card size="small" style={{ ...sectionCardStyle, marginTop: 18 }}>
-              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>
-                SSH 配置信息
-              </div>
-              <div style={{ display: 'grid', gap: 14 }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text strong>用户名</Text>
-                    <Button type="link" size="small" onClick={() => handleCopy(notebookDetail.sshConfig?.username || '', '用户名')}>
-                      复制
-                    </Button>
-                  </div>
-                  <pre style={codeBlockStyle}>{notebookDetail.sshConfig.username}</pre>
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text strong>SSH Key</Text>
-                    <Button type="link" size="small" onClick={() => handleCopy(notebookDetail.sshConfig?.sshKey || '', 'SSH Key')}>
-                      复制
-                    </Button>
-                  </div>
-                  <pre style={codeBlockStyle}>{notebookDetail.sshConfig.sshKey}</pre>
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text strong>SSH 命令</Text>
-                    <Button type="link" size="small" onClick={() => handleCopy(notebookDetail.sshConfig?.sshCommand || '', 'SSH 命令')}>
-                      复制
-                    </Button>
-                  </div>
-                  <pre style={codeBlockStyle}>{notebookDetail.sshConfig.sshCommand}</pre>
-                </div>
-              </div>
-            </Card>
-          )}
         </Card>
 
         <Modal
@@ -1522,6 +2123,7 @@ const MLNotebook: React.FC = () => {
             </Form.Item>
           </Form>
         </Modal>
+        {notebookWorkflowModals}
       </div>
     )
   }
@@ -1538,35 +2140,57 @@ const MLNotebook: React.FC = () => {
             activeKey={activeTab}
             onChange={handleTabChange}
             items={[
-              { key: 'square', label: 'Notebook广场' },
               { key: 'mine', label: '我的Notebook' },
+              { key: 'square', label: 'Notebook广场' },
             ]}
           />
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+          <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
             <Space wrap>
               <Input
                 prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
-                placeholder="搜索名称"
+                placeholder={activeTab === 'mine' ? '搜索Notebook' : '搜索名称'}
                 value={searchValue}
                 onChange={e => setSearchValue(e.target.value)}
                 style={{ width: 230 }}
               />
-              <Button icon={<ReloadOutlined />} onClick={() => message.success('Notebook 列表已刷新')}>
-                刷新
-              </Button>
               {activeTab === 'mine' && (
-                <Button onClick={() => message.info('自定义镜像能力将在后续版本补充')}>
-                  自定义镜像
-                </Button>
+                <Select
+                  allowClear
+                  placeholder="状态"
+                  style={{ width: 150 }}
+                  options={[
+                    { value: '运行中', label: '运行中' },
+                    { value: '已终止', label: '已终止' },
+                    { value: '已创建', label: '已创建' },
+                  ]}
+                />
+              )}
+              {activeTab === 'mine' ? (
+                <>
+                  <Button type="primary">搜索</Button>
+                  <Button onClick={() => setSearchValue('')}>重置</Button>
+                </>
+              ) : (
+                <Button icon={<SearchOutlined />} />
               )}
             </Space>
 
-            {activeTab === 'mine' && (
-              <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-                创建Notebook
+            <Space wrap>
+              {activeTab === 'mine' && (
+                <>
+                  <Button type="primary" onClick={openCreate}>
+                    创建Notebook
+                  </Button>
+                  <Button onClick={() => navigate('/machine-notebook/mirror')}>
+                    自定义镜像
+                  </Button>
+                </>
+              )}
+              <Button icon={<ReloadOutlined />} onClick={() => message.success('Notebook 列表已刷新')}>
+                刷新
               </Button>
-            )}
+            </Space>
           </div>
 
           {activeTab === 'mine' ? (
@@ -1633,18 +2257,19 @@ const MLNotebook: React.FC = () => {
                         <Paragraph type="secondary" style={{ minHeight: 72 }}>
                           {item.description || '暂无说明'}
                         </Paragraph>
-                        <Space>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
                           <Button
                             icon={<EyeOutlined />}
                             disabled={isProcessing}
                             onClick={() => navigate(`/machine-notebook/cases/${item.id}`)}
+                            style={{ width: '100%' }}
                           >
                             查看详情
                           </Button>
-                          <Button type="primary" icon={<CopyOutlined />} disabled={isProcessing}>
+                          <Button type="primary" icon={<CopyOutlined />} disabled={isProcessing} style={{ width: '100%' }}>
                             复制案例
                           </Button>
-                        </Space>
+                        </div>
                       </Card>
                     )
                   })}
@@ -1657,6 +2282,7 @@ const MLNotebook: React.FC = () => {
         </Card>
       </div>
 
+      {notebookWorkflowModals}
     </>
   )
 }

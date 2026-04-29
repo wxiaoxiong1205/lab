@@ -22,6 +22,7 @@ export interface PermissionRole {
 export interface PermissionUser {
   account: string
   username: string
+  email?: string
   roleKey: RoleKey
   roleKeys: RoleKey[]
 }
@@ -30,6 +31,7 @@ export interface ProjectPermissionMember {
   account: string
   roleKey: RoleKey
   hasDataPermission: boolean
+  joinedAt?: string
 }
 
 export interface PermissionProject {
@@ -141,9 +143,9 @@ const seedRoles: PermissionRole[] = [
 ]
 
 const seedUsers: PermissionUser[] = [
-  { account: 'zhangsan', username: '张三', roleKey: 'platform_admin', roleKeys: ['platform_admin'] },
-  { account: 'lisi', username: '李四', roleKey: 'project_admin', roleKeys: ['project_admin', 'training_engineer'] },
-  { account: 'wangwu', username: '王五', roleKey: 'training_engineer', roleKeys: ['training_engineer'] },
+  { account: 'zhangsan', username: '张三', email: 'z****@deepexilab.com', roleKey: 'platform_admin', roleKeys: ['platform_admin'] },
+  { account: 'lisi', username: '李四', email: 'l****@deepexilab.com', roleKey: 'project_admin', roleKeys: ['project_admin', 'training_engineer'] },
+  { account: 'wangwu', username: '王五', email: 'w****@deepexilab.com', roleKey: 'training_engineer', roleKeys: ['training_engineer'] },
 ]
 
 const seedProjects: PermissionProject[] = [
@@ -154,9 +156,9 @@ const seedProjects: PermissionProject[] = [
     cluster: 'V1.12版本集群',
     createdAt: '2026/3/23 15:43:58',
     members: [
-      { account: 'zhangsan', roleKey: 'platform_admin', hasDataPermission: true },
-      { account: 'lisi', roleKey: 'project_admin', hasDataPermission: true },
-      { account: 'wangwu', roleKey: 'training_engineer', hasDataPermission: true },
+      { account: 'zhangsan', roleKey: 'platform_admin', hasDataPermission: true, joinedAt: '2026/03/23 15:43:58' },
+      { account: 'lisi', roleKey: 'project_admin', hasDataPermission: true, joinedAt: '2026/03/23 15:43:58' },
+      { account: 'wangwu', roleKey: 'training_engineer', hasDataPermission: true, joinedAt: '2026/03/23 15:43:58' },
     ],
   },
   {
@@ -166,9 +168,9 @@ const seedProjects: PermissionProject[] = [
     cluster: '测试环境集群12',
     createdAt: '2025/12/10 22:08:35',
     members: [
-      { account: 'zhangsan', roleKey: 'platform_admin', hasDataPermission: true },
-      { account: 'lisi', roleKey: 'project_admin', hasDataPermission: false },
-      { account: 'wangwu', roleKey: 'training_engineer', hasDataPermission: false },
+      { account: 'zhangsan', roleKey: 'platform_admin', hasDataPermission: true, joinedAt: '2025/12/10 22:08:35' },
+      { account: 'lisi', roleKey: 'project_admin', hasDataPermission: false, joinedAt: '2025/12/10 22:08:35' },
+      { account: 'wangwu', roleKey: 'training_engineer', hasDataPermission: false, joinedAt: '2025/12/10 22:08:35' },
     ],
   },
 ]
@@ -227,6 +229,10 @@ function getRole(roleKey: RoleKey, sourceState = state): PermissionRole {
   return sourceState.roles.find(item => item.key === roleKey) ?? seedRoles[0]
 }
 
+function uniqueValues<T>(values: T[]): T[] {
+  return Array.from(new Set(values))
+}
+
 export function getPermissionState(): PermissionState {
   return state
 }
@@ -266,7 +272,19 @@ export function getCurrentRole(sourceState = state): PermissionRole {
   }
 
   const projectMember = getCurrentProjectMember(sourceState)
-  return getRole(projectMember?.roleKey ?? currentUser.roleKey, sourceState)
+  if (!projectMember?.hasDataPermission) {
+    return getRole(currentUser.roleKey, sourceState)
+  }
+
+  const mergedRoles = currentUser.roleKeys.map(roleKey => getRole(roleKey, sourceState))
+  return {
+    key: projectMember.roleKey,
+    name: mergedRoles.map(role => role.name).join(' / '),
+    lockedName: true,
+    lockedOperations: true,
+    menuPermissions: uniqueValues(mergedRoles.flatMap(role => role.menuPermissions)),
+    operationPermissions: uniqueValues(mergedRoles.flatMap(role => role.operationPermissions)),
+  }
 }
 
 export function hasMenuPermission(menuKey: string, sourceState = state): boolean {
@@ -375,12 +393,30 @@ export function setCurrentProject(projectId: string | null, mode: 'llm' | 'ml' =
   persistState(nextState)
 }
 
-export function createProject(input: { name: string; description: string; cluster: string }) {
+export function createProject(input: { name: string; description: string; cluster: string; projectAdmins?: string[] }) {
   const nextState = cloneState(state)
   const currentUser = getCurrentUser(nextState)
   const now = new Date()
   const pad = (value: number) => String(value).padStart(2, '0')
   const createdAt = `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+  const platformOwner: ProjectPermissionMember = {
+    account: currentUser.account,
+    roleKey: currentUser.roleKeys.includes('platform_admin') ? 'platform_admin' : currentUser.roleKey,
+    hasDataPermission: true,
+    joinedAt: createdAt,
+  }
+  const adminMembers: ProjectPermissionMember[] = uniqueValues(input.projectAdmins ?? [])
+    .filter(account => account !== currentUser.account)
+    .filter(account => !getUserByAccount(account, nextState)?.roleKeys.includes('platform_admin'))
+    .map(account => {
+      const user = getUserByAccount(account, nextState)
+      return {
+        account,
+        roleKey: user?.roleKeys.includes('project_admin') ? 'project_admin' : user?.roleKey ?? 'project_admin',
+        hasDataPermission: true,
+        joinedAt: createdAt,
+      }
+    })
 
   const project: PermissionProject = {
     id: `project-${Date.now()}`,
@@ -388,16 +424,59 @@ export function createProject(input: { name: string; description: string; cluste
     description: input.description,
     cluster: input.cluster,
     createdAt,
-    members: [
-      {
-        account: currentUser.account,
-        roleKey: currentUser.roleKeys.includes('platform_admin') ? 'platform_admin' : currentUser.roleKey,
-        hasDataPermission: true,
-      },
-    ],
+    members: [platformOwner, ...adminMembers],
   }
 
   nextState.projects.unshift(project)
+  persistState(nextState)
+}
+
+export function updateProject(
+  projectId: string,
+  input: { name: string; description: string; cluster: string; projectAdmins?: string[] },
+) {
+  const nextState = cloneState(state)
+  const selectedProjectAdmins = uniqueValues(input.projectAdmins ?? []).filter(
+    account => !getUserByAccount(account, nextState)?.roleKeys.includes('platform_admin'),
+  )
+
+  nextState.projects = nextState.projects.map(project => {
+    if (project.id !== projectId) {
+      return project
+    }
+
+    const selectedAdminSet = new Set(selectedProjectAdmins)
+    const memberMap = new Map(
+      project.members
+        .map(member => {
+          const user = getUserByAccount(member.account, nextState)
+          const isProjectAdmin = Boolean(user?.roleKeys.includes('project_admin') && !user.roleKeys.includes('platform_admin'))
+          if (isProjectAdmin && !selectedAdminSet.has(member.account)) {
+            return { ...member, hasDataPermission: false }
+          }
+          return member
+        })
+        .map(member => [member.account, member]),
+    )
+    selectedProjectAdmins.forEach(account => {
+      const user = getUserByAccount(account, nextState)
+      memberMap.set(account, {
+        account,
+        roleKey: user?.roleKeys.includes('project_admin') ? 'project_admin' : user?.roleKey ?? 'project_admin',
+        hasDataPermission: true,
+        joinedAt: memberMap.get(account)?.joinedAt ?? new Date().toLocaleString('zh-CN', { hour12: false }).replaceAll('-', '/'),
+      })
+    })
+
+    return {
+      ...project,
+      name: input.name,
+      description: input.description,
+      cluster: input.cluster,
+      members: Array.from(memberMap.values()),
+    }
+  })
+
   persistState(nextState)
 }
 
@@ -433,7 +512,7 @@ export function updateProjectMembers(projectId: string, members: ProjectPermissi
 
 export function addProjectMember(
   projectId: string,
-  member: { account: string; roleKey: RoleKey; hasDataPermission: boolean },
+  member: { account: string; roleKey: RoleKey; hasDataPermission: boolean; joinedAt?: string },
 ) {
   const nextState = cloneState(state)
   nextState.projects = nextState.projects.map(project => {
@@ -446,6 +525,7 @@ export function addProjectMember(
       account: member.account,
       roleKey: member.roleKey,
       hasDataPermission: member.roleKey === 'platform_admin' ? true : member.hasDataPermission,
+      joinedAt: member.joinedAt ?? new Date().toLocaleString('zh-CN', { hour12: false }).replaceAll('-', '/'),
     }
 
     if (user && !user.roleKeys.includes(member.roleKey)) {

@@ -57,6 +57,24 @@ type DatasetDetailRow = {
   response?: string
   user?: string
   assistant?: string
+  chosen?: string
+  rejected?: string
+}
+
+function isDpoUsage(value?: string): boolean {
+  return String(value ?? '').startsWith('DPO-')
+}
+
+function isRftUsage(value?: string): boolean {
+  return String(value ?? '').startsWith('RFT-PPO-') || String(value ?? '').startsWith('RFT-GRPO-')
+}
+
+function resolveFormatLabel(dataUsage?: string, dataFormat?: string): string {
+  if (isDpoUsage(dataUsage)) {
+    return 'CHOSEN_REJECTED'
+  }
+
+  return dataFormat === 'role-based' ? 'ROLE_BASED' : 'PROMPT_RESPONSE'
 }
 
 function buildTestVersions(row: Omit<TestDatasetRecord, 'versions'>): TestVersionRow[] {
@@ -86,6 +104,25 @@ function attachTestVersions(row: Omit<TestDatasetRecord, 'versions'>): TestDatas
 function buildDetailRows(record: TestDatasetRecord, version: TestVersionRow): DatasetDetailRow[] {
   if ('detailRows' in version && Array.isArray((version as any).detailRows) && (version as any).detailRows.length) {
     return (version as any).detailRows as DatasetDetailRow[]
+  }
+
+  if (isDpoUsage(record.dataUsage)) {
+    return [
+      {
+        key: `${version.id}-1`,
+        system: '你是一名电商售后服务助手，需要在安抚用户情绪的同时给出清晰的退换货建议。',
+        user: '耳机收到后右耳没有声音，我已经很着急了，今天必须用。',
+        chosen: '非常抱歉影响了您的使用。我先帮您排查，如确认设备故障可优先为您安排补发，并同步补偿运费。',
+        rejected: '你先再试几次，如果还是不行就自己联系售后，平台这边暂时帮不上忙。',
+      },
+      {
+        key: `${version.id}-2`,
+        system: '你是一名金融客服回复优化助手，需要确保表述准确、合规、稳妥。',
+        user: '基金今天跌了这么多，是不是应该马上全部赎回？',
+        chosen: '我无法直接给出投资决策建议。您可以先关注持仓目标、风险承受能力和基金公告，再结合专业顾问意见综合判断。',
+        rejected: '建议你立刻全部赎回，不然继续跌下去会更亏。',
+      },
+    ]
   }
 
   if (record.dataFormat === 'role-based') {
@@ -155,6 +192,8 @@ const TestDataset: React.FC = () => {
   const [listLoading, setListLoading] = useState(false)
   const [listResult, setListResult] = useState<PaginatedResult<TestDatasetRecord>>({ items: [], total: 0 })
   const [activeVersionId, setActiveVersionId] = useState<string>()
+  const selectedCreateUsagePath = Form.useWatch('dataUsage', form) as string[] | undefined
+  const selectedCreateUsage = resolveDatasetUsageFromPath(selectedCreateUsagePath) ?? 'SFT-文本生成'
   const isCreateRoute = location.pathname === '/measurement/testing/create'
   const isNewVersionRoute = location.pathname.endsWith('/new-version')
   const isDetailRoute = location.pathname.startsWith('/measurement/testing/') && !isCreateRoute && !isNewVersionRoute
@@ -353,7 +392,15 @@ const TestDataset: React.FC = () => {
         return <Tag color={t.color}>{t.text}</Tag>
       },
     },
-    { title: '数据格式', dataIndex: 'dataFormat', key: 'dataFormat', width: 130, render: (val: string) => <Text style={{ color: '#64748b', fontSize: 12 }}>{val}</Text> },
+    {
+      title: '数据格式',
+      dataIndex: 'dataFormat',
+      key: 'dataFormat',
+      width: 130,
+      render: (val: string, record) => (
+        <Text style={{ color: '#64748b', fontSize: 12 }}>{resolveFormatLabel(record.dataUsage, val)}</Text>
+      ),
+    },
     {
       title: '操作',
       key: 'action',
@@ -393,11 +440,18 @@ const TestDataset: React.FC = () => {
       setSelectedFile(null)
       setUploadProgress(0)
       setCreateModalVisible(true)
+      form.setFieldValue('dataFormat', 'PROMPT_RESPONSE')
       return
     }
 
     setCreateModalVisible(false)
   }, [form, isCreateRoute])
+
+  useEffect(() => {
+    if (isDpoUsage(selectedCreateUsage) || isRftUsage(selectedCreateUsage)) {
+      form.setFieldValue('dataFormat', 'PROMPT_RESPONSE')
+    }
+  }, [form, selectedCreateUsage])
 
   useEffect(() => {
     if (!isDetailRoute && !isNewVersionRoute) {
@@ -492,8 +546,16 @@ const TestDataset: React.FC = () => {
 
       <Form.Item label="数据格式" name="dataFormat" rules={[{ required: true, message: '请选择数据格式' }]}>
         <Select placeholder="请选择数据格式">
-          <Select.Option value="PROMPT_RESPONSE">PROMPT_RESPONSE</Select.Option>
-          <Select.Option value="ROLE_BASED">ROLE_BASED</Select.Option>
+          {isDpoUsage(selectedCreateUsage) ? (
+            <Select.Option value="PROMPT_RESPONSE">CHOSEN_REJECTED</Select.Option>
+          ) : isRftUsage(selectedCreateUsage) ? (
+            <Select.Option value="PROMPT_RESPONSE">PROMPT_RESPONSE</Select.Option>
+          ) : (
+            <>
+              <Select.Option value="PROMPT_RESPONSE">PROMPT_RESPONSE</Select.Option>
+              <Select.Option value="ROLE_BASED">ROLE_BASED</Select.Option>
+            </>
+          )}
         </Select>
       </Form.Item>
 
@@ -549,7 +611,7 @@ const TestDataset: React.FC = () => {
           <Tag color={(statusMap[selectedRecord.versionStatus] || { color: 'default' }).color}>{selectedRecord.versionStatus}</Tag>
         </Descriptions.Item>
         <Descriptions.Item label="数据用途">{selectedRecord.dataUsage}</Descriptions.Item>
-        <Descriptions.Item label="数据格式">{selectedRecord.dataFormat}</Descriptions.Item>
+        <Descriptions.Item label="数据格式">{resolveFormatLabel(selectedRecord.dataUsage, selectedRecord.dataFormat)}</Descriptions.Item>
         <Descriptions.Item label="创建人">{selectedRecord.creator}</Descriptions.Item>
         <Descriptions.Item label="最近更新时间">{selectedRecord.createdAt}</Descriptions.Item>
       </Descriptions>
@@ -566,7 +628,21 @@ const TestDataset: React.FC = () => {
   )
 
   const detailTableColumns: ColumnsType<DatasetDetailRow> =
-    selectedRecord?.dataFormat === 'role-based'
+    selectedRecord && isDpoUsage(selectedRecord.dataUsage)
+      ? [
+          { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
+          { title: 'System', dataIndex: 'system', key: 'system', width: 260 },
+          { title: 'User', dataIndex: 'user', key: 'user', width: 240 },
+          {
+            title: 'Assistant',
+            key: 'assistant',
+            children: [
+              { title: 'Chosen', dataIndex: 'chosen', key: 'chosen', width: 280 },
+              { title: 'Rejected', dataIndex: 'rejected', key: 'rejected', width: 280 },
+            ],
+          },
+        ]
+      : selectedRecord?.dataFormat === 'role-based'
       ? [
           { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
           { title: 'System', dataIndex: 'system', key: 'system' },
@@ -683,7 +759,7 @@ const TestDataset: React.FC = () => {
                 <div><Text type="secondary">数据集名称：</Text><Text strong>{selectedRecord.name}</Text></div>
                 <div><Text type="secondary">数据量：</Text><Text strong>{activeVersion?.sampleCount ?? 0} 条</Text></div>
                 <div><Text type="secondary">数据用途：</Text><Text strong>{selectedRecord.dataUsage}</Text></div>
-                <div><Text type="secondary">数据格式：</Text><Tag>{selectedRecord.dataFormat}</Tag></div>
+                <div><Text type="secondary">数据格式：</Text><Tag>{resolveFormatLabel(selectedRecord.dataUsage, selectedRecord.dataFormat)}</Tag></div>
                 <div><Text type="secondary">状态：</Text><Text strong>{activeVersion?.processStatus ?? selectedRecord.versionStatus}</Text></div>
                 <div><Text type="secondary">文件大小：</Text><Text strong>{formatFileSizeMB(activeVersion?.sampleCount ?? 0)}</Text></div>
                 <div><Text type="secondary">描述：</Text><Text strong>-</Text></div>
@@ -740,7 +816,7 @@ const TestDataset: React.FC = () => {
               <Text strong style={{ fontSize: 16 }}>{addVersionTarget.dataUsage}</Text>
 
               <Text strong style={{ fontSize: 15, paddingTop: 10 }}>数据格式：</Text>
-              <Text strong style={{ fontSize: 16 }}>{addVersionTarget.dataFormat === 'prompt-response' ? 'PROMPT_RESPONSE' : 'ROLE_BASED'}</Text>
+              <Text strong style={{ fontSize: 16 }}>{resolveFormatLabel(addVersionTarget.dataUsage, addVersionTarget.dataFormat)}</Text>
 
               <Text strong style={{ fontSize: 15, paddingTop: 10 }}>继承历史版本：</Text>
               <Form.Item name="inheritHistoryVersion" valuePropName="checked" style={{ marginBottom: 0 }}>
@@ -975,7 +1051,9 @@ const TestDataset: React.FC = () => {
             >
               <p style={{ fontSize: 40, color: '#94a3b8', margin: 0 }}><UploadOutlined /></p>
               <p style={{ color: '#64748b' }}>上传新版本数据文件</p>
-              <p style={{ color: '#94a3b8', fontSize: 12 }}>格式需与数据集一致：{addVersionTarget?.dataFormat ?? '-'}</p>
+              <p style={{ color: '#94a3b8', fontSize: 12 }}>
+                格式需与数据集一致：{addVersionTarget ? resolveFormatLabel(addVersionTarget.dataUsage, addVersionTarget.dataFormat) : '-'}
+              </p>
             </Upload.Dragger>
           </Form.Item>
           {addVersionUploading && <Progress percent={addVersionProgress} size="small" status="active" style={{ marginBottom: 12 }} />}

@@ -5,10 +5,10 @@ import {
   Form,
   Input,
   Modal,
+  Select,
   Space,
   Table,
   Tabs,
-  Tag,
   Typography,
   message,
 } from 'antd'
@@ -43,7 +43,7 @@ const labelMenu = [
   { group: '在线Notebook', items: ['自定义镜像'] },
 ]
 
-const attributeRows: AttributeRecord[] = [
+const seedAttributeRows: AttributeRecord[] = [
   { id: 'attr-1', name: '训练数据最大上传大小', description: '单次训练数据上传大小限制', inputType: 'number', value: '1024', group: '训练数据管理', required: true },
   { id: 'attr-2', name: '训练数据支持格式', description: '训练数据可上传格式', inputType: 'text', value: 'jsonl,json,xlsx', group: '训练数据管理', required: true },
   { id: 'attr-3', name: '测试数据最大上传大小', description: '单次测试数据上传大小限制', inputType: 'number', value: '512', group: '测试数据管理', required: true },
@@ -59,20 +59,23 @@ const SystemSettings: React.FC = () => {
   const [searchValue, setSearchValue] = useState('')
   const [activeTab, setActiveTab] = useState('attributes')
   const [activeGroup, setActiveGroup] = useState('训练数据管理')
+  const [attributes, setAttributes] = useState<AttributeRecord[]>(seedAttributeRows)
   const [labels, setLabels] = useState<LabelRecord[]>(seedLabels)
+  const [attributeOpen, setAttributeOpen] = useState(false)
   const [labelOpen, setLabelOpen] = useState(false)
   const [valueOpen, setValueOpen] = useState(false)
   const [selectedLabel, setSelectedLabel] = useState<LabelRecord | null>(null)
+  const [attributeForm] = Form.useForm()
   const [labelForm] = Form.useForm()
   const [valueForm] = Form.useForm()
 
   const filteredAttributes = useMemo(
     () =>
-      attributeRows.filter(item =>
+      attributes.filter(item =>
         item.group === activeGroup &&
         item.name.toLowerCase().includes(searchValue.toLowerCase()),
       ),
-    [activeGroup, searchValue],
+    [activeGroup, attributes, searchValue],
   )
 
   const filteredLabels = useMemo(
@@ -87,7 +90,6 @@ const SystemSettings: React.FC = () => {
   const attributeColumns: ColumnsType<AttributeRecord> = [
     { title: '属性名称', dataIndex: 'name', key: 'name' },
     { title: '属性描述', dataIndex: 'description', key: 'description', render: value => value || '-' },
-    { title: '输入方式', dataIndex: 'inputType', key: 'inputType', render: value => <Tag color="default">{value}</Tag> },
     { title: '属性值', dataIndex: 'value', key: 'value' },
     { title: '属性分组', dataIndex: 'group', key: 'group' },
     { title: '是否必填', dataIndex: 'required', key: 'required', render: value => (value ? '是' : '否') },
@@ -166,6 +168,30 @@ const SystemSettings: React.FC = () => {
       setLabelOpen(false)
       setSelectedLabel(null)
       labelForm.resetFields()
+    } catch {
+      return
+    }
+  }
+
+  const submitAttribute = async () => {
+    try {
+      const values = await attributeForm.validateFields()
+      setAttributes(previous => [
+        {
+          id: `attr-${Date.now()}`,
+          name: values.name,
+          description: values.description || '',
+          inputType: 'text',
+          value: values.value,
+          group: values.group,
+          required: values.required ?? true,
+        },
+        ...previous,
+      ])
+      setActiveGroup(values.group)
+      setAttributeOpen(false)
+      attributeForm.resetFields()
+      message.success('属性已添加')
     } catch {
       return
     }
@@ -253,7 +279,7 @@ const SystemSettings: React.FC = () => {
             </Card>
 
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, gap: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 16, gap: 12 }}>
                 <Input
                   prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
                   placeholder={activeTab === 'attributes' ? '请输入属性名称' : '请输入标签名称'}
@@ -262,7 +288,17 @@ const SystemSettings: React.FC = () => {
                   style={{ width: 280 }}
                 />
                 {activeTab === 'attributes' ? (
-                  <Button type="primary" icon={<PlusOutlined />}>添加属性</Button>
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => {
+                      attributeForm.resetFields()
+                      attributeForm.setFieldsValue({ group: activeGroup, required: true })
+                      setAttributeOpen(true)
+                    }}
+                  >
+                    添加属性
+                  </Button>
                 ) : (
                   <Button
                     type="primary"
@@ -279,14 +315,57 @@ const SystemSettings: React.FC = () => {
               </div>
 
               {activeTab === 'attributes' ? (
-                <Table rowKey="id" columns={attributeColumns} dataSource={filteredAttributes} pagination={false} />
+                <Table rowKey="id" columns={attributeColumns} dataSource={filteredAttributes} pagination={false} scroll={{ x: 820 }} />
               ) : (
-                <Table rowKey="id" columns={labelColumns} dataSource={filteredLabels} pagination={false} />
+                <Table rowKey="id" columns={labelColumns} dataSource={filteredLabels} pagination={false} scroll={{ x: 760 }} />
               )}
             </div>
           </div>
         </Card>
       </div>
+
+      <Modal
+        title="添加属性"
+        open={attributeOpen}
+        onCancel={() => {
+          setAttributeOpen(false)
+          attributeForm.resetFields()
+        }}
+        footer={
+          <Space>
+            <Button onClick={() => {
+              setAttributeOpen(false)
+              attributeForm.resetFields()
+            }}>取消</Button>
+            <Button type="primary" onClick={submitAttribute}>确定</Button>
+          </Space>
+        }
+      >
+        <Form form={attributeForm} layout="vertical">
+          <Form.Item label="属性名称" name="name" rules={[{ required: true, message: '请输入属性名称' }]}>
+            <Input placeholder="请输入属性名称" />
+          </Form.Item>
+          <Form.Item label="属性描述" name="description">
+            <Input.TextArea rows={3} placeholder="请输入属性描述（可选）" />
+          </Form.Item>
+          <Form.Item label="属性值" name="value" rules={[{ required: true, message: '请输入属性值' }]}>
+            <Input placeholder="请输入属性值" />
+          </Form.Item>
+          <Form.Item label="属性分组" name="group" rules={[{ required: true, message: '请选择属性分组' }]}>
+            <Select
+              options={attributeMenu.flatMap(group => group.items.map(item => ({ value: item, label: item })))}
+            />
+          </Form.Item>
+          <Form.Item label="是否必填" name="required" rules={[{ required: true, message: '请选择是否必填' }]}>
+            <Select
+              options={[
+                { value: true, label: '是' },
+                { value: false, label: '否' },
+              ]}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         title={selectedLabel ? '编辑标签' : '添加标签'}

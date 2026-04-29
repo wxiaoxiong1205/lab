@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import {
   Button,
   Card,
+  Cascader,
   Descriptions,
   Form,
   Input,
@@ -12,14 +13,16 @@ import {
   Space,
   Table,
   Tag,
-  Tooltip,
   Typography,
+  Upload,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   ArrowLeftOutlined,
   CloudServerOutlined,
   CodeOutlined,
+  DownloadOutlined,
+  InboxOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -70,6 +73,30 @@ const customImageOptions = [
   { value: 'registry.cn-shanghai.aliyuncs.com/ml/custom-serving:1.0.0', label: 'registry.cn-shanghai.aliyuncs.com/ml/custom-serving:1.0.0' },
   { value: 'registry.cn-beijing.aliyuncs.com/ml/yolov8-serving:2.1.0', label: 'registry.cn-beijing.aliyuncs.com/ml/yolov8-serving:2.1.0' },
   { value: 'harbor.example.com/ml/classifier-runtime:latest', label: 'harbor.example.com/ml/classifier-runtime:latest' },
+]
+
+const standardRunCommand = 'gunicorn --bind :9090 --workers 1 --threads 1 --timeout 120 _wsgi:app'
+
+const standardImageOptions = [
+  {
+    value: 'ML',
+    label: 'ML',
+    children: [
+      {
+        value: 'jupyter/deepexi-notebook:pytorch_2.11-cuda_12.8-py312-ubuntu24.04-ml',
+        label: 'jupyter/deepexi-notebook:pytorch_2.11-cuda_12.8-py312-ubuntu24.04-ml',
+      },
+      {
+        value: 'jupyter/deepexi-notebook:pytorch_2.5-cuda_12.1-py312-ubuntu24.04-ml',
+        label: 'jupyter/deepexi-notebook:pytorch_2.5-cuda_12.1-py312-ubuntu24.04-ml',
+      },
+    ],
+  },
+]
+
+const notebookPythonOptions = [
+  { value: 'nb-1:model.py', label: '3rwrwr / model.py' },
+  { value: 'nb-2:model.py', label: '新建 Notebook-选带标签的镜像 / model.py' },
 ]
 
 const defaultCustomSpec = `{
@@ -126,6 +153,13 @@ function getCreateInitialValues(): CreateFormValues {
       model: undefined,
       modelVersion: undefined,
       network: undefined,
+      imageSource: 'system',
+      imageSelection: ['ML', 'jupyter/deepexi-notebook:pytorch_2.11-cuda_12.8-py312-ubuntu24.04-ml'],
+      customImage: undefined,
+      runCommand: standardRunCommand,
+      pythonSource: 'local',
+      pythonFile: undefined,
+      notebookSource: undefined,
       resources: {
         cpuRequest: 4,
         cpuLimit: 8,
@@ -211,7 +245,7 @@ const sectionTitleStyle: React.CSSProperties = {
   fontWeight: 600,
 }
 
-const ResourceFields: React.FC<{ prefix: (string | number)[] }> = ({ prefix }) => (
+const ResourceFields: React.FC<{ prefix: (string | number)[]; hideInstanceCount?: boolean }> = ({ prefix, hideInstanceCount }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
     <Card size="small" style={{ borderRadius: 14, background: '#f8fafc', borderColor: '#e2e8f0' }}>
       <div style={{ fontWeight: 600, marginBottom: 16 }}>CPU 与内存请求</div>
@@ -234,16 +268,18 @@ const ResourceFields: React.FC<{ prefix: (string | number)[] }> = ({ prefix }) =
     </Card>
 
     <Card size="small" style={{ borderRadius: 14, background: '#f8fafc', borderColor: '#e2e8f0' }}>
-      <div style={{ fontWeight: 600, marginBottom: 16 }}>GPU 与实例</div>
+      <div style={{ fontWeight: 600, marginBottom: 16 }}>{hideInstanceCount ? 'GPU' : 'GPU 与实例'}</div>
       <Form.Item label="显卡类型" name={[...prefix, 'gpuType']}>
         <Select allowClear placeholder="可选，无 GPU 可留空" options={gpuOptions} />
       </Form.Item>
       <Form.Item label="显卡数量" name={[...prefix, 'gpuCount']}>
         <InputNumber style={{ width: '100%' }} min={1} max={8} />
       </Form.Item>
-      <Form.Item label="部署实例数" name={[...prefix, 'instanceCount']} rules={[{ required: true, message: '请输入部署实例数' }]}>
-        <InputNumber style={{ width: '100%' }} min={1} max={20} />
-      </Form.Item>
+      {!hideInstanceCount && (
+        <Form.Item label="部署实例数" name={[...prefix, 'instanceCount']} rules={[{ required: true, message: '请输入部署实例数' }]}>
+          <InputNumber style={{ width: '100%' }} min={1} max={20} />
+        </Form.Item>
+      )}
     </Card>
   </div>
 )
@@ -283,6 +319,8 @@ const MLModelDeployment: React.FC = () => {
     [editId, rows],
   )
   const customImageSource = Form.useWatch(['custom', 'imageSource'], form) ?? 'system'
+  const standardImageSource = Form.useWatch(['standard', 'imageSource'], form) ?? 'system'
+  const standardPythonSource = Form.useWatch(['standard', 'pythonSource'], form) ?? 'local'
   const selectedModel = Form.useWatch(['standard', 'model'], form)
   const availableVersions = useMemo(
     () => modelOptions.find(option => option.value === selectedModel)?.versions ?? [],
@@ -603,13 +641,146 @@ const MLModelDeployment: React.FC = () => {
               </Card>
 
               {createType === 'standard' ? (
-                <Card id="resource-info" style={{ ...sectionCardStyle, marginBottom: 20 }}>
-                  <div style={sectionTitleStyle}>资源信息</div>
-                  <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-                    标准部署沿用资源申请方式，支持 CPU、内存、GPU 和实例数配置。
-                  </Text>
-                  <ResourceFields prefix={['standard', 'resources']} />
-                </Card>
+                <>
+                  <Card id="environment-info" style={{ ...sectionCardStyle, marginBottom: 20 }}>
+                    <div style={sectionTitleStyle}>环境信息</div>
+                    <Form.Item
+                      label="镜像配置"
+                      name={['standard', 'imageSource']}
+                      rules={[{ required: true, message: '请选择镜像配置' }]}
+                    >
+                      <Radio.Group optionType="button" buttonStyle="solid">
+                        <Radio.Button value="system">系统镜像</Radio.Button>
+                        <Radio.Button value="custom">自定义镜像</Radio.Button>
+                      </Radio.Group>
+                    </Form.Item>
+
+                    {standardImageSource === 'system' ? (
+                      <Form.Item
+                        label="系统镜像"
+                        name={['standard', 'imageSelection']}
+                        rules={[{ required: true, message: '请选择系统镜像' }]}
+                      >
+                        <Cascader
+                          placeholder="请选择镜像类型 / 镜像"
+                          options={standardImageOptions}
+                          expandTrigger="hover"
+                          style={{ width: '100%' }}
+                        />
+                      </Form.Item>
+                    ) : (
+                      <Form.Item
+                        label="自定义镜像"
+                        name={['standard', 'customImage']}
+                        rules={[{ required: true, message: '请选择自定义镜像' }]}
+                      >
+                        <Select placeholder="请选择自定义镜像" options={customImageOptions} />
+                      </Form.Item>
+                    )}
+
+                    <Form.Item
+                      label="部署实例数"
+                      name={['standard', 'resources', 'instanceCount']}
+                      rules={[{ required: true, message: '请输入部署实例数' }]}
+                    >
+                      <InputNumber style={{ width: '100%' }} min={1} max={20} />
+                    </Form.Item>
+
+                    <Form.Item label="运行命令" required>
+                      <div
+                        style={{
+                          borderRadius: 12,
+                          overflow: 'hidden',
+                          border: '1px solid #1f2937',
+                          background: '#111827',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 12px',
+                            borderBottom: '1px solid #374151',
+                            color: '#cbd5e1',
+                            fontSize: 12,
+                          }}
+                        >
+                          <span>bash</span>
+                          <span>{standardRunCommand.length} 个字符</span>
+                        </div>
+                        <pre
+                          style={{
+                            margin: 0,
+                            padding: '12px 14px',
+                            color: '#d1fae5',
+                            fontFamily: 'SFMono-Regular, Consolas, Monaco, monospace',
+                            fontSize: 13,
+                            lineHeight: 1.6,
+                            whiteSpace: 'pre-wrap',
+                          }}
+                        >
+                          <span style={{ color: '#65a30d', marginRight: 10 }}>1</span>
+                          {standardRunCommand}
+                        </pre>
+                      </div>
+                    </Form.Item>
+                    <Form.Item name={['standard', 'runCommand']} hidden>
+                      <Input />
+                    </Form.Item>
+
+                    <Form.Item
+                      name={['standard', 'pythonSource']}
+                      rules={[{ required: true, message: '请选择 Python 文件来源' }]}
+                    >
+                      <Radio.Group>
+                        <Space size={28}>
+                          <Radio value="local">本地上传</Radio>
+                          <Radio value="notebook">Notebook获取</Radio>
+                        </Space>
+                      </Radio.Group>
+                    </Form.Item>
+
+                    {standardPythonSource === 'local' ? (
+                      <Form.Item
+                        label="Python文件"
+                        name={['standard', 'pythonFile']}
+                        valuePropName="fileList"
+                        getValueFromEvent={event => event?.fileList ?? []}
+                        rules={[{ required: true, message: '请上传 Python 文件' }]}
+                      >
+                        <Upload.Dragger
+                          accept=".py"
+                          maxCount={1}
+                          beforeUpload={() => false}
+                        >
+                          <p className="ant-upload-drag-icon">
+                            <InboxOutlined />
+                          </p>
+                          <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
+                          <p className="ant-upload-hint">支持 model.py 文件拖到此处，或点击上传</p>
+                        </Upload.Dragger>
+                      </Form.Item>
+                    ) : (
+                      <Form.Item
+                        label="Python文件"
+                        name={['standard', 'notebookSource']}
+                        rules={[{ required: true, message: '请选择 Notebook 文件' }]}
+                      >
+                        <Select placeholder="请选择 Notebook 中的 Python 文件" options={notebookPythonOptions} />
+                      </Form.Item>
+                    )}
+
+                    <Button icon={<DownloadOutlined />} onClick={() => message.success('Python 模板示例已准备下载')}>
+                      Python模板示例
+                    </Button>
+                  </Card>
+
+                  <Card id="resource-info" style={{ ...sectionCardStyle, marginBottom: 20 }}>
+                    <div style={sectionTitleStyle}>资源信息</div>
+                    <ResourceFields prefix={['standard', 'resources']} hideInstanceCount />
+                  </Card>
+                </>
               ) : (
                 <>
                   <Card id="environment-info" style={{ ...sectionCardStyle, marginBottom: 20 }}>
@@ -669,11 +840,18 @@ const MLModelDeployment: React.FC = () => {
                     >
                       <InputNumber style={{ width: '100%' }} min={1} max={65535} />
                     </Form.Item>
+                    <Form.Item
+                      label="部署实例数"
+                      name={['custom', 'resources', 'instanceCount']}
+                      rules={[{ required: true, message: '请输入部署实例数' }]}
+                    >
+                      <InputNumber style={{ width: '100%' }} min={1} max={20} />
+                    </Form.Item>
                   </Card>
 
                   <Card id="resource-info" style={{ ...sectionCardStyle, marginBottom: 20 }}>
                     <div style={sectionTitleStyle}>资源信息</div>
-                    <ResourceFields prefix={['custom', 'resources']} />
+                    <ResourceFields prefix={['custom', 'resources']} hideInstanceCount />
                   </Card>
 
                 </>

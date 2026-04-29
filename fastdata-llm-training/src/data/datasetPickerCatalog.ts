@@ -184,6 +184,17 @@ export const DATASET_PICKER_CATALOG: DatasetPickerItem[] = [
     ],
   },
   {
+    id: 'ds_grpo_reward_1',
+    name: 'GRPO-Completion_Reward-推理增强集',
+    latestVersion: 'V1',
+    dataType: '训练数据集',
+    dataUsage: '文本生成',
+    dataFormat: 'Completion_Reward',
+    versions: [
+      { id: 'v1', label: 'V1', charCount: 420_000, sampleCount: 1050 },
+    ],
+  },
+  {
     id: 'ds_val_reward_1',
     name: '验证-Completion_Reward-1',
     latestVersion: 'V1',

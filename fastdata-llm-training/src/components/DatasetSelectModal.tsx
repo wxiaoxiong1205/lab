@@ -10,7 +10,7 @@ import {
   Table,
   Tag,
 } from 'antd'
-import { SearchOutlined } from '@ant-design/icons'
+import { CaretDownOutlined, CaretRightOutlined, SearchOutlined } from '@ant-design/icons'
 import type { TrainingType } from '../types/training'
 import { TRAINING_METHOD_LABELS, type TrainingMethod } from '../types/training'
 import {
@@ -35,6 +35,10 @@ export interface DatasetSelectModalProps {
   trainingMethod?: TrainingMethod
   /** 固定数据类型：训练/验证数据集选择场景下只显示对应类型 */
   fixedDataType?: DatasetPickerDataType
+  /** 不固定数据类型时，首次打开默认选中的数据类型 */
+  defaultDataType?: DatasetPickerDataType
+  /** 推理结果集选择数据时，数据用途需要细分到 SFT / DPO / RFT-PPO / RFT-GRPO */
+  detailedDataUsage?: boolean
   defaultSelectedKeys?: string[]
   excludeKeys?: string[]
   onCancel: () => void
@@ -55,6 +59,15 @@ function getDefaultDataUsage(trainingType: TrainingType): string {
 
 interface FormatOption { value: string; label: string; count: number }
 
+function getDetailedUsage(item: DatasetPickerItem): string {
+  if (item.dataUsage === '图像理解') return '图像理解'
+  if (item.dataFormat === 'Chosen_Rejected') return '文本生成 / DPO'
+  if (item.dataFormat === 'Completion_Reward') {
+    return item.name.toUpperCase().includes('GRPO') ? '文本生成 / RFT-GRPO' : '文本生成 / RFT-PPO'
+  }
+  return '文本生成 / SFT'
+}
+
 /** 训练/验证弹窗固定为训练/验证数据集类型 */
 const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
   open,
@@ -63,6 +76,8 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
   trainingType,
   trainingMethod,
   fixedDataType,
+  defaultDataType,
+  detailedDataUsage = false,
   defaultSelectedKeys = [],
   excludeKeys = [],
   onCancel,
@@ -71,10 +86,10 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
   // ─── 筛选状态 ───
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const pageSize = 5
+  const pageSize = 10
 
-  const [dataType, setDataType] = useState<string>(fixedDataType ?? '')
-  const [dataUsage, setDataUsage] = useState(() => getDefaultDataUsage(trainingType))
+  const [dataType, setDataType] = useState<string>(fixedDataType ?? defaultDataType ?? '')
+  const [dataUsage, setDataUsage] = useState(() => (detailedDataUsage ? '' : getDefaultDataUsage(trainingType)))
   const [dataFormat, setDataFormat] = useState('')
 
   // 选中状态
@@ -97,8 +112,8 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
       setSearch('')
       setPage(1)
       setExpandedIds(new Set())
-      setDataType(fixedDataType ?? '')
-      setDataUsage(getDefaultDataUsage(trainingType))
+      setDataType(fixedDataType ?? defaultDataType ?? '')
+      setDataUsage(detailedDataUsage ? '' : getDefaultDataUsage(trainingType))
       setDataFormat('')
       if (mode === 'multiple') {
         setMultiSelected(new Set(defaultSelectedKeys.filter(k => !excludeKeys.includes(k))))
@@ -109,7 +124,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
       }
     }
     prevOpenRef.current = true
-  }, [open, fixedDataType, mode, trainingType, trainingMethod, defaultSelectedKeys, excludeKeys])
+  }, [open, fixedDataType, defaultDataType, mode, trainingType, trainingMethod, detailedDataUsage, defaultSelectedKeys, excludeKeys])
 
   // ─── 派生数据：数据类型选项 & 数量 ───
   const DATA_TYPES = useMemo(
@@ -132,7 +147,9 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
     let list = DATASET_PICKER_CATALOG
     if (fixedDataType) list = list.filter(d => d.dataType === fixedDataType)
     else if (dataType) list = list.filter(d => d.dataType === dataType)
-    if (dataUsage) list = list.filter(d => d.dataUsage === dataUsage)
+    if (dataUsage) {
+      list = list.filter(d => (detailedDataUsage ? getDetailedUsage(d) === dataUsage : d.dataUsage === dataUsage))
+    }
     if (dataFormat) list = list.filter(d => d.dataFormat === dataFormat)
     if (allowedFormats) list = list.filter(d => allowedFormats.has(d.dataFormat))
     if (search.trim()) {
@@ -140,7 +157,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
       list = list.filter(d => d.name.toLowerCase().includes(q))
     }
     return list
-  }, [fixedDataType, dataType, dataUsage, dataFormat, search, allowedFormats])
+  }, [fixedDataType, dataType, dataUsage, dataFormat, search, allowedFormats, detailedDataUsage])
 
   const usageScope = useMemo(() => {
     let list = DATASET_PICKER_CATALOG
@@ -153,12 +170,25 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
     let list = DATASET_PICKER_CATALOG
     if (fixedDataType) list = list.filter(d => d.dataType === fixedDataType)
     else if (dataType) list = list.filter(d => d.dataType === dataType)
-    if (dataUsage) list = list.filter(d => d.dataUsage === dataUsage)
+    if (dataUsage) {
+      list = list.filter(d => (detailedDataUsage ? getDetailedUsage(d) === dataUsage : d.dataUsage === dataUsage))
+    }
     if (allowedFormats) list = list.filter(d => allowedFormats.has(d.dataFormat))
     return list
-  }, [fixedDataType, dataType, dataUsage, allowedFormats])
+  }, [fixedDataType, dataType, dataUsage, allowedFormats, detailedDataUsage])
 
   const usageOptions = useMemo(() => {
+    if (detailedDataUsage) {
+      const values = ['文本生成 / SFT', '文本生成 / DPO', '文本生成 / RFT-PPO', '文本生成 / RFT-GRPO', '图像理解']
+      return [
+        { value: '', label: '全部', count: usageScope.length },
+        ...values.map(value => ({
+          value,
+          label: value,
+          count: usageScope.filter(item => getDetailedUsage(item) === value).length,
+        })),
+      ]
+    }
     const text = usageScope.filter(d => d.dataUsage === '文本生成').length
     const vision = usageScope.filter(d => d.dataUsage === '图像理解').length
     return [
@@ -166,7 +196,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
       { value: '文本生成', label: '文本生成', count: text },
       { value: '图像理解', label: '图像理解', count: vision },
     ]
-  }, [usageScope])
+  }, [detailedDataUsage, usageScope])
 
   // dataFormat 超出范围时自动清除（单向监听 formatScope，避免无限循环）
   useEffect(() => {
@@ -307,8 +337,8 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
               size="small"
               style={{ padding: 0, height: 'auto' }}
               onClick={() => {
-                setDataType(fixedDataType ?? '')
-                setDataUsage(getDefaultDataUsage(trainingType))
+                setDataType(fixedDataType ?? defaultDataType ?? '')
+                setDataUsage(detailedDataUsage ? '' : getDefaultDataUsage(trainingType))
                 setDataFormat('')
                 setSearch('')
                 setPage(1)
@@ -433,9 +463,31 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
             dataSource={pagedList}
             pagination={false}
             locale={{ emptyText: '暂无数据集' }}
+            onRow={record => ({
+              style: { cursor: 'pointer' },
+              onClick: () => {
+                setExpandedIds(prev => {
+                  const next = new Set(prev)
+                  if (next.has(record.id)) next.delete(record.id)
+                  else next.add(record.id)
+                  return next
+                })
+              },
+            })}
             expandable={{
               expandedRowKeys: Array.from(expandedIds),
               expandIconColumnIndex: 0,
+              expandIcon: ({ expanded, onExpand, record }) => (
+                <Button
+                  type="text"
+                  size="small"
+                  icon={expanded ? <CaretDownOutlined /> : <CaretRightOutlined />}
+                  onClick={event => {
+                    event.stopPropagation()
+                    onExpand(record, event)
+                  }}
+                />
+              ),
               onExpand: (expanded, record) => {
                 setExpandedIds(prev => {
                   const next = new Set(prev)
@@ -446,12 +498,12 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
               },
               expandedRowRender: record =>
                 mode === 'single' ? (
-                  <div style={{ padding: '4px 8px 8px' }}>
+                  <div style={{ padding: '10px 16px 14px', background: '#f8fafc', borderRadius: 10 }}>
                     <Radio.Group
                       value={singleSelected ?? undefined}
                       onChange={e => setSingleSelected(e.target.value)}
                     >
-                      <Space orientation="vertical" size={8}>
+                      <Space orientation="vertical" size={10} onClick={event => event.stopPropagation()}>
                         {record.versions.map(v => {
                           const key = makeDatasetRowKey(record.id, v.id)
                           return (

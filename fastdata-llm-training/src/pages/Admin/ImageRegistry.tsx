@@ -6,6 +6,7 @@ import {
   Form,
   Input,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Table,
@@ -14,7 +15,7 @@ import {
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { AppstoreOutlined, PlusOutlined } from '@ant-design/icons'
+import { PlusOutlined } from '@ant-design/icons'
 import { mockImageRegistries } from '../../data/mockDataAll'
 import type { ImageRegistry } from '../../types/shared'
 
@@ -26,7 +27,7 @@ const ImageRegistryPage: React.FC = () => {
   const [authType, setAuthType] = useState<string>()
   const [createOpen, setCreateOpen] = useState(false)
   const [detailRecord, setDetailRecord] = useState<ImageRegistry | null>(null)
-  const [rows, setRows] = useState<ImageRegistry[]>(mockImageRegistries)
+  const [rows, setRows] = useState<ImageRegistry[]>(mockImageRegistries.slice(0, 1))
 
   const filteredData = useMemo(
     () =>
@@ -42,44 +43,63 @@ const ImageRegistryPage: React.FC = () => {
   )
 
   const columns: ColumnsType<ImageRegistry> = [
-    { title: '仓库名称', dataIndex: 'name', key: 'name' },
-    { title: '命名空间', dataIndex: 'namespace', key: 'namespace' },
-    { title: '仓库地址', dataIndex: 'address', key: 'address', render: value => <Text code>{value}</Text> },
-    { title: '认证方式', dataIndex: 'authType', key: 'authType' },
-    { title: '管理地址', dataIndex: 'adminAddress', key: 'adminAddress', render: value => value || '-' },
-    { title: '绑定集群', dataIndex: 'boundClusterCount', key: 'boundClusterCount', width: 90, render: value => value ?? 0 },
+    { title: '仓库名称', dataIndex: 'name', key: 'name', width: 180 },
+    { title: '命名空间', dataIndex: 'namespace', key: 'namespace', width: 180 },
+    { title: '仓库地址', dataIndex: 'address', key: 'address', width: 260, render: value => <Text code>{value}</Text> },
+    { title: '认证方式', dataIndex: 'authType', key: 'authType', width: 130 },
+    { title: '管理地址', dataIndex: 'adminAddress', key: 'adminAddress', width: 240, render: value => value || '-' },
+    { title: '绑定集群', dataIndex: 'boundClusterCount', key: 'boundClusterCount', width: 110, render: value => value ?? 0 },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 100,
+      width: 120,
       render: value => <Tag color={value === 'normal' ? 'success' : 'error'}>{value === 'normal' ? '连接正常' : '异常'}</Tag>,
     },
     {
       title: '操作',
       key: 'action',
       width: 220,
-      render: (_, record) => (
-        <Space size={0}>
-          <Button type="link" size="small">测试连接</Button>
-          <Button type="link" size="small" onClick={() => setDetailRecord(record)}>查看详情</Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            onClick={() => {
-              setRows(previous => previous.filter(item => item.id !== record.id))
-              message.success(`已删除镜像仓库：${record.name}`)
-            }}
-          >
-            删除
-          </Button>
-        </Space>
-      ),
+      render: (_, record) => {
+        const hasBoundCluster = (record.boundClusterCount ?? 0) > 0
+
+        return (
+          <Space size={0} style={{ whiteSpace: 'nowrap' }}>
+            <Button type="link" size="small">测试连接</Button>
+            <Button type="link" size="small" onClick={() => setDetailRecord(record)}>查看详情</Button>
+            {hasBoundCluster ? (
+              <Button type="link" size="small" danger disabled>
+                删除
+              </Button>
+            ) : (
+              <Popconfirm
+                title="确认删除该镜像仓库？"
+                description="删除后需要重新创建镜像仓库配置。"
+                okText="删除"
+                cancelText="取消"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => {
+                  setRows(previous => previous.filter(item => item.id !== record.id))
+                  message.success(`已删除镜像仓库：${record.name}`)
+                }}
+              >
+                <Button type="link" size="small" danger>
+                  删除
+                </Button>
+              </Popconfirm>
+            )}
+          </Space>
+        )
+      },
     },
   ]
 
   const submitCreate = async () => {
+    if (rows.length >= 1) {
+      message.warning('镜像仓库仅支持创建一个，请先删除当前仓库后再新增')
+      return
+    }
+
     try {
       await form.validateFields()
       const values = form.getFieldsValue()
@@ -111,8 +131,8 @@ const ImageRegistryPage: React.FC = () => {
         <Card style={{ borderRadius: 20, border: '1px solid #e5e7eb' }}>
           <Title level={2}>镜像仓库</Title>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
-            <Space>
+          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+            <Space wrap>
               <Input
                 placeholder="请输入仓库名称或地址"
                 value={searchValue}
@@ -134,7 +154,18 @@ const ImageRegistryPage: React.FC = () => {
               <Button>搜索</Button>
               <Button onClick={() => { setSearchValue(''); setAuthType(undefined) }}>重置</Button>
             </Space>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              disabled={rows.length >= 1}
+              onClick={() => {
+                if (rows.length >= 1) {
+                  message.warning('镜像仓库仅支持创建一个，请先删除当前仓库后再新增')
+                  return
+                }
+                setCreateOpen(true)
+              }}
+            >
               新增
             </Button>
           </div>
@@ -144,6 +175,7 @@ const ImageRegistryPage: React.FC = () => {
             columns={columns}
             dataSource={filteredData}
             pagination={{ pageSize: 10 }}
+            scroll={{ x: 1460 }}
           />
         </Card>
       </div>

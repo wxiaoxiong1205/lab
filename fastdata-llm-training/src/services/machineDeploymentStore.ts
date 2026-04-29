@@ -35,6 +35,13 @@ export interface StandardDeploymentConfig {
   modelVersion?: string
   modelSource?: string
   network?: string
+  imageSource?: ImageSourceType
+  imageSelection?: string[]
+  customImage?: string
+  runCommand?: string
+  pythonSource?: 'local' | 'notebook'
+  pythonFile?: string
+  notebookSource?: string
   resources: ResourceConfig
 }
 

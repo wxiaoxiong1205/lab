@@ -86,15 +86,15 @@ export const mockProjects: Project[] = [
 ]
 
 export const mockKubernetesClusters: KubernetesCluster[] = [
-  { id: '1', name: '测试集群-01', apiServer: 'https://k8s-test.example.com:6443', labels: ['dev', 'test'], nodeCount: 8, connectionStatus: 'connected', mountStatus: 'mounted', storageConfig: 'NFS-测试存储', imageRegistry: 'harbor-test.example.com', createdAt: '2026/01/10 09:00:00' },
-  { id: '2', name: '生产集群-A', apiServer: 'https://k8s-prod.example.com:6443', labels: ['prod', 'high-memory'], nodeCount: 32, connectionStatus: 'connected', mountStatus: 'mounted', storageConfig: 'Ceph-生产存储', imageRegistry: 'harbor-prod.example.com', createdAt: '2026/02/01 10:00:00' },
-  { id: '3', name: 'GPU集群-01', apiServer: 'https://k8s-gpu.example.com:6443', labels: ['gpu', '训练'], nodeCount: 16, connectionStatus: 'disconnected', mountStatus: 'unmounted', createdAt: '2026/03/05 14:30:00' },
+  { id: '1', name: '测试集群-01', description: '测试环境 Kubernetes 集群', apiServer: 'https://k8s-test.example.com:6443', kubeconfig: 'apiVersion: v1\nclusters:\n- cluster:\n    server: https://k8s-test.example.com:6443', labels: ['dev', 'test'], nodeCount: 8, connectionStatus: 'connected', mountStatus: 'mounted', storageConfig: 'NFS-测试存储', imageRegistry: 'harbor-test.example.com', createdAt: '2026/01/10 09:00:00' },
+  { id: '2', name: '生产集群-A', description: '生产环境高内存集群', apiServer: 'https://k8s-prod.example.com:6443', kubeconfig: 'apiVersion: v1\nclusters:\n- cluster:\n    server: https://k8s-prod.example.com:6443', labels: ['prod', 'high-memory'], nodeCount: 32, connectionStatus: 'connected', mountStatus: 'mounted', storageConfig: 'Ceph-生产存储', imageRegistry: 'harbor-prod.example.com', createdAt: '2026/02/01 10:00:00' },
+  { id: '3', name: 'GPU集群-01', description: '训练任务 GPU 集群', apiServer: 'https://k8s-gpu.example.com:6443', kubeconfig: 'apiVersion: v1\nclusters:\n- cluster:\n    server: https://k8s-gpu.example.com:6443', labels: ['gpu', '训练'], nodeCount: 16, connectionStatus: 'disconnected', mountStatus: 'unmounted', createdAt: '2026/03/05 14:30:00' },
 ]
 
 export const mockStorageConfigs: StorageConfig[] = [
-  { id: '1', name: 'NFS-测试存储', description: '测试环境NFS共享存储', type: 'NFS', clusterCount: 2, connectionStatus: 'connected', lastTestTime: '2026/03/26 10:00:00' },
-  { id: '2', name: 'Ceph-生产存储', description: '生产环境Ceph分布式存储', type: 'Ceph', clusterCount: 3, connectionStatus: 'connected', lastTestTime: '2026/03/26 09:30:00' },
-  { id: '3', name: 'OSS-备份存储', description: '阿里云OSS对象存储用于数据备份', type: 'OSS', clusterCount: 1, connectionStatus: 'untested', lastTestTime: '--' },
+  { id: '1', name: '测试环境存储', description: '', type: '火山引擎 TOS', endpoint: 'tos-cn-beijing.volces.com', region: 'cn-beijing', bucket: 'lab-juicefs-test-not-sanyuan', accessKeyId: 'VOLCENGINE_ACCESS_KEY_ID_PLACEHOLDER', accessKeySecret: 'VOLCENGINE_ACCESS_KEY_SECRET_PLACEHOLDER', clusterCount: 2, connectionStatus: 'connected', lastTestTime: '2026/03/26 10:00:00' },
+  { id: '2', name: 'MinIO-研发存储', description: '研发环境对象存储', type: 'MinIO', endpoint: 'minio-dev.deepexi.local', region: 'local', bucket: 'lab-dev', accessKeyId: 'minio-access-key', accessKeySecret: 'minio-secret-key', clusterCount: 3, connectionStatus: 'connected', lastTestTime: '2026/03/26 09:30:00' },
+  { id: '3', name: 'NFS-共享存储', description: '训练共享目录', type: 'NFS', endpoint: 'nfs.lab.local:/data/share', region: '-', bucket: 'lab-share', accessKeyId: '-', accessKeySecret: '-', clusterCount: 1, connectionStatus: 'untested', lastTestTime: '--' },
 ]
 
 export const mockImageRegistries: ImageRegistry[] = [

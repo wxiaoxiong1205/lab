@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react'
 import {
-  Alert,
   Button,
   Card,
   Form,
@@ -14,17 +13,25 @@ import {
   Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { DatabaseOutlined, PlusOutlined } from '@ant-design/icons'
+import {
+  CloudServerOutlined,
+  CloseOutlined,
+  DatabaseOutlined,
+  FolderOutlined,
+  InfoCircleOutlined,
+  PlusOutlined,
+  SettingOutlined,
+} from '@ant-design/icons'
 import { mockStorageConfigs } from '../../data/mockDataAll'
 import type { StorageConfig as StorageConfigRecord } from '../../types/shared'
 
 const { Title, Text } = Typography
 
 const storageTypes = [
-  { value: 'NFS', label: 'NFS' },
-  { value: 'Ceph', label: 'Ceph' },
-  { value: 'OSS', label: 'OSS' },
-  { value: '火山引擎 TOS', label: '火山引擎 TOS' },
+  { value: '火山引擎 TOS', label: '火山引擎 TOS', icon: <CloudServerOutlined style={{ color: '#1677ff' }} /> },
+  { value: 'MinIO', label: 'MinIO', icon: <DatabaseOutlined style={{ color: '#52c41a' }} /> },
+  { value: 'NFS', label: 'NFS', icon: <FolderOutlined style={{ color: '#fa8c16' }} /> },
+  { value: '华为云 OBS', label: '华为云 OBS', icon: <CloudServerOutlined style={{ color: '#1677ff' }} /> },
 ]
 
 function renderStatus(status: string): React.ReactNode {
@@ -43,8 +50,28 @@ const StorageConfig: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<string>()
   const [createOpen, setCreateOpen] = useState(false)
   const [detailRecord, setDetailRecord] = useState<StorageConfigRecord | null>(null)
-  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success'>('idle')
   const [rows, setRows] = useState<StorageConfigRecord[]>(mockStorageConfigs)
+
+  const maskSecret = (value?: string) => (value && value !== '-' ? '********' : value || '-')
+
+  const confirmDelete = (record: StorageConfigRecord) => {
+    if ((record.clusterCount ?? 0) > 0) {
+      message.warning('已绑定集群，不允许删除')
+      return
+    }
+
+    Modal.confirm({
+      title: '确认删除存储配置？',
+      content: `删除后存储配置「${record.name}」将从列表移除，请确认是否继续。`,
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        setRows(previous => previous.filter(item => item.id !== record.id))
+        message.success(`已删除存储配置：${record.name}`)
+      },
+    })
+  }
 
   const filteredData = useMemo(
     () =>
@@ -60,10 +87,17 @@ const StorageConfig: React.FC = () => {
   )
 
   const columns: ColumnsType<StorageConfigRecord> = [
-    { title: '存储名称', dataIndex: 'name', key: 'name' },
-    { title: '描述', dataIndex: 'description', key: 'description', render: value => value || '-' },
-    { title: '存储类型', dataIndex: 'type', key: 'type' },
-    { title: '集群数量', dataIndex: 'clusterCount', key: 'clusterCount', width: 90 },
+    { title: '存储名称', dataIndex: 'name', key: 'name', width: 180 },
+    {
+      title: '描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 260,
+      ellipsis: true,
+      render: value => value || '-',
+    },
+    { title: '存储类型', dataIndex: 'type', key: 'type', width: 140 },
+    { title: '集群数量', dataIndex: 'clusterCount', key: 'clusterCount', width: 110 },
     {
       title: '连接状态',
       dataIndex: 'connectionStatus',
@@ -75,9 +109,9 @@ const StorageConfig: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 280,
+      width: 320,
       render: (_, record) => (
-        <Space size={0}>
+        <Space size={0} style={{ whiteSpace: 'nowrap' }}>
           <Button type="link" size="small">测试连接</Button>
           <Button type="link" size="small" onClick={() => setDetailRecord(record)}>查看详情</Button>
           <Button type="link" size="small" danger>文件系统格式化</Button>
@@ -85,14 +119,7 @@ const StorageConfig: React.FC = () => {
             type="link"
             size="small"
             danger
-            onClick={() => {
-              if ((record.clusterCount ?? 0) > 0) {
-                message.warning('已绑定集群，不允许删除')
-                return
-              }
-              setRows(previous => previous.filter(item => item.id !== record.id))
-              message.success(`已删除存储配置：${record.name}`)
-            }}
+            onClick={() => confirmDelete(record)}
           >
             删除
           </Button>
@@ -103,16 +130,30 @@ const StorageConfig: React.FC = () => {
 
   const submitCreate = async () => {
     try {
-      await form.validateFields()
+      const values = await form.validateFields()
+      setRows(previous => [
+        {
+          id: `storage-${Date.now()}`,
+          name: values.name,
+          description: values.description,
+          type: values.type,
+          endpoint: values.endpoint,
+          region: values.region,
+          bucket: values.bucket,
+          accessKeyId: values.accessKeyId,
+          accessKeySecret: values.accessKeySecret,
+          clusterCount: 0,
+          connectionStatus: 'untested',
+          lastTestTime: '--',
+        },
+        ...previous,
+      ])
       setCreateOpen(false)
+      form.resetFields()
+      message.success('存储配置创建成功')
     } catch {
       return
     }
-  }
-
-  const testCurrentConnection = () => {
-    setConnectionStatus('testing')
-    window.setTimeout(() => setConnectionStatus('success'), 1200)
   }
 
   return (
@@ -124,13 +165,13 @@ const StorageConfig: React.FC = () => {
             管理和配置不同类型的存储，并进行文件系统格式化
           </Text>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
-            <Space>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+            <Space wrap>
               <Input
                 placeholder="搜索配置名称或描述"
                 value={searchValue}
                 onChange={e => setSearchValue(e.target.value)}
-                style={{ width: 260 }}
+                style={{ width: 260, maxWidth: '100%' }}
               />
               <Select
                 placeholder="存储类型"
@@ -144,7 +185,7 @@ const StorageConfig: React.FC = () => {
               <Button onClick={() => { setSearchValue(''); setTypeFilter(undefined) }}>重置</Button>
             </Space>
 
-            <Space>
+            <Space wrap>
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
                 新建配置
               </Button>
@@ -157,78 +198,208 @@ const StorageConfig: React.FC = () => {
             columns={columns}
             dataSource={filteredData}
             pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条数据` }}
+            scroll={{ x: 1470 }}
           />
         </Card>
       </div>
 
       <Modal
-        title="新建存储配置"
+        title={
+          <Space>
+            <PlusOutlined />
+            <span>新建存储配置</span>
+          </Space>
+        }
         open={createOpen}
-        onCancel={() => setCreateOpen(false)}
+        onCancel={() => {
+          setCreateOpen(false)
+          form.resetFields()
+        }}
+        width={760}
         footer={
           <Space>
-            <Button onClick={() => setCreateOpen(false)}>取消</Button>
-            <Button type="primary" onClick={submitCreate}>创建</Button>
+            <Button
+              icon={<CloseOutlined />}
+              onClick={() => {
+                setCreateOpen(false)
+                form.resetFields()
+              }}
+            >
+              取消
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={submitCreate}>创建配置</Button>
           </Space>
         }
       >
-        <Form form={form} layout="vertical">
-          <Form.Item label="存储名称" name="name" rules={[{ required: true, message: '请输入存储名称' }]}>
-            <Input placeholder="请输入存储名称" />
-          </Form.Item>
-          <Form.Item label="描述" name="description">
-            <Input.TextArea rows={2} placeholder="请输入存储描述（可选）" />
-          </Form.Item>
-          <Form.Item label="存储类型" name="type" rules={[{ required: true, message: '请选择存储类型' }]}>
-            <Select placeholder="请选择存储类型" options={storageTypes} />
-          </Form.Item>
-          <Form.Item label="访问密钥ID" name="accessKeyId" rules={[{ required: true, message: '请输入访问密钥ID' }]}>
-            <Input placeholder="请输入访问密钥ID" />
-          </Form.Item>
-          <Form.Item label="访问密钥密钥" name="accessKeySecret" rules={[{ required: true, message: '请输入访问密钥密钥' }]}>
-            <Input.Password placeholder="请输入访问密钥密钥" />
-          </Form.Item>
-          <Form.Item label="存储桶/卷名" name="bucket" rules={[{ required: true, message: '请输入存储桶/卷名' }]}>
-            <Input placeholder="请输入存储桶名称或挂载卷名" />
-          </Form.Item>
-          <Form.Item label="访问域名/地址" name="endpoint" rules={[{ required: true, message: '请输入访问域名/地址' }]}>
-            <Input placeholder="如：https://your-bucket.s3.amazonaws.com" />
-          </Form.Item>
-          <Space style={{ marginBottom: 12 }}>
-            <Button icon={<DatabaseOutlined />} loading={connectionStatus === 'testing'} onClick={testCurrentConnection}>
-              测试连接
-            </Button>
-            {connectionStatus === 'success' && <Tag color="success">连接成功</Tag>}
-          </Space>
-          {connectionStatus === 'success' && (
-            <Alert message="连接测试成功" description="连接正常，可以进行创建操作。" type="success" showIcon />
-          )}
+        <Form form={form} layout="vertical" initialValues={{ type: '火山引擎 TOS' }}>
+          <Card
+            size="small"
+            title={
+              <Space>
+                <InfoCircleOutlined style={{ color: '#1677ff' }} />
+                <span>基本信息</span>
+              </Space>
+            }
+            style={{ borderRadius: 8, background: '#fafafa', marginBottom: 24 }}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '20px 24px' }}>
+              <Form.Item label="配置名称" name="name" rules={[{ required: true, message: '请输入存储配置名称' }]}>
+                <Input prefix={<DatabaseOutlined />} placeholder="请输入存储配置名称" />
+              </Form.Item>
+              <Form.Item label="存储类型" name="type" rules={[{ required: true, message: '请选择存储类型' }]}>
+                <Select
+                  placeholder="请选择存储类型"
+                  options={storageTypes.map(item => ({
+                    value: item.value,
+                    label: (
+                      <Space>
+                        {item.icon}
+                        <span>{item.label}</span>
+                      </Space>
+                    ),
+                  }))}
+                />
+              </Form.Item>
+              <Form.Item
+                label="描述信息"
+                name="description"
+                style={{ gridColumn: '1 / -1', marginBottom: 0 }}
+              >
+                <Input.TextArea
+                  rows={3}
+                  maxLength={200}
+                  showCount
+                  placeholder="请输入存储配置的描述信息（可选）"
+                />
+              </Form.Item>
+            </div>
+          </Card>
+
+          <Card
+            size="small"
+            title={
+              <Space>
+                <SettingOutlined style={{ color: '#1677ff' }} />
+                <span>配置参数</span>
+              </Space>
+            }
+            style={{ borderRadius: 8, background: '#fafafa' }}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '20px 24px' }}>
+              <Form.Item label="终端节点" name="endpoint" rules={[{ required: true, message: '请输入终端节点' }]}>
+                <Input prefix={<CloudServerOutlined />} placeholder="例如：tos-cn-beijing.volces.com" />
+              </Form.Item>
+              <Form.Item label="地区 (Region)" name="region" rules={[{ required: true, message: '请输入地区' }]}>
+                <Input prefix={<CloudServerOutlined />} placeholder="例如：cn-beijing" />
+              </Form.Item>
+              <Form.Item
+                label="存储桶 (Bucket)"
+                name="bucket"
+                rules={[{ required: true, message: '请输入存储桶名称' }]}
+                style={{ gridColumn: '1 / -1' }}
+              >
+                <Input prefix={<FolderOutlined />} placeholder="例如：my-bucket" />
+              </Form.Item>
+              <Form.Item
+                label="访问密钥 (Access Key)"
+                name="accessKeyId"
+                rules={[{ required: true, message: '请输入Access Key' }]}
+                style={{ gridColumn: '1 / -1' }}
+              >
+                <Input prefix={<DatabaseOutlined />} placeholder="请输入Access Key" />
+              </Form.Item>
+              <Form.Item
+                label="密钥 (Secret Key)"
+                name="accessKeySecret"
+                rules={[{ required: true, message: '请输入Secret Key' }]}
+                style={{ gridColumn: '1 / -1', marginBottom: 0 }}
+              >
+                <Input.Password prefix={<DatabaseOutlined />} placeholder="请输入Secret Key" />
+              </Form.Item>
+            </div>
+          </Card>
         </Form>
       </Modal>
 
       <Modal
-        title="存储配置详情"
+        title={
+          detailRecord ? (
+            <Space>
+              <InfoCircleOutlined />
+              <span>存储配置详情</span>
+              <Tag color="blue">{detailRecord.name}</Tag>
+            </Space>
+          ) : (
+            '存储配置详情'
+          )
+        }
         open={Boolean(detailRecord)}
         onCancel={() => setDetailRecord(null)}
-        footer={<Button onClick={() => setDetailRecord(null)}>关闭</Button>}
+        width={760}
+        footer={null}
       >
         {detailRecord && (
-          <Table
-            rowKey="key"
-            pagination={false}
-            columns={[
-              { title: '字段', dataIndex: 'label', key: 'label', width: 120 },
-              { title: '内容', dataIndex: 'value', key: 'value' },
-            ]}
-            dataSource={[
-              { key: 'name', label: '存储名称', value: detailRecord.name },
-              { key: 'desc', label: '描述', value: detailRecord.description || '-' },
-              { key: 'type', label: '存储类型', value: detailRecord.type },
-              { key: 'count', label: '集群数量', value: detailRecord.clusterCount ?? '-' },
-              { key: 'status', label: '连接状态', value: detailRecord.connectionStatus },
-              { key: 'time', label: '最后测试时间', value: detailRecord.lastTestTime || '-' },
-            ]}
-          />
+          <Space direction="vertical" size={24} style={{ width: '100%' }}>
+            <Card
+              size="small"
+              title={
+                <Space>
+                  <InfoCircleOutlined style={{ color: '#1677ff' }} />
+                  <span>基本信息</span>
+                </Space>
+              }
+              style={{ borderRadius: 8, background: '#fafafa' }}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '20px 24px' }}>
+                <div>
+                  <Text style={{ display: 'block', marginBottom: 10 }}>配置名称</Text>
+                  <Input readOnly prefix={<DatabaseOutlined />} value={detailRecord.name} />
+                </div>
+                <div>
+                  <Text style={{ display: 'block', marginBottom: 10 }}>存储类型</Text>
+                  <Input readOnly value={detailRecord.type} />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <Text style={{ display: 'block', marginBottom: 10 }}>描述信息</Text>
+                  <Input.TextArea readOnly rows={3} value={detailRecord.description || '-'} />
+                </div>
+              </div>
+            </Card>
+
+            <Card
+              size="small"
+              title={
+                <Space>
+                  <SettingOutlined style={{ color: '#1677ff' }} />
+                  <span>配置参数</span>
+                </Space>
+              }
+              style={{ borderRadius: 8, background: '#fafafa' }}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '20px 24px' }}>
+                <div>
+                  <Text style={{ display: 'block', marginBottom: 10 }}>终端节点</Text>
+                  <Input readOnly prefix={<CloudServerOutlined />} value={detailRecord.endpoint || '-'} />
+                </div>
+                <div>
+                  <Text style={{ display: 'block', marginBottom: 10 }}>地区 (Region)</Text>
+                  <Input readOnly prefix={<CloudServerOutlined />} value={detailRecord.region || '-'} />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <Text style={{ display: 'block', marginBottom: 10 }}>存储桶 (Bucket)</Text>
+                  <Input readOnly prefix={<FolderOutlined />} value={detailRecord.bucket || '-'} />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <Text style={{ display: 'block', marginBottom: 10 }}>访问密钥 (Access Key)</Text>
+                  <Input readOnly prefix={<DatabaseOutlined />} value={detailRecord.accessKeyId || '-'} />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <Text style={{ display: 'block', marginBottom: 10 }}>密钥 (Secret Key)</Text>
+                  <Input readOnly prefix={<DatabaseOutlined />} value={maskSecret(detailRecord.accessKeySecret)} />
+                </div>
+              </div>
+            </Card>
+          </Space>
         )}
       </Modal>
     </>

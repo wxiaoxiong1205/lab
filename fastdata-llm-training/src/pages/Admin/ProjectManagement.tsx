@@ -22,9 +22,9 @@ import {
   getOperationDeniedMessage,
   getRoleLabel,
   getUserByAccount,
+  updateProject,
   updateProjectMembers,
   usePermissionStore,
-  type RoleKey,
   type PermissionProject,
   type ProjectPermissionMember,
 } from '../../services/permissionStore'
@@ -53,10 +53,12 @@ const ProjectManagement: React.FC = () => {
   const [sshOpen, setSshOpen] = useState(false)
   const [namespaceOpen, setNamespaceOpen] = useState(false)
   const [selectedProject, setSelectedProject] = useState<PermissionProject | null>(null)
+  const [editingProject, setEditingProject] = useState<PermissionProject | null>(null)
   const [draftMembers, setDraftMembers] = useState<ProjectPermissionMember[]>([])
   const [selectedMemberAccount, setSelectedMemberAccount] = useState<string>()
   const [sshConfigs, setSshConfigs] = useState<Record<string, SSHConfigRecord>>({})
   const [namespaceConfigs, setNamespaceConfigs] = useState<Record<string, string>>({})
+  const sshEnabled = Form.useWatch('enabled', sshForm)
 
   const visibleProjects = useMemo(() => {
     if (currentUser.roleKeys.includes('platform_admin')) {
@@ -68,16 +70,51 @@ const ProjectManagement: React.FC = () => {
     )
   }, [currentUser.account, currentUser.roleKeys, permissionState.projects])
 
-  const memberRoleOptions = useMemo(() => {
-    if (!selectedMemberAccount) {
-      return []
+  const projectAdminOptions = useMemo(
+    () =>
+      permissionState.users
+        .filter(user => user.roleKeys.includes('project_admin') && !user.roleKeys.includes('platform_admin'))
+        .map(user => ({
+          value: user.account,
+          label: `${user.account}（${user.username}）`,
+        })),
+    [permissionState.users],
+  )
+
+  const getProjectAdminAccounts = (project: PermissionProject) =>
+    project.members
+      .filter(member => {
+        const user = getUserByAccount(member.account, permissionState)
+        return Boolean(member.hasDataPermission && user?.roleKeys.includes('project_admin') && !user.roleKeys.includes('platform_admin'))
+      })
+      .map(member => member.account)
+
+  const getPrimaryRoleKey = (account: string) => {
+    const user = getUserByAccount(account, permissionState)
+    if (!user) {
+      return 'training_engineer' as const
     }
-    const targetUser = getUserByAccount(selectedMemberAccount, permissionState)
-    return (targetUser?.roleKeys ?? []).map(roleKey => ({
-      value: roleKey,
-      label: getRoleLabel(roleKey, permissionState),
-    }))
-  }, [permissionState, selectedMemberAccount])
+    if (user.roleKeys.includes('platform_admin')) {
+      return 'platform_admin' as const
+    }
+    if (user.roleKeys.includes('project_admin')) {
+      return 'project_admin' as const
+    }
+    return user.roleKey
+  }
+
+  const getRoleTags = (account: string) => {
+    const user = getUserByAccount(account, permissionState)
+    return (user?.roleKeys ?? []).map(roleKey => getRoleLabel(roleKey, permissionState))
+  }
+
+  const getMemberUser = (account: string) => getUserByAccount(account, permissionState)
+
+  const formatJoinedAt = () => {
+    const now = new Date()
+    const pad = (value: number) => String(value).padStart(2, '0')
+    return `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+  }
 
   const guardOperation = (operationKey: string, callback: () => void) => {
     const result = canRunOperation(operationKey, undefined, permissionState)
@@ -88,13 +125,70 @@ const ProjectManagement: React.FC = () => {
     callback()
   }
 
+  const openCreateProject = () => {
+    setEditingProject(null)
+    form.resetFields()
+    setCreateOpen(true)
+  }
+
+  const openEditProject = (project: PermissionProject) => {
+    setEditingProject(project)
+    form.setFieldsValue({
+      name: project.name,
+      description: project.description,
+      projectAdmins: getProjectAdminAccounts(project),
+      cluster: project.cluster,
+    })
+    setCreateOpen(true)
+  }
+
+  const closeProjectModal = () => {
+    setCreateOpen(false)
+    setEditingProject(null)
+    form.resetFields()
+  }
+
+  const confirmDeleteProject = (project: PermissionProject) => {
+    Modal.confirm({
+      title: '确认删除项目？',
+      content: `删除后项目「${project.name}」将从项目管理列表移除，请确认是否继续。`,
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        deleteProject(project.id)
+        message.success(`已删除项目：${project.name}`)
+      },
+    })
+  }
+
+  const generateSSHKey = () => {
+    const generatedKey = `ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDeepexiLabGeneratedKey-${Date.now()}`
+    sshForm.setFieldValue('sshKey', generatedKey)
+    const blob = new Blob([`${generatedKey}\n`], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${selectedProject?.name ?? 'project'}-ssh-key.pub`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const columns: ColumnsType<PermissionProject> = [
-    { title: '项目名称', dataIndex: 'name', key: 'name' },
-    { title: '项目描述', dataIndex: 'description', key: 'description', render: value => value || '-' },
-    { title: '绑定集群', dataIndex: 'cluster', key: 'cluster' },
+    { title: '项目名称', dataIndex: 'name', key: 'name', width: 180 },
+    {
+      title: '项目描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      ellipsis: true,
+      render: value => value || '-',
+    },
+    { title: '绑定集群', dataIndex: 'cluster', key: 'cluster', width: 180 },
     {
       title: 'SSH配置',
       key: 'ssh',
+      width: 120,
       render: (_, record) => {
         const config = sshConfigs[record.id]
         return config?.enabled ? '已配置' : '未配置'
@@ -103,21 +197,22 @@ const ProjectManagement: React.FC = () => {
     {
       title: '镜像命名空间',
       key: 'namespace',
+      width: 150,
       render: (_, record) => namespaceConfigs[record.id] || '-',
     },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt' },
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 180 },
     {
       title: '操作',
       key: 'action',
-      width: 390,
+      width: 420,
       render: (_, record) => (
-        <Space size={0}>
+        <Space size={0} style={{ whiteSpace: 'nowrap' }}>
           <Button
             type="link"
             size="small"
             onClick={() =>
               guardOperation('admin.project.edit', () => {
-                message.success(`项目 ${record.name} 编辑入口已开放`)
+                openEditProject(record)
               })
             }
           >
@@ -163,7 +258,7 @@ const ProjectManagement: React.FC = () => {
             onClick={() =>
               guardOperation('admin.project.members', () => {
                 setSelectedProject(record)
-                setDraftMembers(record.members)
+                setDraftMembers(record.members.filter(member => member.hasDataPermission))
                 memberForm.resetFields()
                 setSelectedMemberAccount(undefined)
                 setPermissionOpen(true)
@@ -178,8 +273,7 @@ const ProjectManagement: React.FC = () => {
             danger
             onClick={() =>
               guardOperation('admin.project.edit', () => {
-                deleteProject(record.id)
-                message.success(`已删除项目：${record.name}`)
+                confirmDeleteProject(record)
               })
             }
           >
@@ -195,84 +289,69 @@ const ProjectManagement: React.FC = () => {
       title: '账号',
       dataIndex: 'account',
       key: 'account',
+      width: 180,
+    },
+    {
+      title: '用户名',
+      key: 'username',
+      width: 180,
+      render: (_, record) => getMemberUser(record.account)?.username ?? '-',
     },
     {
       title: '角色',
       key: 'role',
-      render: (_, record) => getRoleLabel(record.roleKey, permissionState),
+      width: 260,
+      render: (_, record) => getRoleTags(record.account).join('、') || '-',
     },
     {
-      title: '数据权限',
-      key: 'permission',
-      width: 140,
+      title: '邮箱',
+      key: 'email',
+      width: 240,
+      render: (_, record) => getMemberUser(record.account)?.email ?? '-',
+    },
+    {
+      title: '加入时间',
+      key: 'joinedAt',
+      width: 190,
+      render: (_, record) => record.joinedAt ?? '-',
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 120,
       render: (_, record) => (
-        <Switch
-          checked={record.roleKey === 'platform_admin' ? true : record.hasDataPermission}
-          disabled={record.roleKey === 'platform_admin'}
-          checkedChildren="已开通"
-          unCheckedChildren="未开通"
-          onChange={checked => {
-            setDraftMembers(previous =>
-              previous.map(item =>
-                item.account === record.account ? { ...item, hasDataPermission: checked } : item,
-              ),
-            )
+        <Button
+          type="link"
+          danger
+          size="small"
+          onClick={() => {
+            setDraftMembers(previous => previous.filter(item => item.account !== record.account))
           }}
-        />
+        >
+          删除
+        </Button>
       ),
-    },
-    {
-      title: '切换角色',
-      key: 'switchRole',
-      width: 180,
-      render: (_, record) => {
-        const targetUser = getUserByAccount(record.account, permissionState)
-        const options = (targetUser?.roleKeys ?? [record.roleKey]).map(roleKey => ({
-          value: roleKey,
-          label: getRoleLabel(roleKey, permissionState),
-        }))
-        return (
-          <Select
-            value={record.roleKey}
-            style={{ width: '100%' }}
-            disabled={record.roleKey === 'platform_admin'}
-            options={options}
-            onChange={value => {
-              setDraftMembers(previous =>
-                previous.map(item =>
-                  item.account === record.account ? { ...item, roleKey: value as RoleKey } : item,
-                ),
-              )
-            }}
-          />
-        )
-      },
-    },
-    {
-      title: '说明',
-      key: 'description',
-      render: (_, record) =>
-        record.roleKey === 'platform_admin' ? (
-          <Text type="secondary">平台管理员默认拥有项目数据权限</Text>
-        ) : record.hasDataPermission ? (
-          <Text style={{ color: '#059669' }}>可查看该项目及其业务页面</Text>
-        ) : (
-          <Text type="secondary">无数据权限，不显示该项目</Text>
-        ),
     },
   ]
 
   const submitCreate = async () => {
     try {
       const values = await form.validateFields()
-      createProject({
+      const payload = {
         name: values.name,
         description: values.description ?? '',
+        projectAdmins: values.projectAdmins ?? [],
         cluster: values.cluster,
-      })
-      setCreateOpen(false)
-      form.resetFields()
-      message.success('项目创建成功')
+      }
+
+      if (editingProject) {
+        updateProject(editingProject.id, payload)
+        message.success('项目编辑成功')
+      } else {
+        createProject(payload)
+        message.success('项目创建成功')
+      }
+      closeProjectModal()
     } catch {
       return
     }
@@ -338,10 +417,12 @@ const ProjectManagement: React.FC = () => {
       const values = await memberForm.validateFields()
       setDraftMembers(previous => {
         const existingIndex = previous.findIndex(item => item.account === values.account)
+        const roleKey = getPrimaryRoleKey(values.account)
         const nextMember: ProjectPermissionMember = {
           account: values.account,
-          roleKey: values.roleKey,
-          hasDataPermission: values.roleKey === 'platform_admin' ? true : Boolean(values.hasDataPermission),
+          roleKey,
+          hasDataPermission: true,
+          joinedAt: previous[existingIndex]?.joinedAt ?? formatJoinedAt(),
         }
 
         if (existingIndex >= 0) {
@@ -367,14 +448,14 @@ const ProjectManagement: React.FC = () => {
         <Card style={{ borderRadius: 20, border: '1px solid #e5e7eb' }}>
           <Title level={2}>项目管理</Title>
           <Text type="secondary" style={{ display: 'block', marginBottom: 18 }}>
-            数据权限在项目维度控制。只有同时具备菜单权限、操作权限和项目权限的账号，才可以进入项目并执行操作。
+            统一维护项目基础信息、绑定集群、项目管理员、成员权限、SSH 配置与镜像命名空间。
           </Text>
 
           <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => guardOperation('admin.project.create', () => setCreateOpen(true))}
+              onClick={() => guardOperation('admin.project.create', openCreateProject)}
             >
               新建项目
             </Button>
@@ -385,19 +466,20 @@ const ProjectManagement: React.FC = () => {
             columns={columns}
             dataSource={visibleProjects}
             pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条数据` }}
+            scroll={{ x: 1250 }}
           />
         </Card>
       </div>
 
       <Modal
-        title="新建项目"
+        title={editingProject ? '编辑项目' : '新建项目'}
         open={createOpen}
-        onCancel={() => setCreateOpen(false)}
+        onCancel={closeProjectModal}
         footer={
           <Space>
-            <Button onClick={() => setCreateOpen(false)}>取消</Button>
+            <Button onClick={closeProjectModal}>取消</Button>
             <Button type="primary" onClick={submitCreate}>
-              创建
+              {editingProject ? '确定' : '创建'}
             </Button>
           </Space>
         }
@@ -409,8 +491,20 @@ const ProjectManagement: React.FC = () => {
           <Form.Item label="项目描述" name="description">
             <Input.TextArea rows={3} placeholder="请输入项目描述（可选）" />
           </Form.Item>
+          <Form.Item label="项目管理员" name="projectAdmins">
+            <Select
+              mode="multiple"
+              placeholder="请选择项目管理员"
+              options={projectAdminOptions}
+              optionFilterProp="label"
+            />
+          </Form.Item>
           <Form.Item label="绑定集群" name="cluster" rules={[{ required: true, message: '请选择绑定集群' }]}>
-            <Select placeholder="请选择集群" options={clusterOptions.map(item => ({ value: item, label: item }))} />
+            <Select
+              disabled={Boolean(editingProject)}
+              placeholder="请选择集群"
+              options={clusterOptions.map(item => ({ value: item, label: item }))}
+            />
           </Form.Item>
           <div style={{ background: '#f8fafc', borderRadius: 10, padding: 14 }}>
             <Text type="secondary">
@@ -456,20 +550,8 @@ const ProjectManagement: React.FC = () => {
                 }))}
                 onChange={value => {
                   setSelectedMemberAccount(value)
-                  memberForm.setFieldValue('roleKey', undefined)
                 }}
               />
-            </Form.Item>
-            <Form.Item
-              label="成员角色"
-              name="roleKey"
-              rules={[{ required: true, message: '请选择角色' }]}
-              style={{ minWidth: 220 }}
-            >
-              <Select placeholder="请选择该成员角色" options={memberRoleOptions} disabled={!selectedMemberAccount} />
-            </Form.Item>
-            <Form.Item label="数据权限" name="hasDataPermission" valuePropName="checked" initialValue={false}>
-              <Switch checkedChildren="已开通" unCheckedChildren="未开通" />
             </Form.Item>
             <Form.Item>
               <Button type="primary" onClick={submitMember}>
@@ -477,8 +559,21 @@ const ProjectManagement: React.FC = () => {
               </Button>
             </Form.Item>
           </Form>
+          {selectedMemberAccount && (
+            <Text type="secondary" style={{ display: 'block', marginTop: 10 }}>
+              该成员已有角色：
+              {getRoleTags(selectedMemberAccount).join('、') || '-'}；项目内操作权限将按多个角色的权限合集生效。
+            </Text>
+          )}
         </Card>
-        <Table rowKey="account" columns={permissionColumns} dataSource={draftMembers} pagination={false} />
+        <Table
+          rowKey="account"
+          columns={permissionColumns}
+          dataSource={draftMembers}
+          pagination={false}
+          rowSelection={{}}
+          scroll={{ x: 1170 }}
+        />
       </Modal>
 
       <Modal
@@ -493,30 +588,30 @@ const ProjectManagement: React.FC = () => {
         }
       >
         <Form form={sshForm} layout="vertical" initialValues={{ enabled: false }}>
-          <Form.Item label="ssh配置" name="enabled" valuePropName="checked">
-            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
-          </Form.Item>
-          <Form.Item label="用户名" name="username">
-            <Input placeholder="请输入用户名" />
-          </Form.Item>
-          <Form.Item label="密码" name="password">
-            <Input.Password placeholder="请输入密码" />
-          </Form.Item>
-          <Form.Item label="SSH Key" name="sshKey">
-            <Input placeholder="可手动输入或生成 SSH Key" />
-          </Form.Item>
-          <Button
-            type="primary"
-            ghost
-            onClick={() =>
-              sshForm.setFieldValue(
-                'sshKey',
-                'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDeepexiLabGeneratedKey',
-              )
-            }
-          >
-            生成SSH Key
-          </Button>
+          <Card size="small" style={{ borderRadius: 14, background: '#f8fafc', marginBottom: 16 }}>
+            <Form.Item label="ssh配置" name="enabled" valuePropName="checked" style={{ marginBottom: 0 }}>
+              <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+            </Form.Item>
+            {!sshEnabled && (
+              <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
+                当前未开启 SSH 配置，开启后可填写用户名、密码并生成 SSH Key。
+              </Text>
+            )}
+          </Card>
+          {sshEnabled && (
+            <Card size="small" style={{ borderRadius: 14, border: '1px solid #e5e7eb' }}>
+              <Form.Item label="用户名" name="username">
+                <Input placeholder="请输入用户名" />
+              </Form.Item>
+              <Form.Item label="密码" name="password">
+                <Input.Password placeholder="请输入密码" />
+              </Form.Item>
+              <Form.Item label="SSH Key" name="sshKey">
+                <Input placeholder="可手动输入或生成 SSH Key" />
+              </Form.Item>
+              <Button onClick={generateSSHKey}>生成SSH Key</Button>
+            </Card>
+          )}
         </Form>
       </Modal>
 

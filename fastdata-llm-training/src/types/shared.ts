@@ -108,10 +108,12 @@ export interface Project {
 export interface KubernetesCluster {
   id: string
   name: string
+  description?: string
   apiServer: string
+  kubeconfig?: string
   labels?: string[]
   nodeCount?: number
-  connectionStatus: 'connected' | 'disconnected' | 'unknown'
+  connectionStatus: 'connected' | 'disconnected' | 'unknown' | 'untested'
   mountStatus: 'mounted' | 'unmounted'
   storageConfig?: string
   imageRegistry?: string
@@ -123,6 +125,11 @@ export interface StorageConfig {
   name: string
   description?: string
   type: string
+  endpoint?: string
+  region?: string
+  bucket?: string
+  accessKeyId?: string
+  accessKeySecret?: string
   clusterCount?: number
   connectionStatus: 'connected' | 'disconnected' | 'untested'
   lastTestTime?: string

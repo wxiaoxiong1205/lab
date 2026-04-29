@@ -14,51 +14,15 @@ import {
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import {
+  onlineInferenceServiceActions,
+  type OnlineInferenceServiceRecord,
+  type OnlineServiceConnectionStatus,
+  type OnlineServiceModelType,
+  useOnlineInferenceServices,
+} from '../../services/onlineInferenceServiceStore'
 
 const { Title, Text } = Typography
-
-type ConnectionStatus = '测试通过' | '测试失败'
-type ModelType = '文本生成' | '图像理解' | '图像理解/文本生成'
-
-type OnlineServiceRecord = {
-  id: string
-  name: string
-  connectionStatus: ConnectionStatus
-  description: string
-  modelType: ModelType
-  creator: string
-  createdAt: string
-}
-
-const seedServices: OnlineServiceRecord[] = [
-  {
-    id: 'svc-1',
-    name: 'qwen3-vl-plus-图像理解-在线推理服务',
-    connectionStatus: '测试通过',
-    description: '测试2',
-    modelType: '图像理解',
-    creator: 'deepexilab',
-    createdAt: '2026/03/19 14:04:46',
-  },
-  {
-    id: 'svc-2',
-    name: 'Qwen3-Next-80B-A3B-Instruct-文本生成-在线推理服务',
-    connectionStatus: '测试通过',
-    description: '测试',
-    modelType: '文本生成',
-    creator: 'deepexilab',
-    createdAt: '2026/03/19 14:04:43',
-  },
-  {
-    id: 'svc-3',
-    name: 'test2323243',
-    connectionStatus: '测试失败',
-    description: '文本生成',
-    modelType: '文本生成',
-    creator: 'system_admin',
-    createdAt: '2026/03/06 16:06:22',
-  },
-]
 
 const sectionCardStyle: React.CSSProperties = {
   borderRadius: 18,
@@ -66,19 +30,20 @@ const sectionCardStyle: React.CSSProperties = {
   boxShadow: '0 10px 30px rgba(15, 23, 42, 0.04)',
 }
 
-const statusColorMap: Record<ConnectionStatus, string> = {
+const statusColorMap: Record<OnlineServiceConnectionStatus, string> = {
   测试通过: 'green',
   测试失败: 'red',
 }
 
 const OnlineInferenceService: React.FC = () => {
   const [form] = Form.useForm()
-  const [services, setServices] = useState(seedServices)
+  const services = useOnlineInferenceServices()
   const [searchValue, setSearchValue] = useState('')
-  const [statusFilter, setStatusFilter] = useState<ConnectionStatus | undefined>()
-  const [modelTypeFilter, setModelTypeFilter] = useState<ModelType | undefined>()
-  const [detailRecord, setDetailRecord] = useState<OnlineServiceRecord | null>(null)
+  const [statusFilter, setStatusFilter] = useState<OnlineServiceConnectionStatus | undefined>()
+  const [modelTypeFilter, setModelTypeFilter] = useState<OnlineServiceModelType | undefined>()
+  const [detailRecord, setDetailRecord] = useState<OnlineInferenceServiceRecord | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null)
 
   const filteredData = useMemo(
     () =>
@@ -91,7 +56,7 @@ const OnlineInferenceService: React.FC = () => {
     [modelTypeFilter, searchValue, services, statusFilter],
   )
 
-  const columns: ColumnsType<OnlineServiceRecord> = [
+  const columns: ColumnsType<OnlineInferenceServiceRecord> = [
     {
       title: '服务名称',
       dataIndex: 'name',
@@ -103,7 +68,7 @@ const OnlineInferenceService: React.FC = () => {
       dataIndex: 'connectionStatus',
       key: 'connectionStatus',
       width: 120,
-      render: (value: ConnectionStatus) => <Tag color={statusColorMap[value]}>{value}</Tag>,
+      render: (value: OnlineServiceConnectionStatus) => <Tag color={statusColorMap[value]}>{value}</Tag>,
     },
     { title: '描述', dataIndex: 'description', key: 'description', width: 160 },
     { title: '模型类型', dataIndex: 'modelType', key: 'modelType', width: 150 },
@@ -119,16 +84,15 @@ const OnlineInferenceService: React.FC = () => {
           <Button type="link" size="small" onClick={() => {
             form.setFieldsValue(record)
             setDetailRecord(null)
+            setEditingServiceId(record.id)
             setCreateOpen(true)
           }}>编辑</Button>
           <Button
             type="link"
             size="small"
             onClick={() => {
-              setServices(previous =>
-                previous.map(item =>
-                  item.id === record.id ? { ...item, connectionStatus: item.connectionStatus === '测试通过' ? '测试失败' : '测试通过' } : item,
-                ),
+              onlineInferenceServiceActions.updateService(record.id, item =>
+                ({ ...item, connectionStatus: item.connectionStatus === '测试通过' ? '测试失败' : '测试通过' }),
               )
               message.success('连接测试已执行')
             }}
@@ -143,27 +107,34 @@ const OnlineInferenceService: React.FC = () => {
 
   const openCreate = () => {
     form.resetFields()
+    setEditingServiceId(null)
     setCreateOpen(true)
   }
 
   const submit = async () => {
     try {
       const values = await form.validateFields()
-      setServices(previous => [
-        {
-          id: `svc-${Date.now()}`,
+      if (editingServiceId) {
+        onlineInferenceServiceActions.updateService(editingServiceId, record => ({
+          ...record,
+          name: values.name,
+          description: values.description,
+          modelType: values.modelType,
+        }))
+        message.success('在线推理服务已更新')
+      } else {
+        onlineInferenceServiceActions.createService({
           name: values.name,
           connectionStatus: '测试失败',
           description: values.description,
           modelType: values.modelType,
           creator: 'zhangsan',
-          createdAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
-        },
-        ...previous,
-      ])
+        })
+        message.success('在线推理服务已创建')
+      }
       setCreateOpen(false)
+      setEditingServiceId(null)
       form.resetFields()
-      message.success('在线推理服务已创建')
     } catch {
       return
     }
@@ -253,11 +224,14 @@ const OnlineInferenceService: React.FC = () => {
       </Modal>
 
       <Modal
-        title="新建在线推理服务"
+        title={editingServiceId ? '编辑在线推理服务' : '新建在线推理服务'}
         open={createOpen}
-        onCancel={() => setCreateOpen(false)}
+        onCancel={() => {
+          setCreateOpen(false)
+          setEditingServiceId(null)
+        }}
         onOk={submit}
-        okText="创建"
+        okText={editingServiceId ? '保存' : '创建'}
       >
         <Form form={form} layout="vertical">
           <Form.Item label="服务名称" name="name" rules={[{ required: true, message: '请输入服务名称' }]}>
