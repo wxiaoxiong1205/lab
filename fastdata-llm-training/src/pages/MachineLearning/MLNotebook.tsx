@@ -45,6 +45,7 @@ import {
 } from '../../services/taskLifecycle'
 import { getCurrentUser, usePermissionStore } from '../../services/permissionStore'
 import { useOnlineInferenceServices } from '../../services/onlineInferenceServiceStore'
+import { PUBLISH_CASE_NOTICE } from '../notebookCaseNotice'
 
 const { Text, Title, Paragraph } = Typography
 
@@ -621,11 +622,9 @@ const MLNotebook: React.FC = () => {
   }, [isCaseDetailRoute, isCaseEditRoute, isCreateRoute, isMirrorRoute, isPublishCaseRoute, location.search])
 
   useEffect(() => {
-    if (isPublishCaseRoute && sourceNotebook) {
-      caseForm.setFieldsValue({
-        name: sourceNotebook.name,
-        description: sourceNotebook.description,
-      })
+    if (isPublishCaseRoute) {
+      caseForm.resetFields()
+      return
     }
 
     if (isCaseEditRoute && caseDetail) {
@@ -634,7 +633,7 @@ const MLNotebook: React.FC = () => {
         description: caseDetail.description,
       })
     }
-  }, [caseDetail, caseForm, isCaseEditRoute, isPublishCaseRoute, sourceNotebook])
+  }, [caseDetail, caseForm, isCaseEditRoute, isPublishCaseRoute])
 
   useEffect(() => {
     const nextPreview = filteredImageOptions[0]?.value
@@ -1692,8 +1691,12 @@ const MLNotebook: React.FC = () => {
               <Input placeholder="请输入案例名称" maxLength={120} />
             </Form.Item>
 
-            <Form.Item label="案例说明" name="description" rules={[{ required: true, message: '请输入案例说明' }]}>
-              <Input.TextArea rows={18} placeholder="请输入案例说明" maxLength={5000} showCount />
+            <Form.Item
+              label="案例说明"
+              name="description"
+              tooltip={{ title: <span style={{ whiteSpace: 'pre-line' }}>{PUBLISH_CASE_NOTICE}</span> }}
+              rules={[{ required: true, message: '请输入案例说明' }]}>
+              <Input.TextArea rows={18} placeholder={PUBLISH_CASE_NOTICE} maxLength={5000} showCount />
             </Form.Item>
 
             <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
