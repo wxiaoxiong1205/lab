@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const dbPath = path.join(__dirname, 'data-service-db.json')
+const documentAgentDbPath = path.join(__dirname, 'document-agent-db.json')
 const port = Number(process.env.DATA_SERVICE_API_PORT || 5203)
 
 function makeDataset({
@@ -92,6 +93,90 @@ const seedState = {
   cleaningTasks: [],
 }
 
+const documentKnowledgeBase = [
+  {
+    docId: 'usage-guide',
+    title: '使用指南',
+    sectionTitle: '平台概览',
+    routePath: '/docs/usage-guide',
+    anchor: 'platform-overview',
+    content: '平台当前采用项目空间与系统管理双入口结构。登录后默认进入项目空间，点击项目后进入数据服务、模型训练、模型评估、模型服务与机器学习等业务模块。',
+  },
+  {
+    docId: 'usage-guide',
+    title: '使用指南',
+    sectionTitle: '典型工作流',
+    routePath: '/docs/usage-guide',
+    anchor: 'typical-workflow',
+    content: '典型工作流包括准备数据、发起训练、评估与发布。用户可在训练数据管理中准备数据，在大模型训练中创建任务，在效果评估和模型服务中完成验证与发布。',
+  },
+  {
+    docId: 'usage-guide',
+    title: '使用指南',
+    sectionTitle: '权限与项目',
+    routePath: '/docs/usage-guide',
+    anchor: 'permission-project',
+    content: '系统管理中的项目管理用于维护项目成员和数据权限。用户需要先从项目空间点击项目卡片进入，再执行训练、评估和部署等业务操作。',
+  },
+  {
+    docId: 'system-settings-agent',
+    title: '系统配置',
+    sectionTitle: 'Agent助手',
+    routePath: '/admin/settings?tab=agent',
+    anchor: 'document-agent',
+    content: '系统配置的 Agent助手用于维护文档中心全局服务。管理员可以分别配置 Embedding、Rerank 和对话模型，同一时间只能启动一个文档中心 Agent 服务。',
+  },
+  {
+    docId: 'document-center-agent',
+    title: '文档中心',
+    sectionTitle: 'Agent助手',
+    routePath: '/docs/usage-guide',
+    anchor: 'agent-assistant',
+    content: '文档中心存在启动中的 Agent 服务时会显示 Agent助手。用户可以通过对话查找文档，回答会展示引用来源、章节和跳转定位。',
+  },
+]
+
+const seedDocumentAgentState = {
+  services: [
+    {
+      id: 'doc-agent-seed',
+      name: '文档中心默认助手',
+      directory: '文档中心',
+      description: '用于文档中心问答和文档定位的全局 Agent 服务。',
+      status: 'stopped',
+      indexStatus: 'ready',
+      embedding: {
+        apiUrl: 'http://127.0.0.1:5203/mock/embedding',
+        apiKey: '',
+        modelName: 'bge-m3',
+      },
+      rerank: {
+        apiUrl: 'http://127.0.0.1:5203/mock/rerank',
+        apiKey: '',
+        modelName: 'bge-reranker-large',
+      },
+      chatModel: {
+        source: 'customApi',
+        customApi: {
+          apiUrl: 'http://127.0.0.1:5203/mock/chat',
+          apiKey: '',
+          modelName: 'qwen-plus',
+        },
+        advanced: {
+          maxTokens: null,
+          temperature: 0.7,
+          topP: 1,
+          presencePenalty: 0,
+        },
+      },
+      createdBy: 'system_admin',
+      createdAt: '2026/05/07 10:00:00',
+      updatedAt: '2026/05/07 10:00:00',
+    },
+  ],
+  conversations: [],
+}
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value))
 }
@@ -145,6 +230,33 @@ async function writeDb(state) {
   await writeFile(dbPath, JSON.stringify(state, null, 2))
 }
 
+async function ensureDocumentAgentDb() {
+  if (!existsSync(documentAgentDbPath)) {
+    await writeFile(documentAgentDbPath, JSON.stringify(seedDocumentAgentState, null, 2))
+  }
+}
+
+async function readDocumentAgentDb() {
+  await ensureDocumentAgentDb()
+  const raw = await readFile(documentAgentDbPath, 'utf8')
+  const state = JSON.parse(raw)
+  state.services = state.services || []
+  state.conversations = state.conversations || []
+
+  const existingIds = new Set(state.services.map(item => item.id))
+  for (const item of seedDocumentAgentState.services) {
+    if (!existingIds.has(item.id)) {
+      state.services.push(clone(item))
+    }
+  }
+
+  return state
+}
+
+async function writeDocumentAgentDb(state) {
+  await writeFile(documentAgentDbPath, JSON.stringify(state, null, 2))
+}
+
 function nowText() {
   const now = new Date()
   const pad = value => String(value).padStart(2, '0')
@@ -191,7 +303,7 @@ function json(res, statusCode, payload) {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
   })
   res.end(JSON.stringify(payload))
 }
@@ -251,6 +363,52 @@ function queryCleaning(items, searchParams) {
   return paginate(filtered, page, pageSize)
 }
 
+function normalizeText(value) {
+  return String(value || '').toLowerCase()
+}
+
+function scoreDocument(question, item) {
+  const query = normalizeText(question)
+  const haystack = normalizeText(`${item.title} ${item.sectionTitle} ${item.content}`)
+  const tokens = query.split(/[\s,，。！？?;；:：/\\-]+/).filter(Boolean)
+  const keywordScore = tokens.reduce((score, token) => score + (haystack.includes(token) ? 1 : 0), 0)
+  const directScore = haystack.includes(query) ? 2 : 0
+  return keywordScore + directScore + (item.title && query.includes(normalizeText(item.title)) ? 1 : 0)
+}
+
+function searchDocuments(question) {
+  const scored = documentKnowledgeBase
+    .map(item => ({ ...item, score: scoreDocument(question, item) }))
+    .sort((a, b) => b.score - a.score)
+
+  const positive = scored.filter(item => item.score > 0)
+  return (positive.length ? positive : scored).slice(0, 3).map((item, index) => ({
+    docId: item.docId,
+    title: item.title,
+    sectionTitle: item.sectionTitle,
+    routePath: item.routePath,
+    anchor: item.anchor,
+    snippet: item.content.slice(0, 110),
+    score: Number((0.92 - index * 0.11).toFixed(2)),
+  }))
+}
+
+function buildRagAnswer(question, service, citations) {
+  if (!citations.length) {
+    return '当前知识库没有找到足够相关的文档。你可以换一种关键词提问，或联系管理员确认文档索引是否已构建。'
+  }
+
+  const modelName = service.chatModel?.source === 'onlineInference'
+    ? service.chatModel?.onlineInferenceServiceName
+    : service.chatModel?.customApi?.modelName
+  const citationText = citations.map(item => `「${item.title} / ${item.sectionTitle}」`).join('、')
+  return [
+    `已通过 ${service.name} 处理你的问题：“${question}”。`,
+    `最相关的文档定位为 ${citationText}。`,
+    `当前最小 RAG 服务已完成检索、重排占位和回答生成链路；实际模型调用可接入 ${modelName || '已配置的对话模型'}。`,
+  ].join('\n')
+}
+
 const server = createServer(async (req, res) => {
   if (!req.url) {
     return notFound(res)
@@ -262,6 +420,171 @@ const server = createServer(async (req, res) => {
 
   const url = new URL(req.url, `http://${req.headers.host}`)
   const pathname = url.pathname
+
+  if (req.method === 'GET' && pathname === '/api/document-agent/services') {
+    const state = await readDocumentAgentDb()
+    return json(res, 200, { items: state.services })
+  }
+
+  if (req.method === 'GET' && pathname === '/api/document-agent/active') {
+    const state = await readDocumentAgentDb()
+    return json(res, 200, { service: state.services.find(item => item.status === 'running') || null })
+  }
+
+  if (req.method === 'POST' && pathname === '/api/document-agent/services') {
+    const body = await readBody(req)
+    const state = await readDocumentAgentDb()
+    const createdAt = nowText()
+    state.services.unshift({
+      id: `doc-agent-${Date.now()}`,
+      name: body.name,
+      directory: '文档中心',
+      description: body.description || '',
+      status: 'stopped',
+      indexStatus: 'not_built',
+      embedding: body.embedding,
+      rerank: body.rerank,
+      chatModel: body.chatModel,
+      createdBy: 'system_admin',
+      createdAt,
+      updatedAt: createdAt,
+    })
+    await writeDocumentAgentDb(state)
+    return json(res, 200, { items: state.services })
+  }
+
+  const documentAgentServiceMatch = pathname.match(/^\/api\/document-agent\/services\/([^/]+)$/)
+  if (req.method === 'PUT' && documentAgentServiceMatch) {
+    const targetId = decodeURIComponent(documentAgentServiceMatch[1])
+    const body = await readBody(req)
+    const state = await readDocumentAgentDb()
+    const target = state.services.find(item => item.id === targetId)
+    if (!target) {
+      return notFound(res)
+    }
+
+    target.name = body.name
+    target.description = body.description || ''
+    target.embedding = body.embedding
+    target.rerank = body.rerank
+    target.chatModel = body.chatModel
+    target.updatedAt = nowText()
+    await writeDocumentAgentDb(state)
+    return json(res, 200, { items: state.services })
+  }
+
+  if (req.method === 'DELETE' && documentAgentServiceMatch) {
+    const targetId = decodeURIComponent(documentAgentServiceMatch[1])
+    const state = await readDocumentAgentDb()
+    state.services = state.services.filter(item => item.id !== targetId)
+    await writeDocumentAgentDb(state)
+    return json(res, 200, { items: state.services })
+  }
+
+  const startDocumentAgentMatch = pathname.match(/^\/api\/document-agent\/services\/([^/]+)\/start$/)
+  if (req.method === 'POST' && startDocumentAgentMatch) {
+    const targetId = decodeURIComponent(startDocumentAgentMatch[1])
+    const state = await readDocumentAgentDb()
+    const target = state.services.find(item => item.id === targetId)
+    if (!target) {
+      return notFound(res)
+    }
+
+    state.services = state.services.map(item => {
+      if (item.id === targetId) {
+        return {
+          ...item,
+          status: 'running',
+          indexStatus: item.indexStatus === 'not_built' ? 'ready' : item.indexStatus,
+          startedAt: nowText(),
+          updatedAt: nowText(),
+        }
+      }
+      return { ...item, status: item.status === 'running' ? 'stopped' : item.status }
+    })
+    await writeDocumentAgentDb(state)
+    return json(res, 200, { items: state.services })
+  }
+
+  const stopDocumentAgentMatch = pathname.match(/^\/api\/document-agent\/services\/([^/]+)\/stop$/)
+  if (req.method === 'POST' && stopDocumentAgentMatch) {
+    const targetId = decodeURIComponent(stopDocumentAgentMatch[1])
+    const state = await readDocumentAgentDb()
+    const target = state.services.find(item => item.id === targetId)
+    if (!target) {
+      return notFound(res)
+    }
+
+    target.status = 'stopped'
+    target.updatedAt = nowText()
+    await writeDocumentAgentDb(state)
+    return json(res, 200, { items: state.services })
+  }
+
+  const testDocumentAgentMatch = pathname.match(/^\/api\/document-agent\/services\/([^/]+)\/test$/)
+  if (req.method === 'POST' && testDocumentAgentMatch) {
+    const state = await readDocumentAgentDb()
+    const target = state.services.find(item => item.id === decodeURIComponent(testDocumentAgentMatch[1]))
+    if (!target) {
+      return notFound(res)
+    }
+
+    return json(res, 200, { ok: true, message: 'Embedding、Rerank 与对话模型接口契约校验通过' })
+  }
+
+  const reindexDocumentAgentMatch = pathname.match(/^\/api\/document-agent\/services\/([^/]+)\/reindex$/)
+  if (req.method === 'POST' && reindexDocumentAgentMatch) {
+    const targetId = decodeURIComponent(reindexDocumentAgentMatch[1])
+    const state = await readDocumentAgentDb()
+    const target = state.services.find(item => item.id === targetId)
+    if (!target) {
+      return notFound(res)
+    }
+
+    target.indexStatus = 'ready'
+    target.updatedAt = nowText()
+    await writeDocumentAgentDb(state)
+    return json(res, 200, { items: state.services })
+  }
+
+  if (req.method === 'GET' && pathname === '/api/document-agent/index/status') {
+    const state = await readDocumentAgentDb()
+    const active = state.services.find(item => item.status === 'running')
+    return json(res, 200, { status: active?.indexStatus || 'not_built', chunkCount: documentKnowledgeBase.length })
+  }
+
+  if (req.method === 'POST' && pathname === '/api/document-agent/chat') {
+    const body = await readBody(req)
+    const question = String(body.question || '').trim()
+    const state = await readDocumentAgentDb()
+    const active = state.services.find(item => item.status === 'running')
+    if (!active) {
+      return json(res, 409, { message: '当前没有启动中的文档中心 Agent 服务' })
+    }
+    if (!question) {
+      return json(res, 400, { message: '请输入问题' })
+    }
+
+    const citations = searchDocuments(question)
+    const conversationId = body.conversationId || `conv-${Date.now()}`
+    const answer = buildRagAnswer(question, active, citations)
+    state.conversations.unshift({
+      id: conversationId,
+      serviceId: active.id,
+      question,
+      answer,
+      citations,
+      createdAt: nowText(),
+    })
+    state.conversations = state.conversations.slice(0, 50)
+    await writeDocumentAgentDb(state)
+    return json(res, 200, {
+      answer,
+      citations,
+      conversationId,
+      serviceName: active.name,
+    })
+  }
 
   if (req.method === 'GET' && pathname === '/api/data-service/snapshot') {
     return json(res, 200, await readDb())

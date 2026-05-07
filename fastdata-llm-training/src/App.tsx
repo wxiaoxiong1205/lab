@@ -95,11 +95,14 @@ const App: React.FC = () => {
               <Route path="/service/inference/hosted" element={<ModelDeployment />} />
               <Route path="/service/inference/hosted/create" element={<ModelDeployment />} />
               <Route path="/service/inference/external" element={<OnlineInferenceService />} />
+              <Route path="/service/inference/external/create" element={<OnlineInferenceService />} />
 
               {/* 机器学习 */}
               <Route path="/machine-data-management" element={<MLDataset />} />
+              <Route path="/machine-data-management/create" element={<MLDataset />} />
               <Route path="/machine-annotation" element={<MLAnnotation />} />
               <Route path="/machine-model-management" element={<MLModelManagement />} />
+              <Route path="/machine-model-management/create" element={<MLModelManagement />} />
               <Route path="/machine-model-deployment" element={<MLModelDeployment />} />
               <Route path="/machine-model-deployment/create" element={<MLModelDeployment />} />
               <Route path="/machine-model-deployment/:id/edit" element={<MLModelDeployment />} />
@@ -110,6 +113,7 @@ const App: React.FC = () => {
               <Route path="/machine-notebook/cases/:caseId" element={<MLNotebook />} />
               <Route path="/machine-notebook/:id" element={<MLNotebook />} />
               <Route path="/machine-annotation-service" element={<MLAnnotationService />} />
+              <Route path="/machine-online-annotation-service" element={<MLAnnotationService />} />
 
               {/* 系统管理 */}
               <Route path="/admin/projects" element={<ProjectManagement />} />

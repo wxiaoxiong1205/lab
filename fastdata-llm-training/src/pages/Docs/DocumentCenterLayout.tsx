@@ -4,6 +4,8 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeftOutlined, BookOutlined, SearchOutlined, FileTextOutlined } from '@ant-design/icons'
 import type { MenuProps } from 'antd'
 import { getCurrentProject, usePermissionStore } from '../../services/permissionStore'
+import { useActiveDocumentAgent } from '../../services/documentAgentService'
+import DocumentAgentPanel from './DocumentAgentPanel'
 
 const SIDER_WIDTH = 280
 
@@ -12,6 +14,7 @@ const DocumentCenterLayout: React.FC = () => {
   const location = useLocation()
   const permissionState = usePermissionStore()
   const currentProject = getCurrentProject(permissionState)
+  const { activeService } = useActiveDocumentAgent()
   const [search, setSearch] = useState('')
 
   const selectedKeys = useMemo(() => {
@@ -84,16 +87,19 @@ const DocumentCenterLayout: React.FC = () => {
           style={{ border: 'none', padding: '0 8px 16px' }}
         />
       </div>
-      <div
-        style={{
-          flex: 1,
-          padding: '32px 40px 48px',
-          background: '#fff',
-          overflow: 'auto',
-          maxWidth: 960,
-        }}
-      >
-        <Outlet />
+      <div style={{ flex: 1, display: 'flex', minWidth: 0 }}>
+        <div
+          style={{
+            flex: 1,
+            padding: '32px 40px 48px',
+            background: '#fff',
+            overflow: 'auto',
+            maxWidth: activeService ? 900 : 960,
+          }}
+        >
+          <Outlet />
+        </div>
+        {activeService && <DocumentAgentPanel activeService={activeService} />}
       </div>
     </div>
   )

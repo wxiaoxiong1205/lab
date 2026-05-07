@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   Button,
   Card,
@@ -21,6 +21,7 @@ import {
   type OnlineServiceModelType,
   useOnlineInferenceServices,
 } from '../../services/onlineInferenceServiceStore'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 const { Title, Text } = Typography
 
@@ -36,6 +37,8 @@ const statusColorMap: Record<OnlineServiceConnectionStatus, string> = {
 }
 
 const OnlineInferenceService: React.FC = () => {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [form] = Form.useForm()
   const services = useOnlineInferenceServices()
   const [searchValue, setSearchValue] = useState('')
@@ -44,6 +47,16 @@ const OnlineInferenceService: React.FC = () => {
   const [detailRecord, setDetailRecord] = useState<OnlineInferenceServiceRecord | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null)
+  const isCreateRoute = location.pathname === '/service/inference/external/create'
+  const redirectPath = new URLSearchParams(location.search).get('redirect')
+
+  useEffect(() => {
+    if (isCreateRoute) {
+      form.resetFields()
+      setEditingServiceId(null)
+      setCreateOpen(true)
+    }
+  }, [form, isCreateRoute])
 
   const filteredData = useMemo(
     () =>
@@ -135,6 +148,11 @@ const OnlineInferenceService: React.FC = () => {
       setCreateOpen(false)
       setEditingServiceId(null)
       form.resetFields()
+      if (isCreateRoute && redirectPath) {
+        navigate(redirectPath, { replace: true })
+      } else if (isCreateRoute) {
+        navigate('/service/inference/external', { replace: true })
+      }
     } catch {
       return
     }
@@ -229,6 +247,11 @@ const OnlineInferenceService: React.FC = () => {
         onCancel={() => {
           setCreateOpen(false)
           setEditingServiceId(null)
+          if (isCreateRoute && redirectPath) {
+            navigate(redirectPath, { replace: true })
+          } else if (isCreateRoute) {
+            navigate('/service/inference/external', { replace: true })
+          }
         }}
         onOk={submit}
         okText={editingServiceId ? '保存' : '创建'}

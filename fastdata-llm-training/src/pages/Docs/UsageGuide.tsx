@@ -13,12 +13,12 @@ const UsageGuide: React.FC = () => {
         本页介绍 DeepexiLab 大模型训练平台的核心能力与日常使用方式，帮助您快速完成数据准备、训练、评估与部署等流程。
       </Paragraph>
 
-      <Title level={4}>平台概览</Title>
+      <Title id="platform-overview" level={4}>平台概览</Title>
       <Paragraph>
         平台当前采用<strong>项目空间</strong>与<strong>系统管理</strong>双入口结构。登录后默认进入项目空间，用户可先查看自己有权限访问的项目卡片，点击项目后再进入数据服务、模型训练、模型评估、模型服务与机器学习等业务模块；平台级治理能力统一从系统管理入口进入。
       </Paragraph>
 
-      <Title level={4} style={{ marginTop: 28 }}>
+      <Title id="typical-workflow" level={4} style={{ marginTop: 28 }}>
         典型工作流
       </Title>
       <ol style={{ paddingLeft: 20, lineHeight: 1.8, marginBottom: 0 }}>
@@ -33,11 +33,18 @@ const UsageGuide: React.FC = () => {
         </li>
       </ol>
 
-      <Title level={4} style={{ marginTop: 28 }}>
+      <Title id="permission-project" level={4} style={{ marginTop: 28 }}>
         权限与项目
       </Title>
       <Paragraph>
         系统管理中的「项目管理」用于维护项目成员和数据权限。登录后系统会自动匹配当前账号可访问的项目；请先从项目空间点击项目卡片进入，再在该项目上下文中执行训练、评估和部署等业务操作。
+      </Paragraph>
+
+      <Title id="agent-assistant" level={4} style={{ marginTop: 28 }}>
+        Agent助手
+      </Title>
+      <Paragraph>
+        当系统配置中存在已启动的文档中心 Agent 服务时，文档中心右侧会展示 Agent 助手。用户可以输入自然语言问题查找平台文档，回答中会展示对应文档、章节与跳转定位。
       </Paragraph>
 
       <Title level={4} style={{ marginTop: 28 }}>

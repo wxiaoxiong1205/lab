@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   Button,
   Card,
@@ -14,6 +14,8 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, TagsOutlined } from '@ant-design/icons'
+import { useLocation } from 'react-router-dom'
+import DocumentAgentSettings from './DocumentAgentSettings'
 
 const { Title, Text } = Typography
 
@@ -56,8 +58,9 @@ const seedLabels: LabelRecord[] = [
 ]
 
 const SystemSettings: React.FC = () => {
+  const location = useLocation()
   const [searchValue, setSearchValue] = useState('')
-  const [activeTab, setActiveTab] = useState('attributes')
+  const [activeTab, setActiveTab] = useState(() => new URLSearchParams(location.search).get('tab') === 'agent' ? 'agent' : 'attributes')
   const [activeGroup, setActiveGroup] = useState('训练数据管理')
   const [attributes, setAttributes] = useState<AttributeRecord[]>(seedAttributeRows)
   const [labels, setLabels] = useState<LabelRecord[]>(seedLabels)
@@ -68,6 +71,14 @@ const SystemSettings: React.FC = () => {
   const [attributeForm] = Form.useForm()
   const [labelForm] = Form.useForm()
   const [valueForm] = Form.useForm()
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('tab') === 'agent') {
+      setActiveTab('agent')
+      setActiveGroup('文档中心')
+      setSearchValue('')
+    }
+  }, [location.search])
 
   const filteredAttributes = useMemo(
     () =>
@@ -221,7 +232,11 @@ const SystemSettings: React.FC = () => {
     }
   }
 
-  const currentMenu = activeTab === 'attributes' ? attributeMenu : labelMenu
+  const currentMenu = activeTab === 'attributes'
+    ? attributeMenu
+    : activeTab === 'labels'
+      ? labelMenu
+      : [{ group: '文档中心', items: ['文档中心'] }]
 
   return (
     <>
@@ -234,11 +249,12 @@ const SystemSettings: React.FC = () => {
             onChange={key => {
               setActiveTab(key)
               setSearchValue('')
-              setActiveGroup(key === 'attributes' ? '训练数据管理' : '自定义镜像')
+              setActiveGroup(key === 'attributes' ? '训练数据管理' : key === 'labels' ? '自定义镜像' : '文档中心')
             }}
             items={[
               { key: 'attributes', label: '属性配置' },
               { key: 'labels', label: '标签配置' },
+              { key: 'agent', label: 'Agent助手' },
             ]}
           />
 
@@ -280,13 +296,17 @@ const SystemSettings: React.FC = () => {
 
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 16, gap: 12 }}>
-                <Input
-                  prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
-                  placeholder={activeTab === 'attributes' ? '请输入属性名称' : '请输入标签名称'}
-                  value={searchValue}
-                  onChange={e => setSearchValue(e.target.value)}
-                  style={{ width: 280 }}
-                />
+                {activeTab === 'agent' ? (
+                  <div />
+                ) : (
+                  <Input
+                    prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+                    placeholder={activeTab === 'attributes' ? '请输入属性名称' : '请输入标签名称'}
+                    value={searchValue}
+                    onChange={e => setSearchValue(e.target.value)}
+                    style={{ width: 280 }}
+                  />
+                )}
                 {activeTab === 'attributes' ? (
                   <Button
                     type="primary"
@@ -299,7 +319,7 @@ const SystemSettings: React.FC = () => {
                   >
                     添加属性
                   </Button>
-                ) : (
+                ) : activeTab === 'labels' ? (
                   <Button
                     type="primary"
                     icon={<TagsOutlined />}
@@ -311,13 +331,15 @@ const SystemSettings: React.FC = () => {
                   >
                     添加标签
                   </Button>
-                )}
+                ) : null}
               </div>
 
               {activeTab === 'attributes' ? (
                 <Table rowKey="id" columns={attributeColumns} dataSource={filteredAttributes} pagination={false} scroll={{ x: 820 }} />
-              ) : (
+              ) : activeTab === 'labels' ? (
                 <Table rowKey="id" columns={labelColumns} dataSource={filteredLabels} pagination={false} scroll={{ x: 760 }} />
+              ) : (
+                <DocumentAgentSettings />
               )}
             </div>
           </div>

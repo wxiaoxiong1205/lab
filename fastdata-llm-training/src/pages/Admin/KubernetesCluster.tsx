@@ -48,6 +48,7 @@ const KubernetesClusterPage: React.FC = () => {
     form.setFieldsValue({
       name: record.name,
       description: record.description,
+      apiServer: record.apiServer,
       kubeconfig: record.kubeconfig,
     })
     setCreateOpen(true)
@@ -161,8 +162,8 @@ const KubernetesClusterPage: React.FC = () => {
                   ...item,
                   name: values.name,
                   description: values.description,
+                  apiServer: values.apiServer?.trim() || extractApiServer(values.kubeconfig),
                   kubeconfig: values.kubeconfig,
-                  apiServer: extractApiServer(values.kubeconfig),
                   connectionStatus: 'untested',
                 }
               : item,
@@ -240,17 +241,22 @@ const KubernetesClusterPage: React.FC = () => {
             <Input placeholder="请输入集群描述" />
           </Form.Item>
           {editingRecord ? (
-            <Form.Item label="集群配置 (YAML格式)" name="kubeconfig">
-              <TextArea
-                rows={14}
-                value={editingKubeconfig}
-                placeholder="请输入集群配置信息，支持YAML格式..."
-                onChange={event => {
-                  setEditingKubeconfig(event.target.value)
-                  form.setFieldValue('kubeconfig', event.target.value)
-                }}
-              />
-            </Form.Item>
+            <>
+              <Form.Item label="API Server" name="apiServer" rules={[{ required: true, message: '请输入 API Server 地址' }]}>
+                <Input placeholder="请输入 API Server 地址，例如：https://k8s.example.com:6443" />
+              </Form.Item>
+              <Form.Item label="集群配置 (YAML格式)" name="kubeconfig">
+                <TextArea
+                  rows={14}
+                  value={editingKubeconfig}
+                  placeholder="请输入集群配置信息，支持YAML格式..."
+                  onChange={event => {
+                    setEditingKubeconfig(event.target.value)
+                    form.setFieldValue('kubeconfig', event.target.value)
+                  }}
+                />
+              </Form.Item>
+            </>
           ) : (
             <>
               <div style={{ marginBottom: 12 }}>

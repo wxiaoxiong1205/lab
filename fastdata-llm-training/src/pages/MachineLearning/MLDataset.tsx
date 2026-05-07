@@ -1,13 +1,15 @@
 import React, { useMemo, useState } from 'react'
+import { ArrowLeftOutlined, CheckCircleOutlined, DeleteOutlined, EyeOutlined, PlusOutlined, SearchOutlined, UploadOutlined } from '@ant-design/icons'
 import {
   Button,
   Card,
   Descriptions,
-  Divider,
   Form,
   Input,
   List,
   Modal,
+  Popconfirm,
+  Radio,
   Select,
   Space,
   Table,
@@ -16,133 +18,278 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { UploadFile } from 'antd/es/upload/interface'
-import { AppstoreOutlined, PlusOutlined, UploadOutlined, CheckCircleOutlined } from '@ant-design/icons'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 const { Title, Text } = Typography
+
+type MLDatasetFormValues = {
+  name: string
+  description?: string
+  version: string
+  dataType: 'text' | 'image'
+  annotationType: string
+  annotationTemplate: string
+  labelStatus: 'none' | 'with-label'
+  dataSource: 'local' | 'notebook'
+}
 
 type MLDatasetRecord = {
   id: string
   name: string
   version: string
-  dataType: string
+  dataType: '文本' | '图片'
   annotationType: string
   annotationTemplate: string
+  description?: string
+  labelStatus: '无标注信息' | '有标注信息'
+  dataSource: '本地上传' | 'Notebook 获取'
   createdAt: string
 }
 
 const dataTypes = [
-  { value: 'image', label: '图片', description: '支持图片分类、检测、分割等任务' },
-  { value: 'text', label: '文本', description: '支持文本分类、实体识别等任务' },
-  { value: 'audio', label: '音频', description: '支持语音识别等任务' },
+  { value: 'text', label: '文本' },
+  { value: 'image', label: '图片' },
 ]
 
-const annotationTypesByDataType: Record<string, Array<{ value: string; label: string; template: string }>> = {
-  image: [
-    { value: 'image_classification', label: '图像分类', template: '单图单标签' },
-    { value: 'object_detection', label: '物体检测', template: '矩阵框标注' },
-    { value: 'image_segmentation', label: '图像分割', template: '实例分割' },
-  ],
+const annotationTypesByDataType: Record<string, Array<{ value: string; label: string; templates: string[] }>> = {
   text: [
-    { value: 'text_classification', label: '文本分类', template: '文本单标签' },
-    { value: 'entity_recognition', label: '实体识别', template: '文本实体识别' },
+    { value: '文本分类', label: '文本分类', templates: ['文本单标签', '文本多标签'] },
+    { value: '实体识别', label: '实体识别', templates: ['文本实体识别'] },
   ],
-  audio: [
-    { value: 'speech_recognition', label: '语音识别', template: '语音转文字模板' },
+  image: [
+    { value: '图像分类', label: '图像分类', templates: ['单图单标签', '单图多标签'] },
+    { value: '图像分割', label: '图像分割', templates: ['实例分割'] },
+    { value: '物体检测', label: '物体检测', templates: ['矩阵框标注'] },
   ],
 }
 
-const datasetRows: MLDatasetRecord[] = [
-  { id: '1', name: '图像分类-多-1', version: 'V3', dataType: '图片', annotationType: '图像分类', annotationTemplate: '单图多标签', createdAt: '2026/03/10 09:00:00' },
-  { id: '2', name: 'basion-文本实体识别', version: 'V2', dataType: '文本', annotationType: '实体识别', annotationTemplate: '文本实体识别', createdAt: '2026/03/08 14:30:00' },
-  { id: '3', name: 'basion-文本分类-多标签-无标注', version: 'V2', dataType: '文本', annotationType: '文本分类', annotationTemplate: '文本多标签', createdAt: '2026/03/05 11:00:00' },
-  { id: '4', name: 'basion-文本分类-单标签-无标注', version: 'V2', dataType: '文本', annotationType: '文本分类', annotationTemplate: '文本单标签', createdAt: '2026/03/03 11:20:00' },
-  { id: '5', name: 'basion-图像分类-单标签-无标注', version: 'V2', dataType: '图片', annotationType: '图像分类', annotationTemplate: '单图单标签', createdAt: '2026/03/02 15:45:00' },
-  { id: '6', name: 'basion-图像分割-实例分割-无标注', version: 'V1', dataType: '图片', annotationType: '图像分割', annotationTemplate: '实例分割', createdAt: '2026/03/01 09:10:00' },
+const initialDatasetRows: MLDatasetRecord[] = [
+  { id: '1', name: 'basion-物体检测', version: 'V1', dataType: '图片', annotationType: '物体检测', annotationTemplate: '矩阵框标注', labelStatus: '有标注信息', dataSource: '本地上传', createdAt: '2026-04-24 14:13:09' },
+  { id: '2', name: 'qeqwe', version: 'V1', dataType: '文本', annotationType: '实体识别', annotationTemplate: '文本实体识别', labelStatus: '无标注信息', dataSource: 'Notebook 获取', createdAt: '2026-04-22 15:11:38' },
+  { id: '3', name: 'basion-文本实体识别', version: 'V3', dataType: '文本', annotationType: '实体识别', annotationTemplate: '文本实体识别', labelStatus: '有标注信息', dataSource: '本地上传', createdAt: '2026-04-15 09:35:59' },
+  { id: '4', name: '图像分类-多-1', version: 'V3', dataType: '图片', annotationType: '图像分类', annotationTemplate: '单图多标签', labelStatus: '有标注信息', dataSource: '本地上传', createdAt: '2026-04-14 17:43:06' },
+  { id: '5', name: 'basion-文本分类-多标签-无标注', version: 'V2', dataType: '文本', annotationType: '文本分类', annotationTemplate: '文本多标签', labelStatus: '无标注信息', dataSource: '本地上传', createdAt: '2026-04-14 16:33:51' },
+  { id: '6', name: 'basion-图像分割-实例分割-无标注', version: 'V1', dataType: '图片', annotationType: '图像分割', annotationTemplate: '实例分割', labelStatus: '无标注信息', dataSource: '本地上传', createdAt: '2026-03-01 09:10:00' },
 ]
 
 const MLDataset: React.FC = () => {
-  const [form] = Form.useForm()
-  const [createOpen, setCreateOpen] = useState(false)
+  const [form] = Form.useForm<MLDatasetFormValues>()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const isCreateRoute = location.pathname === '/machine-data-management/create'
+  const [rows, setRows] = useState<MLDatasetRecord[]>(initialDatasetRows)
   const [detailRecord, setDetailRecord] = useState<MLDatasetRecord | null>(null)
   const [annotationTypeFilter, setAnnotationTypeFilter] = useState<string>('全部')
   const [searchValue, setSearchValue] = useState('')
-  const [selectedDataType, setSelectedDataType] = useState<string>()
+  const [selectedDataType, setSelectedDataType] = useState<'text' | 'image'>('text')
+  const [selectedAnnotationType, setSelectedAnnotationType] = useState('文本分类')
   const [selectedFile, setSelectedFile] = useState<UploadFile | null>(null)
-  const [uploading, setUploading] = useState(false)
 
   const filteredRows = useMemo(
     () =>
-      datasetRows.filter(item => {
+      rows.filter(item => {
         const matchType = annotationTypeFilter === '全部' || item.annotationType === annotationTypeFilter
         const matchSearch = !searchValue || item.name.toLowerCase().includes(searchValue.toLowerCase())
         return matchType && matchSearch
       }),
-    [annotationTypeFilter, searchValue],
+    [annotationTypeFilter, searchValue, rows],
   )
 
-  const availableAnnotationTypes = selectedDataType ? annotationTypesByDataType[selectedDataType] ?? [] : []
+  const availableAnnotationTypes = annotationTypesByDataType[selectedDataType]
+  const availableTemplates = availableAnnotationTypes.find(item => item.value === selectedAnnotationType)?.templates ?? []
 
-  const columns: ColumnsType<MLDatasetRecord> = [
-    { title: '数据集名称', dataIndex: 'name', key: 'name' },
-    { title: '最新版本', dataIndex: 'version', key: 'version', width: 90 },
-    { title: '数据类型', dataIndex: 'dataType', key: 'dataType', width: 100 },
-    { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 120 },
-    { title: '标注模板', dataIndex: 'annotationTemplate', key: 'annotationTemplate', width: 140 },
-    {
-      title: '操作',
-      key: 'action',
-      width: 140,
-      render: (_, record) => (
-        <Space size={0}>
-          <Button type="link" size="small" onClick={() => setDetailRecord(record)}>查看详情</Button>
-          <Button type="link" size="small" danger>删除</Button>
-        </Space>
-      ),
-    },
-  ]
-
-  const handleFileChange = (info: any) => {
-    const file = info.file
-    if (file.status === 'uploading') {
-      setUploading(true)
-      window.setTimeout(() => {
-        setUploading(false)
-        setSelectedFile({
-          uid: file.uid,
-          name: file.name,
-          status: 'done',
-        } as UploadFile)
-      }, 400)
-    }
+  const resetCreateState = () => {
+    form.resetFields()
+    setSelectedDataType('text')
+    setSelectedAnnotationType('文本分类')
+    setSelectedFile(null)
   }
 
   const submitCreate = async () => {
     try {
-      await form.validateFields()
-      setCreateOpen(false)
-      form.resetFields()
-      setSelectedDataType(undefined)
-      setSelectedFile(null)
+      const values = await form.validateFields()
+      setRows(prev => [
+        {
+          id: `ml-dataset-${Date.now()}`,
+          name: values.name,
+          version: 'V1',
+          dataType: values.dataType === 'image' ? '图片' : '文本',
+          annotationType: values.annotationType,
+          annotationTemplate: values.annotationTemplate,
+          description: values.description,
+          labelStatus: values.labelStatus === 'with-label' ? '有标注信息' : '无标注信息',
+          dataSource: values.dataSource === 'notebook' ? 'Notebook 获取' : '本地上传',
+          createdAt: new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-'),
+        },
+        ...prev,
+      ])
+      resetCreateState()
+      navigate('/machine-data-management')
     } catch {
       return
     }
   }
 
+  const deleteRecord = (id: string) => {
+    setRows(prev => prev.filter(item => item.id !== id))
+  }
+
+  const columns: ColumnsType<MLDatasetRecord> = [
+    { title: '数据集名称', dataIndex: 'name', key: 'name', ellipsis: true },
+    { title: '最新版本', dataIndex: 'version', key: 'version', width: 110 },
+    { title: '数据类型', dataIndex: 'dataType', key: 'dataType', width: 110 },
+    { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 130 },
+    { title: '标注模板', dataIndex: 'annotationTemplate', key: 'annotationTemplate', width: 150 },
+    {
+      title: '操作',
+      key: 'action',
+      width: 180,
+      render: (_, record) => (
+        <Space size={0}>
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setDetailRecord(record)}>查看详情</Button>
+          <Popconfirm title="确认删除该数据集？" okText="删除" cancelText="取消" onConfirm={() => deleteRecord(record.id)}>
+            <Button type="link" size="small" icon={<DeleteOutlined />} danger>删除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ]
+
+  if (isCreateRoute) {
+    return (
+      <div style={{ padding: '28px 32px', minHeight: '100%' }}>
+        <Space style={{ marginBottom: 16 }}>
+          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => { resetCreateState(); navigate('/machine-data-management') }}>返回</Button>
+          <Title level={3} style={{ margin: 0 }}>创建数据集</Title>
+        </Space>
+
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{
+            version: 'V1',
+            dataType: 'text',
+            annotationType: '文本分类',
+            annotationTemplate: '文本单标签',
+            labelStatus: 'none',
+            dataSource: 'local',
+          }}
+        >
+          <Card title="基本信息" style={{ borderRadius: 12, marginBottom: 16 }}>
+            <Form.Item label="数据集名称" name="name" rules={[{ required: true, message: '请输入数据集名称' }]}>
+              <Input placeholder="请输入数据集名称" maxLength={64} showCount />
+            </Form.Item>
+            <Form.Item label="数据集版本" name="version">
+              <Text>V1</Text>
+            </Form.Item>
+            <Form.Item label="描述" name="description">
+              <Input.TextArea rows={4} placeholder="请输入训练数据集描述" maxLength={200} showCount />
+            </Form.Item>
+          </Card>
+
+          <Card title="数据配置" style={{ borderRadius: 12, marginBottom: 16 }}>
+            <Form.Item label="数据类型" name="dataType" rules={[{ required: true, message: '请选择数据类型' }]}>
+              <Radio.Group
+                options={dataTypes}
+                onChange={event => {
+                  const nextType = event.target.value as 'text' | 'image'
+                  const nextAnnotationType = annotationTypesByDataType[nextType][0]
+                  setSelectedDataType(nextType)
+                  setSelectedAnnotationType(nextAnnotationType.value)
+                  form.setFieldsValue({
+                    annotationType: nextAnnotationType.value,
+                    annotationTemplate: nextAnnotationType.templates[0],
+                  })
+                }}
+              />
+            </Form.Item>
+            <Form.Item label="标注类型" name="annotationType" rules={[{ required: true, message: '请选择标注类型' }]}>
+              <Radio.Group
+                options={availableAnnotationTypes.map(item => ({ label: item.label, value: item.value }))}
+                onChange={event => {
+                  const nextAnnotationType = event.target.value
+                  setSelectedAnnotationType(nextAnnotationType)
+                  form.setFieldValue('annotationTemplate', annotationTypesByDataType[selectedDataType].find(item => item.value === nextAnnotationType)?.templates[0])
+                }}
+              />
+            </Form.Item>
+            <Form.Item label="标注模板" name="annotationTemplate" rules={[{ required: true, message: '请选择标注模板' }]}>
+              <Radio.Group options={availableTemplates.map(item => ({ label: item, value: item }))} />
+            </Form.Item>
+            <Form.Item label="数据标注状态" name="labelStatus" rules={[{ required: true, message: '请选择数据标注状态' }]}>
+              <Radio.Group
+                options={[
+                  { value: 'none', label: '无标注信息' },
+                  { value: 'with-label', label: '有标注信息' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item label="数据来源" name="dataSource" rules={[{ required: true, message: '请选择数据来源' }]}>
+              <Radio.Group
+                options={[
+                  { value: 'local', label: '本地上传' },
+                  { value: 'notebook', label: 'Notebook 获取' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item label="上传数据">
+              <Upload.Dragger
+                showUploadList={false}
+                customRequest={({ file, onSuccess }: any) => {
+                  setSelectedFile({ uid: file.uid, name: file.name, status: 'done' } as UploadFile)
+                  window.setTimeout(() => onSuccess?.('ok'), 100)
+                }}
+              >
+                <p><UploadOutlined style={{ fontSize: 38, color: '#1677ff' }} /></p>
+                <p>点击或拖拽文件到此区域上传</p>
+                <p style={{ color: '#94a3b8' }}>支持文本、图片等机器学习任务数据格式</p>
+              </Upload.Dragger>
+            </Form.Item>
+            {selectedFile && (
+              <List
+                size="small"
+                bordered
+                dataSource={[selectedFile]}
+                renderItem={item => (
+                  <List.Item actions={[<Button key="remove" type="link" danger size="small" onClick={() => setSelectedFile(null)}>删除</Button>]}>
+                    <List.Item.Meta avatar={<CheckCircleOutlined style={{ color: '#52c41a' }} />} title={item.name} description="上传完成" />
+                  </List.Item>
+                )}
+              />
+            )}
+          </Card>
+
+          <Space>
+            <Button onClick={() => { resetCreateState(); navigate('/machine-data-management') }}>取消</Button>
+            <Button type="primary" onClick={submitCreate}>确定</Button>
+          </Space>
+        </Form>
+      </div>
+    )
+  }
+
   return (
     <>
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        <Card style={{ borderRadius: 20, border: '1px solid #e5e7eb' }}>
-          <Title level={2}>数据管理</Title>
-          <Text type="secondary" style={{ display: 'block', marginBottom: 20 }}>
-            管理和创建用于机器学习的数据集，支持数据查看、导入导出和删除等操作。
-          </Text>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
-            <Space>
+        <Title level={3} style={{ marginBottom: 4 }}>数据管理</Title>
+        <Text type="secondary" style={{ display: 'block', marginBottom: 20 }}>
+          管理和创建用于机器学习的数据集，支持数据查看、导入导出和删除等操作。
+        </Text>
+        <Card style={{ borderRadius: 12, border: '1px solid #e5e7eb' }}>
+          <Space wrap style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
+            <Space wrap>
+              <Input
+                prefix={<SearchOutlined />}
+                placeholder="搜索数据集名称"
+                value={searchValue}
+                onChange={event => setSearchValue(event.target.value)}
+                style={{ width: 220 }}
+              />
+              <Text>标注类型：</Text>
               <Select
                 value={annotationTypeFilter}
                 onChange={value => setAnnotationTypeFilter(value)}
-                style={{ width: 180 }}
+                style={{ width: 160 }}
                 options={[
                   { value: '全部', label: '全部' },
                   { value: '图像分类', label: '图像分类' },
@@ -152,19 +299,13 @@ const MLDataset: React.FC = () => {
                   { value: '实体识别', label: '实体识别' },
                 ]}
               />
-              <Input
-                placeholder="搜索"
-                value={searchValue}
-                onChange={e => setSearchValue(e.target.value)}
-                style={{ width: 220 }}
-              />
-              <Button>搜索</Button>
+              <Button type="primary" icon={<SearchOutlined />}>搜索</Button>
               <Button onClick={() => { setAnnotationTypeFilter('全部'); setSearchValue('') }}>重置</Button>
             </Space>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/machine-data-management/create')}>
               创建数据集
             </Button>
-          </div>
+          </Space>
 
           <Table
             rowKey="id"
@@ -175,114 +316,17 @@ const MLDataset: React.FC = () => {
         </Card>
       </div>
 
-      <Modal
-        title="创建数据集"
-        open={createOpen}
-        onCancel={() => setCreateOpen(false)}
-        width={720}
-        footer={
-          <Space>
-            <Button onClick={() => setCreateOpen(false)}>取消</Button>
-            <Button type="primary" onClick={submitCreate}>创建</Button>
-          </Space>
-        }
-      >
-        <Form form={form} layout="vertical">
-          <Divider>基本信息</Divider>
-
-          <Form.Item label="数据集名称" name="name" rules={[{ required: true, message: '请输入数据集名称' }]}>
-            <Input placeholder="请输入数据集名称" maxLength={64} showCount />
-          </Form.Item>
-
-          <Form.Item label="描述" name="description">
-            <Input.TextArea rows={2} placeholder="请输入数据集描述（可选）" maxLength={200} showCount />
-          </Form.Item>
-
-          <Divider>数据配置</Divider>
-
-          <Form.Item label="数据类型" name="dataType" rules={[{ required: true, message: '请选择数据类型' }]}>
-            <Select
-              placeholder="请选择数据类型"
-              onChange={value => {
-                setSelectedDataType(value)
-                form.setFieldValue('annotationType', undefined)
-                form.setFieldValue('annotationTemplate', undefined)
-              }}
-            >
-              {dataTypes.map(item => (
-                <Select.Option key={item.value} value={item.value}>
-                  <div>
-                    <div>{item.label}</div>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{item.description}</Text>
-                  </div>
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item label="标注类型" name="annotationType" rules={[{ required: true, message: '请选择标注类型' }]}>
-            <Select placeholder="请先选择数据类型" disabled={!selectedDataType}>
-              {availableAnnotationTypes.map(item => (
-                <Select.Option key={item.value} value={item.label}>{item.label}</Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item label="标注模板" name="annotationTemplate" rules={[{ required: true, message: '请选择标注模板' }]}>
-            <Select placeholder="请选择标注模板">
-              {availableAnnotationTypes.map(item => (
-                <Select.Option key={`${item.value}-template`} value={item.template}>{item.template}</Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Divider>数据上传</Divider>
-
-          <Form.Item label="上传数据" name="file">
-            <Upload.Dragger
-              showUploadList={false}
-              customRequest={({ onSuccess }: any) => window.setTimeout(() => onSuccess?.('ok'), 100)}
-              onChange={handleFileChange}
-              disabled={uploading}
-            >
-              <p><UploadOutlined style={{ fontSize: 38, color: '#3b82f6' }} /></p>
-              <p>点击或拖拽文件到此区域上传</p>
-              <p style={{ color: '#94a3b8' }}>支持图片、文本、音频等机器学习任务数据格式</p>
-            </Upload.Dragger>
-          </Form.Item>
-
-          {selectedFile && (
-            <List
-              size="small"
-              bordered
-              dataSource={[selectedFile]}
-              renderItem={(item: UploadFile) => (
-                <List.Item actions={[<Button type="link" danger size="small" onClick={() => setSelectedFile(null)}>删除</Button>]}>
-                  <List.Item.Meta
-                    avatar={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
-                    title={item.name}
-                    description="上传完成"
-                  />
-                </List.Item>
-              )}
-            />
-          )}
-        </Form>
-      </Modal>
-
-      <Modal
-        title="数据集详情"
-        open={Boolean(detailRecord)}
-        onCancel={() => setDetailRecord(null)}
-        footer={<Button onClick={() => setDetailRecord(null)}>关闭</Button>}
-      >
+      <Modal title="数据集详情" open={Boolean(detailRecord)} onCancel={() => setDetailRecord(null)} footer={<Button onClick={() => setDetailRecord(null)}>关闭</Button>} width={720}>
         {detailRecord && (
           <Descriptions column={2} bordered size="small">
             <Descriptions.Item label="数据集名称" span={2}>{detailRecord.name}</Descriptions.Item>
             <Descriptions.Item label="最新版本">{detailRecord.version}</Descriptions.Item>
             <Descriptions.Item label="数据类型">{detailRecord.dataType}</Descriptions.Item>
-            <Descriptions.Item label="标注类型" span={2}>{detailRecord.annotationType}</Descriptions.Item>
-            <Descriptions.Item label="标注模板" span={2}>{detailRecord.annotationTemplate}</Descriptions.Item>
+            <Descriptions.Item label="标注类型">{detailRecord.annotationType}</Descriptions.Item>
+            <Descriptions.Item label="标注模板">{detailRecord.annotationTemplate}</Descriptions.Item>
+            <Descriptions.Item label="数据标注状态">{detailRecord.labelStatus}</Descriptions.Item>
+            <Descriptions.Item label="数据来源">{detailRecord.dataSource}</Descriptions.Item>
+            <Descriptions.Item label="描述" span={2}>{detailRecord.description || '-'}</Descriptions.Item>
             <Descriptions.Item label="创建时间" span={2}>{detailRecord.createdAt}</Descriptions.Item>
           </Descriptions>
         )}
