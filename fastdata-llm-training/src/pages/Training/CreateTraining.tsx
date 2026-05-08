@@ -18,6 +18,8 @@ import {
   Tag,
   DatePicker,
   Alert,
+  Tooltip,
+  Modal,
 } from 'antd'
 import {
   PlusOutlined,
@@ -36,7 +38,8 @@ import {
   ArrowLeftOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
-import { baseModelSeriesList, baseModelVariants, trainedModels, mockTasks } from '../../data/mockData'
+import { trainedModels, mockTasks } from '../../data/mockData'
+import { getTrainingTypeFromModel, isQwenProvider, loadBaseModelCatalog } from '../../data/modelCatalog'
 import { resolveDatasetVersionRow } from '../../data/datasetPickerCatalog'
 import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
 import RewardRulesConfig from '../../components/RewardRulesConfig'
@@ -51,13 +54,22 @@ import {
   type RFTAlgorithm,
   type RewardRuleType,
 } from '../../types/training'
-import type { BaseModelVariant } from '../../types/training'
 import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat'
 
 dayjs.extend(customParseFormat)
 
 const { Title, Text, Paragraph } = Typography
+
+type TrainingBaseModelOption = {
+  id: string
+  name: string
+  provider: string
+  description?: string
+  type: TrainingType
+  adapted: boolean
+  downloaded: boolean
+}
 
 /** 将版本上的 scheduleTime 字符串转为 DatePicker 可用的 dayjs（与 mock 中 `2026/04/02 10:00:00` 等格式兼容） */
 function scheduleTimeToPickerValue(raw?: string) {
@@ -72,107 +84,6 @@ function scheduleTimeToPickerValue(raw?: string) {
   return d.isValid() ? d : undefined
 }
 const { TextArea } = Input
-
-/** 基础模型系列卡片（当前仅 Qwen） */
-const BaseSeriesCardPicker: React.FC<{
-  value?: string
-  onChange?: (seriesId: string) => void
-}> = ({ value, onChange }) => (
-  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-    {baseModelSeriesList.map(series => {
-      const selected = value === series.id
-      return (
-        <button
-          key={series.id}
-          type="button"
-          onClick={() => onChange?.(series.id)}
-          style={{
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-            minWidth: 280,
-            maxWidth: 420,
-            flex: '1 1 280px',
-            padding: '18px 22px',
-            borderRadius: 14,
-            border: selected ? '2px solid #1677ff' : '1px solid #e2e8f0',
-            background: selected
-              ? 'linear-gradient(135deg, rgba(22, 119, 255, 0.08) 0%, rgba(124, 58, 237, 0.06) 100%)'
-              : '#fff',
-            boxShadow: selected ? '0 4px 14px rgba(22, 119, 255, 0.12)' : '0 1px 2px rgba(15, 23, 42, 0.04)',
-            cursor: 'pointer',
-            textAlign: 'left',
-            transition: 'border-color 0.2s, background 0.2s, box-shadow 0.2s, transform 0.2s',
-          }}
-          onMouseEnter={e => {
-            if (!selected) {
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.08)'
-              e.currentTarget.style.transform = 'translateY(-1px)'
-            }
-          }}
-          onMouseLeave={e => {
-            if (!selected) {
-              e.currentTarget.style.boxShadow = '0 1px 2px rgba(15, 23, 42, 0.04)'
-              e.currentTarget.style.transform = 'none'
-            }
-          }}
-        >
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontSize: 14,
-              fontWeight: 700,
-              flexShrink: 0,
-              boxShadow: '0 4px 12px rgba(124, 58, 237, 0.35)',
-            }}
-          >
-            Q
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 17, color: '#0f172a', letterSpacing: '0.02em' }}>{series.name}</div>
-            {series.description && (
-              <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 4, lineHeight: 1.45 }}>
-                {series.description}
-              </Text>
-            )}
-          </div>
-          {selected && (
-            <CheckOutlined
-              style={{
-                position: 'absolute',
-                top: 12,
-                right: 12,
-                color: '#52c41a',
-                fontSize: 18,
-              }}
-            />
-          )}
-        </button>
-      )
-    })}
-  </div>
-)
-
-/** 文本模型分组：便于浏览 */
-function groupTextVariants(items: BaseModelVariant[]): { title: string; items: BaseModelVariant[] }[] {
-  const special = items.filter(v => /asr|reranker/i.test(v.id))
-  const q25 = items.filter(v => v.id.startsWith('qwen2.5'))
-  const q3rest = items.filter(v => !special.includes(v) && !q25.includes(v))
-  const groups = [
-    { title: 'Qwen2.5 系列', items: q25 },
-    { title: 'Qwen3 / Qwen3.5 系列', items: q3rest },
-    { title: '语音与重排', items: special },
-  ]
-  return groups.filter(g => g.items.length > 0)
-}
 
 /** 微调类型：与 Form 联动，切换时回到基础参数 Tab */
 const FineTuneTypePicker: React.FC<{
@@ -214,19 +125,32 @@ const FineTuneTypePicker: React.FC<{
   </Space>
 )
 
-const ModelVariantTagPicker: React.FC<{
+const BaseModelModalPicker: React.FC<{
   value?: string
   onChange?: (id: string) => void
-  options: BaseModelVariant[]
+  options: TrainingBaseModelOption[]
   trainingType: TrainingType
 }> = ({ value, onChange, options, trainingType }) => {
-  const sections = useMemo(() => {
-    if (options.length === 0) return []
-    if (trainingType === 'vision') {
-      return [{ title: '视觉语言（VLM）', items: options }]
+  const [open, setOpen] = useState(false)
+  const providers = useMemo(() => Array.from(new Set(options.map(item => item.provider))), [options])
+  const [activeProvider, setActiveProvider] = useState<string>()
+  const selectedModel = useMemo(() => options.find(item => item.id === value), [options, value])
+
+  useEffect(() => {
+    if (providers.length === 0) {
+      setActiveProvider(undefined)
+      return
     }
-    return groupTextVariants(options)
-  }, [options, trainingType])
+
+    if (!activeProvider || !providers.includes(activeProvider)) {
+      setActiveProvider(selectedModel?.provider && providers.includes(selectedModel.provider) ? selectedModel.provider : providers[0])
+    }
+  }, [activeProvider, providers, selectedModel?.provider])
+
+  const currentModels = useMemo(
+    () => options.filter(item => item.provider === activeProvider),
+    [activeProvider, options],
+  )
 
   if (options.length === 0) {
     return (
@@ -245,72 +169,156 @@ const ModelVariantTagPicker: React.FC<{
   }
 
   return (
-    <div
-      style={{
-        border: '1px solid #e2e8f0',
-        borderRadius: 14,
-        background: '#f8fafc',
-        padding: '16px 18px 18px',
-      }}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-        {sections.map(section => (
-          <div key={section.title}>
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: '#64748b',
-                marginBottom: 10,
-                paddingLeft: 2,
-                letterSpacing: '0.02em',
-              }}
-            >
-              {section.title}
-              <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: 8 }}>
-                （{section.items.length}）
-              </span>
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 8,
-                alignItems: 'flex-start',
-              }}
-            >
-              {section.items.map(opt => {
-                const active = value === opt.id
+    <>
+      <div
+        style={{
+          border: '1px solid #e2e8f0',
+          borderRadius: 12,
+          background: '#f8fafc',
+          padding: 16,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 6 }}>
+            当前基础模型
+          </Text>
+          {selectedModel ? (
+            <Space wrap size={8}>
+              <Text strong style={{ fontSize: 15 }}>{selectedModel.name}</Text>
+              <Tag color={selectedModel.adapted ? 'green' : 'orange'}>{selectedModel.adapted ? '已适配' : '未适配'}</Tag>
+              {selectedModel.adapted && !selectedModel.downloaded && <Tag color="red">未下载，请联系管理员</Tag>}
+              <Tag color="blue">{selectedModel.provider}</Tag>
+            </Space>
+          ) : (
+            <Text type="secondary">请选择基础模型</Text>
+          )}
+        </div>
+        <Button onClick={() => setOpen(true)}>选择基础模型</Button>
+      </div>
+
+      <Modal
+        title="选择基础模型"
+        open={open}
+        width={900}
+        onCancel={() => setOpen(false)}
+        footer={<Button onClick={() => setOpen(false)}>关闭</Button>}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: '220px minmax(0,1fr)', gap: 20, minHeight: 420 }}>
+          <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: 16 }}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>模型提供商</Text>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              {providers.map(provider => {
+                const active = provider === activeProvider
+                const count = options.filter(item => item.provider === provider).length
                 return (
                   <button
-                    key={opt.id}
+                    key={provider}
                     type="button"
-                    onClick={() => onChange?.(opt.id)}
-                    title={opt.name}
+                    onClick={() => setActiveProvider(provider)}
                     style={{
-                      padding: '8px 14px',
+                      width: '100%',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '10px 12px',
                       borderRadius: 10,
-                      border: active ? '2px solid #1677ff' : '1px solid #e2e8f0',
-                      background: active ? '#1677ff' : '#fff',
-                      color: active ? '#fff' : '#0f172a',
-                      fontSize: 13,
+                      border: active ? '1px solid rgba(37,99,235,0.38)' : '1px solid transparent',
+                      background: active ? 'rgba(37,99,235,0.1)' : '#fff',
+                      color: active ? '#2563eb' : '#334155',
+                      fontWeight: active ? 600 : 500,
                       cursor: 'pointer',
-                      lineHeight: 1.35,
-                      transition: 'all 0.2s',
-                      boxShadow: active ? '0 2px 8px rgba(22, 119, 255, 0.25)' : '0 1px 2px rgba(15, 23, 42, 0.04)',
-                      maxWidth: '100%',
-                      textAlign: 'left',
                     }}
                   >
-                    {opt.name}
+                    <span>{provider}</span>
+                    <Tag style={{ margin: 0 }}>{count}</Tag>
                   </button>
                 )
               })}
-            </div>
+            </Space>
           </div>
-        ))}
-      </div>
-    </div>
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div>
+                <Text strong>{activeProvider || '模型'}</Text>
+                <Text type="secondary" style={{ marginLeft: 8 }}>
+                  {trainingType === 'vision' ? '图像理解' : '文本生成'} · {currentModels.length} 个模型
+                </Text>
+              </div>
+              <Space size={6}>
+                <Tag color="green">已适配</Tag>
+                <Tag color="orange">未适配</Tag>
+              </Space>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12, maxHeight: 360, overflow: 'auto', paddingRight: 4 }}>
+              {currentModels.map(model => {
+                const active = value === model.id
+                const disabled = model.adapted && !model.downloaded
+                return (
+                  <Tooltip key={model.id} title={disabled ? '未下载，请联系管理员' : undefined}>
+                    <button
+                      type="button"
+                      aria-disabled={disabled}
+                      onClick={() => {
+                        if (disabled) {
+                          message.warning('未下载，请联系管理员')
+                          return
+                        }
+                        onChange?.(model.id)
+                        setOpen(false)
+                      }}
+                      style={{
+                        minHeight: 122,
+                        padding: 14,
+                        borderRadius: 12,
+                        border: active ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                        background: disabled ? '#f8fafc' : active ? 'rgba(37,99,235,0.06)' : '#fff',
+                        cursor: disabled ? 'not-allowed' : 'pointer',
+                        textAlign: 'left',
+                        opacity: disabled ? 0.66 : 1,
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+                        <Text strong style={{ color: disabled ? '#94a3b8' : '#0f172a' }}>{model.name}</Text>
+                        {active && <CheckOutlined style={{ color: '#2563eb', marginTop: 3 }} />}
+                      </div>
+                      <Space wrap size={6}>
+                        <Tag color={model.adapted ? 'green' : 'orange'}>{model.adapted ? '已适配' : '未适配'}</Tag>
+                        {model.adapted && !model.downloaded && <Tag color="red">未下载，请联系管理员</Tag>}
+                      </Space>
+                      {model.description && (
+                        <Text type="secondary" style={{ display: 'block', marginTop: 10, fontSize: 12, lineHeight: 1.45 }}>
+                          {model.description}
+                        </Text>
+                      )}
+                    </button>
+                  </Tooltip>
+                )
+              })}
+            </div>
+
+            {currentModels.length === 0 && (
+              <div
+                style={{
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                  background: '#f8fafc',
+                  borderRadius: 12,
+                  border: '1px dashed #cbd5e1',
+                }}
+              >
+                <Text type="secondary">当前提供商暂无匹配模型</Text>
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
+    </>
   )
 }
 
@@ -582,7 +590,7 @@ function mapVersionToFormValues(
 
   const evalDatasetKey = version.dataset?.validationSplit ? version.dataset.train.id : undefined
 
-  const baseModelId = baseModelVariants.find(v => v.name === version.baseModel)?.id ?? version.baseModel
+  const baseModelId = loadBaseModelCatalog().find(v => v.name === version.baseModel)?.code ?? version.baseModel
 
   return {
     taskName: parentTaskName,
@@ -595,7 +603,6 @@ function mapVersionToFormValues(
     splitRatio: version.dataset?.validationSplit?.ratio ?? 15,
     baseModelSource: version.modelSource ?? 'base',
     baseModel: baseModelId,
-    baseModelSeries: 'qwen',
     trainedModelId: version.modelSource === 'trained' ? version.baseModel : undefined,
     rewardModelId: undefined,
     scheduleEnabled: Boolean(version.scheduleTime),
@@ -643,6 +650,7 @@ const CreateTraining: React.FC = () => {
   const [searchParams] = useSearchParams()
   const [form] = Form.useForm()
   const [activeTab, setActiveTab] = useState('basic')
+  const [baseModelCatalog] = useState(() => loadBaseModelCatalog())
 
   // 同一页面路由在「仅 taskId」与「taskId + editVersion」之间切换时组件不卸载，Ant Design Form 的 initialValues 只生效一次；
   // 用完整查询串作为 key，保证从「新增版本 V9」切到「编辑某版本」时表单整表重建并正确回显。
@@ -688,7 +696,6 @@ const CreateTraining: React.FC = () => {
       trainingType: parentTask?.trainingType || 'text',
       trainingMethod: parentTask?.trainingMethod || 'SFT',
       baseModelSource: 'base',
-      baseModelSeries: 'qwen',
       fineTuneType: 'full' as FineTuneType,
       splitRatio: 15,
       validationSplitMode: 'split' as const,
@@ -724,12 +731,29 @@ const CreateTraining: React.FC = () => {
   const validationSplitMode =
     (Form.useWatch('validationSplitMode', form) as 'split' | 'dataset' | undefined) ?? 'split'
   const scheduleEnabled = Form.useWatch('scheduleEnabled', form)
-  const baseModelSeries = Form.useWatch('baseModelSeries', form) as string | undefined
   const rftAlgorithm = Form.useWatch('rftAlgorithm', form) as RFTAlgorithm | undefined
   const rewardRuleType = Form.useWatch('rewardRuleType', form) as RewardRuleType | undefined
 
-  const filteredVariants = baseModelVariants.filter(
-    v => v.type === trainingType && (!baseModelSeries || v.seriesId === baseModelSeries)
+  const filteredVariants = useMemo<TrainingBaseModelOption[]>(
+    () =>
+      baseModelCatalog
+        .map((model): TrainingBaseModelOption | null => {
+          const type = getTrainingTypeFromModel(model)
+          const option: TrainingBaseModelOption = {
+            id: model.code,
+            name: model.name,
+            provider: model.provider ?? '未知',
+            type,
+            adapted: isQwenProvider(model.provider),
+            downloaded: model.status === 'running',
+          }
+          if (model.description) {
+            option.description = model.description
+          }
+          return option
+        })
+        .filter((model): model is TrainingBaseModelOption => model !== null && model.type === trainingType),
+    [baseModelCatalog, trainingType],
   )
 
   /** 我的模型：按训练类型过滤（DPO/RFT 可用已训练的模型作基础） */
@@ -1422,24 +1446,14 @@ const CreateTraining: React.FC = () => {
 
           {/* 选择基础模型（基础模型来源时） */}
           {baseModelSource === 'base' && (
-            <>
-              <Form.Item
-                label="选择基础模型系列"
-                name="baseModelSeries"
-                rules={[{ required: baseModelSource === 'base', message: '请选择基础模型系列' }]}
-              >
-                <BaseSeriesCardPicker />
-              </Form.Item>
-
-              <Form.Item
-                label="基础模型版本"
-                name="baseModel"
-                rules={[{ required: baseModelSource === 'base', message: '请选择具体模型版本' }]}
-                tooltip="在已选系列下，按训练类型展示对应的具体模型"
-              >
-                <ModelVariantTagPicker options={filteredVariants} trainingType={trainingType} />
-              </Form.Item>
-            </>
+            <Form.Item
+              label="基础模型版本"
+              name="baseModel"
+              rules={[{ required: baseModelSource === 'base', message: '请选择具体模型版本' }]}
+              tooltip="通过弹窗先选择模型提供商，再选择具体模型；Qwen 本期标记为已适配，其它提供商可选并标记为未适配"
+            >
+              <BaseModelModalPicker options={filteredVariants} trainingType={trainingType} />
+            </Form.Item>
           )}
 
           {/* 选择我的模型（我的模型来源时） */}

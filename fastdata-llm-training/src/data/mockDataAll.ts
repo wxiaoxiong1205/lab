@@ -14,6 +14,7 @@ import type {
   SystemSetting,
   PlatformAdmin,
 } from '../types/shared'
+import { mockBaseModelCatalog } from './modelCatalog'
 
 // ============ 数据服务 Mock 数据 ============
 
@@ -110,11 +111,7 @@ export const mockImageRecords: ImageRecord[] = [
   { id: '4', name: 'ml-notebook-runtime:v1.0', description: '机器学习在线Notebook镜像', category: '机器学习-在线Notebook', registry: 'Harbor生产仓库', namespace: 'notebook', addedAt: '2026/03/20 08:30:00' },
 ]
 
-export const mockBaseModels: BaseModelRecord[] = [
-  { id: '1', code: 'qwen2.5-7b-instruct', name: 'Qwen2.5-7B-Instruct', description: '通义千问2.5 7B指令微调模型', type: 'LLM', provider: 'Qwen', capabilities: ['训练', '推理'], status: 'running', createdAt: '2026/01/15 08:00:00' },
-  { id: '2', code: 'qwen2-vl-2b-instruct', name: 'Qwen2-VL-2B-Instruct', description: '通义千问2 VL 2B视觉语言模型', type: 'VLM', provider: 'Qwen', capabilities: ['推理'], status: 'stopped', createdAt: '2026/01/20 10:00:00' },
-  { id: '3', code: 'qwen3-8b', name: 'Qwen3-8B', description: '通义千问3 8B基础模型', type: 'LLM', provider: 'Qwen', capabilities: ['训练', '推理'], status: 'stopped', createdAt: '2026/03/01 09:00:00' },
-]
+export const mockBaseModels: BaseModelRecord[] = mockBaseModelCatalog
 
 export const mockSystemSettings: SystemSetting[] = [
   { id: '1', name: '训练最大GPU数', description: '单次训练任务最大使用GPU数量', inputType: 'number', value: '8', group: '训练配置', required: true },

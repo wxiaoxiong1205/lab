@@ -203,6 +203,42 @@ const imageOptions: NotebookImageOption[] = [
     framework: 'Pytorch 2.x',
   },
   {
+    value: 'lab-cn-guangzhou.cr.volces.com/fs/jupyter/deepexi-notebook:pytorch_2.6-cuda_12.4-py311-ubuntu22.04',
+    label: 'pytorch_2.6-cuda_12.4-py311-ubuntu22.04',
+    source: 'system',
+    namespace: 'fs',
+    imageName: 'jupyter/deepexi-notebook',
+    version: 'pytorch_2.6-cuda_12.4-py311-ubuntu22.04',
+    imageType: 'GPU镜像',
+    createdAt: '2026-04-26 09:18:24',
+    pythonVersion: 'python3.11',
+    framework: 'Pytorch 2.x',
+  },
+  {
+    value: 'lab-cn-guangzhou.cr.volces.com/fs/jupyter/deepexi-notebook:pytorch_2.5-cuda_12.1-py310-ubuntu22.04',
+    label: 'pytorch_2.5-cuda_12.1-py310-ubuntu22.04',
+    source: 'system',
+    namespace: 'fs',
+    imageName: 'jupyter/deepexi-notebook',
+    version: 'pytorch_2.5-cuda_12.1-py310-ubuntu22.04',
+    imageType: 'GPU镜像',
+    createdAt: '2026-04-19 14:42:10',
+    pythonVersion: 'python3.10',
+    framework: 'Pytorch 2.x',
+  },
+  {
+    value: 'lab-cn-guangzhou.cr.volces.com/fs/jupyter/deepexi-notebook:mindspore_2.4-cann_8.0-py310-ubuntu22.04',
+    label: 'mindspore_2.4-cann_8.0-py310-ubuntu22.04',
+    source: 'system',
+    namespace: 'fs',
+    imageName: 'jupyter/deepexi-notebook',
+    version: 'mindspore_2.4-cann_8.0-py310-ubuntu22.04',
+    imageType: 'NPU镜像',
+    createdAt: '2026-04-08 11:05:37',
+    pythonVersion: 'python3.10',
+    framework: 'MindSpore 2.x',
+  },
+  {
     value: 'jupyter/deepexi-notebook:datascience-cpu-python',
     label: 'datascience-cpu-python',
     source: 'system',
@@ -215,6 +251,18 @@ const imageOptions: NotebookImageOption[] = [
     framework: 'torch 2.x',
   },
   {
+    value: 'jupyter/deepexi-notebook:rag-cpu-python311',
+    label: 'rag-cpu-python311',
+    source: 'system',
+    namespace: 'fs',
+    imageName: 'jupyter/deepexi-notebook',
+    version: 'rag-cpu-python311',
+    imageType: 'CPU镜像',
+    createdAt: '2026-02-21 16:40:32',
+    pythonVersion: 'python3.11',
+    framework: 'LangChain / RAG',
+  },
+  {
     value: 'registry.deepexi.com/notebook/custom-ml-runtime:1.0.3',
     label: 'custom-ml-runtime:1.0.3',
     source: 'custom',
@@ -225,6 +273,42 @@ const imageOptions: NotebookImageOption[] = [
     createdAt: '2026-03-18 10:12:00',
     pythonVersion: 'python3.11',
     framework: 'Pytorch 2.x',
+  },
+  {
+    value: 'registry.deepexi.com/notebook/custom-qwen-runtime:2.1.0',
+    label: 'custom-qwen-runtime:2.1.0',
+    source: 'custom',
+    namespace: 'custom',
+    imageName: 'notebook/custom-qwen-runtime',
+    version: '2.1.0',
+    imageType: 'GPU镜像',
+    createdAt: '2026-04-29 17:22:18',
+    pythonVersion: 'python3.11',
+    framework: 'Pytorch 2.x',
+  },
+  {
+    value: 'registry.deepexi.com/notebook/custom-vllm-runtime:0.8.4',
+    label: 'custom-vllm-runtime:0.8.4',
+    source: 'custom',
+    namespace: 'custom',
+    imageName: 'notebook/custom-vllm-runtime',
+    version: '0.8.4',
+    imageType: 'GPU镜像',
+    createdAt: '2026-04-30 10:31:46',
+    pythonVersion: 'python3.12',
+    framework: 'vLLM',
+  },
+  {
+    value: 'registry.deepexi.com/notebook/team-rag-dev:2026.04',
+    label: 'team-rag-dev:2026.04',
+    source: 'custom',
+    namespace: 'custom',
+    imageName: 'notebook/team-rag-dev',
+    version: '2026.04',
+    imageType: 'CPU镜像',
+    createdAt: '2026-04-24 13:16:09',
+    pythonVersion: 'python3.11',
+    framework: 'LangChain / RAG',
   },
 ]
 
@@ -466,6 +550,44 @@ function formatAiServiceLabel(values?: string[]) {
   return values.join(' / ')
 }
 
+function parseAiServiceValue(value?: string): string[] | undefined {
+  if (!value || value === '-') {
+    return undefined
+  }
+
+  return value.split(' / ')
+}
+
+function toEditFormValues(record: MyNotebookRecord): CreateFormValues {
+  return {
+    name: record.name,
+    description: record.description,
+    aiService: parseAiServiceValue(record.aiService),
+    dataset: record.dataset,
+    model: record.model,
+    cpuRequest: Number.parseFloat(record.cpuRequest),
+    cpuLimit: Number.parseFloat(record.cpuLimit),
+    memoryRequest: Number.parseFloat(record.memoryRequest),
+    memoryLimit: Number.parseFloat(record.memoryLimit),
+    gpuEnabled: record.gpuEnabled,
+    gpuType: record.gpuType,
+    gpuCount: record.gpuCount,
+    runtimeEnabled: record.runtimeEnabled,
+    runtimeHours: record.runtimeHours,
+    runtimeMinutes: record.runtimeMinutes,
+    image: record.image,
+    openPorts: record.openPorts.map(port => ({
+      protocol: port.protocol,
+      port: port.port,
+      purpose: port.purpose,
+    })),
+  }
+}
+
+function canEditNotebook(status: NotebookStatus): boolean {
+  return !['启动中', '排队中', '运行中'].includes(status)
+}
+
 function renderNotebookImageSummary(image: string) {
   const option = imageOptions.find(item => item.value === image)
   if (!option) {
@@ -554,13 +676,16 @@ const OnlineNotebook: React.FC = () => {
   const [previewImageValue, setPreviewImageValue] = useState<string>()
   const isCreateRoute = location.pathname === '/finetune/notebooks/create'
   const isMirrorRoute = location.pathname === '/finetune/notebooks/mirror'
+  const isEditRoute = /^\/finetune\/notebooks\/[^/]+\/edit$/.test(location.pathname)
   const isPublishCaseRoute = /^\/finetune\/notebooks\/[^/]+\/publish-case$/.test(location.pathname)
   const isCaseEditRoute = /^\/finetune\/notebooks\/cases\/[^/]+\/edit$/.test(location.pathname)
   const isCaseDetailRoute = /^\/finetune\/notebooks\/cases\/[^/]+$/.test(location.pathname)
-  const isDetailRoute = Boolean(id) && !isMirrorRoute && !isCreateRoute && !isPublishCaseRoute && !isCaseDetailRoute && !isCaseEditRoute
+  const isDetailRoute = Boolean(id) && !isMirrorRoute && !isCreateRoute && !isEditRoute && !isPublishCaseRoute && !isCaseDetailRoute && !isCaseEditRoute
   const gpuEnabled = Form.useWatch('gpuEnabled', form)
   const runtimeEnabled = Form.useWatch('runtimeEnabled', form)
+  const selectedImageValue = Form.useWatch('image', form)
   const notebookDetail = useMemo(() => (id ? rows.find(item => item.id === id) ?? null : null), [id, rows])
+  const editingNotebook = useMemo(() => (isEditRoute && id ? rows.find(item => item.id === id) ?? null : null), [id, isEditRoute, rows])
   const sourceNotebook = useMemo(
     () => (notebookId ? rows.find(item => item.id === notebookId) ?? null : null),
     [notebookId, rows],
@@ -602,12 +727,15 @@ const OnlineNotebook: React.FC = () => {
   useEffect(() => {
     if (isCreateRoute) {
       form.setFieldsValue(getCreateInitialValues())
+    } else if (isEditRoute && editingNotebook) {
+      form.setFieldsValue(toEditFormValues(editingNotebook))
     }
-  }, [form, isCreateRoute])
+  }, [editingNotebook, form, isCreateRoute, isEditRoute])
 
   useEffect(() => {
     if (
       !isCreateRoute &&
+      !isEditRoute &&
       !isMirrorRoute &&
       !isPublishCaseRoute &&
       !isCaseEditRoute &&
@@ -617,7 +745,7 @@ const OnlineNotebook: React.FC = () => {
       setActiveTab('square')
       setSearchValue('')
     }
-  }, [isCaseDetailRoute, isCaseEditRoute, isCreateRoute, isMirrorRoute, isPublishCaseRoute, location.search])
+  }, [isCaseDetailRoute, isCaseEditRoute, isCreateRoute, isEditRoute, isMirrorRoute, isPublishCaseRoute, location.search])
 
   useEffect(() => {
     if (isPublishCaseRoute) {
@@ -1044,6 +1172,14 @@ const OnlineNotebook: React.FC = () => {
               >
                 启动
               </Button>
+              <Button
+                type="link"
+                size="small"
+                disabled={!canEditNotebook(record.status)}
+                onClick={() => navigate(`/finetune/notebooks/${record.id}/edit`)}
+              >
+                编辑
+              </Button>
               <Button type="link" size="small" onClick={() => navigate(`/finetune/notebooks/${record.id}`)}>
                 查看详情
               </Button>
@@ -1082,6 +1218,15 @@ const OnlineNotebook: React.FC = () => {
     navigate('/finetune/notebooks')
   }
 
+  const closeEdit = () => {
+    if (editingNotebook) {
+      navigate(`/finetune/notebooks/${editingNotebook.id}`)
+      return
+    }
+
+    navigate('/finetune/notebooks')
+  }
+
   const openImagePicker = () => {
     const currentImage = imageOptions.find(item => item.value === (form.getFieldValue('image') as string | undefined)) ?? imageOptions[0]
     setImageSource(currentImage.source)
@@ -1091,6 +1236,35 @@ const OnlineNotebook: React.FC = () => {
     setImageDrawerOpen(true)
   }
 
+  const switchImageSource = (source: 'system' | 'custom') => {
+    const firstImage = imageOptions.find(item => item.source === source)
+    setImageSource(source)
+    if (firstImage) {
+      setPythonVersionFilter(firstImage.pythonVersion)
+      setFrameworkFilter(firstImage.framework)
+      setPreviewImageValue(firstImage.value)
+    }
+  }
+
+  const switchPythonVersionFilter = (pythonVersion: string) => {
+    const firstImage = imageOptions.find(item => item.source === imageSource && item.pythonVersion === pythonVersion)
+    setPythonVersionFilter(pythonVersion)
+    if (firstImage) {
+      setFrameworkFilter(firstImage.framework)
+      setPreviewImageValue(firstImage.value)
+    }
+  }
+
+  const switchFrameworkFilter = (framework: string) => {
+    const firstImage = imageOptions.find(
+      item => item.source === imageSource && item.pythonVersion === pythonVersionFilter && item.framework === framework,
+    )
+    setFrameworkFilter(framework)
+    if (firstImage) {
+      setPreviewImageValue(firstImage.value)
+    }
+  }
+
   const confirmImagePicker = () => {
     if (!previewImage) {
       message.warning('请选择镜像')
@@ -1098,7 +1272,9 @@ const OnlineNotebook: React.FC = () => {
     }
 
     form.setFieldValue('image', previewImage.value)
+    form.setFields([{ name: 'image', errors: [] }])
     setImageDrawerOpen(false)
+    message.success('镜像已选择')
   }
 
   const submitCreate = async () => {
@@ -1136,6 +1312,50 @@ const OnlineNotebook: React.FC = () => {
       setRows(previous => [newRecord, ...previous])
       message.success('Notebook 创建成功')
       closeCreate()
+    } catch {
+      return
+    }
+  }
+
+  const submitEdit = async () => {
+    if (!editingNotebook || !canEditNotebook(editingNotebook.status)) {
+      message.warning('请先停止 Notebook 后再编辑配置')
+      return
+    }
+
+    try {
+      const values = await form.validateFields()
+      setRows(previous =>
+        previous.map(item =>
+          item.id === editingNotebook.id
+            ? {
+                ...item,
+                name: values.name || item.name,
+                description: values.description?.trim() || '',
+                image: values.image || item.image,
+                spec: buildSpecSummary(values),
+                runtimeLimit: buildRuntimeLimit(values),
+                updatedAt: nowText(),
+                aiService: formatAiServiceLabel(values.aiService),
+                dataset: values.dataset,
+                model: values.model,
+                cpuRequest: `${values.cpuRequest || '-'} Core`,
+                cpuLimit: `${values.cpuLimit || '-'} Core`,
+                memoryRequest: `${values.memoryRequest || '-'} GB`,
+                memoryLimit: `${values.memoryLimit || '-'} GB`,
+                gpuEnabled: Boolean(values.gpuEnabled),
+                gpuType: values.gpuEnabled ? values.gpuType : undefined,
+                gpuCount: values.gpuEnabled ? values.gpuCount : undefined,
+                runtimeEnabled: Boolean(values.runtimeEnabled),
+                runtimeHours: values.runtimeEnabled ? values.runtimeHours : undefined,
+                runtimeMinutes: values.runtimeEnabled ? values.runtimeMinutes : undefined,
+                openPorts: toPortRecords(values.openPorts),
+              }
+            : item,
+        ),
+      )
+      message.success('Notebook 配置已保存，重新启动后生效')
+      navigate(`/finetune/notebooks/${editingNotebook.id}`)
     } catch {
       return
     }
@@ -1279,16 +1499,36 @@ const OnlineNotebook: React.FC = () => {
     </>
   )
 
-  if (isCreateRoute) {
+  if (isEditRoute && (!editingNotebook || !canEditNotebook(editingNotebook.status))) {
+    return (
+      <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(editingNotebook ? `/finetune/notebooks/${editingNotebook.id}` : '/finetune/notebooks')} style={{ marginBottom: 20 }}>
+          返回
+        </Button>
+        <Alert
+          type="warning"
+          showIcon
+          message={editingNotebook ? '运行中的 Notebook 暂不支持编辑配置' : 'Notebook 不存在'}
+          description={editingNotebook ? '请先停止 Notebook，停止后可进入编辑页修改原创建配置；再次启动前可反复编辑。' : '请返回列表重新选择要编辑的 Notebook。'}
+        />
+      </div>
+    )
+  }
+
+  if (isCreateRoute || isEditRoute) {
+    const isEditing = Boolean(isEditRoute && editingNotebook)
     return (
       <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-          <Button icon={<ArrowLeftOutlined />} onClick={closeCreate}>
+          <Button icon={<ArrowLeftOutlined />} onClick={isEditing ? closeEdit : closeCreate}>
             返回
           </Button>
         </div>
 
         <Card style={cardStyle}>
+          <Title level={4} style={{ marginTop: 0, marginBottom: 20 }}>
+            {isEditing ? '编辑 Notebook' : '创建 Notebook'}
+          </Title>
           <Form form={form} layout="vertical" initialValues={getCreateInitialValues()}>
             <div style={{ display: 'grid', gap: 18 }}>
               <Card size="small" style={sectionCardStyle}>
@@ -1436,9 +1676,28 @@ const OnlineNotebook: React.FC = () => {
                   validateStatus={form.getFieldError('image').length ? 'error' : ''}
                   help={form.getFieldError('image')[0]}
                 >
-                  <Button icon={<PlusOutlined />} onClick={openImagePicker} style={{ width: 160 }}>
-                    添加镜像
-                  </Button>
+                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                    <Button icon={<PlusOutlined />} onClick={openImagePicker} style={{ width: 160 }}>
+                      添加镜像
+                    </Button>
+                    {selectedImageValue ? (
+                      <div
+                        style={{
+                          width: '100%',
+                          maxWidth: 560,
+                          border: '1px solid #dbeafe',
+                          background: '#f8fbff',
+                          borderRadius: 12,
+                          padding: '12px 14px',
+                        }}
+                      >
+                        <Text type="secondary" style={{ display: 'block', marginBottom: 6 }}>
+                          当前镜像
+                        </Text>
+                        {renderNotebookImageSummary(selectedImageValue)}
+                      </div>
+                    ) : null}
+                  </Space>
                 </Form.Item>
               </Card>
 
@@ -1528,10 +1787,10 @@ const OnlineNotebook: React.FC = () => {
             </div>
 
             <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
-              <Button type="primary" onClick={submitCreate}>
-                创建
+              <Button type="primary" onClick={isEditing ? submitEdit : submitCreate}>
+                {isEditing ? '保存' : '创建'}
               </Button>
-              <Button onClick={closeCreate}>取消</Button>
+              <Button onClick={isEditing ? closeEdit : closeCreate}>取消</Button>
             </div>
           </Form>
         </Card>
@@ -1555,7 +1814,7 @@ const OnlineNotebook: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '260px minmax(0, 280px) 1fr', minHeight: 520 }}>
             <div style={{ paddingRight: 20, borderRight: '1px solid #f1f5f9' }}>
               <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 18 }}>镜像来源</div>
-              <Radio.Group value={imageSource} onChange={event => setImageSource(event.target.value)} style={{ marginBottom: 28 }}>
+              <Radio.Group value={imageSource} onChange={event => switchImageSource(event.target.value)} style={{ marginBottom: 28 }}>
                 <Space size={24}>
                   <Radio value="system">系统镜像</Radio>
                   <Radio value="custom">自定义镜像</Radio>
@@ -1569,7 +1828,7 @@ const OnlineNotebook: React.FC = () => {
                     key={item}
                     size="small"
                     type={pythonVersionFilter === item ? 'primary' : 'default'}
-                    onClick={() => setPythonVersionFilter(item)}
+                    onClick={() => switchPythonVersionFilter(item)}
                   >
                     {item}
                   </Button>
@@ -1583,7 +1842,7 @@ const OnlineNotebook: React.FC = () => {
                     key={item}
                     size="small"
                     type={frameworkFilter === item ? 'primary' : 'default'}
-                    onClick={() => setFrameworkFilter(item)}
+                    onClick={() => switchFrameworkFilter(item)}
                   >
                     {item}
                   </Button>
@@ -1956,6 +2215,12 @@ const OnlineNotebook: React.FC = () => {
               onClick={() => openStopNotebook(notebookDetail)}
             >
               停止
+            </Button>
+            <Button
+              disabled={!canEditNotebook(notebookDetail.status)}
+              onClick={() => navigate(`/finetune/notebooks/${notebookDetail.id}/edit`)}
+            >
+              编辑
             </Button>
             <Button
               icon={<ReloadOutlined />}

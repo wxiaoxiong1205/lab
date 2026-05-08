@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react'
 import {
   Button,
   Card,
-  Checkbox,
   Descriptions,
   Form,
   Input,
@@ -17,7 +16,7 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined } from '@ant-design/icons'
-import { mockBaseModels } from '../../data/mockDataAll'
+import { CUSTOM_MODEL_PROVIDER, knownModelProviders, loadBaseModelCatalog, modelProviderOptions, saveBaseModelCatalog } from '../../data/modelCatalog'
 import type { BaseModelRecord } from '../../types/shared'
 import {
   canRunTaskLifecycleAction,
@@ -33,20 +32,22 @@ type BaseModelRow = Omit<BaseModelRecord, 'status'> & {
   modelSource: 'local' | 'modelscope'
 }
 
-const modelTypeOptions = [
-  { value: '文本生成', label: '文本生成' },
-  { value: '图像理解', label: '图像理解' },
-]
+const toBaseModelRow = (model: BaseModelRecord, index: number): BaseModelRow => ({
+  ...model,
+  status: model.status === 'running' ? '运行中' : '已创建',
+  modelSource: index % 2 === 0 ? 'modelscope' : 'local',
+})
 
-const providerOptions = [
-  { value: 'Qwen', label: 'Qwen' },
-]
-
-const seedRows: BaseModelRow[] = [
-  { ...mockBaseModels[0], type: '文本生成', provider: 'Qwen', status: '运行中', modelSource: 'modelscope' },
-  { ...mockBaseModels[1], type: '文本生成', provider: 'Qwen', status: '已创建', modelSource: 'modelscope' },
-  { ...mockBaseModels[2], type: '图像理解', provider: 'Qwen', status: '失败', modelSource: 'modelscope' },
-]
+const toCatalogModel = (row: BaseModelRow): BaseModelRecord => ({
+  id: row.id,
+  code: row.code,
+  name: row.name,
+  description: row.description,
+  provider: row.provider,
+  address: row.address,
+  status: row.status === '运行中' ? 'running' : 'stopped',
+  createdAt: row.createdAt,
+})
 
 function statusTag(status: TaskLifecycleStatus): React.ReactNode {
   const config = TASK_LIFECYCLE_TAG[status]
@@ -55,42 +56,50 @@ function statusTag(status: TaskLifecycleStatus): React.ReactNode {
 
 const BaseModelManagement: React.FC = () => {
   const [form] = Form.useForm()
-  const [typeFilter, setTypeFilter] = useState<string>()
   const [providerFilter, setProviderFilter] = useState<string>()
   const [createOpen, setCreateOpen] = useState(false)
   const [detailRecord, setDetailRecord] = useState<BaseModelRow | null>(null)
-  const [rows, setRows] = useState(seedRows)
+  const [rows, setRows] = useState<BaseModelRow[]>(() => loadBaseModelCatalog().map(toBaseModelRow))
   const [modelSource, setModelSource] = useState<'local' | 'modelscope'>('local')
+  const selectedProvider = Form.useWatch('provider', form) as string | undefined
+
+  const modelCodeOptions = useMemo(
+    () =>
+      rows
+        .filter(model => {
+          if (!selectedProvider || selectedProvider === CUSTOM_MODEL_PROVIDER) return true
+          return model.provider === selectedProvider
+        })
+        .map(model => ({ value: model.code, label: model.code })),
+    [rows, selectedProvider],
+  )
+
+  const commitRows = (updater: (previous: BaseModelRow[]) => BaseModelRow[]) => {
+    setRows(previous => {
+      const next = updater(previous)
+      saveBaseModelCatalog(next.map(toCatalogModel))
+      return next
+    })
+  }
 
   const filteredData = useMemo(
     () =>
       rows.filter(item => {
-        const matchType = !typeFilter || item.type === typeFilter
-        const matchProvider = !providerFilter || item.provider === providerFilter
-        return matchType && matchProvider
+        const matchProvider =
+          !providerFilter ||
+          (providerFilter === CUSTOM_MODEL_PROVIDER
+            ? Boolean(item.provider && !knownModelProviders.includes(item.provider))
+            : item.provider === providerFilter)
+        return matchProvider
       }),
-    [providerFilter, rows, typeFilter],
+    [providerFilter, rows],
   )
 
   const columns: ColumnsType<BaseModelRow> = [
-    { title: '模型Code', dataIndex: 'name', key: 'name', width: 220 },
+    { title: '模型Code', dataIndex: 'code', key: 'code', width: 220 },
     { title: '描述', dataIndex: 'description', key: 'description', width: 260, render: value => value || '-' },
-    { title: '模型类型', dataIndex: 'type', key: 'type', width: 130, render: value => <Tag color="blue">{value}</Tag> },
     { title: '模型提供商', dataIndex: 'provider', key: 'provider', width: 150 },
     { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: value => statusTag(value) },
-    {
-      title: '支持能力',
-      dataIndex: 'capabilities',
-      key: 'capabilities',
-      width: 180,
-      render: value => (
-        <Space wrap size={6}>
-          {value?.map((item: string) => (
-            <Tag key={item}>{item}</Tag>
-          ))}
-        </Space>
-      ),
-    },
     {
       title: '操作',
       key: 'action',
@@ -102,7 +111,7 @@ const BaseModelManagement: React.FC = () => {
               type="link"
               size="small"
               onClick={() =>
-                setRows(previous =>
+                commitRows(previous =>
                   previous.map(item =>
                     item.id === record.id
                       ? {
@@ -122,7 +131,7 @@ const BaseModelManagement: React.FC = () => {
               type="link"
               size="small"
               onClick={() =>
-                setRows(previous =>
+                commitRows(previous =>
                   previous.map(item =>
                     item.id === record.id ? { ...item, status: '已创建' } : item,
                   ),
@@ -141,7 +150,7 @@ const BaseModelManagement: React.FC = () => {
             size="small"
             danger
             disabled={!canRunTaskLifecycleAction(record.status, 'delete')}
-            onClick={() => setRows(previous => previous.filter(item => item.id !== record.id))}
+            onClick={() => commitRows(previous => previous.filter(item => item.id !== record.id))}
           >
             删除
           </Button>
@@ -150,7 +159,7 @@ const BaseModelManagement: React.FC = () => {
             size="small"
             disabled={!canRunTaskLifecycleAction(record.status, 'terminate')}
             onClick={() =>
-              setRows(previous =>
+              commitRows(previous =>
                 previous.map(item => (item.id === record.id ? { ...item, status: '已终止' } : item)),
               )
             }
@@ -166,15 +175,14 @@ const BaseModelManagement: React.FC = () => {
     try {
       await form.validateFields()
       const values = form.getFieldsValue()
-      setRows(previous => [
+      const provider = values.provider === CUSTOM_MODEL_PROVIDER ? values.customProvider?.trim() : values.provider
+      commitRows(previous => [
         {
           id: `base-${Date.now()}`,
           code: values.code,
           name: values.code,
           description: values.description,
-          type: values.type,
-          provider: values.provider,
-          capabilities: values.capabilities || [],
+          provider,
           status: '已创建',
           modelSource: values.modelSource,
           createdAt: new Date().toISOString(),
@@ -198,23 +206,15 @@ const BaseModelManagement: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
             <Space wrap>
               <Select
-                placeholder="请选择模型类型"
-                allowClear
-                value={typeFilter}
-                onChange={value => setTypeFilter(value)}
-                style={{ width: 160 }}
-                options={modelTypeOptions}
-              />
-              <Select
                 placeholder="请选择模型提供商"
                 allowClear
                 value={providerFilter}
                 onChange={value => setProviderFilter(value)}
                 style={{ width: 180 }}
-                options={providerOptions}
+                options={modelProviderOptions}
               />
               <Button>搜索</Button>
-              <Button onClick={() => { setTypeFilter(undefined); setProviderFilter(undefined) }}>重置</Button>
+              <Button onClick={() => { setProviderFilter(undefined) }}>重置</Button>
             </Space>
             <Space>
               <Button>刷新</Button>
@@ -238,7 +238,7 @@ const BaseModelManagement: React.FC = () => {
             columns={columns}
             dataSource={filteredData}
             pagination={{ pageSize: 10 }}
-            scroll={{ x: 1520 }}
+            scroll={{ x: 1180 }}
           />
         </Card>
       </div>
@@ -281,30 +281,32 @@ const BaseModelManagement: React.FC = () => {
               </Typography.Link>
             </Space>
           </Form.Item>
-          <Form.Item label="模型类型" name="type" rules={[{ required: true, message: '请选择模型类型' }]}>
-            <Select
-              placeholder="请选择模型类型"
-              options={modelTypeOptions}
-            />
-          </Form.Item>
           <Form.Item label="模型提供商" name="provider" rules={[{ required: true, message: '请选择模型提供商' }]}>
             <Select
               placeholder="请选择模型提供商"
-              options={providerOptions}
+              options={modelProviderOptions}
+              onChange={() => form.setFieldsValue({ customProvider: undefined, code: undefined })}
             />
           </Form.Item>
-          {modelSource === 'local' ? (
-            <Form.Item label="模型Code" name="code" rules={[{ required: true, message: '请选择模型Code' }]}>
-              <Select
-                showSearch
-                placeholder="请选择模型Code"
-                options={[
-                  { value: 'qwen2.5-7b-instruct', label: 'qwen2.5-7b-instruct' },
-                  { value: 'qwen2.5-1.5b-instruct', label: 'qwen2.5-1.5b-instruct' },
-                  { value: 'qwen2.5-vl-7b-instruct', label: 'qwen2.5-vl-7b-instruct' },
-                ]}
-              />
+          {selectedProvider === CUSTOM_MODEL_PROVIDER && (
+            <Form.Item label="自定义提供商" name="customProvider" rules={[{ required: true, message: '请输入自定义提供商' }]}>
+              <Input placeholder="请输入模型提供商名称" />
             </Form.Item>
+          )}
+          {modelSource === 'local' ? (
+            selectedProvider === CUSTOM_MODEL_PROVIDER ? (
+              <Form.Item label="模型Code" name="code" rules={[{ required: true, message: '请输入模型Code' }]}>
+                <Input placeholder="请输入模型code" />
+              </Form.Item>
+            ) : (
+              <Form.Item label="模型Code" name="code" rules={[{ required: true, message: '请选择模型Code' }]}>
+                <Select
+                  showSearch
+                  placeholder="请选择模型Code"
+                  options={modelCodeOptions}
+                />
+              </Form.Item>
+            )
           ) : (
             <>
               <Form.Item label="模型Code" name="code" rules={[{ required: true, message: '请输入模型Code' }]}>
@@ -324,14 +326,6 @@ const BaseModelManagement: React.FC = () => {
               </Form.Item>
             </>
           )}
-          <Form.Item label="支持能力" name="capabilities" rules={[{ required: true, message: '请选择支持能力' }]}>
-            <Checkbox.Group
-              options={[
-                { value: '训练', label: '训练' },
-                { value: '推理', label: '推理' },
-              ]}
-            />
-          </Form.Item>
           <Form.Item label="模型描述" name="description">
             <Input.TextArea rows={3} maxLength={200} showCount placeholder="请输入模型描述" />
           </Form.Item>
@@ -348,11 +342,9 @@ const BaseModelManagement: React.FC = () => {
           <Descriptions column={2} bordered size="small">
             <Descriptions.Item label="模型Code" span={2}>{detailRecord.code}</Descriptions.Item>
             <Descriptions.Item label="模型名称">{detailRecord.name}</Descriptions.Item>
-            <Descriptions.Item label="模型类型">{detailRecord.type || '-'}</Descriptions.Item>
             <Descriptions.Item label="模型提供商">{detailRecord.provider || '-'}</Descriptions.Item>
             <Descriptions.Item label="状态">{statusTag(detailRecord.status)}</Descriptions.Item>
             <Descriptions.Item label="模型来源">{detailRecord.modelSource === 'local' ? '本地' : 'ModelScope'}</Descriptions.Item>
-            <Descriptions.Item label="支持能力" span={2}>{detailRecord.capabilities?.join('、') || '-'}</Descriptions.Item>
             <Descriptions.Item label="创建时间" span={2}>{detailRecord.createdAt}</Descriptions.Item>
             <Descriptions.Item label="描述" span={2}>{detailRecord.description || '-'}</Descriptions.Item>
           </Descriptions>

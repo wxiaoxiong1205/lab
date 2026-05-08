@@ -1,5 +1,6 @@
 import { TrainingTask, type TrainingMethod, type TrainedModel, type TrainingVersion } from '../types/training'
 import type { BaseModel, BaseModelSeries, BaseModelVariant } from '../types/training'
+import { getTrainingTypeFromModel, mockBaseModelCatalog } from './modelCatalog'
 
 /** 参考真实页面数据的完整训练配置（模拟 V1.12测试项目 的 V1 版本） */
 const MOCK_SFT_CONFIG = {
@@ -598,32 +599,14 @@ export const mockTasks: TrainingTask[] = [
 
 const QWEN = 'qwen' as const
 
-/** Qwen 系列下的具体模型；type 为 text=文本生成，vision=图像理解（含 VL） */
-export const baseModelVariants: BaseModelVariant[] = [
-  // 文本生成
-  { id: 'qwen2.5-0.5b-instruct', name: 'Qwen2.5-0.5B-Instruct', seriesId: QWEN, type: 'text' },
-  { id: 'qwen2.5-0.5b-instruct-gptq', name: 'Qwen2.5-0.5B-Instruct-GPTQ-Int8', seriesId: QWEN, type: 'text' },
-  { id: 'qwen2.5-0.5b-instruct-awq', name: 'Qwen2.5-0.5B-Instruct-AWQ', seriesId: QWEN, type: 'text' },
-  { id: 'qwen2.5-1.5b-instruct', name: 'Qwen2.5-1.5B-Instruct', seriesId: QWEN, type: 'text' },
-  { id: 'qwen2.5-7b-instruct', name: 'Qwen2.5-7B-Instruct', seriesId: QWEN, type: 'text' },
-  { id: 'qwen2.5-32b-instruct', name: 'Qwen2.5-32B-Instruct', seriesId: QWEN, type: 'text' },
-  { id: 'qwen3-0.6b-fp8', name: 'Qwen3-0.6B-FP8', seriesId: QWEN, type: 'text' },
-  { id: 'qwen3-0.6b-gguf', name: 'Qwen3-0.6B-GGUF', seriesId: QWEN, type: 'text' },
-  { id: 'qwen3-1.7b', name: 'Qwen3-1.7B', seriesId: QWEN, type: 'text' },
-  { id: 'qwen3-1.7b-fp8', name: 'Qwen3-1.7B-FP8', seriesId: QWEN, type: 'text' },
-  { id: 'qwen3-1.7b-gptq', name: 'Qwen3-1.7B-GPTQ-Int8', seriesId: QWEN, type: 'text' },
-  { id: 'qwen3-1.7b-mlx-6bit', name: 'Qwen3-1.7B-MLX-6bit', seriesId: QWEN, type: 'text' },
-  { id: 'qwen3-1.7b-mlx-8bit', name: 'Qwen3-1.7B-MLX-8bit', seriesId: QWEN, type: 'text' },
-  { id: 'qwen3-4b', name: 'Qwen3-4B', seriesId: QWEN, type: 'text' },
-  { id: 'qwen3-8b', name: 'Qwen3-8B', seriesId: QWEN, type: 'text' },
-  { id: 'qwen3-8b-gguf', name: 'Qwen3-8B-GGUF', seriesId: QWEN, type: 'text' },
-  { id: 'qwen3-5-4b', name: 'Qwen3.5-4B', seriesId: QWEN, type: 'text' },
-  { id: 'qwen3-asr-0.6b', name: 'Qwen3-ASR-0.6B', seriesId: QWEN, type: 'text' },
-  { id: 'qwen3-reranker-0.6b', name: 'Qwen3-Reranker-0.6B', seriesId: QWEN, type: 'text' },
-  // 图像理解（VLM）
-  { id: 'qwen2-vl-2b-instruct', name: 'Qwen2-VL-2B-Instruct', seriesId: QWEN, type: 'vision' },
-  { id: 'qwen3-vl-8b-instruct', name: 'Qwen3-VL-8B-Instruct', seriesId: QWEN, type: 'vision' },
-]
+/** 模型仓库中的具体模型；type 为 text=文本生成，vision=图像理解（含 VL） */
+export const baseModelVariants: BaseModelVariant[] = mockBaseModelCatalog
+  .map(model => ({
+    id: model.code,
+    name: model.name,
+    seriesId: model.provider ?? QWEN,
+    type: getTrainingTypeFromModel(model),
+  }))
 
 /** @deprecated 请用 baseModelVariants；保留兼容导出 */
 export const baseModels: BaseModel[] = baseModelVariants

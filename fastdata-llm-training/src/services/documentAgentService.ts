@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { productManual } from '../docs/productManual'
 
 export type DocumentAgentStatus = 'stopped' | 'starting' | 'running' | 'failed'
 export type DocumentAgentIndexStatus = 'not_built' | 'building' | 'ready' | 'failed'
@@ -126,6 +127,14 @@ function persistFallbackServices(nextServices: DocumentAgentServiceRecord[]) {
   }
 }
 
+function normalizeSingleService(services: DocumentAgentServiceRecord[]): DocumentAgentServiceRecord[] {
+  if (services.length <= 1) {
+    return services
+  }
+
+  return [services.find(item => item.status === 'running') ?? services[0]]
+}
+
 async function requestJson<T>(input: string, init?: RequestInit): Promise<T | null> {
   if (typeof fetch === 'undefined') {
     return null
@@ -158,29 +167,38 @@ function nowText() {
 
 function localSearchAnswer(question: string): DocumentAgentChatResponse {
   const lowerQuestion = question.toLowerCase()
-  const matches = [
-    {
-      docId: 'usage-guide',
-      title: '使用指南',
-      sectionTitle: '典型工作流',
-      routePath: '/docs/usage-guide',
-      anchor: 'typical-workflow',
-      snippet: '平台支持数据准备、训练、评估与发布等典型工作流。',
-      score: lowerQuestion.includes('训练') || lowerQuestion.includes('workflow') ? 0.92 : 0.68,
-    },
-    {
-      docId: 'system-settings',
-      title: '系统配置',
-      sectionTitle: 'Agent助手',
-      routePath: '/admin/settings?tab=agent',
-      anchor: 'document-agent',
-      snippet: '系统配置中的 Agent助手用于维护文档中心的全局问答服务。',
-      score: lowerQuestion.includes('agent') || lowerQuestion.includes('助手') ? 0.9 : 0.62,
-    },
-  ].sort((a, b) => b.score - a.score)
+  const compactQuestion = lowerQuestion.replace(/[\s,，。！？?;；:：/\\-]+/g, '')
+  const cleanedQuestion = compactQuestion
+    .replace(/^(如何|怎么|怎样|请问|什么是|如何查看|如何创建)/, '')
+    .replace(/(是什么|有哪些能力|有哪些|有什么能力|怎么做|怎么操作|如何操作|的内容是)$/, '')
+  const tokens = Array.from(
+    new Set([
+      ...lowerQuestion.split(/[\s,，。！？?;；:：/\\-]+/),
+      compactQuestion,
+      cleanedQuestion,
+    ].filter(token => token.length >= 2)),
+  )
+  const matches = productManual.chunks
+    .map((item, index) => {
+      const haystack = `${item.title} ${item.sectionTitle} ${item.content}`.toLowerCase()
+      const keywordScore = tokens.reduce((score, token) => score + (haystack.includes(token) ? Math.min(token.length, 8) : 0), 0)
+      const directScore = haystack.includes(lowerQuestion) ? 2 : 0
+
+      return {
+        docId: item.docId,
+        title: item.title,
+        sectionTitle: item.sectionTitle,
+        routePath: item.routePath,
+        anchor: item.anchor,
+        snippet: item.content.slice(0, 110),
+        score: keywordScore + directScore || Math.max(0.2, 0.7 - index * 0.01),
+      }
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
 
   return {
-    answer: `已根据内置文档找到 ${matches.length} 条相关定位。当前最相关的是「${matches[0].title} / ${matches[0].sectionTitle}」，可点击引用直接跳转。`,
+    answer: `已根据《${productManual.title}》找到 ${matches.length} 条相关定位。当前最相关的是「${matches[0].sectionTitle}」，可点击引用直接跳转。`,
     citations: matches,
     conversationId: `local-${Date.now()}`,
     serviceName: '本地文档助手',
@@ -205,7 +223,7 @@ export function hasEmbeddingConfigChanged(
 export const documentAgentApi = {
   async listServices(): Promise<DocumentAgentServiceRecord[]> {
     const remote = await requestJson<{ items: DocumentAgentServiceRecord[] }>(`${API_ROOT}/services`)
-    return remote?.items ?? readFallbackServices()
+    return normalizeSingleService(remote?.items ?? readFallbackServices())
   },
 
   async getActiveService(): Promise<DocumentAgentServiceRecord | null> {
@@ -224,7 +242,7 @@ export const documentAgentApi = {
     })
 
     if (remote?.items) {
-      return remote.items
+      return normalizeSingleService(remote.items)
     }
 
     const nextServices = [
@@ -238,7 +256,6 @@ export const documentAgentApi = {
         createdAt: nowText(),
         updatedAt: nowText(),
       },
-      ...readFallbackServices(),
     ]
     persistFallbackServices(nextServices)
     return nextServices
@@ -251,7 +268,7 @@ export const documentAgentApi = {
     })
 
     if (remote?.items) {
-      return remote.items
+      return normalizeSingleService(remote.items)
     }
 
     const nextServices = readFallbackServices().map(item =>
@@ -273,7 +290,7 @@ export const documentAgentApi = {
     })
 
     if (remote?.items) {
-      return remote.items
+      return normalizeSingleService(remote.items)
     }
 
     const nextServices = readFallbackServices().filter(item => item.id !== id)
@@ -287,7 +304,7 @@ export const documentAgentApi = {
     })
 
     if (remote?.items) {
-      return remote.items
+      return normalizeSingleService(remote.items)
     }
 
     const nextServices = readFallbackServices().map(item =>
@@ -305,7 +322,7 @@ export const documentAgentApi = {
     })
 
     if (remote?.items) {
-      return remote.items
+      return normalizeSingleService(remote.items)
     }
 
     const nextServices = readFallbackServices().map(item =>
@@ -321,7 +338,7 @@ export const documentAgentApi = {
     })
 
     if (remote?.items) {
-      return remote.items
+      return normalizeSingleService(remote.items)
     }
 
     const nextServices = readFallbackServices().map(item =>

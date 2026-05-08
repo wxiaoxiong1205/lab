@@ -1,12 +1,13 @@
 import { createServer } from 'node:http'
 import { readFile, writeFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const dbPath = path.join(__dirname, 'data-service-db.json')
 const documentAgentDbPath = path.join(__dirname, 'document-agent-db.json')
+const documentKnowledgeBasePath = path.join(__dirname, 'document-knowledge-base.json')
 const port = Number(process.env.DATA_SERVICE_API_PORT || 5203)
 
 function makeDataset({
@@ -93,48 +94,7 @@ const seedState = {
   cleaningTasks: [],
 }
 
-const documentKnowledgeBase = [
-  {
-    docId: 'usage-guide',
-    title: '使用指南',
-    sectionTitle: '平台概览',
-    routePath: '/docs/usage-guide',
-    anchor: 'platform-overview',
-    content: '平台当前采用项目空间与系统管理双入口结构。登录后默认进入项目空间，点击项目后进入数据服务、模型训练、模型评估、模型服务与机器学习等业务模块。',
-  },
-  {
-    docId: 'usage-guide',
-    title: '使用指南',
-    sectionTitle: '典型工作流',
-    routePath: '/docs/usage-guide',
-    anchor: 'typical-workflow',
-    content: '典型工作流包括准备数据、发起训练、评估与发布。用户可在训练数据管理中准备数据，在大模型训练中创建任务，在效果评估和模型服务中完成验证与发布。',
-  },
-  {
-    docId: 'usage-guide',
-    title: '使用指南',
-    sectionTitle: '权限与项目',
-    routePath: '/docs/usage-guide',
-    anchor: 'permission-project',
-    content: '系统管理中的项目管理用于维护项目成员和数据权限。用户需要先从项目空间点击项目卡片进入，再执行训练、评估和部署等业务操作。',
-  },
-  {
-    docId: 'system-settings-agent',
-    title: '系统配置',
-    sectionTitle: 'Agent助手',
-    routePath: '/admin/settings?tab=agent',
-    anchor: 'document-agent',
-    content: '系统配置的 Agent助手用于维护文档中心全局服务。管理员可以分别配置 Embedding、Rerank 和对话模型，同一时间只能启动一个文档中心 Agent 服务。',
-  },
-  {
-    docId: 'document-center-agent',
-    title: '文档中心',
-    sectionTitle: 'Agent助手',
-    routePath: '/docs/usage-guide',
-    anchor: 'agent-assistant',
-    content: '文档中心存在启动中的 Agent 服务时会显示 Agent助手。用户可以通过对话查找文档，回答会展示引用来源、章节和跳转定位。',
-  },
-]
+const documentKnowledgeBase = JSON.parse(readFileSync(documentKnowledgeBasePath, 'utf8'))
 
 const seedDocumentAgentState = {
   services: [
@@ -248,6 +208,9 @@ async function readDocumentAgentDb() {
     if (!existingIds.has(item.id)) {
       state.services.push(clone(item))
     }
+  }
+  if (state.services.length > 1) {
+    state.services = [state.services.find(item => item.status === 'running') || state.services[0]]
   }
 
   return state
@@ -367,11 +330,21 @@ function normalizeText(value) {
   return String(value || '').toLowerCase()
 }
 
+function getSearchTerms(question) {
+  const query = normalizeText(question)
+  const tokens = query.split(/[\s,，。！？?;；:：/\\-]+/).filter(Boolean)
+  const compact = query.replace(/[\s,，。！？?;；:：/\\-]+/g, '')
+  const cleaned = compact
+    .replace(/^(如何|怎么|怎样|请问|什么是|如何查看|如何创建)/, '')
+    .replace(/(是什么|有哪些能力|有哪些|有什么能力|怎么做|怎么操作|如何操作|的内容是)$/, '')
+  return Array.from(new Set([...tokens, compact, cleaned].filter(term => term.length >= 2)))
+}
+
 function scoreDocument(question, item) {
   const query = normalizeText(question)
   const haystack = normalizeText(`${item.title} ${item.sectionTitle} ${item.content}`)
-  const tokens = query.split(/[\s,，。！？?;；:：/\\-]+/).filter(Boolean)
-  const keywordScore = tokens.reduce((score, token) => score + (haystack.includes(token) ? 1 : 0), 0)
+  const tokens = getSearchTerms(question)
+  const keywordScore = tokens.reduce((score, token) => score + (haystack.includes(token) ? Math.min(token.length, 8) : 0), 0)
   const directScore = haystack.includes(query) ? 2 : 0
   return keywordScore + directScore + (item.title && query.includes(normalizeText(item.title)) ? 1 : 0)
 }
@@ -435,7 +408,7 @@ const server = createServer(async (req, res) => {
     const body = await readBody(req)
     const state = await readDocumentAgentDb()
     const createdAt = nowText()
-    state.services.unshift({
+    state.services = [{
       id: `doc-agent-${Date.now()}`,
       name: body.name,
       directory: '文档中心',
@@ -448,7 +421,7 @@ const server = createServer(async (req, res) => {
       createdBy: 'system_admin',
       createdAt,
       updatedAt: createdAt,
-    })
+    }]
     await writeDocumentAgentDb(state)
     return json(res, 200, { items: state.services })
   }

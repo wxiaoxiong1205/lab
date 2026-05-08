@@ -3,7 +3,9 @@ import {
   Alert,
   Button,
   Card,
+  Collapse,
   Divider,
+  Empty,
   Form,
   Input,
   InputNumber,
@@ -11,22 +13,19 @@ import {
   Radio,
   Select,
   Space,
-  Table,
+  Spin,
   Tag,
   Typography,
   message,
 } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
-import { ApiOutlined, CloudSyncOutlined, PlayCircleOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { ApiOutlined, CloudSyncOutlined, EditOutlined, PlayCircleOutlined, ReloadOutlined, ToolOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import {
   documentAgentApi,
   hasEmbeddingConfigChanged,
   type AgentAdvancedParams,
-  type DocumentAgentIndexStatus,
   type DocumentAgentPayload,
   type DocumentAgentServiceRecord,
-  type DocumentAgentStatus,
   useDocumentAgentServices,
 } from '../../services/documentAgentService'
 import { useOnlineInferenceServices } from '../../services/onlineInferenceServiceStore'
@@ -54,10 +53,12 @@ const defaultAdvancedParams: AgentAdvancedParams = {
   presencePenalty: 0,
 }
 
-const cardStyle: React.CSSProperties = {
+const panelStyle: React.CSSProperties = {
   borderRadius: 16,
   border: '1px solid #e5e7eb',
   boxShadow: '0 8px 26px rgba(15, 23, 42, 0.04)',
+  background: '#fff',
+  padding: 20,
 }
 
 interface DocumentAgentFormValues {
@@ -77,6 +78,12 @@ function maskApiKey(value?: string) {
   return `${value.slice(0, 3)}****${value.slice(-4)}`
 }
 
+function modelName(record: DocumentAgentServiceRecord) {
+  return record.chatModel.source === 'onlineInference'
+    ? record.chatModel.onlineInferenceServiceName || '-'
+    : record.chatModel.customApi?.modelName || '-'
+}
+
 const DocumentAgentSettings: React.FC = () => {
   const navigate = useNavigate()
   const [form] = Form.useForm()
@@ -86,6 +93,8 @@ const DocumentAgentSettings: React.FC = () => {
   const [editingRecord, setEditingRecord] = useState<DocumentAgentServiceRecord | null>(null)
   const chatModelSource = Form.useWatch('chatModelSource', form)
 
+  const service = services[0] ?? null
+
   const onlineInferenceOptions = useMemo(
     () =>
       onlineServices
@@ -94,7 +103,21 @@ const DocumentAgentSettings: React.FC = () => {
     [onlineServices],
   )
 
-  const activeService = services.find(item => item.status === 'running')
+  const openConfig = () => {
+    setEditingRecord(service)
+    form.resetFields()
+    form.setFieldsValue({
+      name: service?.name ?? '文档中心默认助手',
+      description: service?.description ?? '用于文档中心问答和文档定位的全局 Agent 服务。',
+      embedding: service?.embedding ?? { apiUrl: '', apiKey: '', modelName: '' },
+      rerank: service?.rerank ?? { apiUrl: '', apiKey: '', modelName: '' },
+      chatModelSource: service?.chatModel.source ?? 'onlineInference',
+      onlineInferenceServiceId: service?.chatModel.onlineInferenceServiceId,
+      customChat: service?.chatModel.customApi ?? { apiUrl: '', apiKey: '', modelName: '' },
+      advanced: service?.chatModel.advanced ?? defaultAdvancedParams,
+    })
+    setOpen(true)
+  }
 
   const renderAdvancedNumber = (
     label: string,
@@ -160,49 +183,22 @@ const DocumentAgentSettings: React.FC = () => {
     }
   }
 
-  const openCreate = () => {
-    setEditingRecord(null)
-    form.resetFields()
-    form.setFieldsValue({
-      chatModelSource: 'onlineInference',
-      advanced: defaultAdvancedParams,
-      embedding: { apiUrl: '', apiKey: '', modelName: '' },
-      rerank: { apiUrl: '', apiKey: '', modelName: '' },
-      customChat: { apiUrl: '', apiKey: '', modelName: '' },
-    })
-    setOpen(true)
-  }
-
-  const openEdit = (record: DocumentAgentServiceRecord) => {
-    setEditingRecord(record)
-    form.resetFields()
-    form.setFieldsValue({
-      name: record.name,
-      description: record.description,
-      embedding: record.embedding,
-      rerank: record.rerank,
-      chatModelSource: record.chatModel.source,
-      onlineInferenceServiceId: record.chatModel.onlineInferenceServiceId,
-      customChat: record.chatModel.customApi ?? { apiUrl: '', apiKey: '', modelName: '' },
-      advanced: record.chatModel.advanced,
-    })
-    setOpen(true)
-  }
-
-  const savePayload = async (payload: DocumentAgentPayload, rebuildIndex: boolean) => {
-    const nextServices = editingRecord
+  const persistAndStart = async (payload: DocumentAgentPayload, rebuildIndex: boolean) => {
+    const savedServices = editingRecord
       ? await documentAgentApi.updateService(editingRecord.id, payload)
       : await documentAgentApi.createService(payload)
-    setServices(nextServices)
+    const targetId = editingRecord?.id ?? savedServices[0]?.id
+    let nextServices = savedServices
 
-    if (rebuildIndex) {
-      const targetId = editingRecord?.id ?? nextServices[0]?.id
-      if (targetId) {
-        setServices(await documentAgentApi.reindexService(targetId))
-      }
+    if (targetId && rebuildIndex) {
+      nextServices = await documentAgentApi.reindexService(targetId)
+    }
+    if (targetId) {
+      nextServices = await documentAgentApi.startService(targetId)
     }
 
-    message.success(editingRecord ? 'Agent 服务已更新' : 'Agent 服务已创建')
+    setServices(nextServices)
+    message.success('Agent 服务已保存并启动')
     setOpen(false)
     setEditingRecord(null)
     form.resetFields()
@@ -218,190 +214,138 @@ const DocumentAgentSettings: React.FC = () => {
         content: '修改向量模型会触发知识库向量重新构建，是否重新构建？',
         okText: '是',
         cancelText: '否',
-        onOk: () => savePayload(payload, true),
-        onCancel: () => savePayload(payload, false),
+        onOk: () => persistAndStart(payload, true),
+        onCancel: () => persistAndStart(payload, false),
       })
       return
     }
 
-    await savePayload(payload, false)
+    await persistAndStart(payload, false)
   }
-
-  const startService = async (record: DocumentAgentServiceRecord) => {
-    const run = async () => {
-      setServices(await documentAgentApi.startService(record.id))
-      message.success(`已启动：${record.name}`)
-    }
-
-    if (activeService && activeService.id !== record.id) {
-      Modal.confirm({
-        title: '切换运行中的 Agent 服务',
-        content: `当前已启动「${activeService.name}」。启动「${record.name}」后，当前服务会自动停止。`,
-        okText: '启动并切换',
-        cancelText: '取消',
-        onOk: run,
-      })
-      return
-    }
-
-    await run()
-  }
-
-  const columns: ColumnsType<DocumentAgentServiceRecord> = [
-    {
-      title: '服务名称',
-      dataIndex: 'name',
-      key: 'name',
-      width: 220,
-      render: (_, record) => (
-        <div>
-          <Button type="link" size="small" style={{ padding: 0 }} onClick={() => openEdit(record)}>
-            {record.name}
-          </Button>
-          <div style={{ color: '#64748b', fontSize: 12 }}>{record.description || '暂无描述'}</div>
-        </div>
-      ),
-    },
-    {
-      title: '运行状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (value: DocumentAgentStatus) => <Tag color={statusLabelMap[value].color}>{statusLabelMap[value].text}</Tag>,
-    },
-    {
-      title: '索引状态',
-      dataIndex: 'indexStatus',
-      key: 'indexStatus',
-      width: 100,
-      render: (value: DocumentAgentIndexStatus) => <Tag color={indexStatusLabelMap[value].color}>{indexStatusLabelMap[value].text}</Tag>,
-    },
-    {
-      title: '模型配置',
-      key: 'models',
-      width: 260,
-      render: (_, record) => (
-        <Space direction="vertical" size={2}>
-          <Text style={{ fontSize: 12 }}>Embedding：{record.embedding.modelName}</Text>
-          <Text style={{ fontSize: 12 }}>Rerank：{record.rerank.modelName}</Text>
-          <Text style={{ fontSize: 12 }}>
-            对话：{record.chatModel.source === 'onlineInference' ? record.chatModel.onlineInferenceServiceName : record.chatModel.customApi?.modelName}
-          </Text>
-        </Space>
-      ),
-    },
-    { title: '更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 160 },
-    {
-      title: '操作',
-      key: 'action',
-      width: 310,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size={0}>
-          {record.status === 'running' ? (
-            <Button
-              type="link"
-              size="small"
-              onClick={async () => {
-                setServices(await documentAgentApi.stopService(record.id))
-                message.success('Agent 服务已停止')
-              }}
-            >
-              停止
-            </Button>
-          ) : (
-            <Button type="link" size="small" onClick={() => startService(record)}>
-              启动
-            </Button>
-          )}
-          <Button type="link" size="small" onClick={() => openEdit(record)}>编辑</Button>
-          <Button
-            type="link"
-            size="small"
-            onClick={async () => {
-              const result = await documentAgentApi.testService(record.id)
-              result.ok ? message.success(result.message) : message.error(result.message)
-            }}
-          >
-            测试
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            onClick={async () => {
-              setServices(await documentAgentApi.reindexService(record.id))
-              message.success('知识库向量已重新构建')
-            }}
-          >
-            重建索引
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            onClick={() => {
-              if (record.status === 'running') {
-                message.warning('运行中的 Agent 服务不能删除，请先停止服务')
-                return
-              }
-              Modal.confirm({
-                title: '删除 Agent 服务',
-                content: `确认删除「${record.name}」吗？`,
-                okText: '删除',
-                okButtonProps: { danger: true },
-                cancelText: '取消',
-                onOk: async () => {
-                  setServices(await documentAgentApi.deleteService(record.id))
-                  message.success('Agent 服务已删除')
-                },
-              })
-            }}
-          >
-            删除
-          </Button>
-        </Space>
-      ),
-    },
-  ]
 
   return (
     <>
-      <div style={{ ...cardStyle, background: '#fff', padding: 20 }}>
+      <div style={panelStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
             <Title level={4} style={{ marginTop: 0, marginBottom: 6 }}>
-              文档中心 Agent 服务
+              Agent服务
             </Title>
             <Text type="secondary">
-              全局服务配置，同一时间仅允许一个 Agent 服务运行；文档中心将使用运行中的服务进行 RAG 问答和文档定位。
+              启用后，文档中心将展示 Agent 助手，用户可通过对话检索平台文档，并查看命中文档的章节定位与引用来源。
             </Text>
           </div>
           <Space>
             <Button icon={<ReloadOutlined />} onClick={refresh}>刷新</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建服务</Button>
+            <Button type="primary" icon={<EditOutlined />} onClick={openConfig}>
+              {service ? '编辑配置' : '配置服务'}
+            </Button>
           </Space>
         </div>
 
-        <Alert
-          showIcon
-          type="info"
-          style={{ marginBottom: 16, borderRadius: 12 }}
-          message={activeService ? `当前运行服务：${activeService.name}` : '当前未启动文档中心 Agent 服务'}
-          description="Embedding 用于向量化文档，Rerank 用于对召回结果重排，对话模型用于生成最终回答和引用说明。"
-        />
+        {loading ? (
+          <div style={{ padding: '64px 0', textAlign: 'center' }}>
+            <Spin />
+          </div>
+        ) : service ? (
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            <Alert
+              showIcon
+              type={service.status === 'running' ? 'success' : 'info'}
+              style={{ borderRadius: 12 }}
+              message={service.status === 'running' ? `当前运行服务：${service.name}` : '当前服务已配置，保存配置后会自动启动'}
+              description="Embedding 用于向量化文档，Rerank 用于对召回结果重排，对话模型用于生成最终回答和引用说明。"
+            />
 
-        <Table
-          rowKey="id"
-          loading={loading}
-          columns={columns}
-          dataSource={services}
-          scroll={{ x: 1180 }}
-          pagination={{ pageSize: 6, showTotal: total => `共 ${total} 个服务` }}
-        />
+            <div
+              style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: 14,
+                overflow: 'hidden',
+                background: '#fff',
+              }}
+            >
+              <div style={{ padding: '18px 20px', display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', borderBottom: '1px solid #eef2f7' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                    <Text strong style={{ fontSize: 16 }}>{service.name}</Text>
+                    <Tag color={statusLabelMap[service.status].color}>{statusLabelMap[service.status].text}</Tag>
+                    <Tag color={indexStatusLabelMap[service.indexStatus].color}>索引{indexStatusLabelMap[service.indexStatus].text}</Tag>
+                  </div>
+                  <Text type="secondary">{service.description || '暂无描述'}</Text>
+                </div>
+                <Space wrap>
+                  <Button
+                    onClick={async () => {
+                      const result = await documentAgentApi.testService(service.id)
+                      result.ok ? message.success(result.message) : message.error(result.message)
+                    }}
+                  >
+                    测试连接
+                  </Button>
+                  <Button
+                    icon={<ToolOutlined />}
+                    onClick={async () => {
+                      setServices(await documentAgentApi.reindexService(service.id))
+                      message.success('知识库向量已重新构建')
+                    }}
+                  >
+                    重建索引
+                  </Button>
+                </Space>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 0 }}>
+                {[
+                  {
+                    title: 'Embedding',
+                    icon: <CloudSyncOutlined />,
+                    model: service.embedding.modelName,
+                    api: service.embedding.apiUrl,
+                    key: service.embedding.apiKey,
+                  },
+                  {
+                    title: 'Rerank',
+                    icon: <ApiOutlined />,
+                    model: service.rerank.modelName,
+                    api: service.rerank.apiUrl,
+                    key: service.rerank.apiKey,
+                  },
+                  {
+                    title: '对话模型',
+                    icon: <PlayCircleOutlined />,
+                    model: modelName(service),
+                    api: service.chatModel.source === 'onlineInference' ? '在线推理服务' : service.chatModel.customApi?.apiUrl || '-',
+                    key: service.chatModel.source === 'onlineInference' ? '-' : maskApiKey(service.chatModel.customApi?.apiKey),
+                  },
+                ].map(item => (
+                  <div key={item.title} style={{ padding: 18, borderRight: item.title === '对话模型' ? 'none' : '1px solid #eef2f7', minWidth: 0 }}>
+                    <Space size={8} style={{ marginBottom: 12 }}>
+                      {item.icon}
+                      <Text strong>{item.title}</Text>
+                    </Space>
+                    <div style={{ display: 'grid', gap: 8, minWidth: 0 }}>
+                      <Text style={{ fontSize: 13 }} ellipsis={{ tooltip: item.model }}>模型：{item.model || '-'}</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }} ellipsis={{ tooltip: item.api }}>API：{item.api || '-'}</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>Key：{item.key === service.embedding.apiKey || item.key === service.rerank.apiKey ? maskApiKey(item.key) : item.key}</Text>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Space>
+        ) : (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="尚未配置文档中心 Agent 服务"
+          >
+            <Button type="primary" icon={<EditOutlined />} onClick={openConfig}>配置服务</Button>
+          </Empty>
+        )}
       </div>
 
       <Modal
-        title={editingRecord ? '编辑 Agent 服务' : '新建 Agent 服务'}
+        title={editingRecord ? '编辑 Agent 服务' : '配置 Agent 服务'}
         open={open}
         width={920}
         onCancel={() => {
@@ -410,7 +354,7 @@ const DocumentAgentSettings: React.FC = () => {
           form.resetFields()
         }}
         onOk={submit}
-        okText={editingRecord ? '保存' : '创建'}
+        okText="保存并启动"
         destroyOnClose
       >
         <Form form={form} layout="vertical">
@@ -495,24 +439,26 @@ const DocumentAgentSettings: React.FC = () => {
               </div>
             )}
 
-            <Divider orientationMargin={0}>推理模型参数设置</Divider>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
-              {renderAdvancedNumber('max_tokens(最大生成token数)', 'maxTokens', { placeholder: '留空表示不限制', step: 1, min: 1 })}
-              {renderAdvancedNumber('Temperature（温度）', 'temperature', { required: true, step: 0.1, min: 0 })}
-              {renderAdvancedNumber('Top_p（核采样）', 'topP', { required: true, step: 0.1, min: 0 })}
-              {renderAdvancedNumber('presence_penalty（存在性惩罚）', 'presencePenalty', { required: true, step: 0.1 })}
-            </div>
-          </Card>
-
-          {editingRecord && (
-            <Alert
-              type="warning"
-              showIcon
-              style={{ marginTop: 14, borderRadius: 12 }}
-              message="修改 Embedding 配置后，保存时将提示是否重建知识库向量。"
-              description={`当前 API Key：${maskApiKey(editingRecord.embedding.apiKey)}`}
+            <Divider orientationMargin={0} />
+            <Collapse
+              bordered={false}
+              style={{ background: '#f8fafc', borderRadius: 12 }}
+              items={[
+                {
+                  key: 'advanced',
+                  label: '高级配置',
+                  children: (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
+                      {renderAdvancedNumber('max_tokens(最大生成token数)', 'maxTokens', { placeholder: '留空表示不限制', step: 1, min: 1 })}
+                      {renderAdvancedNumber('Temperature（温度）', 'temperature', { required: true, step: 0.1, min: 0 })}
+                      {renderAdvancedNumber('Top_p（核采样）', 'topP', { required: true, step: 0.1, min: 0 })}
+                      {renderAdvancedNumber('presence_penalty（存在性惩罚）', 'presencePenalty', { required: true, step: 0.1 })}
+                    </div>
+                  ),
+                },
+              ]}
             />
-          )}
+          </Card>
         </Form>
       </Modal>
     </>

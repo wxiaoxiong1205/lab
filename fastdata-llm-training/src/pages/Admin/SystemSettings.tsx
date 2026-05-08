@@ -33,6 +33,7 @@ type LabelRecord = {
   id: string
   name: string
   description: string
+  group: string
   values: string[]
 }
 
@@ -43,6 +44,7 @@ const attributeMenu = [
 
 const labelMenu = [
   { group: '在线Notebook', items: ['自定义镜像'] },
+  { group: '模型仓库', items: [] },
 ]
 
 const seedAttributeRows: AttributeRecord[] = [
@@ -53,8 +55,10 @@ const seedAttributeRows: AttributeRecord[] = [
 ]
 
 const seedLabels: LabelRecord[] = [
-  { id: 'label-1', name: 'python版本', description: 'python镜像版本', values: ['python3.10', 'python3.11'] },
-  { id: 'label-2', name: '框架', description: '深度学习框架', values: ['torch', 'tf'] },
+  { id: 'label-model-provider', name: '模型提供商', description: '模型仓库可选模型提供商标签', group: '模型仓库', values: ['Qwen', 'DeepSeek', 'Llama', 'Mistral'] },
+  { id: 'label-model-source', name: '模型来源', description: '模型仓库模型来源标签', group: '模型仓库', values: ['本地', 'ModelScope'] },
+  { id: 'label-1', name: 'python版本', description: 'python镜像版本', group: '自定义镜像', values: ['python3.10', 'python3.11'] },
+  { id: 'label-2', name: '框架', description: '深度学习框架', group: '自定义镜像', values: ['torch', 'tf'] },
 ]
 
 const SystemSettings: React.FC = () => {
@@ -92,7 +96,7 @@ const SystemSettings: React.FC = () => {
   const filteredLabels = useMemo(
     () =>
       labels.filter(item =>
-        activeGroup === '自定义镜像' &&
+        item.group === activeGroup &&
         item.name.toLowerCase().includes(searchValue.toLowerCase()),
       ),
     [activeGroup, labels, searchValue],
@@ -170,6 +174,7 @@ const SystemSettings: React.FC = () => {
             id: `label-${Date.now()}`,
             name: values.name,
             description: values.description || '',
+            group: activeGroup,
             values: [],
           },
           ...previous,
@@ -236,7 +241,7 @@ const SystemSettings: React.FC = () => {
     ? attributeMenu
     : activeTab === 'labels'
       ? labelMenu
-      : [{ group: '文档中心', items: ['文档中心'] }]
+      : [{ group: '', items: ['文档中心'] }]
 
   return (
     <>
@@ -260,35 +265,60 @@ const SystemSettings: React.FC = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: '246px minmax(0,1fr)', gap: 20 }}>
             <Card style={{ borderRadius: 16 }}>
-              <Text type="secondary" style={{ display: 'block', marginBottom: 14 }}>
-                {activeTab === 'attributes' ? '属性配置' : '标签配置'}
-              </Text>
+              {activeTab !== 'agent' && (
+                <Text type="secondary" style={{ display: 'block', marginBottom: 14 }}>
+                  {activeTab === 'attributes' ? '属性配置' : '标签配置'}
+                </Text>
+              )}
               <Space direction="vertical" size={14} style={{ width: '100%' }}>
                 {currentMenu.map(group => (
                   <div key={group.group}>
-                    <Text type="secondary" style={{ display: 'block', marginBottom: 10 }}>{group.group}</Text>
-                    <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                      {group.items.map(item => {
-                        const active = item === activeGroup
-                        return (
-                          <div
-                            key={item}
-                            onClick={() => setActiveGroup(item)}
-                            style={{
-                              cursor: 'pointer',
-                              padding: '12px 16px',
-                              borderRadius: 12,
-                              background: active ? 'rgba(59,130,246,0.12)' : '#fff',
-                              border: active ? '1px solid rgba(59,130,246,0.3)' : '1px solid transparent',
-                              color: active ? '#2563eb' : '#334155',
-                              fontWeight: active ? 600 : 500,
-                            }}
-                          >
-                            {item}
-                          </div>
-                        )
-                      })}
-                    </Space>
+                    {group.group && (() => {
+                      const groupSelectable = activeTab === 'labels' && group.items.length === 0
+                      const active = group.group === activeGroup
+                      return groupSelectable ? (
+                        <div
+                          onClick={() => setActiveGroup(group.group)}
+                          style={{
+                            cursor: 'pointer',
+                            padding: '12px 16px',
+                            borderRadius: 12,
+                            background: active ? 'rgba(59,130,246,0.12)' : '#fff',
+                            border: active ? '1px solid rgba(59,130,246,0.3)' : '1px solid transparent',
+                            color: active ? '#2563eb' : '#334155',
+                            fontWeight: active ? 600 : 500,
+                          }}
+                        >
+                          {group.group}
+                        </div>
+                      ) : (
+                        <Text type="secondary" style={{ display: 'block', marginBottom: 10 }}>{group.group}</Text>
+                      )
+                    })()}
+                    {group.items.length > 0 && (
+                      <Space direction="vertical" size={8} style={{ width: '100%', paddingLeft: activeTab === 'labels' && group.group ? 12 : 0 }}>
+                        {group.items.map(item => {
+                          const active = item === activeGroup
+                          return (
+                            <div
+                              key={item}
+                              onClick={() => setActiveGroup(item)}
+                              style={{
+                                cursor: 'pointer',
+                                padding: '12px 16px',
+                                borderRadius: 12,
+                                background: active ? 'rgba(59,130,246,0.12)' : '#fff',
+                                border: active ? '1px solid rgba(59,130,246,0.3)' : '1px solid transparent',
+                                color: active ? '#2563eb' : '#334155',
+                                fontWeight: active ? 600 : 500,
+                              }}
+                            >
+                              {item}
+                            </div>
+                          )
+                        })}
+                      </Space>
+                    )}
                   </div>
                 ))}
               </Space>

@@ -162,10 +162,8 @@ export interface BaseModelRecord {
   code: string
   name: string
   description?: string
-  type?: string
   provider?: string
   address?: string
-  capabilities?: string[]
   status: 'running' | 'stopped'
   createdAt: string
 }

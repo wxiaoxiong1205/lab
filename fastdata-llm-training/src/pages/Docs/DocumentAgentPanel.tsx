@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Button, Card, Empty, Input, Space, Spin, Tag, Typography, message } from 'antd'
+import { Alert, Button, Card, Empty, Input, Space, Spin, Tag, Typography, message } from 'antd'
 import { MessageOutlined, SendOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -18,10 +18,11 @@ interface ChatMessage {
 }
 
 interface DocumentAgentPanelProps {
-  activeService: DocumentAgentServiceRecord
+  activeService: DocumentAgentServiceRecord | null
+  loading?: boolean
 }
 
-const DocumentAgentPanel: React.FC<DocumentAgentPanelProps> = ({ activeService }) => {
+const DocumentAgentPanel: React.FC<DocumentAgentPanelProps> = ({ activeService, loading: serviceLoading = false }) => {
   const navigate = useNavigate()
   const [question, setQuestion] = useState('')
   const [loading, setLoading] = useState(false)
@@ -32,6 +33,10 @@ const DocumentAgentPanel: React.FC<DocumentAgentPanelProps> = ({ activeService }
     const trimmed = question.trim()
     if (!trimmed) {
       message.warning('请输入要查找的文档问题')
+      return
+    }
+    if (!activeService) {
+      message.warning('当前没有启动中的文档中心 Agent 服务')
       return
     }
 
@@ -74,7 +79,8 @@ const DocumentAgentPanel: React.FC<DocumentAgentPanelProps> = ({ activeService }
         flexShrink: 0,
         borderLeft: '1px solid #e2e8f0',
         background: '#f8fafc',
-        minHeight: 'calc(100vh - 72px)',
+        height: '100%',
+        minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -98,20 +104,31 @@ const DocumentAgentPanel: React.FC<DocumentAgentPanelProps> = ({ activeService }
           <div>
             <div style={{ fontWeight: 700, color: '#0f172a' }}>Agent助手</div>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {activeService.name}
+              {activeService?.name ?? '文档中心 Agent 服务'}
             </Text>
           </div>
         </Space>
         <div style={{ marginTop: 12 }}>
-          <Tag color="green">运行中</Tag>
-          <Tag color={activeService.indexStatus === 'ready' ? 'blue' : 'orange'}>
-            索引{activeService.indexStatus === 'ready' ? '就绪' : '未就绪'}
+          <Tag color={activeService ? 'green' : 'default'}>{activeService ? '运行中' : serviceLoading ? '加载中' : '未启动'}</Tag>
+          <Tag color={activeService?.indexStatus === 'ready' ? 'blue' : 'orange'}>
+            索引{activeService?.indexStatus === 'ready' ? '就绪' : '未就绪'}
           </Tag>
         </div>
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16 }}>
-        {messages.length === 0 ? (
+        {!activeService && !serviceLoading ? (
+          <Alert
+            type="warning"
+            showIcon
+            message="Agent 服务未启动"
+            description="请在系统管理 - 系统配置 - Agent助手中保存并启动文档中心 Agent 服务。"
+          />
+        ) : serviceLoading ? (
+          <div style={{ padding: 24, textAlign: 'center' }}>
+            <Spin size="small" /> <Text type="secondary">正在加载 Agent 服务...</Text>
+          </div>
+        ) : messages.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description="通过对话查找平台文档，回答会附带文档定位"
@@ -179,12 +196,14 @@ const DocumentAgentPanel: React.FC<DocumentAgentPanelProps> = ({ activeService }
             }
           }}
           placeholder="输入问题，例如：如何创建训练任务？"
+          disabled={!activeService || serviceLoading}
           style={{ borderRadius: 10, resize: 'none' }}
         />
         <Button
           type="primary"
           icon={<SendOutlined />}
           loading={loading}
+          disabled={!activeService || serviceLoading}
           onClick={sendQuestion}
           style={{ marginTop: 10, width: '100%' }}
         >

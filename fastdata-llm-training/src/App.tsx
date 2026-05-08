@@ -35,7 +35,7 @@ import BaseModelManagement from './pages/Admin/BaseModelManagement'
 import SystemSettings from './pages/Admin/SystemSettings'
 import PermissionConfig from './pages/Admin/PermissionConfig'
 import DocumentCenterLayout from './pages/Docs/DocumentCenterLayout'
-import UsageGuide from './pages/Docs/UsageGuide'
+import ProductManual from './pages/Docs/ProductManual'
 import { useDataServiceBackendBootstrap } from './services/dataServiceApi'
 import './styles/theme.css'
 
@@ -76,6 +76,7 @@ const App: React.FC = () => {
               <Route path="/finetune/notebooks/:notebookId/publish-case" element={<OnlineNotebook />} />
               <Route path="/finetune/notebooks/cases/:caseId/edit" element={<OnlineNotebook />} />
               <Route path="/finetune/notebooks/cases/:caseId" element={<OnlineNotebook />} />
+              <Route path="/finetune/notebooks/:id/edit" element={<OnlineNotebook />} />
               <Route path="/finetune/notebooks/:id" element={<OnlineNotebook />} />
               <Route path="/training" element={<TrainingList />} />
               <Route path="/training/create" element={<CreateTraining />} />
@@ -111,6 +112,7 @@ const App: React.FC = () => {
               <Route path="/machine-notebook/:notebookId/publish-case" element={<MLNotebook />} />
               <Route path="/machine-notebook/cases/:caseId/edit" element={<MLNotebook />} />
               <Route path="/machine-notebook/cases/:caseId" element={<MLNotebook />} />
+              <Route path="/machine-notebook/:id/edit" element={<MLNotebook />} />
               <Route path="/machine-notebook/:id" element={<MLNotebook />} />
               <Route path="/machine-annotation-service" element={<MLAnnotationService />} />
               <Route path="/machine-online-annotation-service" element={<MLAnnotationService />} />
@@ -126,8 +128,9 @@ const App: React.FC = () => {
               <Route path="/admin/permissions" element={<PermissionConfig />} />
 
               <Route path="/docs" element={<DocumentCenterLayout />}>
-                <Route index element={<Navigate to="usage-guide" replace />} />
-                <Route path="usage-guide" element={<UsageGuide />} />
+                <Route index element={<Navigate to="product-manual" replace />} />
+                <Route path="product-manual" element={<ProductManual />} />
+                <Route path="usage-guide" element={<ProductManual />} />
               </Route>
 
               <Route path="*" element={<Navigate to="/workspace" replace />} />

@@ -32,6 +32,7 @@ const storageTypes = [
   { value: 'MinIO', label: 'MinIO', icon: <DatabaseOutlined style={{ color: '#52c41a' }} /> },
   { value: 'NFS', label: 'NFS', icon: <FolderOutlined style={{ color: '#fa8c16' }} /> },
   { value: '华为云 OBS', label: '华为云 OBS', icon: <CloudServerOutlined style={{ color: '#1677ff' }} /> },
+  { value: '移动云', label: '移动云', icon: <CloudServerOutlined style={{ color: '#2f54eb' }} /> },
 ]
 
 function renderStatus(status: string): React.ReactNode {
