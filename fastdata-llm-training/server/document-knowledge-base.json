@@ -245,7 +245,7 @@
     "sectionTitle": "2.1.3.1. 训练数据管理",
     "routePath": "/docs/product-manual",
     "anchor": "manual-section-31",
-    "content": "2.1.3.1. 训练数据管理 平台可统一纳管用于模型训练的数据集，并支持对数据集进行多版本迭代、增量导入和删除等操作。同步支持训练数据及和验证数据集单独管理，以满足模型开发人员多样的训练数据需求。支持JSON, JSONL，XLSX格式。"
+    "content": "2.1.3.1. 训练数据管理 平台可统一纳管用于模型训练的数据集，并支持对数据集进行多版本迭代、增量导入和删除等操作。同步支持训练数据及和验证数据集单独管理，以满足模型开发人员多样的训练数据需求。支持JSON, JSONL，CSV格式。"
   },
   {
     "docId": "deepexilab-product-manual-v1-2",
@@ -277,7 +277,7 @@
     "sectionTitle": "2.1.3.2. 测试数据管理",
     "routePath": "/docs/product-manual",
     "anchor": "manual-section-35",
-    "content": "2.1.3.2. 测试数据管理 平台可统一纳管用于模型评估的测试数据集，并支持对数据集进行多版本迭代、增量导入和删除等操作，支持JSON, JSONL，XLSX格式。"
+    "content": "2.1.3.2. 测试数据管理 平台可统一纳管用于模型评估的测试数据集，并支持对数据集进行多版本迭代、增量导入和删除等操作，支持JSON, JSONL，CSV格式。"
   },
   {
     "docId": "deepexilab-product-manual-v1-2",
@@ -573,7 +573,7 @@
     "sectionTitle": "2.1.6.3.2. 人工评估详情",
     "routePath": "/docs/product-manual",
     "anchor": "manual-section-72",
-    "content": "2.1.6.3.2. 人工评估详情 评估报告：包含基本信息、评估结果（评分维度雷达图、数据明细、对比柱状图），支持下载。 评估详情：支持多格式下载（JSONL、JSON、XLSX、CSV），便于进一步分析。"
+    "content": "2.1.6.3.2. 人工评估详情 评估报告：包含基本信息、评估结果（评分维度雷达图、数据明细、对比柱状图），支持下载。 评估详情：支持多格式下载（JSONL、JSON、CSV），便于进一步分析。"
   },
   {
     "docId": "deepexilab-product-manual-v1-2",
@@ -773,7 +773,7 @@
     "sectionTitle": "2.2.5.2. 本地上传模型",
     "routePath": "/docs/product-manual",
     "anchor": "manual-section-97",
-    "content": "2.2.5.2. 本地上传模型 1.安装juicefs工具 wget -O juicefs-1.3.0-linux-amd64.tar.gz \"https://fastagi-web.obs.cn-southwest-2.myhuaweicloud.com:443/deepexilab/cicd/lab-0.2.1/juicefs-1.3.0-linux-amd64.tar.gz?AccessKeyId=EDIHRED9EIAE2DVRSMGZ&Expires=1795424265&Signature=UnTs3MevQDE%2B3C6wbuTWHb5Ifmg%3D\" tar -zxf \"juicefs-1.3.0-linux-amd64.tar.gz\" sudo install juicefs /usr/local/bin 2.获取存储初始化后metaurl 使用metaurl 地址挂载juicefs ：如下将juicefs存储挂载到Linux机器的/mnt/jfs目录上 juicefs mount postgres://postgres:postgres1234@172.31.16.33:31108/juicefs /mnt/jfs -d 3.确保服务器已安装git lfs已经安装 git lfs install 4.创建qwen系列目录并下载权重文件 mkdir /mnt/jfs/public/models/Qwen cd /mnt/jfs/public/models/Qwen && git clone https://www.modelscope.cn/Qwen/Qwen2.5-0.5B-Instruct.git"
+    "content": "2.2.5.2. 本地上传模型 1.安装juicefs工具 wget -O juicefs-1.3.0-linux-amd64.tar.gz \"https://example.com/path/to/juicefs-1.3.0-linux-amd64.tar.gz\" tar -zxf \"juicefs-1.3.0-linux-amd64.tar.gz\" sudo install juicefs /usr/local/bin 2.获取存储初始化后metaurl 使用metaurl 地址挂载juicefs ：如下将juicefs存储挂载到Linux机器的/mnt/jfs目录上 juicefs mount postgres://&lt;user&gt;:&lt;password&gt;@&lt;host&gt;:&lt;port&gt;/juicefs /mnt/jfs -d 3.确保服务器已安装git lfs已经安装 git lfs install 4.创建qwen系列目录并下载权重文件 mkdir /mnt/jfs/public/models/Qwen cd /mnt/jfs/public/models/Qwen && git clone https://www.modelscope.cn/Qwen/Qwen2.5-0.5B-Instruct.git"
   },
   {
     "docId": "deepexilab-product-manual-v1-2",

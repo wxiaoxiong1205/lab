@@ -9,6 +9,13 @@ const dbPath = path.join(__dirname, 'data-service-db.json')
 const documentAgentDbPath = path.join(__dirname, 'document-agent-db.json')
 const documentKnowledgeBasePath = path.join(__dirname, 'document-knowledge-base.json')
 const port = Number(process.env.DATA_SERVICE_API_PORT || 5203)
+const host = process.env.DATA_SERVICE_API_HOST || '127.0.0.1'
+const allowedOrigins = new Set([
+  'http://127.0.0.1:5202',
+  'http://localhost:5202',
+])
+const allowedOriginPattern = /^http:\/\/(127\.0\.0\.1|localhost):\d+$/
+const maxBodyBytes = 1024 * 1024
 
 function makeDataset({
   id,
@@ -252,27 +259,50 @@ function normalizeDatasetUsage(value) {
 
 async function readBody(req) {
   const chunks = []
+  let totalBytes = 0
   for await (const chunk of req) {
+    totalBytes += chunk.length
+    if (totalBytes > maxBodyBytes) {
+      const error = new Error('Request body too large')
+      error.statusCode = 413
+      throw error
+    }
     chunks.push(chunk)
   }
   if (!chunks.length) {
     return {}
   }
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'))
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'))
+  } catch {
+    const error = new Error('Invalid JSON body')
+    error.statusCode = 400
+    throw error
+  }
 }
 
-function json(res, statusCode, payload) {
+function getAllowedOrigin(req) {
+  const origin = req.headers.origin
+  if (origin && (allowedOrigins.has(origin) || allowedOriginPattern.test(origin))) {
+    return origin
+  }
+  return 'http://127.0.0.1:5202'
+}
+
+function json(req, res, statusCode, payload) {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': getAllowedOrigin(req),
+    'Vary': 'Origin',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'X-Content-Type-Options': 'nosniff',
   })
   res.end(JSON.stringify(payload))
 }
 
-function notFound(res) {
-  json(res, 404, { message: 'Not Found' })
+function notFound(req, res) {
+  json(req, res, 404, { message: 'Not Found' })
 }
 
 function pickList(state, kind) {
@@ -383,25 +413,26 @@ function buildRagAnswer(question, service, citations) {
 }
 
 const server = createServer(async (req, res) => {
-  if (!req.url) {
-    return notFound(res)
-  }
+  try {
+    if (!req.url) {
+      return notFound(req, res)
+    }
 
-  if (req.method === 'OPTIONS') {
-    return json(res, 204, {})
-  }
+    if (req.method === 'OPTIONS') {
+      return json(req, res, 204, {})
+    }
 
-  const url = new URL(req.url, `http://${req.headers.host}`)
-  const pathname = url.pathname
+    const url = new URL(req.url, `http://${req.headers.host}`)
+    const pathname = url.pathname
 
   if (req.method === 'GET' && pathname === '/api/document-agent/services') {
     const state = await readDocumentAgentDb()
-    return json(res, 200, { items: state.services })
+    return json(req, res, 200, { items: state.services })
   }
 
   if (req.method === 'GET' && pathname === '/api/document-agent/active') {
     const state = await readDocumentAgentDb()
-    return json(res, 200, { service: state.services.find(item => item.status === 'running') || null })
+    return json(req, res, 200, { service: state.services.find(item => item.status === 'running') || null })
   }
 
   if (req.method === 'POST' && pathname === '/api/document-agent/services') {
@@ -423,7 +454,7 @@ const server = createServer(async (req, res) => {
       updatedAt: createdAt,
     }]
     await writeDocumentAgentDb(state)
-    return json(res, 200, { items: state.services })
+    return json(req, res, 200, { items: state.services })
   }
 
   const documentAgentServiceMatch = pathname.match(/^\/api\/document-agent\/services\/([^/]+)$/)
@@ -433,7 +464,7 @@ const server = createServer(async (req, res) => {
     const state = await readDocumentAgentDb()
     const target = state.services.find(item => item.id === targetId)
     if (!target) {
-      return notFound(res)
+      return notFound(req, res)
     }
 
     target.name = body.name
@@ -443,7 +474,7 @@ const server = createServer(async (req, res) => {
     target.chatModel = body.chatModel
     target.updatedAt = nowText()
     await writeDocumentAgentDb(state)
-    return json(res, 200, { items: state.services })
+    return json(req, res, 200, { items: state.services })
   }
 
   if (req.method === 'DELETE' && documentAgentServiceMatch) {
@@ -451,7 +482,7 @@ const server = createServer(async (req, res) => {
     const state = await readDocumentAgentDb()
     state.services = state.services.filter(item => item.id !== targetId)
     await writeDocumentAgentDb(state)
-    return json(res, 200, { items: state.services })
+    return json(req, res, 200, { items: state.services })
   }
 
   const startDocumentAgentMatch = pathname.match(/^\/api\/document-agent\/services\/([^/]+)\/start$/)
@@ -460,7 +491,7 @@ const server = createServer(async (req, res) => {
     const state = await readDocumentAgentDb()
     const target = state.services.find(item => item.id === targetId)
     if (!target) {
-      return notFound(res)
+      return notFound(req, res)
     }
 
     state.services = state.services.map(item => {
@@ -476,7 +507,7 @@ const server = createServer(async (req, res) => {
       return { ...item, status: item.status === 'running' ? 'stopped' : item.status }
     })
     await writeDocumentAgentDb(state)
-    return json(res, 200, { items: state.services })
+    return json(req, res, 200, { items: state.services })
   }
 
   const stopDocumentAgentMatch = pathname.match(/^\/api\/document-agent\/services\/([^/]+)\/stop$/)
@@ -485,13 +516,13 @@ const server = createServer(async (req, res) => {
     const state = await readDocumentAgentDb()
     const target = state.services.find(item => item.id === targetId)
     if (!target) {
-      return notFound(res)
+      return notFound(req, res)
     }
 
     target.status = 'stopped'
     target.updatedAt = nowText()
     await writeDocumentAgentDb(state)
-    return json(res, 200, { items: state.services })
+    return json(req, res, 200, { items: state.services })
   }
 
   const testDocumentAgentMatch = pathname.match(/^\/api\/document-agent\/services\/([^/]+)\/test$/)
@@ -499,10 +530,10 @@ const server = createServer(async (req, res) => {
     const state = await readDocumentAgentDb()
     const target = state.services.find(item => item.id === decodeURIComponent(testDocumentAgentMatch[1]))
     if (!target) {
-      return notFound(res)
+      return notFound(req, res)
     }
 
-    return json(res, 200, { ok: true, message: 'Embedding、Rerank 与对话模型接口契约校验通过' })
+    return json(req, res, 200, { ok: true, message: 'Embedding、Rerank 与对话模型接口契约校验通过' })
   }
 
   const reindexDocumentAgentMatch = pathname.match(/^\/api\/document-agent\/services\/([^/]+)\/reindex$/)
@@ -511,19 +542,19 @@ const server = createServer(async (req, res) => {
     const state = await readDocumentAgentDb()
     const target = state.services.find(item => item.id === targetId)
     if (!target) {
-      return notFound(res)
+      return notFound(req, res)
     }
 
     target.indexStatus = 'ready'
     target.updatedAt = nowText()
     await writeDocumentAgentDb(state)
-    return json(res, 200, { items: state.services })
+    return json(req, res, 200, { items: state.services })
   }
 
   if (req.method === 'GET' && pathname === '/api/document-agent/index/status') {
     const state = await readDocumentAgentDb()
     const active = state.services.find(item => item.status === 'running')
-    return json(res, 200, { status: active?.indexStatus || 'not_built', chunkCount: documentKnowledgeBase.length })
+    return json(req, res, 200, { status: active?.indexStatus || 'not_built', chunkCount: documentKnowledgeBase.length })
   }
 
   if (req.method === 'POST' && pathname === '/api/document-agent/chat') {
@@ -532,10 +563,10 @@ const server = createServer(async (req, res) => {
     const state = await readDocumentAgentDb()
     const active = state.services.find(item => item.status === 'running')
     if (!active) {
-      return json(res, 409, { message: '当前没有启动中的文档中心 Agent 服务' })
+      return json(req, res, 409, { message: '当前没有启动中的文档中心 Agent 服务' })
     }
     if (!question) {
-      return json(res, 400, { message: '请输入问题' })
+      return json(req, res, 400, { message: '请输入问题' })
     }
 
     const citations = searchDocuments(question)
@@ -551,7 +582,7 @@ const server = createServer(async (req, res) => {
     })
     state.conversations = state.conversations.slice(0, 50)
     await writeDocumentAgentDb(state)
-    return json(res, 200, {
+    return json(req, res, 200, {
       answer,
       citations,
       conversationId,
@@ -560,13 +591,13 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && pathname === '/api/data-service/snapshot') {
-    return json(res, 200, await readDb())
+    return json(req, res, 200, await readDb())
   }
 
   const listDatasetMatch = pathname.match(/^\/api\/data-service\/datasets\/(training|validation|test)$/)
   if (req.method === 'GET' && listDatasetMatch) {
     const state = await readDb()
-    return json(res, 200, queryDatasets(pickList(state, listDatasetMatch[1]), url.searchParams))
+    return json(req, res, 200, queryDatasets(pickList(state, listDatasetMatch[1]), url.searchParams))
   }
 
   const createDatasetMatch = pathname.match(/^\/api\/data-service\/datasets\/(training|validation|test)$/)
@@ -605,7 +636,7 @@ const server = createServer(async (req, res) => {
     ]
     list.unshift(item)
     await writeDb(state)
-    return json(res, 200, state)
+    return json(req, res, 200, state)
   }
 
   const addVersionMatch = pathname.match(/^\/api\/data-service\/datasets\/(training|validation|test)\/([^/]+)\/versions$/)
@@ -617,7 +648,7 @@ const server = createServer(async (req, res) => {
     const list = pickList(state, kind)
     const target = list.find(item => item.id === targetId)
     if (!target) {
-      return notFound(res)
+      return notFound(req, res)
     }
 
     const createdAt = nowText()
@@ -647,7 +678,7 @@ const server = createServer(async (req, res) => {
       detailRows: body.inheritFromPrevious ? clone(previousVersion?.detailRows || []) : (previousVersion?.detailRows || []).map(item => ({ ...item, key: `${nextVersion}-${Math.random().toString(16).slice(2, 6)}` })),
     })
     await writeDb(state)
-    return json(res, 200, state)
+    return json(req, res, 200, state)
   }
 
   const deleteDatasetMatch = pathname.match(/^\/api\/data-service\/datasets\/(training|validation|test)\/([^/]+)$/)
@@ -658,7 +689,7 @@ const server = createServer(async (req, res) => {
     const key = kind === 'training' ? 'trainingDatasets' : kind === 'validation' ? 'validationDatasets' : 'testDatasets'
     state[key] = state[key].filter(item => item.id !== targetId)
     await writeDb(state)
-    return json(res, 200, state)
+    return json(req, res, 200, state)
   }
 
   if (req.method === 'POST' && pathname === '/api/data-service/inference-results') {
@@ -675,12 +706,12 @@ const server = createServer(async (req, res) => {
       createdAt: nowText(),
     })
     await writeDb(state)
-    return json(res, 200, state)
+    return json(req, res, 200, state)
   }
 
   if (req.method === 'GET' && pathname === '/api/data-service/inference-results') {
     const state = await readDb()
-    return json(res, 200, queryInference(state.inferenceResults, url.searchParams))
+    return json(req, res, 200, queryInference(state.inferenceResults, url.searchParams))
   }
 
   const deleteInferenceMatch = pathname.match(/^\/api\/data-service\/inference-results\/([^/]+)$/)
@@ -689,7 +720,7 @@ const server = createServer(async (req, res) => {
     const state = await readDb()
     state.inferenceResults = state.inferenceResults.filter(item => item.id !== targetId)
     await writeDb(state)
-    return json(res, 200, state)
+    return json(req, res, 200, state)
   }
 
   const startInferenceMatch = pathname.match(/^\/api\/data-service\/inference-results\/([^/]+)\/start$/)
@@ -698,13 +729,13 @@ const server = createServer(async (req, res) => {
     const state = await readDb()
     const target = state.inferenceResults.find(item => item.id === targetId)
     if (!target) {
-      return notFound(res)
+      return notFound(req, res)
     }
     if (target.progress !== '启动中') {
       target.progress = '启动中'
     }
     await writeDb(state)
-    return json(res, 200, state)
+    return json(req, res, 200, state)
   }
 
   const terminateInferenceMatch = pathname.match(/^\/api\/data-service\/inference-results\/([^/]+)\/terminate$/)
@@ -713,11 +744,11 @@ const server = createServer(async (req, res) => {
     const state = await readDb()
     const target = state.inferenceResults.find(item => item.id === targetId)
     if (!target) {
-      return notFound(res)
+      return notFound(req, res)
     }
     target.progress = '已终止'
     await writeDb(state)
-    return json(res, 200, state)
+    return json(req, res, 200, state)
   }
 
   if (req.method === 'POST' && pathname === '/api/data-service/annotation-tasks') {
@@ -740,14 +771,14 @@ const server = createServer(async (req, res) => {
       createdAt: nowText().replace(/\//g, '-'),
     })
     await writeDb(state)
-    return json(res, 200, state)
+    return json(req, res, 200, state)
   }
 
   if (req.method === 'GET' && pathname === '/api/data-service/annotation-tasks') {
     const state = await readDb()
     const page = Number(url.searchParams.get('page') || '1')
     const pageSize = Number(url.searchParams.get('pageSize') || '10')
-    return json(res, 200, paginate(state.annotationTasks, page, pageSize))
+    return json(req, res, 200, paginate(state.annotationTasks, page, pageSize))
   }
 
   const deleteAnnotationMatch = pathname.match(/^\/api\/data-service\/annotation-tasks\/([^/]+)$/)
@@ -756,7 +787,7 @@ const server = createServer(async (req, res) => {
     const state = await readDb()
     state.annotationTasks = state.annotationTasks.filter(item => item.id !== targetId)
     await writeDb(state)
-    return json(res, 200, state)
+    return json(req, res, 200, state)
   }
 
   if (req.method === 'POST' && pathname === '/api/data-service/cleaning-tasks') {
@@ -772,12 +803,12 @@ const server = createServer(async (req, res) => {
       createdAt: nowText(),
     })
     await writeDb(state)
-    return json(res, 200, state)
+    return json(req, res, 200, state)
   }
 
   if (req.method === 'GET' && pathname === '/api/data-service/cleaning-tasks') {
     const state = await readDb()
-    return json(res, 200, queryCleaning(state.cleaningTasks, url.searchParams))
+    return json(req, res, 200, queryCleaning(state.cleaningTasks, url.searchParams))
   }
 
   const deleteCleaningMatch = pathname.match(/^\/api\/data-service\/cleaning-tasks\/([^/]+)$/)
@@ -786,7 +817,7 @@ const server = createServer(async (req, res) => {
     const state = await readDb()
     state.cleaningTasks = state.cleaningTasks.filter(item => item.id !== targetId)
     await writeDb(state)
-    return json(res, 200, state)
+    return json(req, res, 200, state)
   }
 
   const startCleaningMatch = pathname.match(/^\/api\/data-service\/cleaning-tasks\/([^/]+)\/start$/)
@@ -795,18 +826,23 @@ const server = createServer(async (req, res) => {
     const state = await readDb()
     const target = state.cleaningTasks.find(item => item.id === targetId)
     if (!target) {
-      return notFound(res)
+      return notFound(req, res)
     }
     if (target.status !== '启动中') {
       target.status = '启动中'
     }
     await writeDb(state)
-    return json(res, 200, state)
+    return json(req, res, 200, state)
   }
 
-  return notFound(res)
+    return notFound(req, res)
+  } catch (error) {
+    const statusCode = Number(error?.statusCode || 500)
+    const message = statusCode === 500 ? 'Internal Server Error' : error.message
+    return json(req, res, statusCode, { message })
+  }
 })
 
-server.listen(port, () => {
-  console.log(`data-service api listening on http://127.0.0.1:${port}`)
+server.listen(port, host, () => {
+  console.log(`data-service api listening on http://${host}:${port}`)
 })

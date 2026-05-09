@@ -1,26 +1,50 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Input, Menu } from 'antd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeftOutlined, BookOutlined, SearchOutlined, FileTextOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, ApiOutlined, BookOutlined, SearchOutlined, FileTextOutlined } from '@ant-design/icons'
 import type { MenuProps } from 'antd'
 import { getCurrentProject, usePermissionStore } from '../../services/permissionStore'
 import { useActiveDocumentAgent } from '../../services/documentAgentService'
 import { productManual } from '../../docs/productManual'
+import { developerGuide } from '../../docs/developerGuide'
 import DocumentAgentPanel from './DocumentAgentPanel'
 
 const SIDER_WIDTH = 280
 
-function getParentKeys(headingId: string): string[] {
-  const keys = ['doc-root', 'product-manual']
+const documents = [
+  {
+    key: 'product-manual',
+    title: productManual.title,
+    route: '/docs/product-manual',
+    icon: <BookOutlined />,
+    headings: productManual.headings,
+  },
+  {
+    key: 'developer-guide',
+    title: developerGuide.title,
+    route: '/docs/developer-guide',
+    icon: <ApiOutlined />,
+    headings: developerGuide.headings,
+  },
+]
+
+type DocumentEntry = (typeof documents)[number]
+
+function getDocumentByPath(pathname: string): DocumentEntry {
+  return documents.find(item => pathname === item.route) ?? documents[0]
+}
+
+function getParentKeys(doc: DocumentEntry, headingId: string): string[] {
+  const keys = ['doc-root', doc.key]
   let currentLevelOneId = ''
 
-  for (const heading of productManual.headings) {
+  for (const heading of doc.headings) {
     if (heading.level === 1) {
       currentLevelOneId = heading.id
     }
     if (heading.id === headingId) {
       if (currentLevelOneId) {
-        keys.push(`heading:${currentLevelOneId}`)
+        keys.push(`heading:${doc.key}:${currentLevelOneId}`)
       }
       break
     }
@@ -39,23 +63,30 @@ const DocumentCenterLayout: React.FC = () => {
   const [search, setSearch] = useState('')
   const [activeHeadingId, setActiveHeadingId] = useState(() => decodeURIComponent(location.hash.replace(/^#/, '')))
   const [openKeys, setOpenKeys] = useState<string[]>(['doc-root', 'product-manual'])
+  const activeDoc = useMemo(() => getDocumentByPath(location.pathname), [location.pathname])
 
   const visibleHeadings = useMemo(() => {
     const keyword = search.trim().toLowerCase()
     if (!keyword) {
-      return productManual.headings
+      return activeDoc.headings
     }
 
-    return productManual.headings.filter(item => item.title.toLowerCase().includes(keyword))
-  }, [search])
+    return activeDoc.headings.filter(item => item.title.toLowerCase().includes(keyword))
+  }, [activeDoc, search])
+
+  useEffect(() => {
+    setOpenKeys(previous => Array.from(new Set([...previous, 'doc-root', activeDoc.key])))
+  }, [activeDoc])
 
   useEffect(() => {
     const currentAnchor = decodeURIComponent(location.hash.replace(/^#/, ''))
     if (currentAnchor) {
       setActiveHeadingId(currentAnchor)
-      setOpenKeys(previous => Array.from(new Set([...previous, ...getParentKeys(currentAnchor)])))
+      setOpenKeys(previous => Array.from(new Set([...previous, ...getParentKeys(activeDoc, currentAnchor)])))
+    } else {
+      setActiveHeadingId('')
     }
-  }, [location.hash])
+  }, [activeDoc, location.hash])
 
   useEffect(() => {
     const container = contentRef.current
@@ -80,22 +111,21 @@ const DocumentCenterLayout: React.FC = () => {
       const nextId = current.id
       if (nextId && nextId !== activeHeadingId) {
         setActiveHeadingId(nextId)
-        setOpenKeys(previous => Array.from(new Set([...previous, ...getParentKeys(nextId)])))
+        setOpenKeys(previous => Array.from(new Set([...previous, ...getParentKeys(activeDoc, nextId)])))
       }
     }
 
     updateActiveHeading()
     container.addEventListener('scroll', updateActiveHeading, { passive: true })
     return () => container.removeEventListener('scroll', updateActiveHeading)
-  }, [activeHeadingId, location.pathname])
+  }, [activeDoc, activeHeadingId, location.pathname])
 
   const selectedKeys = useMemo(() => {
     if (activeHeadingId) {
-      return [`heading:${activeHeadingId}`]
+      return [`heading:${activeDoc.key}:${activeHeadingId}`]
     }
-    if (location.pathname.includes('/docs')) return ['product-manual']
-    return []
-  }, [activeHeadingId, location.pathname])
+    return [activeDoc.key]
+  }, [activeDoc, activeHeadingId])
 
   const getMenuLabel = (title: string, level: number) => (
     <span
@@ -115,7 +145,7 @@ const DocumentCenterLayout: React.FC = () => {
   const groupedHeadings = useMemo(() => {
     if (search.trim()) {
       return visibleHeadings.map(item => ({
-        key: `heading:${item.id}`,
+        key: `heading:${activeDoc.key}:${item.id}`,
         label: getMenuLabel(item.title, item.level),
       }))
     }
@@ -123,11 +153,11 @@ const DocumentCenterLayout: React.FC = () => {
     const groups: NonNullable<MenuProps['items']> = []
     let currentGroup: NonNullable<MenuProps['items']>[number] | null = null
 
-    productManual.headings.forEach(item => {
+    activeDoc.headings.forEach(item => {
       if (item.level === 1) {
         const children: NonNullable<MenuProps['items']> = []
         currentGroup = {
-          key: `heading:${item.id}`,
+          key: `heading:${activeDoc.key}:${item.id}`,
           label: getMenuLabel(item.title, item.level),
           children,
         }
@@ -136,7 +166,7 @@ const DocumentCenterLayout: React.FC = () => {
       }
 
       const menuItem = {
-        key: `heading:${item.id}`,
+        key: `heading:${activeDoc.key}:${item.id}`,
         label: getMenuLabel(item.title, item.level),
       }
 
@@ -148,40 +178,45 @@ const DocumentCenterLayout: React.FC = () => {
     })
 
     return groups
-  }, [search, visibleHeadings])
+  }, [activeDoc, search, visibleHeadings])
+
+  const documentMenuItems = documents.map(doc => ({
+    key: doc.key,
+    label: doc.title,
+    icon: doc.icon,
+    children: activeDoc.key === doc.key ? groupedHeadings : undefined,
+  }))
 
   const menuItems: MenuProps['items'] = [
     {
       key: 'doc-root',
       icon: <FileTextOutlined />,
       label: '文档中心',
-      children: [
-        {
-          key: 'product-manual',
-          label: productManual.title,
-          icon: <BookOutlined />,
-          children: groupedHeadings,
-        },
-      ],
+      children: documentMenuItems,
     },
   ]
 
   const onMenuClick: MenuProps['onClick'] = ({ key }) => {
-    if (key === 'product-manual') {
-      navigate('/docs/product-manual')
+    const targetDoc = documents.find(item => item.key === key)
+    if (targetDoc) {
+      setSearch('')
+      setActiveHeadingId('')
+      navigate(targetDoc.route)
       return
     }
+
     if (typeof key === 'string' && key.startsWith('heading:')) {
-      const targetId = key.replace('heading:', '')
+      const [, docKey, targetId] = key.split(':')
+      const headingDoc = documents.find(item => item.key === docKey) ?? activeDoc
       setActiveHeadingId(targetId)
-      navigate(`/docs/product-manual#${encodeURIComponent(targetId)}`)
+      navigate(`${headingDoc.route}#${encodeURIComponent(targetId)}`)
     }
   }
 
   const handleSearchEnter = () => {
     const firstHeading = visibleHeadings[0]
     if (firstHeading) {
-      navigate(`/docs/product-manual#${encodeURIComponent(firstHeading.id)}`)
+      navigate(`${activeDoc.route}#${encodeURIComponent(firstHeading.id)}`)
     }
   }
 

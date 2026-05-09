@@ -16,6 +16,7 @@ import {
   FileTextOutlined,
   FolderOpenOutlined,
   ApartmentOutlined,
+  ApiOutlined,
 } from '@ant-design/icons'
 import DesignDocFab from '../DesignDoc/DesignDocFab'
 import DesignDocPanel from '../DesignDoc/DesignDocPanel'
@@ -546,6 +547,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   label: `${user.account} · ${getUserRoleLabels(user.account, permissionState).join(' / ')}`,
                 })),
                 { type: 'divider' as const },
+                { key: 'open-platform-api', icon: <ApiOutlined />, label: '开放平台 API' },
                 { key: 'profile', label: '个人中心' },
                 { key: 'settings', label: '设置' },
               ],
@@ -553,6 +555,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 if (key.startsWith('switch:')) {
                   setCurrentUser(key.replace('switch:', ''))
                   navigate('/workspace')
+                  return
+                }
+                if (key === 'open-platform-api') {
+                  navigate('/open-platform/api-keys')
                 }
               },
             }}

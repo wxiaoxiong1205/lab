@@ -247,6 +247,44 @@ const DesignDocPanel: React.FC<DesignDocPanelProps> = ({ doc, open, onClose }) =
             children: (
               <div className="design-doc-panel__content">
                 <section className="design-doc-section">
+                  <div className="design-doc-section__label">页面基线</div>
+                  <div className="design-doc-card">
+                    <Space orientation="vertical" size={10} style={{ width: '100%' }}>
+                      <div>
+                        <Text type="secondary">页面目标</Text>
+                        <Paragraph style={{ marginBottom: 0 }}>{doc.goal}</Paragraph>
+                      </div>
+                      {doc.structure.length ? (
+                        <div>
+                          <Text type="secondary">页面结构</Text>
+                          <div style={{ marginTop: 8 }}>
+                            <Space size={[6, 6]} wrap>
+                              {doc.structure.map(item => (
+                                <Tag key={item} color="blue">
+                                  {item}
+                                </Tag>
+                              ))}
+                            </Space>
+                          </div>
+                        </div>
+                      ) : null}
+                      {doc.interactionNotes.length ? (
+                        <div>
+                          <Text type="secondary">交互说明</Text>
+                          <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                            {doc.interactionNotes.map(item => (
+                              <li key={item}>
+                                <Text>{item}</Text>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </Space>
+                  </div>
+                </section>
+
+                <section className="design-doc-section">
                   <div className="design-doc-section__header">
                     <Space size={8}>
                       <Text type="secondary" className="design-doc-save-hint">

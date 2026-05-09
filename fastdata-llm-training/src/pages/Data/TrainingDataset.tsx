@@ -4,7 +4,6 @@ import { DatabaseOutlined, UploadOutlined, CheckCircleOutlined, PlusOutlined, Pl
 import type { UploadFile } from 'antd/es/upload/interface'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import * as XLSX from 'xlsx'
 import type { PaginatedResult } from '../../services/dataServiceApi'
 import { dataServiceApi, selectDatasets, useDataServiceSnapshot } from '../../services/dataServiceApi'
 import {
@@ -68,7 +67,7 @@ type DatasetDetailRow = {
   response?: string
 }
 
-type TemplateDownloadFormat = 'jsonl' | 'json' | 'xlsx'
+type TemplateDownloadFormat = 'jsonl' | 'json' | 'csv'
 
 const DATA_ATTRIBUTE_GROUPS = [
   {
@@ -192,6 +191,23 @@ function normalizeRowsForSheet(rows: DatasetDetailRow[]): Array<Record<string, s
   })
 }
 
+function escapeCsvValue(value: unknown): string {
+  const text = String(value ?? '')
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replaceAll('"', '""')}"`
+  }
+  return text
+}
+
+function buildCsv(rows: Array<Record<string, unknown>>): string {
+  const headers = Array.from(new Set(rows.flatMap(row => Object.keys(row))))
+  const lines = [
+    headers.map(escapeCsvValue).join(','),
+    ...rows.map(row => headers.map(header => escapeCsvValue(row[header])).join(',')),
+  ]
+  return lines.join('\n')
+}
+
 function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -226,13 +242,10 @@ function downloadDatasetTemplate(
     return
   }
 
-  const worksheet = XLSX.utils.json_to_sheet(buildSheetTemplateRows(dataUsage, dataFormat))
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Template')
-  const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
+  const csv = buildCsv(buildSheetTemplateRows(dataUsage, dataFormat))
   triggerDownload(
-    new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-    `${filenamePrefix}-${suffix}.xlsx`,
+    new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }),
+    `${filenamePrefix}-${suffix}.csv`,
   )
 }
 
@@ -259,13 +272,10 @@ function downloadDatasetRows(
     return
   }
 
-  const worksheet = XLSX.utils.json_to_sheet(normalizeRowsForSheet(rows))
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Dataset')
-  const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
+  const csv = buildCsv(normalizeRowsForSheet(rows))
   triggerDownload(
-    new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-    `${filenamePrefix}-${suffix}.xlsx`,
+    new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }),
+    `${filenamePrefix}-${suffix}.csv`,
   )
 }
 
@@ -848,7 +858,7 @@ const TrainingDataset: React.FC = () => {
 
       <Form.Item label="上传文件" name="file" rules={[{ required: true, message: '请上传数据文件' }]} style={{ marginBottom: 8 }}>
         <Upload.Dragger
-          accept=".jsonl,.json,.xlsx"
+          accept=".jsonl,.json,.csv"
           showUploadList={false}
           customRequest={({ onSuccess }: any) => { setTimeout(() => onSuccess?.('ok'), 100) }}
           onChange={handleFileChange}
@@ -856,7 +866,7 @@ const TrainingDataset: React.FC = () => {
         >
           <p style={{ fontSize: 40, color: '#94a3b8', margin: 0 }}><UploadOutlined /></p>
           <p style={{ color: '#64748b' }}>点击或拖拽文件到此区域上传</p>
-          <p style={{ color: '#94a3b8', fontSize: 12 }}>支持 .jsonl/.json/.xlsx 格式，单个文件不超过 100MB</p>
+          <p style={{ color: '#94a3b8', fontSize: 12 }}>支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB</p>
         </Upload.Dragger>
       </Form.Item>
 
@@ -864,7 +874,7 @@ const TrainingDataset: React.FC = () => {
         <Space size={16}>
           <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => downloadDatasetTemplate('jsonl', selectedCreateUsage, form.getFieldValue('dataFormat'), 'train-dataset-template')}>JSONL 格式</Button>
           <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => downloadDatasetTemplate('json', selectedCreateUsage, form.getFieldValue('dataFormat'), 'train-dataset-template')}>JSON 格式</Button>
-          <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => downloadDatasetTemplate('xlsx', selectedCreateUsage, form.getFieldValue('dataFormat'), 'train-dataset-template')}>XLSX 格式</Button>
+          <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => downloadDatasetTemplate('csv', selectedCreateUsage, form.getFieldValue('dataFormat'), 'train-dataset-template')}>CSV 格式</Button>
         </Space>
         {uploading && <Progress percent={uploadProgress} size="small" status="active" style={{ width: 160 }} />}
       </div>
@@ -938,7 +948,7 @@ const TrainingDataset: React.FC = () => {
   const downloadItems = [
     { key: 'jsonl', label: '下载 JSONL' },
     { key: 'json', label: '下载 JSON' },
-    { key: 'xlsx', label: '下载 XLSX' },
+    { key: 'csv', label: '下载 CSV' },
   ]
 
   useEffect(() => {
@@ -1312,7 +1322,7 @@ const TrainingDataset: React.FC = () => {
                 )}
 
                 <Upload.Dragger
-                  accept=".jsonl,.json,.xlsx"
+                  accept=".jsonl,.json,.csv"
                   showUploadList={false}
                   customRequest={({ onSuccess }: any) => { setTimeout(() => onSuccess?.('ok'), 100) }}
                   onChange={handleAddVersionFileChange}
@@ -1320,7 +1330,7 @@ const TrainingDataset: React.FC = () => {
                 >
                   <p style={{ fontSize: 44, color: '#3b82f6', margin: 0 }}><UploadOutlined /></p>
                   <p style={{ color: '#0f172a', fontSize: 20, margin: '12px 0 8px' }}>点击或拖拽文件到此区域上传</p>
-                  <p style={{ color: '#94a3b8', fontSize: 14 }}>支持 .jsonl/.json/.xlsx 格式，单个文件不超过 100MB</p>
+                  <p style={{ color: '#94a3b8', fontSize: 14 }}>支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB</p>
                 </Upload.Dragger>
 
                 {addVersionFile && (
@@ -1340,7 +1350,7 @@ const TrainingDataset: React.FC = () => {
                 <div style={{ marginTop: 16, display: 'flex', gap: 28 }}>
                   <Button type="link" icon={<DownloadOutlined />} onClick={() => downloadDatasetTemplate('jsonl', addVersionTarget.dataUsage, addVersionTarget.dataFormat, 'train-dataset-template')}>JSONL 格式</Button>
                   <Button type="link" icon={<DownloadOutlined />} onClick={() => downloadDatasetTemplate('json', addVersionTarget.dataUsage, addVersionTarget.dataFormat, 'train-dataset-template')}>JSON 格式</Button>
-                  <Button type="link" icon={<DownloadOutlined />} onClick={() => downloadDatasetTemplate('xlsx', addVersionTarget.dataUsage, addVersionTarget.dataFormat, 'train-dataset-template')}>XLSX 格式</Button>
+                  <Button type="link" icon={<DownloadOutlined />} onClick={() => downloadDatasetTemplate('csv', addVersionTarget.dataUsage, addVersionTarget.dataFormat, 'train-dataset-template')}>CSV 格式</Button>
                 </div>
               </Card>
             </div>
@@ -1507,7 +1517,7 @@ const TrainingDataset: React.FC = () => {
           <Divider plain style={{ margin: '12px 0', color: '#64748b', fontSize: 12 }}>数据上传</Divider>
           <Form.Item label="上传文件" name="file">
             <Upload.Dragger
-              accept=".jsonl,.json,.xlsx"
+              accept=".jsonl,.json,.csv"
               showUploadList={false}
               customRequest={({ onSuccess }: any) => { setTimeout(() => onSuccess?.('ok'), 100) }}
               onChange={handleAddVersionFileChange}

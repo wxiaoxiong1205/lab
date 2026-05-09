@@ -569,7 +569,7 @@ const TestDataset: React.FC = () => {
 
       <Form.Item label="上传文件" name="file" rules={[{ required: true, message: '请上传数据文件' }]} style={{ marginBottom: 8 }}>
         <Upload.Dragger
-          accept=".jsonl,.json,.xlsx"
+          accept=".jsonl,.json,.csv"
           showUploadList={false}
           customRequest={({ onSuccess }: any) => { setTimeout(() => onSuccess?.('ok'), 100) }}
           onChange={handleFileChange}
@@ -577,7 +577,7 @@ const TestDataset: React.FC = () => {
         >
           <p style={{ fontSize: 40, color: '#94a3b8', margin: 0 }}><UploadOutlined /></p>
           <p style={{ color: '#64748b' }}>点击或拖拽文件到此区域上传</p>
-          <p style={{ color: '#94a3b8', fontSize: 12 }}>支持 .jsonl/.json/.xlsx 格式，单个文件不超过 100MB</p>
+          <p style={{ color: '#94a3b8', fontSize: 12 }}>支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB</p>
         </Upload.Dragger>
       </Form.Item>
 
@@ -585,7 +585,7 @@ const TestDataset: React.FC = () => {
         <Space size={16}>
           <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }}>JSONL 格式</Button>
           <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }}>JSON 格式</Button>
-          <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }}>XLSX 格式</Button>
+          <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }}>CSV 格式</Button>
         </Space>
         {uploading && <Progress percent={uploadProgress} size="small" status="active" style={{ width: 160 }} />}
       </div>
@@ -659,7 +659,7 @@ const TestDataset: React.FC = () => {
   const downloadItems = [
     { key: 'jsonl', label: '下载 JSONL' },
     { key: 'json', label: '下载 JSON' },
-    { key: 'xlsx', label: '下载 XLSX' },
+    { key: 'xlsx', label: '下载 CSV' },
   ]
 
   if (isCreateRoute) {
@@ -834,7 +834,7 @@ const TestDataset: React.FC = () => {
               <Text strong style={{ fontSize: 15, paddingTop: 10 }}>上传文件：</Text>
               <div>
                 <Upload.Dragger
-                  accept=".jsonl,.json,.xlsx"
+                  accept=".jsonl,.json,.csv"
                   showUploadList={false}
                   customRequest={({ onSuccess }: any) => { setTimeout(() => onSuccess?.('ok'), 100) }}
                   onChange={handleAddVersionFileChange}
@@ -843,7 +843,7 @@ const TestDataset: React.FC = () => {
                 >
                   <p style={{ fontSize: 44, color: '#3b82f6', margin: 0 }}><UploadOutlined /></p>
                   <p style={{ color: '#0f172a', fontSize: 24, margin: '12px 0 8px' }}>点击或拖拽文件到此区域上传</p>
-                  <p style={{ color: '#94a3b8', fontSize: 14 }}>支持 .jsonl/.json/.xlsx 格式，单个文件不超过 100MB</p>
+                  <p style={{ color: '#94a3b8', fontSize: 14 }}>支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB</p>
                 </Upload.Dragger>
                 {inheritHistoryVersion && (
                   <div style={{ marginTop: 12 }}>
@@ -866,7 +866,7 @@ const TestDataset: React.FC = () => {
                 <div style={{ marginTop: 16, display: 'flex', gap: 28 }}>
                   <Button type="link" icon={<DownloadOutlined />}>JSONL 格式</Button>
                   <Button type="link" icon={<DownloadOutlined />}>JSON 格式</Button>
-                  <Button type="link" icon={<DownloadOutlined />}>XLSX 格式</Button>
+                  <Button type="link" icon={<DownloadOutlined />}>CSV 格式</Button>
                 </div>
               </div>
             </div>
@@ -1043,7 +1043,7 @@ const TestDataset: React.FC = () => {
           <Divider plain style={{ margin: '12px 0', color: '#64748b', fontSize: 12 }}>数据上传</Divider>
           <Form.Item label="上传文件" name="file">
             <Upload.Dragger
-              accept=".jsonl,.json,.xlsx"
+              accept=".jsonl,.json,.csv"
               showUploadList={false}
               customRequest={({ onSuccess }: any) => { setTimeout(() => onSuccess?.('ok'), 100) }}
               onChange={handleAddVersionFileChange}

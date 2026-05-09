@@ -49,7 +49,7 @@ const labelMenu = [
 
 const seedAttributeRows: AttributeRecord[] = [
   { id: 'attr-1', name: '训练数据最大上传大小', description: '单次训练数据上传大小限制', inputType: 'number', value: '1024', group: '训练数据管理', required: true },
-  { id: 'attr-2', name: '训练数据支持格式', description: '训练数据可上传格式', inputType: 'text', value: 'jsonl,json,xlsx', group: '训练数据管理', required: true },
+  { id: 'attr-2', name: '训练数据支持格式', description: '训练数据可上传格式', inputType: 'text', value: 'jsonl,json,csv', group: '训练数据管理', required: true },
   { id: 'attr-3', name: '测试数据最大上传大小', description: '单次测试数据上传大小限制', inputType: 'number', value: '512', group: '测试数据管理', required: true },
   { id: 'attr-4', name: '在线推理QPS限制', description: '在线推理服务默认 QPS 限制', inputType: 'number', value: '200', group: '在线推理服务', required: true },
 ]

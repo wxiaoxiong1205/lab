@@ -96,7 +96,7 @@ const seedRows: InferenceResultRecord[] = [
     progress: '已完成',
     dataUsage: '文本生成',
     inferenceMode: '导入推理结果集',
-    importFile: 'PROMPT_RESPONSE_导入样例.xlsx',
+    importFile: 'PROMPT_RESPONSE_导入样例.csv',
     pendingData: '外部导入',
     pendingModel: '手输模型',
     dataVolume: 273,
@@ -539,7 +539,7 @@ const InferenceResult: React.FC = () => {
                     >
                       <UploadOutlined style={{ fontSize: 36, color: '#1677ff', marginBottom: 12 }} />
                       <div style={{ fontSize: 16, marginBottom: 8 }}>点击或拖拽文件到此区域上传</div>
-                      <Text type="secondary">支持 .jsonl/.json/.xlsx 格式，单个文件不超过 100MB</Text>
+                      <Text type="secondary">支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB</Text>
                       <Form.Item name="importFile" rules={[{ required: true, message: '请输入或选择上传文件' }]} noStyle>
                         <Input placeholder="请输入导入文件名" style={{ marginTop: 18 }} />
                       </Form.Item>
@@ -547,7 +547,7 @@ const InferenceResult: React.FC = () => {
                   </Form.Item>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 28, marginBottom: 20 }}>
                     <Text>下载示例文件：</Text>
-                    {['JSONL 格式', 'JSON 格式', 'XLSX 格式'].map(item => (
+                    {['JSONL 格式', 'JSON 格式', 'CSV 格式'].map(item => (
                       <Button key={item} type="link" icon={<FileTextOutlined />} style={{ padding: 0 }}>
                         {item}
                       </Button>

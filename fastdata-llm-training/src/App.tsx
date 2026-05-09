@@ -36,6 +36,8 @@ import SystemSettings from './pages/Admin/SystemSettings'
 import PermissionConfig from './pages/Admin/PermissionConfig'
 import DocumentCenterLayout from './pages/Docs/DocumentCenterLayout'
 import ProductManual from './pages/Docs/ProductManual'
+import DeveloperGuide from './pages/Docs/DeveloperGuide'
+import OpenPlatformApiKeys from './pages/OpenPlatform/OpenPlatformApiKeys'
 import { useDataServiceBackendBootstrap } from './services/dataServiceApi'
 import './styles/theme.css'
 
@@ -51,6 +53,7 @@ const App: React.FC = () => {
               <Route path="/" element={<Navigate to="/workspace" replace />} />
               <Route path="/workspace" element={<ProjectSpace />} />
               <Route path="/home" element={<Home />} />
+              <Route path="/open-platform/api-keys" element={<OpenPlatformApiKeys />} />
 
               {/* 数据服务 */}
               <Route path="/datasets" element={<TrainingDataset />} />
@@ -102,6 +105,9 @@ const App: React.FC = () => {
               <Route path="/machine-data-management" element={<MLDataset />} />
               <Route path="/machine-data-management/create" element={<MLDataset />} />
               <Route path="/machine-annotation" element={<MLAnnotation />} />
+              <Route path="/machine-annotation/create" element={<MLAnnotation />} />
+              <Route path="/machine-annotation/annotate/:assignmentId" element={<MLAnnotation />} />
+              <Route path="/machine-annotation/review/:assignmentId" element={<MLAnnotation />} />
               <Route path="/machine-model-management" element={<MLModelManagement />} />
               <Route path="/machine-model-management/create" element={<MLModelManagement />} />
               <Route path="/machine-model-deployment" element={<MLModelDeployment />} />
@@ -131,6 +137,7 @@ const App: React.FC = () => {
                 <Route index element={<Navigate to="product-manual" replace />} />
                 <Route path="product-manual" element={<ProductManual />} />
                 <Route path="usage-guide" element={<ProductManual />} />
+                <Route path="developer-guide" element={<DeveloperGuide />} />
               </Route>
 
               <Route path="*" element={<Navigate to="/workspace" replace />} />
