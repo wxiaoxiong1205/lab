@@ -564,6 +564,14 @@ function renderMockImage(title: string, height = 280) {
   )
 }
 
+function renderTagGroup(labels: string[]) {
+  return (
+    <Space wrap size={[6, 6]}>
+      {labels.map(label => <Tag key={label} color="blue">{label}</Tag>)}
+    </Space>
+  )
+}
+
 const MLAnnotation: React.FC = () => {
   const [form] = Form.useForm()
   const [onlineForm] = Form.useForm()
@@ -958,6 +966,254 @@ const MLAnnotation: React.FC = () => {
     )
   }
 
+  function completeCurrentSample(feedback: string) {
+    if (!activeSample) return
+    const currentIndex = workbenchSampleRows.findIndex(sample => sample.id === activeSample.id)
+    setWorkbenchSampleRows(previous => previous.map(sample => (
+      sample.id === activeSample.id ? { ...sample, status: '已完成' } : sample
+    )))
+    const nextSample = workbenchSampleRows[currentIndex + 1] ?? workbenchSampleRows.find(sample => sample.id !== activeSample.id)
+    if (nextSample) {
+      setActiveSampleId(nextSample.id)
+    }
+    message.success(feedback)
+  }
+
+  function renderSampleList() {
+    return (
+      <Card title="数据列表" style={cardStyle}>
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          {workbenchSampleRows.map(sample => (
+            <Button
+              key={sample.id}
+              block
+              type={sample.id === activeSampleId ? 'primary' : 'default'}
+              onClick={() => setActiveSampleId(sample.id)}
+              style={{ height: 'auto', padding: '10px 12px', textAlign: 'left' }}
+            >
+              <Space direction="vertical" size={2} style={{ width: '100%' }}>
+                <Text strong>{sample.title}</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>{sample.status}</Text>
+              </Space>
+            </Button>
+          ))}
+          {!workbenchSampleRows.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" />}
+        </Space>
+      </Card>
+    )
+  }
+
+  function renderFooterActions(locked: boolean, primaryText: string) {
+    return (
+      <Space wrap>
+        <Button disabled={!activeSample}>上一条</Button>
+        <Button disabled={locked || !activeSample} onClick={() => message.success('保存成功')}>保存</Button>
+        <Button danger disabled={locked || !activeSample} onClick={handleDeleteWorkbenchSample}>删除当前数据</Button>
+        <Button type="primary" disabled={locked || !activeSample} onClick={() => completeCurrentSample(`${primaryText}成功`)}>
+          {primaryText}
+        </Button>
+        <Button
+          disabled={locked || !activeSample}
+          onClick={() => {
+            setWorkbenchSubmitted(true)
+            message.success('标注任务已提交，数据已锁定')
+          }}
+        >
+          提交标注
+        </Button>
+      </Space>
+    )
+  }
+
+  function renderTextClassificationWorkbench(record: MLAnnotationRecord, locked: boolean) {
+    const multi = isMultiLabelTask(record.name)
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 320px', gap: 16 }}>
+        {renderSampleList()}
+        <Card title="文本内容" style={cardStyle}>
+          {activeSample ? (
+            <div style={{ minHeight: 280, padding: 24, borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff' }}>
+              <Text style={{ fontSize: 15, lineHeight: '28px' }}>{activeSample.content}</Text>
+            </div>
+          ) : <Empty description="暂无数据" />}
+        </Card>
+        <Card title={multi ? '文本多标签标注' : '文本单标签标注'} style={cardStyle}>
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            {multi ? (
+              <Checkbox.Group disabled={locked || !activeSample} defaultValue={[activeSample?.label].filter(Boolean) as string[]} options={labelOptions.slice(5)} />
+            ) : (
+              <Radio.Group disabled={locked || !activeSample} defaultValue={activeSample?.label}>
+                <Space direction="vertical">
+                  {labelOptions.slice(5).map(label => <Radio key={label} value={label}>{label}</Radio>)}
+                </Space>
+              </Radio.Group>
+            )}
+            <Input.TextArea rows={5} disabled={locked || !activeSample} placeholder="请输入标注备注" />
+            {renderFooterActions(locked, '完成标注')}
+          </Space>
+        </Card>
+      </div>
+    )
+  }
+
+  function renderEntityWorkbench(locked: boolean) {
+    const entityText = '2026年4月，DeepExi Lab 在广州发布智能数据标注产品，支持 Qwen 多模态模型辅助识别商品、学校和药物实体。'
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '220px minmax(0, 1fr) 300px', gap: 16 }}>
+        <Card title="标签栏" style={cardStyle}>
+          <Input.Search placeholder="搜索标签" style={{ marginBottom: 12 }} />
+          <Space direction="vertical" style={{ width: '100%' }}>
+            {entityLabels.map((label, index) => (
+              <Card key={label} size="small" style={{ borderColor: index === 0 ? '#1677ff' : '#edf0f5' }}>
+                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                  <Tag color={['blue', 'green', 'orange', 'purple', 'cyan', 'red'][index]}>{label}</Tag>
+                  <Text type="secondary">替换</Text>
+                </Space>
+              </Card>
+            ))}
+            <Button block icon={<PlusOutlined />} disabled={locked}>新增标签</Button>
+          </Space>
+        </Card>
+        <Card
+          title="文本实体识别"
+          extra={<Space><Button disabled={locked}>标注配置</Button><Button disabled={locked}>AI自动标注</Button><Button type="primary" disabled={locked} onClick={() => completeCurrentSample('完成标注')}>完成标注</Button></Space>}
+          style={cardStyle}
+        >
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            {renderSampleList()}
+            <div style={{ padding: 24, minHeight: 220, borderRadius: 8, background: '#fbfdff', border: '1px solid #e5e7eb', lineHeight: '32px', fontSize: 15 }}>
+              {entityText.split(' ').map((part, index) => index === 2 ? <Tag key={part} color="blue">DeepExi Lab / 企业</Tag> : `${part} `)}
+              <Tag color="purple">广州 / LOC</Tag>
+              <Tag color="cyan">Qwen / 产品</Tag>
+            </div>
+            <Card size="small" title="当前选择" style={{ background: '#fafafa' }}>
+              <Text type="secondary">选择文本片段后，可从右侧标签中完成实体标注。</Text>
+            </Card>
+            {renderFooterActions(locked, '完成标注')}
+          </Space>
+        </Card>
+        <Card title="实体结果" style={cardStyle}>
+          <Space direction="vertical" size={14} style={{ width: '100%' }}>
+            <div>
+              <Text type="secondary">可用标签</Text>
+              <div style={{ marginTop: 8 }}>{renderTagGroup(entityLabels)}</div>
+            </div>
+            <div>
+              <Text type="secondary">已标注实体</Text>
+              <Space direction="vertical" style={{ width: '100%', marginTop: 8 }}>
+                {['DeepExi Lab / 企业', '广州 / LOC', 'Qwen / 产品'].map(item => (
+                  <Card key={item} size="small">{item}</Card>
+                ))}
+              </Space>
+            </div>
+          </Space>
+        </Card>
+      </div>
+    )
+  }
+
+  function renderImageClassificationWorkbench(record: MLAnnotationRecord, locked: boolean) {
+    const multi = isMultiLabelTask(record.name)
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 320px', gap: 16 }}>
+        {renderSampleList()}
+        <Card title="图片预览" style={cardStyle}>{activeSample ? renderMockImage(activeSample.title) : <Empty description="暂无数据" />}</Card>
+        <Card title={multi ? '单图多标签' : '单图单标签'} style={cardStyle}>
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            {multi ? (
+              <Checkbox.Group disabled={locked || !activeSample} defaultValue={['商品图']} options={labelOptions.slice(0, 6)} />
+            ) : (
+              <Radio.Group disabled={locked || !activeSample} defaultValue="商品图">
+                <Space direction="vertical">{labelOptions.slice(0, 6).map(label => <Radio key={label} value={label}>{label}</Radio>)}</Space>
+              </Radio.Group>
+            )}
+            {renderFooterActions(locked, '完成标注')}
+          </Space>
+        </Card>
+      </div>
+    )
+  }
+
+  function renderObjectDetectionWorkbench(locked: boolean) {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 340px', gap: 16 }}>
+        {renderSampleList()}
+        <Card title="矩形框标注画布" style={cardStyle}>
+          <div style={{ position: 'relative' }}>
+            {renderMockImage(activeSample?.title ?? '图片样本', 360)}
+            {detectionBoxes.map(box => (
+              <div key={box.id} style={{ position: 'absolute', left: `${box.x}%`, top: `${box.y}%`, width: `${box.width}%`, height: `${box.height}%`, border: '2px solid #f97316', borderRadius: 4 }}>
+                <Tag color="orange" style={{ position: 'absolute', left: 0, top: -28 }}>{box.label}</Tag>
+              </div>
+            ))}
+          </div>
+        </Card>
+        <Card title="检测框列表" style={cardStyle}>
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <Select disabled={locked} defaultValue="商品" options={detectionLabelOptions.map(label => ({ value: label, label }))} style={{ width: '100%' }} />
+            <Button
+              block
+              disabled={locked || !activeSample}
+              icon={<PlusOutlined />}
+              onClick={() => setDetectionBoxes(items => [...items, { id: `box-${Date.now()}`, label: detectionLabelOptions[items.length % detectionLabelOptions.length], x: 20 + items.length * 6, y: 20 + items.length * 4, width: 26, height: 24 }])}
+            >
+              新增矩形框
+            </Button>
+            {detectionBoxes.map(box => (
+              <Card key={box.id} size="small">
+                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                  <span>{box.label} {box.width}x{box.height}</span>
+                  <Button type="link" danger disabled={locked} onClick={() => setDetectionBoxes(items => items.filter(item => item.id !== box.id))}>删除</Button>
+                </Space>
+              </Card>
+            ))}
+            {renderFooterActions(locked, '完成标注')}
+          </Space>
+        </Card>
+      </div>
+    )
+  }
+
+  function renderImageSegmentationWorkbench(locked: boolean) {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 340px', gap: 16 }}>
+        {renderSampleList()}
+        <Card title="图像分割画布" style={cardStyle}>
+          <div style={{ position: 'relative' }}>
+            {renderMockImage(activeSample?.title ?? '图片样本', 360)}
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+              {segmentationRegions.map(region => (
+                <polygon key={region.id} points={region.points} fill={region.color} stroke="#0f172a" strokeWidth="0.6" />
+              ))}
+            </svg>
+          </div>
+        </Card>
+        <Card title="分割区域" style={cardStyle}>
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <Select disabled={locked} defaultValue="道路" options={segmentationLabelOptions.map(label => ({ value: label, label }))} style={{ width: '100%' }} />
+            <Button
+              block
+              disabled={locked || !activeSample}
+              icon={<PlusOutlined />}
+              onClick={() => setSegmentationRegions(items => [...items, { id: `seg-${Date.now()}`, label: segmentationLabelOptions[items.length % segmentationLabelOptions.length], points: '35,20 84,28 76,72 28,68', color: 'rgba(34, 197, 94, 0.42)' }])}
+            >
+              新增分割区域
+            </Button>
+            {segmentationRegions.map(region => (
+              <Card key={region.id} size="small">
+                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                  <Tag color="green">{region.label}</Tag>
+                  <Button type="link" danger disabled={locked} onClick={() => setSegmentationRegions(items => items.filter(item => item.id !== region.id))}>删除</Button>
+                </Space>
+              </Card>
+            ))}
+            {renderFooterActions(locked, '完成标注')}
+          </Space>
+        </Card>
+      </div>
+    )
+  }
+
   function renderOnlineWorkbench() {
     if (!currentOnlineTask) {
       return (
@@ -975,6 +1231,7 @@ const MLAnnotation: React.FC = () => {
     }
 
     const locked = workbenchSubmitted || currentOnlineTask.status === '已完成'
+    const workbenchKind = getAnnotationWorkbenchKind(currentOnlineTask)
     return (
       <div style={{ padding: '24px 32px', minHeight: '100%', background: '#f7f8fa' }}>
         <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -997,77 +1254,11 @@ const MLAnnotation: React.FC = () => {
             </Descriptions>
           </Card>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 320px', gap: 16 }}>
-            <Card title="数据列表" style={cardStyle}>
-              <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                {workbenchSampleRows.map(sample => (
-                  <Button
-                    key={sample.id}
-                    block
-                    type={sample.id === activeSampleId ? 'primary' : 'default'}
-                    onClick={() => setActiveSampleId(sample.id)}
-                    style={{ height: 'auto', padding: '10px 12px', textAlign: 'left' }}
-                  >
-                    <Space direction="vertical" size={2} style={{ width: '100%' }}>
-                      <Text strong>{sample.title}</Text>
-                      <Text type="secondary" style={{ fontSize: 12 }}>{sample.status}</Text>
-                    </Space>
-                  </Button>
-                ))}
-                {!workbenchSampleRows.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" />}
-              </Space>
-            </Card>
-
-            <Card title="当前数据" style={cardStyle}>
-              {activeSample ? (
-                <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                  <Tag color="blue">{activeSample.label}</Tag>
-                  <div style={{ minHeight: 260, padding: 20, borderRadius: 8, border: '1px dashed #cbd5e1', background: '#fbfdff' }}>
-                    <Text>{activeSample.content}</Text>
-                  </div>
-                  <Text type="secondary">未提交前可删除当前单条数据；提交或已完成后数据锁定，不允许继续删除。</Text>
-                </Space>
-              ) : (
-                <Empty description="暂无可标注数据" />
-              )}
-            </Card>
-
-            <Card title={currentOnlineTask.status === '已完成' ? '标注结果' : '标注操作'} style={cardStyle}>
-              <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                <Select
-                  mode="multiple"
-                  value={activeSample ? [activeSample.label] : []}
-                  disabled={locked || !activeSample}
-                  options={[
-                    { value: '商品图', label: '商品图' },
-                    { value: '物流问题', label: '物流问题' },
-                    { value: '待复核', label: '待复核' },
-                    { value: '噪声数据', label: '噪声数据' },
-                  ]}
-                  style={{ width: '100%' }}
-                  placeholder="请选择标签"
-                />
-                <Input.TextArea rows={6} disabled={locked || !activeSample} placeholder="请输入标注备注" />
-                <Space wrap>
-                  <Button disabled={!activeSample}>上一条</Button>
-                  <Button disabled={locked || !activeSample} onClick={() => message.success('标注结果已保存')}>保存</Button>
-                  <Button danger disabled={locked || !activeSample} onClick={handleDeleteWorkbenchSample}>
-                    删除当前数据
-                  </Button>
-                  <Button
-                    type="primary"
-                    disabled={!activeSample || locked}
-                    onClick={() => {
-                      setWorkbenchSubmitted(true)
-                      message.success('标注任务已提交，数据已锁定')
-                    }}
-                  >
-                    提交标注
-                  </Button>
-                </Space>
-              </Space>
-            </Card>
-          </div>
+          {workbenchKind === 'text-classification' && renderTextClassificationWorkbench(currentOnlineTask, locked)}
+          {workbenchKind === 'entity' && renderEntityWorkbench(locked)}
+          {workbenchKind === 'image-classification' && renderImageClassificationWorkbench(currentOnlineTask, locked)}
+          {workbenchKind === 'object-detection' && renderObjectDetectionWorkbench(locked)}
+          {workbenchKind === 'image-segmentation' && renderImageSegmentationWorkbench(locked)}
         </Space>
       </div>
     )
