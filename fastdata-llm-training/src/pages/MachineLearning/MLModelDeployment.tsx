@@ -451,10 +451,27 @@ const MLModelDeployment: React.FC = () => {
       width: 260,
       render: (_value, record) => (
         <TaskMetadataEditor
-          name={record.name}
-          description={record.description}
-          editable={canRunTaskLifecycleAction(record.status, 'edit')}
-          onSave={value => machineDeploymentActions.updateDeploymentMeta(record.id, value)}
+          value={record.name}
+          required
+          maxLength={80}
+          strong
+          placeholder="请输入服务名称"
+          onSave={name => machineDeploymentActions.updateDeploymentMeta(record.id, { name, description: record.description })}
+        />
+      ),
+    },
+    {
+      title: '服务描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          emptyText="暂无描述"
+          placeholder="请输入服务描述"
+          type="secondary"
+          onSave={description => machineDeploymentActions.updateDeploymentMeta(record.id, { name: record.name, description })}
         />
       ),
     },

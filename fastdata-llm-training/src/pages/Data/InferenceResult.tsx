@@ -242,13 +242,32 @@ const InferenceResult: React.FC = () => {
       title: '数据集名称',
       dataIndex: 'name',
       key: 'name',
+      width: 240,
       render: (value, record) => (
         <TaskMetadataEditor
-          name={value}
-          description={record.description}
-          editable={canRunTaskLifecycleAction(record.progress, 'edit')}
-          onNameClick={() => navigate(`/inference/${record.id}`)}
-          onSave={metadata => dataServiceApi.updateInferenceResultMeta(record.id, metadata)}
+          value={value}
+          required
+          maxLength={80}
+          strong
+          placeholder="请输入数据集名称"
+          onTextClick={() => navigate(`/inference/${record.id}`)}
+          onSave={name => dataServiceApi.updateInferenceResultMeta(record.id, { name, description: record.description })}
+        />
+      ),
+    },
+    {
+      title: '描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      ellipsis: true,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          emptyText="暂无描述"
+          placeholder="请输入描述"
+          type="secondary"
+          onSave={description => dataServiceApi.updateInferenceResultMeta(record.id, { name: record.name, description })}
         />
       ),
     },

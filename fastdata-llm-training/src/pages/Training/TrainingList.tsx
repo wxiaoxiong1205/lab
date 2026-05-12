@@ -25,9 +25,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { useNavigate } from 'react-router-dom'
 import type { TrainingTask } from '../../types/training'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
-import { canRunTaskLifecycleAction } from '../../services/taskLifecycle'
 import {
-  getTrainingTaskLifecycleStatus,
   trainingTaskActions,
   useTrainingTasks,
 } from '../../services/trainingTaskStore'
@@ -72,13 +70,30 @@ const TrainingList: React.FC = () => {
             <DatabaseOutlined style={{ color: '#2563eb', fontSize: 18 }} />
           </div>
           <TaskMetadataEditor
-            name={record.name}
-            description={record.description}
-            editable={canRunTaskLifecycleAction(getTrainingTaskLifecycleStatus(record), 'edit')}
-            onNameClick={() => navigate(`/training/detail/${record.id}`)}
-            onSave={value => trainingTaskActions.updateTrainingTaskMeta(record.id, value)}
+            value={record.name}
+            required
+            maxLength={80}
+            strong
+            placeholder="请输入任务名称"
+            onTextClick={() => navigate(`/training/detail/${record.id}`)}
+            onSave={name => trainingTaskActions.updateTrainingTaskMeta(record.id, { name, description: record.description })}
           />
         </div>
+      ),
+    },
+    {
+      title: '任务描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          emptyText="暂无描述"
+          placeholder="请输入任务描述"
+          type="secondary"
+          onSave={description => trainingTaskActions.updateTrainingTaskMeta(record.id, { name: record.name, description })}
+        />
       ),
     },
     {

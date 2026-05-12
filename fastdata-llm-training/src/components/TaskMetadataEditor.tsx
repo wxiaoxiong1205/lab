@@ -3,67 +3,64 @@ import { Button, Input, Space, Tooltip, Typography, message } from 'antd'
 import { CheckOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons'
 
 const { Text } = Typography
-const { TextArea } = Input
 
-export type TaskMetadataValue = {
-  name: string
-  description?: string
-}
-
-type TaskMetadataEditorProps = TaskMetadataValue & {
-  editable: boolean
-  disabledReason?: string
-  onSave: (value: TaskMetadataValue) => void | Promise<void>
-  onNameClick?: () => void
+type TaskMetadataEditorProps = {
+  value?: string
+  emptyText?: string
+  placeholder?: string
+  required?: boolean
+  maxLength?: number
+  strong?: boolean
+  type?: 'default' | 'secondary'
+  onSave: (value: string) => void | Promise<void>
+  onTextClick?: () => void
 }
 
 const TaskMetadataEditor: React.FC<TaskMetadataEditorProps> = ({
-  name,
-  description,
-  editable,
-  disabledReason = '当前任务状态不支持编辑名称和描述',
+  value,
+  emptyText = '-',
+  placeholder = '请输入',
+  required = false,
+  maxLength = 300,
+  strong = false,
+  type = 'default',
   onSave,
-  onNameClick,
+  onTextClick,
 }) => {
+  const displayValue = value?.trim() || ''
+  const [hovered, setHovered] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [draftName, setDraftName] = useState(name)
-  const [draftDescription, setDraftDescription] = useState(description ?? '')
+  const [draftValue, setDraftValue] = useState(displayValue)
   const [saving, setSaving] = useState(false)
 
   const beginEdit = () => {
-    if (!editable) {
-      return
-    }
-    setDraftName(name)
-    setDraftDescription(description ?? '')
+    setDraftValue(displayValue)
     setEditing(true)
   }
 
   const cancelEdit = () => {
-    setDraftName(name)
-    setDraftDescription(description ?? '')
+    setDraftValue(displayValue)
     setEditing(false)
   }
 
   const save = async () => {
-    const nextName = draftName.trim()
-    const nextDescription = draftDescription.trim()
+    const nextValue = draftValue.trim()
 
-    if (!nextName) {
-      message.warning('任务名称不能为空')
+    if (required && !nextValue) {
+      message.warning('名称不能为空')
       return
     }
 
-    if (nextDescription.length > 300) {
-      message.warning('任务描述不能超过 300 字')
+    if (nextValue.length > maxLength) {
+      message.warning(`内容不能超过 ${maxLength} 字`)
       return
     }
 
     setSaving(true)
     try {
-      await onSave({ name: nextName, description: nextDescription })
+      await onSave(nextValue)
       setEditing(false)
-      message.success('任务信息已更新')
+      message.success('已更新')
     } finally {
       setSaving(false)
     }
@@ -71,76 +68,66 @@ const TaskMetadataEditor: React.FC<TaskMetadataEditorProps> = ({
 
   if (editing) {
     return (
-      <Space direction="vertical" size={8} style={{ width: '100%' }}>
+      <Space.Compact style={{ width: '100%' }}>
         <Input
           size="small"
-          value={draftName}
-          maxLength={80}
-          onChange={event => setDraftName(event.target.value)}
+          value={draftValue}
+          maxLength={maxLength}
+          onChange={event => setDraftValue(event.target.value)}
           onPressEnter={save}
-          placeholder="请输入任务名称"
+          placeholder={placeholder}
+          autoFocus
         />
-        <TextArea
-          size="small"
-          value={draftDescription}
-          rows={2}
-          maxLength={300}
-          showCount
-          onChange={event => setDraftDescription(event.target.value)}
-          placeholder="请输入任务描述，最多 300 字"
-        />
-        <Space size={6}>
-          <Button type="primary" size="small" icon={<CheckOutlined />} loading={saving} onClick={save}>
-            保存
-          </Button>
-          <Button size="small" icon={<CloseOutlined />} disabled={saving} onClick={cancelEdit}>
-            取消
-          </Button>
-        </Space>
-      </Space>
+        <Button type="primary" size="small" icon={<CheckOutlined />} loading={saving} onClick={save} />
+        <Button size="small" icon={<CloseOutlined />} disabled={saving} onClick={cancelEdit} />
+      </Space.Compact>
     )
   }
 
-  const nameNode = onNameClick ? (
-    <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontWeight: 600 }} onClick={onNameClick}>
-      {name}
+  const textNode = onTextClick && displayValue ? (
+    <Button
+      type="link"
+      size="small"
+      style={{ padding: 0, height: 'auto', maxWidth: '100%', fontWeight: strong ? 600 : undefined }}
+      onClick={onTextClick}
+    >
+      <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {displayValue}
+      </span>
     </Button>
   ) : (
-    <Text strong style={{ color: '#0f172a' }}>{name}</Text>
+    <Text
+      strong={strong}
+      type={type === 'secondary' || !displayValue ? 'secondary' : undefined}
+      style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+    >
+      {displayValue || emptyText}
+    </Text>
   )
 
   return (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-        <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {nameNode}
-        </div>
-        <Tooltip title={editable ? '编辑任务名称和描述' : disabledReason}>
-          <Button
-            type="text"
-            size="small"
-            icon={<EditOutlined />}
-            disabled={!editable}
-            onClick={beginEdit}
-            style={{ flex: '0 0 auto', color: editable ? '#1677ff' : undefined }}
-          />
-        </Tooltip>
-      </div>
-      <Tooltip title={description || '暂无描述'}>
-        <Text
-          type="secondary"
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, width: '100%' }}
+    >
+      <Tooltip title={displayValue || emptyText}>
+        <div style={{ minWidth: 0, flex: 1 }}>{textNode}</div>
+      </Tooltip>
+      <Tooltip title="编辑">
+        <Button
+          type="text"
+          size="small"
+          icon={<EditOutlined />}
+          onClick={beginEdit}
           style={{
-            display: 'block',
-            marginTop: 3,
-            fontSize: 12,
-            maxWidth: 280,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            flex: '0 0 auto',
+            color: '#1677ff',
+            opacity: hovered ? 1 : 0,
+            pointerEvents: hovered ? 'auto' : 'none',
+            transition: 'opacity 0.16s ease',
           }}
-        >
-          {description || '暂无描述'}
-        </Text>
+        />
       </Tooltip>
     </div>
   )

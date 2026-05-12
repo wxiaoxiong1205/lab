@@ -82,10 +82,27 @@ const ModelDeployment: React.FC = () => {
       width: 240,
       render: (_value, record) => (
         <TaskMetadataEditor
-          name={record.name}
-          description={record.description}
-          editable={canRunTaskLifecycleAction(record.status, 'edit')}
-          onSave={value => updateService(record.id, item => ({ ...item, ...value }))}
+          value={record.name}
+          required
+          maxLength={80}
+          strong
+          placeholder="请输入服务名称"
+          onSave={name => updateService(record.id, item => ({ ...item, name }))}
+        />
+      ),
+    },
+    {
+      title: '服务描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          emptyText="暂无描述"
+          placeholder="请输入服务描述"
+          type="secondary"
+          onSave={description => updateService(record.id, item => ({ ...item, description }))}
         />
       ),
     },

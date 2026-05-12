@@ -37,7 +37,7 @@ import {
   selectCleaningTasks,
   useDataServiceSnapshot,
 } from '../../services/dataServiceApi'
-import { canRunTaskLifecycleAction, type TaskLifecycleStatus } from '../../services/taskLifecycle'
+import { type TaskLifecycleStatus } from '../../services/taskLifecycle'
 import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 
@@ -291,10 +291,27 @@ const DataCleaning: React.FC = () => {
       width: 260,
       render: (_value, record) => (
         <TaskMetadataEditor
-          name={record.name}
-          description={record.description}
-          editable={canRunTaskLifecycleAction(record.status, 'edit')}
-          onSave={metadata => dataServiceApi.updateCleaningTaskMeta(record.id, metadata)}
+          value={record.name}
+          required
+          maxLength={80}
+          strong
+          placeholder="请输入任务名称"
+          onSave={name => dataServiceApi.updateCleaningTaskMeta(record.id, { name, description: record.description })}
+        />
+      ),
+    },
+    {
+      title: '任务描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          emptyText="暂无描述"
+          placeholder="请输入任务描述"
+          type="secondary"
+          onSave={description => dataServiceApi.updateCleaningTaskMeta(record.id, { name: record.name, description })}
         />
       ),
     },

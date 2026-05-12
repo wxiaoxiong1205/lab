@@ -29,7 +29,6 @@ import {
   getOperationDeniedMessage,
   getUserRoleLabels,
   hasMenuPermission,
-  setCurrentUser,
   usePermissionStore,
 } from '../../services/permissionStore'
 import { resolveRouteAccess } from '../../services/permissionCatalog'
@@ -576,22 +575,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           <Dropdown
             menu={{
               items: [
-                { key: 'switch-title', label: '切换身份', disabled: true },
-                ...permissionState.users.map(user => ({
-                  key: `switch:${user.account}`,
-                  label: `${user.account} · ${getUserRoleLabels(user.account, permissionState).join(' / ')}`,
-                })),
-                { type: 'divider' as const },
                 { key: 'open-platform-api', icon: <ApiOutlined />, label: 'API访问密钥' },
                 { key: 'profile', label: '个人中心' },
                 { key: 'settings', label: '设置' },
               ],
               onClick: ({ key }) => {
-                if (key.startsWith('switch:')) {
-                  setCurrentUser(key.replace('switch:', ''))
-                  navigate('/workspace')
-                  return
-                }
                 if (key === 'open-platform-api') {
                   navigate('/open-platform/api-keys')
                 }
