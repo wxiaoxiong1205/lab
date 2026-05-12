@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { message, Modal, Form, Input, Select, Upload, Button, Typography, Space, Divider, Progress, List, Descriptions, Tabs, Table, Tag, Card, Dropdown, Radio, Cascader } from 'antd'
-import { DatabaseOutlined, UploadOutlined, CheckCircleOutlined, PlusOutlined, PlayCircleOutlined, DownloadOutlined, DeleteOutlined, FileTextOutlined, ArrowLeftOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { message, Modal, Form, Input, Select, Button, Typography, Space, Divider, Descriptions, Tabs, Table, Tag, Card, Dropdown, Radio, Cascader } from 'antd'
+import { DatabaseOutlined, PlusOutlined, PlayCircleOutlined, DownloadOutlined, DeleteOutlined, FileTextOutlined, ArrowLeftOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -12,6 +12,8 @@ import {
   getDatasetUsagePath,
   resolveDatasetUsageFromPath,
 } from '../../services/datasetUsage'
+import { formatResourceLockMessage, getCreatorDeletePermission, getDatasetReferenceLocks } from '../../services/resourceReferenceGuard'
+import ResumableUpload from '../../components/ResumableUpload'
 
 const { Text } = Typography
 const { TextArea } = Input
@@ -34,6 +36,7 @@ export type DatasetVersionRow = {
   version: string
   processStatus: string
   publishStatus: string
+  creator?: string
   trainRatio: number
   sampleCount: number
   charCount: number
@@ -301,6 +304,7 @@ function buildVersionsFromRow(row: Omit<TrainingDatasetRecord, 'versions'>): Dat
       version: `V${i}`,
       processStatus: '处理完成',
       publishStatus: isLatest ? row.status : '历史版本',
+      creator: row.creator,
       trainRatio: row.trainRatio,
       sampleCount: Math.max(10, Math.floor(row.sampleCount * scale)),
       charCount: Math.max(1000, Math.floor(row.charCount * scale)),
@@ -315,12 +319,18 @@ function attachVersions(row: Omit<TrainingDatasetRecord, 'versions'>): TrainingD
 }
 
 function normalizeRecordVersions(record: TrainingDatasetRecord): TrainingDatasetRecord {
+  const withCreator = (versions: DatasetVersionRow[]) =>
+    versions.map(version => ({
+      ...version,
+      creator: version.creator ?? record.creator,
+    }))
+
   if (record.versions?.length > 1) {
-    return record
+    return { ...record, versions: withCreator(record.versions) }
   }
 
   if (parseVersionNum(record.latestVersion) <= 1) {
-    return record
+    return { ...record, versions: withCreator(record.versions ?? []) }
   }
 
   const { versions: _versions, ...rest } = record
@@ -488,11 +498,6 @@ const TrainingDataset: React.FC = () => {
   const [form] = Form.useForm()
   const [addVersionForm] = Form.useForm()
   const inheritHistoryVersion = Form.useWatch('inheritHistoryVersion', addVersionForm)
-  const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [selectedFile, setSelectedFile] = useState<UploadFile | null>(null)
-  const [addVersionUploading, setAddVersionUploading] = useState(false)
-  const [addVersionProgress, setAddVersionProgress] = useState(0)
   const [addVersionFile, setAddVersionFile] = useState<UploadFile | null>(null)
   const [creating, setCreating] = useState(false)
   const [addingVersion, setAddingVersion] = useState(false)
@@ -549,35 +554,12 @@ const TrainingDataset: React.FC = () => {
     { title: '训练比例', dataIndex: 'trainRatio', key: 'trainRatio', width: 88, render: (v: number) => `${v}%` },
     { title: '样本数', dataIndex: 'sampleCount', key: 'sampleCount', width: 96, render: (v: number) => v?.toLocaleString() },
     { title: '字符数', dataIndex: 'charCount', key: 'charCount', width: 96, render: (v: number) => v?.toLocaleString() },
+    { title: '创建人', dataIndex: 'creator', key: 'creator', width: 104, render: (v: string) => v || '-' },
     { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', ellipsis: true },
   ]
 
   const handleOpenCreate = () => {
     navigate(`/datasets/training/create?type=${datasetTab === 'validation' ? 'validation' : 'training'}`)
-  }
-
-  const handleFileChange = (info: any) => {
-    const file = info.file
-    if (file.status === 'uploading') {
-      setUploading(true)
-      let progress = 0
-      const timer = setInterval(() => {
-        progress += 10
-        setUploadProgress(progress)
-        if (progress >= 100) {
-          clearInterval(timer)
-          setUploading(false)
-          setSelectedFile({ uid: file.uid, name: file.name, status: 'done' } as UploadFile)
-          message.success(`${file.name} 上传成功`)
-        }
-      }, 200)
-    } else if (file.status === 'done') {
-      setUploading(false)
-      setUploadProgress(100)
-    } else if (file.status === 'error') {
-      setUploading(false)
-      message.error(`${file.name} 上传失败`)
-    }
   }
 
   const handleSubmit = async () => {
@@ -594,8 +576,6 @@ const TrainingDataset: React.FC = () => {
       message.success('创建成功')
       setCreateModalVisible(false)
       form.resetFields()
-      setSelectedFile(null)
-      setUploadProgress(0)
       navigate(`/datasets${datasetTab === 'validation' ? '?key=validation' : ''}`)
     } catch {
       /* 校验失败 */
@@ -607,8 +587,6 @@ const TrainingDataset: React.FC = () => {
   const handleCancel = () => {
     setCreateModalVisible(false)
     form.resetFields()
-    setSelectedFile(null)
-    setUploadProgress(0)
 
     if (isCreateRoute) {
       navigate(`/datasets${datasetTab === 'validation' ? '?key=validation' : ''}`)
@@ -645,31 +623,6 @@ const TrainingDataset: React.FC = () => {
     setAddVersionTarget(null)
     addVersionForm.resetFields()
     setAddVersionFile(null)
-    setAddVersionProgress(0)
-  }
-
-  const handleAddVersionFileChange = (info: any) => {
-    const file = info.file
-    if (file.status === 'uploading') {
-      setAddVersionUploading(true)
-      let progress = 0
-      const timer = setInterval(() => {
-        progress += 10
-        setAddVersionProgress(progress)
-        if (progress >= 100) {
-          clearInterval(timer)
-          setAddVersionUploading(false)
-          setAddVersionFile({ uid: file.uid, name: file.name, status: 'done' } as UploadFile)
-          message.success(`${file.name} 上传成功`)
-        }
-      }, 200)
-    } else if (file.status === 'done') {
-      setAddVersionUploading(false)
-      setAddVersionProgress(100)
-    } else if (file.status === 'error') {
-      setAddVersionUploading(false)
-      message.error(`${file.name} 上传失败`)
-    }
   }
 
   const handleSubmitAddVersion = async () => {
@@ -740,6 +693,24 @@ const TrainingDataset: React.FC = () => {
             size="small"
             danger
             onClick={() => {
+              const permission = getCreatorDeletePermission(record.creator)
+              if (!permission.allowed) {
+                Modal.warning({
+                  title: '无权删除该数据集',
+                  content: permission.reason,
+                })
+                return
+              }
+
+              const locks = getDatasetReferenceLocks(datasetTab === 'validation' ? 'validation' : 'training', record.id)
+              if (locks.length) {
+                Modal.warning({
+                  title: '数据集正在被引用，暂不可删除',
+                  content: formatResourceLockMessage(record.name, locks),
+                })
+                return
+              }
+
               Modal.confirm({
                 title: '确认删除数据集？',
                 content: `删除后将无法恢复：${record.name}`,
@@ -857,17 +828,11 @@ const TrainingDataset: React.FC = () => {
       </Form.Item>
 
       <Form.Item label="上传文件" name="file" rules={[{ required: true, message: '请上传数据文件' }]} style={{ marginBottom: 8 }}>
-        <Upload.Dragger
+        <ResumableUpload
           accept=".jsonl,.json,.csv"
-          showUploadList={false}
-          customRequest={({ onSuccess }: any) => { setTimeout(() => onSuccess?.('ok'), 100) }}
-          onChange={handleFileChange}
-          disabled={uploading}
-        >
-          <p style={{ fontSize: 40, color: '#94a3b8', margin: 0 }}><UploadOutlined /></p>
-          <p style={{ color: '#64748b' }}>点击或拖拽文件到此区域上传</p>
-          <p style={{ color: '#94a3b8', fontSize: 12 }}>支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB</p>
-        </Upload.Dragger>
+          title="点击或拖拽文件到此区域上传"
+          hint="支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB"
+        />
       </Form.Item>
 
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -876,18 +841,7 @@ const TrainingDataset: React.FC = () => {
           <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => downloadDatasetTemplate('json', selectedCreateUsage, form.getFieldValue('dataFormat'), 'train-dataset-template')}>JSON 格式</Button>
           <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => downloadDatasetTemplate('csv', selectedCreateUsage, form.getFieldValue('dataFormat'), 'train-dataset-template')}>CSV 格式</Button>
         </Space>
-        {uploading && <Progress percent={uploadProgress} size="small" status="active" style={{ width: 160 }} />}
       </div>
-
-      {selectedFile && (
-        <List size="small" bordered dataSource={[selectedFile]} style={{ background: '#f8fafc' }}
-          renderItem={(item: UploadFile) => (
-            <List.Item actions={[<Button key="delete-file" type="link" danger size="small" onClick={() => setSelectedFile(null)}>删除</Button>]}>
-              <List.Item.Meta avatar={<CheckCircleOutlined style={{ color: '#52c41a' }} />} title={item.name} description="上传完成" />
-            </List.Item>
-          )}
-        />
-      )}
     </Form>
   )
 
@@ -996,8 +950,6 @@ const TrainingDataset: React.FC = () => {
   useEffect(() => {
     if (isCreateRoute) {
       form.resetFields()
-      setSelectedFile(null)
-      setUploadProgress(0)
       setCreateModalVisible(true)
       form.setFieldValue('dataFormat', 'PROMPT_RESPONSE')
       return
@@ -1127,6 +1079,24 @@ const TrainingDataset: React.FC = () => {
               danger
               icon={<DeleteOutlined />}
               onClick={() => {
+                const permission = getCreatorDeletePermission(selectedRecord.creator)
+                if (!permission.allowed) {
+                  Modal.warning({
+                    title: '无权删除该数据集',
+                    content: permission.reason,
+                  })
+                  return
+                }
+
+                const locks = getDatasetReferenceLocks(datasetTab === 'validation' ? 'validation' : 'training', selectedRecord.id)
+                if (locks.length) {
+                  Modal.warning({
+                    title: '数据集正在被引用，暂不可删除',
+                    content: formatResourceLockMessage(selectedRecord.name, locks),
+                  })
+                  return
+                }
+
                 Modal.confirm({
                   title: '确认删除数据集？',
                   content: `删除后将无法恢复：${selectedRecord.name}`,
@@ -1184,6 +1154,9 @@ const TrainingDataset: React.FC = () => {
                       <div style={{ marginTop: 8, color: '#64748b', fontSize: 12, fontWeight: 500 }}>
                         {version.sampleCount.toLocaleString()} 条样本
                       </div>
+                      <div style={{ marginTop: 4, color: '#94a3b8', fontSize: 12, fontWeight: 500 }}>
+                        创建人：{version.creator ?? selectedRecord.creator}
+                      </div>
                     </div>
                   )
                 })}
@@ -1204,6 +1177,7 @@ const TrainingDataset: React.FC = () => {
                 <div><Text type="secondary">状态：</Text><Text strong>{activeVersion?.processStatus ?? selectedRecord.versionStatus}</Text></div>
                 <div><Text type="secondary">文件大小：</Text><Text strong>{formatFileSizeMB(activeVersion?.charCount ?? selectedRecord.charCount)}</Text></div>
                 <div><Text type="secondary">描述：</Text><Text strong>-</Text></div>
+                <div><Text type="secondary">创建人：</Text><Text strong>{activeVersion?.creator ?? selectedRecord.creator}</Text></div>
                 <div><Text type="secondary">创建时间：</Text><Text strong>{activeVersion?.createdAt ?? selectedRecord.createdAt}</Text></div>
                 <div><Text type="secondary">数据属性：</Text><Text strong>-</Text></div>
               </div>
@@ -1321,31 +1295,13 @@ const TrainingDataset: React.FC = () => {
                   </div>
                 )}
 
-                <Upload.Dragger
+                <ResumableUpload
                   accept=".jsonl,.json,.csv"
-                  showUploadList={false}
-                  customRequest={({ onSuccess }: any) => { setTimeout(() => onSuccess?.('ok'), 100) }}
-                  onChange={handleAddVersionFileChange}
-                  disabled={addVersionUploading}
-                >
-                  <p style={{ fontSize: 44, color: '#3b82f6', margin: 0 }}><UploadOutlined /></p>
-                  <p style={{ color: '#0f172a', fontSize: 20, margin: '12px 0 8px' }}>点击或拖拽文件到此区域上传</p>
-                  <p style={{ color: '#94a3b8', fontSize: 14 }}>支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB</p>
-                </Upload.Dragger>
-
-                {addVersionFile && (
-                  <List
-                    size="small"
-                    bordered
-                    dataSource={[addVersionFile]}
-                    style={{ background: '#f8fafc', marginTop: 12 }}
-                    renderItem={(item: UploadFile) => (
-                      <List.Item actions={[<Button key="delete-file" type="link" danger size="small" onClick={() => setAddVersionFile(null)}>删除</Button>]}>
-                        <List.Item.Meta avatar={<CheckCircleOutlined style={{ color: '#52c41a' }} />} title={item.name} description="上传完成" />
-                      </List.Item>
-                    )}
-                  />
-                )}
+                  title="点击或拖拽文件到此区域上传"
+                  hint="支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB"
+                  value={addVersionFile}
+                  onChange={setAddVersionFile}
+                />
 
                 <div style={{ marginTop: 16, display: 'flex', gap: 28 }}>
                   <Button type="link" icon={<DownloadOutlined />} onClick={() => downloadDatasetTemplate('jsonl', addVersionTarget.dataUsage, addVersionTarget.dataFormat, 'train-dataset-template')}>JSONL 格式</Button>
@@ -1516,28 +1472,13 @@ const TrainingDataset: React.FC = () => {
           </Form.Item>
           <Divider plain style={{ margin: '12px 0', color: '#64748b', fontSize: 12 }}>数据上传</Divider>
           <Form.Item label="上传文件" name="file">
-            <Upload.Dragger
+            <ResumableUpload
               accept=".jsonl,.json,.csv"
-              showUploadList={false}
-              customRequest={({ onSuccess }: any) => { setTimeout(() => onSuccess?.('ok'), 100) }}
-              onChange={handleAddVersionFileChange}
-              disabled={addVersionUploading}
-            >
-              <p style={{ fontSize: 40, color: '#94a3b8', margin: 0 }}><UploadOutlined /></p>
-              <p style={{ color: '#64748b' }}>上传新版本数据文件</p>
-              <p style={{ color: '#94a3b8', fontSize: 12 }}>格式需与数据集一致：{addVersionTarget?.dataFormat ?? '-'}</p>
-            </Upload.Dragger>
-          </Form.Item>
-          {addVersionUploading && <Progress percent={addVersionProgress} size="small" status="active" style={{ marginBottom: 12 }} />}
-          {addVersionFile && (
-            <List size="small" bordered dataSource={[addVersionFile]} style={{ background: '#f8fafc' }}
-              renderItem={(item: UploadFile) => (
-                <List.Item actions={[<Button type="link" danger size="small" onClick={() => setAddVersionFile(null)}>删除</Button>]}>
-                  <List.Item.Meta avatar={<CheckCircleOutlined style={{ color: '#52c41a' }} />} title={item.name} description="上传完成" />
-                </List.Item>
-              )}
+              title="上传新版本数据文件"
+              hint={`格式需与数据集一致：${addVersionTarget?.dataFormat ?? '-'}`}
+              onFileChange={setAddVersionFile}
             />
-          )}
+          </Form.Item>
         </Form>
       </Modal>
     </>

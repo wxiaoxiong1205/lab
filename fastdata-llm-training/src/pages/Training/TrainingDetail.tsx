@@ -152,6 +152,7 @@ const TrainingDetail: React.FC = () => {
       title: '描述',
       dataIndex: 'description',
       key: 'description',
+      width: 220,
       ellipsis: true,
       render: (text: string) => (
         <Tooltip title={text}>
@@ -226,7 +227,7 @@ const TrainingDetail: React.FC = () => {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 120,
+      width: 140,
       render: (time: string) => (
         <Text style={{ color: '#94a3b8', fontSize: 12 }}>{time}</Text>
       ),
@@ -502,6 +503,8 @@ const TrainingDetail: React.FC = () => {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
             marginBottom: 20,
           }}
         >
@@ -521,7 +524,7 @@ const TrainingDetail: React.FC = () => {
               共 {versions.length} 个版本
             </Tag>
           </div>
-          <Space size={12}>
+          <Space size={12} wrap>
             <Button
               icon={<ReloadOutlined />}
               style={{
@@ -553,12 +556,16 @@ const TrainingDetail: React.FC = () => {
         </div>
 
         {/* 表格 */}
-        <Table
-          columns={columns}
-          dataSource={versions}
-          rowKey="id"
-          pagination={false}
-        />
+        <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <Table
+            columns={columns}
+            dataSource={versions}
+            rowKey="id"
+            pagination={false}
+            tableLayout="fixed"
+            scroll={{ x: 1260 }}
+          />
+        </div>
       </Card>
 
       <style>{`

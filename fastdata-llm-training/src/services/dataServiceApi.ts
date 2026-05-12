@@ -270,7 +270,7 @@ function filterDatasets(items: DatasetRecord[], params: ListQueryParams): Pagina
   const { search = '', dataUsage, page = 1, pageSize = 10 } = params
   const filtered = items.filter(item => {
     const matchSearch = !search || item.name.toLowerCase().includes(search.toLowerCase())
-    const matchUsage = !dataUsage || item.dataUsage === dataUsage
+    const matchUsage = !dataUsage || item.dataUsage === dataUsage || item.dataUsage.endsWith(`-${dataUsage}`)
     return matchSearch && matchUsage
   })
   return paginate(filtered, page, pageSize)

@@ -1,7 +1,8 @@
-import React from 'react'
-import { Button, Card, Empty, Space, Table, Tag, Typography } from 'antd'
+import React, { useState } from 'react'
+import { Button, Card, Empty, message, Modal, Space, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { AppstoreOutlined, PlusOutlined } from '@ant-design/icons'
+import { formatResourceLockMessage, getOnlineAnnotationServiceReferenceLocks } from '../../services/resourceReferenceGuard'
 
 const { Title, Text } = Typography
 
@@ -15,7 +16,7 @@ type AnnotationServiceRecord = {
   createdAt: string
 }
 
-const services: AnnotationServiceRecord[] = [
+const seedServices: AnnotationServiceRecord[] = [
   {
     id: 'svc-1',
     name: '图像分类在线标注服务',
@@ -28,6 +29,44 @@ const services: AnnotationServiceRecord[] = [
 ]
 
 const MLAnnotationService: React.FC = () => {
+  const [services, setServices] = useState<AnnotationServiceRecord[]>(seedServices)
+
+  const stopService = (record: AnnotationServiceRecord) => {
+    setServices(previous => previous.map(item => (item.id === record.id ? { ...item, status: '已停止' } : item)))
+    message.success(`已停止在线标注服务：${record.name}`)
+  }
+
+  const deleteService = (record: AnnotationServiceRecord) => {
+    if (record.status === '运行中') {
+      Modal.warning({
+        title: '在线标注服务运行中，暂不可删除',
+        content: '请先停止服务，待服务释放后再删除。',
+      })
+      return
+    }
+
+    const locks = getOnlineAnnotationServiceReferenceLocks(record.name, record.targetDataset)
+    if (locks.length) {
+      Modal.warning({
+        title: '在线标注服务正在被引用，暂不可删除',
+        content: formatResourceLockMessage(record.name, locks),
+      })
+      return
+    }
+
+    Modal.confirm({
+      title: '确认删除在线标注服务？',
+      content: `删除后服务「${record.name}」将从列表移除，请确认是否继续。`,
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        setServices(previous => previous.filter(item => item.id !== record.id))
+        message.success(`已删除在线标注服务：${record.name}`)
+      },
+    })
+  }
+
   const columns: ColumnsType<AnnotationServiceRecord> = [
     { title: '服务名称', dataIndex: 'name', key: 'name' },
     { title: '标注工具', dataIndex: 'tool', key: 'tool' },
@@ -45,11 +84,11 @@ const MLAnnotationService: React.FC = () => {
       title: '操作',
       key: 'action',
       width: 180,
-      render: () => (
+      render: (_, record) => (
         <Space size={0}>
-          <Button type="link" size="small">停止</Button>
+          <Button type="link" size="small" disabled={record.status !== '运行中'} onClick={() => stopService(record)}>停止</Button>
           <Button type="link" size="small">查看详情</Button>
-          <Button type="link" size="small" danger>删除</Button>
+          <Button type="link" size="small" danger onClick={() => deleteService(record)}>删除</Button>
         </Space>
       ),
     },

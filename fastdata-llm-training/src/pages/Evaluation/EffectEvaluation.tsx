@@ -10,6 +10,7 @@ import {
   PlusOutlined,
   QuestionCircleOutlined,
   ReloadOutlined,
+  SearchOutlined,
 } from '@ant-design/icons'
 import {
   Button,
@@ -57,6 +58,8 @@ import {
   TASK_LIFECYCLE_TAG,
   type TaskLifecycleStatus,
 } from '../../services/taskLifecycle'
+import { dataServiceApi } from '../../services/dataServiceApi'
+import type { InferenceResultRecord as DataServiceInferenceResultRecord } from '../../services/dataServiceStore'
 
 const { Text, Title } = Typography
 
@@ -104,6 +107,15 @@ type IndicatorMappingConfig = {
   hint: string
   options: string[]
   defaultValue: string
+}
+
+type InferenceResultOption = {
+  value: string
+  label: string
+  targetModel: string
+  dataUsage: '文本生成' | '图像理解'
+  dataFormat: 'ROLE_BASED' | 'PROMPT_RESPONSE'
+  createdAt?: string
 }
 
 const modeItems = [
@@ -164,11 +176,16 @@ const manualStatusMap: Record<'评估中' | '未评估' | '已完成', { color: 
   已完成: { color: 'success', label: '已完成' },
 }
 
-const inferenceResultOptions = [
-  { value: '推理结果集_2026_03_26_09_34_47', label: '推理结果集_2026_03_26_09_34_47', targetModel: '123123' },
-  { value: '推理结果集_2026_03_19_14_09_32', label: '推理结果集_2026_03_19_14_09_32', targetModel: 'Qwen2.5-0.5B-Instruct-GPTQ-Int8' },
-  { value: '推理结果集_定时测试11_20260318160141', label: '推理结果集_定时测试11_20260318160141', targetModel: 'Qwen3-Next-80B-A3B-Instruct' },
+const seedInferenceResultOptions: InferenceResultOption[] = [
+  { value: '推理结果集_2026_03_26_09_34_47', label: '推理结果集_2026_03_26_09_34_47', targetModel: '123123', dataUsage: '文本生成', dataFormat: 'ROLE_BASED', createdAt: '2026/03/26 09:36:42' },
+  { value: '推理结果集_2026_03_19_14_09_32', label: '推理结果集_2026_03_19_14_09_32', targetModel: 'Qwen2.5-0.5B-Instruct-GPTQ-Int8', dataUsage: '文本生成', dataFormat: 'PROMPT_RESPONSE', createdAt: '2026/03/19 14:09:32' },
+  { value: '推理结果集_定时测试11_20260318160141', label: '推理结果集_定时测试11_20260318160141', targetModel: 'Qwen3-Next-80B-A3B-Instruct', dataUsage: '文本生成', dataFormat: 'ROLE_BASED', createdAt: '2026/03/18 16:01:41' },
+  { value: '图像理解推理结果集_20260318160141', label: '图像理解推理结果集_20260318160141', targetModel: 'qwen3-vl-plus', dataUsage: '图像理解', dataFormat: 'ROLE_BASED', createdAt: '2026/03/18 16:01:41' },
+  { value: '图像理解推理结果集_图表理解_20260410', label: '图像理解推理结果集_图表理解_20260410', targetModel: 'Qwen2.5-VL-72B-Instruct', dataUsage: '图像理解', dataFormat: 'ROLE_BASED', createdAt: '2026/04/10 16:30:11' },
+  { value: '图像理解推理结果集_文档版面_20260411', label: '图像理解推理结果集_文档版面_20260411', targetModel: 'InternVL3-78B', dataUsage: '图像理解', dataFormat: 'ROLE_BASED', createdAt: '2026/04/11 09:41:52' },
 ]
+
+const inferenceResultOptions: InferenceResultOption[] = seedInferenceResultOptions
 
 const judgeServiceOptions = [
   { value: 'Qwen3-Next-80B-A3B-Instruct', label: 'Qwen3-Next-80B-A3B-Instruct' },
@@ -233,6 +250,166 @@ const detailMetricCardStyle: React.CSSProperties = {
 }
 
 const radarLineColors = ['#1677ff', '#52c41a', '#faad14', '#722ed1', '#eb2f96']
+
+function inferInferenceDataFormat(record: Pick<DataServiceInferenceResultRecord, 'name' | 'pendingData'>): InferenceResultOption['dataFormat'] {
+  const text = `${record.name} ${record.pendingData}`.toUpperCase()
+  if (text.includes('ROLE')) return 'ROLE_BASED'
+  if (text.includes('PROMPT')) return 'PROMPT_RESPONSE'
+  return 'ROLE_BASED'
+}
+
+function normalizeInferenceResultOption(record: DataServiceInferenceResultRecord): InferenceResultOption {
+  return {
+    value: record.name,
+    label: record.name,
+    targetModel: record.pendingModel,
+    dataUsage: record.dataUsage,
+    dataFormat: inferInferenceDataFormat(record),
+    createdAt: record.createdAt,
+  }
+}
+
+function mergeInferenceResultOptions(
+  baseOptions: InferenceResultOption[],
+  remoteRecords: DataServiceInferenceResultRecord[],
+): InferenceResultOption[] {
+  const map = new Map<string, InferenceResultOption>()
+  baseOptions.forEach(item => map.set(item.value, item))
+  remoteRecords
+    .filter(item => item.progress === '已完成')
+    .map(normalizeInferenceResultOption)
+    .forEach(item => map.set(item.value, item))
+  return Array.from(map.values())
+}
+
+function isInferenceResultMatchedDatasetType(option: InferenceResultOption, datasetType: DatasetType) {
+  if (datasetType === 'image-understanding') {
+    return option.dataUsage === '图像理解' && option.dataFormat === 'ROLE_BASED'
+  }
+  return option.dataUsage === '文本生成'
+}
+
+const InferenceResultSelectModal: React.FC<{
+  open: boolean
+  datasetType: DatasetType
+  options: InferenceResultOption[]
+  selectedValue?: string
+  onCancel: () => void
+  onConfirm: (record: InferenceResultOption) => void
+}> = ({ open, datasetType, options, selectedValue, onCancel, onConfirm }) => {
+  const [search, setSearch] = useState('')
+  const [dataFormat, setDataFormat] = useState('')
+  const [selected, setSelected] = useState<string | undefined>(selectedValue)
+
+  useEffect(() => {
+    if (!open) return
+    setSearch('')
+    setDataFormat('')
+    setSelected(selectedValue)
+  }, [open, selectedValue])
+
+  const scopedOptions = useMemo(() => {
+    return options.filter(item => isInferenceResultMatchedDatasetType(item, datasetType))
+  }, [datasetType, options])
+
+  const formatOptions = useMemo(() => {
+    const map = new Map<string, number>()
+    scopedOptions.forEach(item => {
+      map.set(item.dataFormat, (map.get(item.dataFormat) ?? 0) + 1)
+    })
+    return Array.from(map.entries()).map(([value, count]) => ({ value, count }))
+  }, [scopedOptions])
+
+  const filteredOptions = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return scopedOptions.filter(item => {
+      const matchSearch = !q || item.label.toLowerCase().includes(q)
+      const matchFormat = !dataFormat || item.dataFormat === dataFormat
+      return matchSearch && matchFormat
+    })
+  }, [dataFormat, scopedOptions, search])
+
+  const handleConfirm = () => {
+    const record = scopedOptions.find(item => item.value === selected)
+    if (!record) {
+      message.warning('请选择推理结果集')
+      return
+    }
+    onConfirm(record)
+  }
+
+  return (
+    <Modal
+      open={open}
+      title="选择已有推理结果集"
+      width={1120}
+      centered
+      onCancel={onCancel}
+      onOk={handleConfirm}
+      okText="确定"
+      cancelText="取消"
+      destroyOnHidden
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: '248px minmax(0, 1fr)', gap: 24, minHeight: 520 }}>
+        <div style={{ borderRight: '1px solid #e5e7eb', paddingRight: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <Text strong style={{ fontSize: 16 }}>筛选条件</Text>
+            <Button type="link" size="small" onClick={() => { setDataFormat(''); setSearch('') }}>清除筛选</Button>
+          </div>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>数据格式</Text>
+          <Radio.Group value={dataFormat} onChange={event => setDataFormat(event.target.value)} style={{ display: 'grid', gap: 10 }}>
+            <Radio value="">全部（{scopedOptions.length}）</Radio>
+            {formatOptions.map(item => (
+              <Radio key={item.value} value={item.value}>{item.value}（{item.count}）</Radio>
+            ))}
+          </Radio.Group>
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <Text strong style={{ display: 'block', fontSize: 16, marginBottom: 16 }}>数据集列表</Text>
+          <Input
+            allowClear
+            prefix={<SearchOutlined />}
+            placeholder="搜索数据集名称"
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            style={{ marginBottom: 16 }}
+          />
+          <Table<InferenceResultOption>
+            rowKey="value"
+            size="middle"
+            dataSource={filteredOptions}
+            pagination={{ pageSize: 10, showSizeChanger: false, showTotal: total => `共 ${total} 个数据集` }}
+            onRow={record => ({
+              onClick: () => setSelected(record.value),
+            })}
+            columns={[
+              { title: '数据集名称', dataIndex: 'label', key: 'label', ellipsis: true },
+              {
+                title: '数据用途',
+                dataIndex: 'dataUsage',
+                key: 'dataUsage',
+                width: 120,
+                render: value => <Tag>{value}</Tag>,
+              },
+              { title: '数据格式', dataIndex: 'dataFormat', key: 'dataFormat', width: 160 },
+              { title: '待评估模型', dataIndex: 'targetModel', key: 'targetModel', width: 220, ellipsis: true },
+              {
+                title: '操作',
+                key: 'action',
+                width: 110,
+                render: (_, record) => (
+                  <Checkbox checked={selected === record.value} onChange={() => setSelected(record.value)}>
+                    选择
+                  </Checkbox>
+                ),
+              },
+            ]}
+          />
+        </div>
+      </div>
+    </Modal>
+  )
+}
 
 function makeBenchmarkTask(params: {
   id: string
@@ -826,6 +1003,46 @@ const MetricValueTooltip: React.FC<{
   )
 }
 
+type VerticalMetricBarDatum = {
+  metric: string
+  numeric: number
+}
+
+function sanitizeFilename(value: string): string {
+  return value.replace(/[\\/:*?"<>|\s]+/g, '_').replace(/^_+|_+$/g, '') || 'download'
+}
+
+function triggerJsonDownload(payload: unknown, filename: string): void {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+const VerticalMetricBarChart: React.FC<{ data: VerticalMetricBarDatum[] }> = ({ data }) => (
+  <div style={{ height: 360 }}>
+    <ResponsiveContainer width="100%" height="100%">
+      <RechartsBarChart data={data} margin={{ top: 18, right: 18, left: 4, bottom: 58 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+        <XAxis
+          dataKey="metric"
+          angle={-28}
+          textAnchor="end"
+          height={78}
+          interval={0}
+          tick={{ fill: '#64748b', fontSize: 12 }}
+        />
+        <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 12 }} />
+        <RechartsTooltip content={<MetricValueTooltip />} />
+        <Bar dataKey="numeric" fill="#1677ff" radius={[8, 8, 0, 0]} maxBarSize={88} />
+      </RechartsBarChart>
+    </ResponsiveContainer>
+  </div>
+)
+
 type ManualReviewMetric = {
   key: string
   name: string
@@ -1088,6 +1305,8 @@ const EffectEvaluation: React.FC = () => {
   const [indicatorChoice, setIndicatorChoice] = useState<string>()
   const [indicatorFieldChoice, setIndicatorFieldChoice] = useState<Record<string, string>>({})
   const [tasks, setTasks] = useState(seedTasks)
+  const [inferenceResultOptions, setInferenceResultOptions] = useState<InferenceResultOption[]>(seedInferenceResultOptions)
+  const [inferenceResultModalOpen, setInferenceResultModalOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const [mode, setMode] = useState<EvaluationMode>('auto')
   const [datasetType, setDatasetType] = useState<DatasetType>('text-generation')
@@ -1118,6 +1337,23 @@ const EffectEvaluation: React.FC = () => {
   }, [form, location.search])
 
   useEffect(() => {
+    let cancelled = false
+    dataServiceApi.listInferenceResults({ page: 1, pageSize: 100 })
+      .then(result => {
+        if (cancelled) return
+        setInferenceResultOptions(mergeInferenceResultOptions(seedInferenceResultOptions, result.items))
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setInferenceResultOptions(seedInferenceResultOptions)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
     setManualReviewPage(1)
   }, [manualReviewTaskId])
 
@@ -1139,12 +1375,37 @@ const EffectEvaluation: React.FC = () => {
 
   const selectedInferenceResult = Form.useWatch('inferenceResult', form)
   const selectedSourceType = Form.useWatch('sourceType', form)
+  const selectedDatasetType = (Form.useWatch('datasetType', form) as DatasetType | undefined) ?? datasetType
   const selectedMethods = Form.useWatch('methods', form) as string[] | undefined
   const selectedIndicators = Form.useWatch('indicators', form) as IndicatorOption[] | undefined
   const inferenceResultMeta = useMemo(
     () => inferenceResultOptions.find(item => item.value === selectedInferenceResult) ?? null,
-    [selectedInferenceResult],
+    [inferenceResultOptions, selectedInferenceResult],
   )
+
+  const handleInferenceResultConfirm = (record: InferenceResultOption) => {
+    form.setFieldsValue({
+      inferenceResult: record.value,
+      targetModel: record.targetModel,
+    })
+    setInferenceResultModalOpen(false)
+  }
+
+  useEffect(() => {
+    if (!inferenceResultMeta) return
+    if (form.getFieldValue('targetModel') !== inferenceResultMeta.targetModel) {
+      form.setFieldValue('targetModel', inferenceResultMeta.targetModel)
+    }
+  }, [form, inferenceResultMeta])
+
+  useEffect(() => {
+    if (!inferenceResultMeta) return
+    if (isInferenceResultMatchedDatasetType(inferenceResultMeta, selectedDatasetType)) return
+    form.setFieldsValue({
+      inferenceResult: undefined,
+      targetModel: undefined,
+    })
+  }, [form, inferenceResultMeta, selectedDatasetType])
 
   const benchmarkCompletedTasks = useMemo(
     () =>
@@ -1422,7 +1683,7 @@ const EffectEvaluation: React.FC = () => {
         runtime: '-',
         progress: 0,
         inferenceResult: values.inferenceResult || '待生成推理结果集',
-        targetModel: inferenceResultMeta?.targetModel ?? '待选择',
+        targetModel: values.targetModel ?? inferenceResultMeta?.targetModel ?? '待选择',
         methods: values.methods,
         creator: 'zhangsan',
         createdAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
@@ -1839,9 +2100,6 @@ const EffectEvaluation: React.FC = () => {
     const reportLogs = buildEvaluationTaskLogs(reportRecord)
     const benchmarkEntry = benchmarkLeaderboard.find(item => item.model === reportRecord.targetModel)
     const reportMetrics = reportRecord.detailMetrics ?? []
-    const benchmarkReportModels = reportRecord.mode === 'benchmark'
-      ? Array.from(new Set([reportRecord.targetModel, ...benchmarkLeaderboard.map(item => item.model).filter(model => model !== reportRecord.targetModel).slice(0, 2)]))
-      : []
     const radarMetrics = reportMetrics.length
       ? reportMetrics.map((item, index) => ({
           metric: item.label,
@@ -1852,16 +2110,39 @@ const EffectEvaluation: React.FC = () => {
           { metric: '忠实度', value: 0 },
           { metric: '上下文精确度', value: 0 },
         ]
-    const benchmarkReportRadarData = reportRecord.mode === 'benchmark'
-      ? benchmarkDatasets.map(dataset => {
-          const row: Record<string, string | number> = { dataset }
-          benchmarkReportModels.forEach(model => {
-            const target = benchmarkLeaderboard.find(item => item.model === model)
-            row[model] = target?.scores.get(dataset) ?? 0
-          })
-          return row
-        })
-      : []
+    const benchmarkReportBarRows =
+      reportRecord.mode === 'benchmark' && benchmarkEntry
+        ? Array.from(benchmarkEntry.scores.entries()).map(([dataset, score]) => ({
+            metric: dataset,
+            numeric: Number(score) || 0,
+          }))
+        : []
+    const handleDownloadBenchmarkDatasetResult = (dataset: string, score: number) => {
+      const payload = {
+        taskId: reportRecord.id,
+        taskName: reportRecord.name,
+        evaluationType: 'benchmark',
+        datasetType: reportRecord.datasetType,
+        benchmarkDataset: dataset,
+        targetModel: reportRecord.targetModel,
+        benchmarkModel: reportRecord.benchmarkModel ?? reportRecord.judgeModel ?? '-',
+        score: Number(score.toFixed(2)),
+        createdAt: reportRecord.createdAt,
+        method: reportRecord.methods.join(', '),
+        results: Array.from({ length: 3 }).map((_, index) => ({
+          id: `${dataset}-${index + 1}`,
+          input: `${dataset} benchmark sample ${index + 1}`,
+          modelOutput: `${reportRecord.targetModel} output for ${dataset} sample ${index + 1}`,
+          expectedOutput: `reference answer ${index + 1}`,
+          score: Number(Math.max(0, score - index * 1.17).toFixed(2)),
+        })),
+      }
+      triggerJsonDownload(
+        payload,
+        `${sanitizeFilename(reportRecord.name)}-${sanitizeFilename(reportRecord.targetModel)}-${sanitizeFilename(dataset)}-results.json`,
+      )
+      message.success(`已下载 ${dataset} 结果文档`)
+    }
     const manualReportMetricRows =
       reportRecord.mode === 'manual'
         ? buildManualReviewItems(reportRecord)[0].indicators.map(item => ({
@@ -2050,123 +2331,77 @@ const EffectEvaluation: React.FC = () => {
                   </Card>
 
                   <Card title="评分对比柱状图" style={{ borderRadius: 16 }}>
-                    <div style={{ display: 'grid', gap: 14 }}>
-                      {radarMetrics.map(item => (
-                        <div key={item.metric}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <Text>{item.metric}</Text>
-                            <Text strong>{item.value.toFixed(2)}</Text>
-                          </div>
-                          <Progress percent={item.value} showInfo={false} strokeColor="#1677ff" />
-                        </div>
-                      ))}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                      <Tag color="blue">{reportRecord.targetModel}</Tag>
                     </div>
+                    <VerticalMetricBarChart data={radarMetrics.map(item => ({ metric: item.metric, numeric: item.value }))} />
                   </Card>
                 </>
               ) : reportRecord.mode === 'benchmark' ? (
                 <>
-                  <Card title="基准评估结果总览" style={{ borderRadius: 16 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-                      <Card size="small" style={detailMetricCardStyle}>
-                        <Text type="secondary">当前任务得分</Text>
-                        <div style={{ marginTop: 8, fontSize: 22, fontWeight: 700 }}>{typeof reportRecord.benchmarkScore === 'number' ? reportRecord.benchmarkScore.toFixed(2) : '-'}</div>
-                      </Card>
-                      <Card size="small" style={detailMetricCardStyle}>
-                        <Text type="secondary">模型平均分</Text>
-                        <div style={{ marginTop: 8, fontSize: 22, fontWeight: 700 }}>{benchmarkEntry?.average?.toFixed(2) ?? '-'}</div>
-                      </Card>
-                      <Card size="small" style={detailMetricCardStyle}>
-                        <Text type="secondary">榜单排名</Text>
-                        <div style={{ marginTop: 8, fontSize: 22, fontWeight: 700 }}>
-                          {benchmarkEntry ? `第 ${benchmarkLeaderboard.findIndex(item => item.model === reportRecord.targetModel) + 1} 名` : '-'}
+                  <Card title="报告结果" style={{ borderRadius: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+                      <Space wrap>
+                        <Tag color="blue">{reportRecord.targetModel}</Tag>
+                        {reportRecord.benchmarkDataset && <Tag color="geekblue">当前基准数据集：{reportRecord.benchmarkDataset}</Tag>}
+                      </Space>
+                      <Select value="平均" style={{ width: 120 }} options={[{ value: '平均', label: '平均' }]} />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 420px', gap: 16 }}>
+                      <Card size="small" title="评分维度雷达图" style={{ borderRadius: 14 }}>
+                        <div style={{ height: 320 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RadarChart data={benchmarkReportBarRows.map(item => ({ metric: item.metric, value: item.numeric }))}>
+                              <PolarGrid />
+                              <PolarAngleAxis dataKey="metric" />
+                              <PolarRadiusAxis domain={[0, 100]} />
+                              <RechartsTooltip content={<MetricValueTooltip />} />
+                              <Radar dataKey="value" name={reportRecord.targetModel} stroke="#1677ff" fill="#1677ff" fillOpacity={0.18} />
+                            </RadarChart>
+                          </ResponsiveContainer>
                         </div>
                       </Card>
-                      <Card size="small" style={detailMetricCardStyle}>
-                        <Text type="secondary">基准评估集</Text>
-                        <div style={{ marginTop: 8, fontSize: 22, fontWeight: 700 }}>{reportRecord.benchmarkDataset || '-'}</div>
+
+                      <Card size="small" title="评分数据明细" style={{ borderRadius: 14 }}>
+                        <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+                          得分以百分比形式展示，具体计算方式：得分/最大值
+                        </Text>
+                        <Table
+                          rowKey="metric"
+                          pagination={false}
+                          size="small"
+                          dataSource={benchmarkReportBarRows.map(item => ({
+                            metric: item.metric,
+                            score: item.numeric.toFixed(2),
+                            numeric: item.numeric,
+                          }))}
+                          columns={[
+                            { title: '评估指标', dataIndex: 'metric', key: 'metric' },
+                            { title: reportRecord.targetModel, dataIndex: 'score', key: 'score', width: 160 },
+                            {
+                              title: '操作',
+                              key: 'actions',
+                              width: 110,
+                              render: (_value, record) => (
+                                <Button
+                                  type="link"
+                                  size="small"
+                                  style={{ padding: 0 }}
+                                  onClick={() => handleDownloadBenchmarkDatasetResult(String(record.metric), Number(record.numeric))}
+                                >
+                                  下载
+                                </Button>
+                              ),
+                            },
+                          ]}
+                        />
                       </Card>
                     </div>
-                  </Card>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 420px', gap: 16 }}>
-                    <Card title="基准评估模型对比雷达图" style={{ borderRadius: 16 }}>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-                        {benchmarkReportModels.map(model => (
-                          <Tag key={model} color={model === reportRecord.targetModel ? 'blue' : 'default'}>
-                            {model}
-                          </Tag>
-                        ))}
-                      </div>
-                      <div style={{ height: 340 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RadarChart data={benchmarkReportRadarData}>
-                            <PolarGrid />
-                            <PolarAngleAxis dataKey="dataset" />
-                            <PolarRadiusAxis domain={[0, 100]} />
-                            {benchmarkReportModels.map((model, index) => (
-                              <Radar
-                                key={model}
-                                name={model}
-                                dataKey={model}
-                                stroke={radarLineColors[index % radarLineColors.length]}
-                                fill={radarLineColors[index % radarLineColors.length]}
-                                fillOpacity={model === reportRecord.targetModel ? 0.22 : 0.08}
-                              />
-                            ))}
-                          </RadarChart>
-                        </ResponsiveContainer>
-                      </div>
+                    <Card size="small" title="评分对比柱状图" style={{ borderRadius: 14, marginTop: 16 }}>
+                      <VerticalMetricBarChart data={benchmarkReportBarRows} />
                     </Card>
-
-                    <Card title="榜单定位" style={{ borderRadius: 16 }}>
-                      <Table
-                        rowKey="key"
-                        size="small"
-                        pagination={false}
-                        dataSource={benchmarkLeaderboard.slice(0, 5)}
-                        columns={[
-                          {
-                            title: '排名',
-                            key: 'rank',
-                            width: 72,
-                            render: (_value, _record, index) => index + 1,
-                          },
-                          { title: '模型', dataIndex: 'model', key: 'model', width: 180 },
-                          {
-                            title: '平均分',
-                            dataIndex: 'average',
-                            key: 'average',
-                            width: 100,
-                            render: value => (value === null ? '-' : value.toFixed(2)),
-                          },
-                        ]}
-                        rowClassName={record => (record.model === reportRecord.targetModel ? 'ant-table-row-selected' : '')}
-                      />
-                    </Card>
-                  </div>
-
-                  <Card title="基准评估数据集得分明细" style={{ borderRadius: 16 }}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-                      {(reportRecord.detailHighlights ?? []).map(item => (
-                        <Tag key={item} color="blue">{item}</Tag>
-                      ))}
-                    </div>
-                    <Table
-                      rowKey="dataset"
-                      pagination={false}
-                      dataSource={(benchmarkEntry ? Array.from(benchmarkEntry.scores.entries()) : []).map(([dataset, score]) => ({ dataset, score: score.toFixed(2), isCurrent: dataset === reportRecord.benchmarkDataset }))}
-                      columns={[
-                        { title: '评估数据集', dataIndex: 'dataset', key: 'dataset' },
-                        { title: reportRecord.targetModel, dataIndex: 'score', key: 'score', width: 180 },
-                        {
-                          title: '当前任务',
-                          dataIndex: 'isCurrent',
-                          key: 'isCurrent',
-                          width: 120,
-                          render: value => (value ? <Tag color="blue">当前任务</Tag> : '-'),
-                        },
-                      ]}
-                    />
                   </Card>
                 </>
               ) : (
@@ -2215,23 +2450,7 @@ const EffectEvaluation: React.FC = () => {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
                       <Tag color="blue">{reportRecord.targetModel}</Tag>
                     </div>
-                    <div style={{ height: 360 }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RechartsBarChart data={manualReportMetricRows} margin={{ top: 16, right: 12, left: 12, bottom: 48 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                          <XAxis
-                            dataKey="metric"
-                            angle={-35}
-                            textAnchor="end"
-                            height={70}
-                            tick={{ fill: '#64748b', fontSize: 12 }}
-                          />
-                          <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 12 }} />
-                          <RechartsTooltip content={<MetricValueTooltip />} />
-                          <Bar dataKey="numeric" fill="#1677ff" radius={[8, 8, 0, 0]} maxBarSize={88} />
-                        </RechartsBarChart>
-                      </ResponsiveContainer>
-                    </div>
+                    <VerticalMetricBarChart data={manualReportMetricRows} />
                   </Card>
                 </>
               )}
@@ -2364,7 +2583,12 @@ const EffectEvaluation: React.FC = () => {
             )}
 
             <Form.Item label="评估类别" name="datasetType" rules={[{ required: true, message: '请选择评估类别' }]}>
-              <Radio.Group>
+              <Radio.Group
+                onChange={() => form.setFieldsValue({
+                  inferenceResult: undefined,
+                  targetModel: undefined,
+                })}
+              >
                 <Space size={16}>
                   <Radio value="text-generation">文本生成</Radio>
                   <Radio value="image-understanding">图像理解</Radio>
@@ -2385,14 +2609,18 @@ const EffectEvaluation: React.FC = () => {
               <>
                 {selectedSourceType === 'existing' ? (
                   <>
-                    <Form.Item label="推理结果集" name="inferenceResult" rules={[{ required: true, message: '请选择推理结果集' }]}>
-                      <Select placeholder="请选择已有推理结果集" options={inferenceResultOptions} />
+                    <Form.Item label="推理结果集" required>
+                      <Space.Compact style={{ width: '100%' }}>
+                        <Form.Item name="inferenceResult" noStyle rules={[{ required: true, message: '请选择推理结果集' }]}>
+                          <Input readOnly placeholder="请选择已有推理结果集" />
+                        </Form.Item>
+                        <Button onClick={() => setInferenceResultModalOpen(true)}>选择</Button>
+                      </Space.Compact>
                     </Form.Item>
 
-                    <div style={{ marginBottom: 24 }}>
-                      <Text type="secondary">待评估模型/服务：</Text>
-                      <Text>{inferenceResultMeta?.targetModel ?? '请先选择推理结果集'}</Text>
-                    </div>
+                    <Form.Item label="待评估模型" name="targetModel">
+                      <Input disabled placeholder="选择推理结果集后自动带出" />
+                    </Form.Item>
                   </>
                 ) : (
                   <>
@@ -2484,13 +2712,17 @@ const EffectEvaluation: React.FC = () => {
 
             {mode === 'manual' && (
               <>
-                <Form.Item label="推理结果集" name="inferenceResult" rules={[{ required: true, message: '请选择推理结果集' }]}>
-                  <Select placeholder="请选择已有推理结果集" options={inferenceResultOptions} />
+                <Form.Item label="推理结果集" required>
+                  <Space.Compact style={{ width: '100%' }}>
+                    <Form.Item name="inferenceResult" noStyle rules={[{ required: true, message: '请选择推理结果集' }]}>
+                      <Input readOnly placeholder="请选择已有推理结果集" />
+                    </Form.Item>
+                    <Button onClick={() => setInferenceResultModalOpen(true)}>选择</Button>
+                  </Space.Compact>
                 </Form.Item>
-                <div style={{ marginBottom: 24 }}>
-                  <Text type="secondary">待评估模型/服务：</Text>
-                  <Text>{inferenceResultMeta?.targetModel ?? '请先选择推理结果集'}</Text>
-                </div>
+                <Form.Item label="待评估模型" name="targetModel">
+                  <Input disabled placeholder="选择推理结果集后自动带出" />
+                </Form.Item>
                 <Form.Item label="数据采样率（可选）" name="sampleRate">
                   <InputNumber min={1} max={100} addonAfter="%" placeholder="请输入采样率（1-100）" style={{ width: 220 }} />
                 </Form.Item>
@@ -2587,6 +2819,14 @@ const EffectEvaluation: React.FC = () => {
             )}
           </div>
         </Modal>
+        <InferenceResultSelectModal
+          open={inferenceResultModalOpen}
+          datasetType={selectedDatasetType}
+          options={inferenceResultOptions}
+          selectedValue={selectedInferenceResult}
+          onCancel={() => setInferenceResultModalOpen(false)}
+          onConfirm={handleInferenceResultConfirm}
+        />
       </div>
     )
   }

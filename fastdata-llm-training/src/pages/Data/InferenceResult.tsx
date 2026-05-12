@@ -27,7 +27,6 @@ import {
   PlusOutlined,
   QuestionCircleOutlined,
   ReloadOutlined,
-  UploadOutlined,
 } from '@ant-design/icons'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -37,6 +36,7 @@ import {
   type TaskLifecycleStatus,
 } from '../../services/taskLifecycle'
 import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
+import ResumableUpload from '../../components/ResumableUpload'
 
 const { Title, Text } = Typography
 
@@ -168,6 +168,19 @@ const importUsageOptions: ImportDataUsage[] = [
 
 function normalizeModelLabel(value: unknown) {
   return Array.isArray(value) ? value.slice(1).join(' / ') : String(value || '')
+}
+
+function normalizeUploadFileName(value: unknown): string | undefined {
+  if (!value) {
+    return undefined
+  }
+  if (typeof value === 'string') {
+    return value
+  }
+  if (typeof value === 'object' && 'name' in value) {
+    return String((value as { name?: string }).name ?? '')
+  }
+  return undefined
 }
 
 function getBaseDataUsage(value?: ImportDataUsage): DataUsage {
@@ -401,7 +414,7 @@ const InferenceResult: React.FC = () => {
             ? getBaseDataUsage(values.importDataUsage)
             : (selectedPendingDataset?.dataUsage === '图像理解' ? '图像理解' : '文本生成') as DataUsage,
           inferenceMode: values.inferenceMode,
-          importFile: values.importFile,
+          importFile: normalizeUploadFileName(values.importFile),
           pendingData: values.inferenceMode === '导入推理结果集' ? '外部导入' : values.pendingData,
           pendingModel: values.inferenceMode === '导入推理结果集' ? values.importModelName : normalizeModelLabel(values.pendingModel),
           dataVolume: values.inferenceMode === '导入推理结果集' ? '-' : selectedPendingDataset?.sampleCount ?? '-',
@@ -527,23 +540,12 @@ const InferenceResult: React.FC = () => {
                       options={getImportDataFormatOptions(importDataUsage).map(value => ({ value, label: value }))}
                     />
                   </Form.Item>
-                  <Form.Item label="上传文件">
-                    <div
-                      style={{
-                        border: '1px dashed #d9d9d9',
-                        borderRadius: 14,
-                        padding: '34px 24px',
-                        textAlign: 'center',
-                        background: '#fcfcfd',
-                      }}
-                    >
-                      <UploadOutlined style={{ fontSize: 36, color: '#1677ff', marginBottom: 12 }} />
-                      <div style={{ fontSize: 16, marginBottom: 8 }}>点击或拖拽文件到此区域上传</div>
-                      <Text type="secondary">支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB</Text>
-                      <Form.Item name="importFile" rules={[{ required: true, message: '请输入或选择上传文件' }]} noStyle>
-                        <Input placeholder="请输入导入文件名" style={{ marginTop: 18 }} />
-                      </Form.Item>
-                    </div>
+                  <Form.Item label="上传文件" name="importFile" rules={[{ required: true, message: '请上传导入文件' }]}>
+                    <ResumableUpload
+                      accept=".jsonl,.json,.csv"
+                      title="点击或拖拽文件到此区域上传"
+                      hint="支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB；失败或取消后可继续上传"
+                    />
                   </Form.Item>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 28, marginBottom: 20 }}>
                     <Text>下载示例文件：</Text>

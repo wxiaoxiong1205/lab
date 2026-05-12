@@ -114,8 +114,8 @@
   --font-weight-bold: 700;
 
   /* Layout */
-  --header-height: 56px;
-  --sidebar-width: 240px;
+  --header-height: 72px;
+  --sidebar-width: 248px;
   --sidebar-collapsed-width: 72px;
 }
 
@@ -149,16 +149,19 @@ body {
 }
 
 .app-shell {
-  display: flex;
-  align-items: stretch;
-  min-height: calc(100vh - 60px);
+  position: relative;
+  display: block;
+  min-height: calc(100vh - 72px);
   width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .app-shell__main {
-  flex: 1 1 auto;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
-  transition: width var(--transition-slow), transform var(--transition-slow);
+  overflow-x: hidden;
 }
 
 .app-shell__main .ant-card,
@@ -171,24 +174,27 @@ body {
 }
 
 .app-shell__doc-rail {
-  width: 0;
-  flex: 0 0 auto;
+  width: min(392px, calc(100vw - 24px));
   overflow: hidden;
-  align-self: flex-start;
-  position: sticky;
-  top: 0;
-  height: calc(100vh - 60px);
+  position: fixed;
+  top: 72px;
+  right: 0;
+  z-index: 110;
+  height: calc(100vh - 72px);
   border-bottom-left-radius: 28px;
   background:
     radial-gradient(circle at top left, rgba(99, 102, 241, 0.16), transparent 28%),
     linear-gradient(180deg, #111827 0%, #0f172a 100%);
   border-left: 1px solid rgba(148, 163, 184, 0.18);
   box-shadow: -18px 0 48px rgba(15, 23, 42, 0.18);
-  transition: width var(--transition-slow), background var(--transition-slow);
+  pointer-events: none;
+  transform: translateX(100%);
+  transition: transform var(--transition-slow), background var(--transition-slow);
 }
 
 .app-shell__doc-rail--open {
-  width: 392px;
+  pointer-events: auto;
+  transform: translateX(0);
 }
 
 .design-doc-panel {
@@ -420,8 +426,8 @@ body {
 }
 
 @media (max-width: 1280px) {
-  .app-shell__doc-rail--open {
-    width: 360px;
+  .app-shell__doc-rail {
+    width: min(360px, calc(100vw - 24px));
   }
 
   .design-doc-fab {

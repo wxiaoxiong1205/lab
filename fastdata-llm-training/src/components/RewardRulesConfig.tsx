@@ -2,25 +2,21 @@ import React, { useState } from 'react'
 import {
   Card,
   Form,
-  Upload,
   Typography,
   Space,
   Divider,
   Alert,
   Tabs,
-  Button,
 } from 'antd'
 import {
   SafetyCertificateOutlined,
   CodeOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
-  UploadOutlined,
-  FileOutlined,
-  DeleteOutlined,
 } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import type { RewardRuleType } from '../types/training'
+import ResumableUpload from './ResumableUpload'
 
 const { Text, Paragraph } = Typography
 
@@ -114,15 +110,10 @@ const RewardRulesConfig: React.FC<RewardRulesConfigProps> = ({ value, onChange }
     onChange?.({ type, customFile: type === 'custom' ? customFile : undefined })
   }
 
-  const handleUploadChange = (info: { file: UploadFile; fileList: UploadFile[] }) => {
-    const file = info.file
-    if (file.status === 'removed') {
-      setCustomFile(undefined)
-      onChange?.({ type: ruleType, customFile: undefined })
-    } else if (file.status === 'done') {
-      setCustomFile(file)
-      onChange?.({ type: ruleType, customFile: file })
-    }
+  const handleCustomFileChange = (file: UploadFile | null) => {
+    const nextFile = file ?? undefined
+    setCustomFile(nextFile)
+    onChange?.({ type: ruleType, customFile: nextFile })
   }
 
   return (
@@ -202,47 +193,13 @@ const RewardRulesConfig: React.FC<RewardRulesConfigProps> = ({ value, onChange }
                   style={{ marginBottom: 12 }}
                 />
 
-                <Upload
+                <ResumableUpload
                   accept=".py"
-                  maxCount={1}
-                  fileList={customFile ? [customFile] : []}
-                  onChange={handleUploadChange}
-                  beforeUpload={() => false}
-                  showUploadList={false}
-                >
-                  {customFile ? (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '8px 12px',
-                      background: '#f8fafc',
-                      borderRadius: 8,
-                      border: '1px solid #e2e8f0',
-                    }}>
-                      <FileOutlined style={{ color: '#7c3aed' }} />
-                      <Text style={{ color: '#0f172a', flex: 1 }}>{customFile.name}</Text>
-                      <Button
-                        type="text"
-                        danger
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        onClick={e => {
-                          e.stopPropagation()
-                          setCustomFile(undefined)
-                          onChange?.({ type: ruleType, customFile: undefined })
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <Button
-                      icon={<UploadOutlined />}
-                      style={{ borderRadius: 8 }}
-                    >
-                      上传 .py 文件
-                    </Button>
-                  )}
-                </Upload>
+                  title="上传 .py 文件"
+                  hint="仅支持上传单个 .py 文件；失败或取消后可继续上传"
+                  value={customFile}
+                  onChange={handleCustomFileChange}
+                />
 
                 {/* 代码模板展示 */}
                 <Tabs

@@ -3,6 +3,8 @@ import { ArrowLeftOutlined, DeleteOutlined, EyeOutlined, PlusOutlined, SearchOut
 import { Button, Card, Descriptions, Form, Input, Modal, Popconfirm, Radio, Select, Space, Table, Tabs, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { formatResourceLockMessage, getModelReferenceLocks } from '../../services/resourceReferenceGuard'
+import ResumableUpload from '../../components/ResumableUpload'
 
 const { Title, Text } = Typography
 
@@ -13,8 +15,8 @@ type MLModelFormValues = {
   annotationType: string
   taskType: string
   source: 'local' | 'notebook'
-  weightFile?: string
-  tokenizer?: string
+  weightFile?: string | { name?: string }
+  tokenizer?: string | { name?: string }
   network?: string
 }
 
@@ -53,6 +55,19 @@ const initialModels: MLModelRecord[] = [
   { id: '4', name: 'hzj_图片分类多标签', version: 'V1', versionCount: 1, modelType: '图片', annotationType: '图像分类', taskType: '单图多标签', source: 'Notebook 获取', weightFile: 'notebook://vision-lab/resnet.pt', network: 'ResNet50', createdAt: '2026-04-13 15:17:32' },
   { id: '5', name: 'basion-图像分类-单标签', version: 'V1', versionCount: 1, modelType: '图片', annotationType: '图像分类', taskType: '单图单标签', source: '本地上传', weightFile: 'image-classifier.pt', network: 'ConvNeXt-Tiny', createdAt: '2026-04-10 10:00:00' },
 ]
+
+function normalizeUploadFileName(value: unknown): string | undefined {
+  if (!value) {
+    return undefined
+  }
+  if (typeof value === 'string') {
+    return value
+  }
+  if (typeof value === 'object' && 'name' in value) {
+    return String((value as { name?: string }).name ?? '')
+  }
+  return undefined
+}
 
 const MLModelManagement: React.FC = () => {
   const [form] = Form.useForm<MLModelFormValues>()
@@ -93,8 +108,8 @@ const MLModelManagement: React.FC = () => {
           annotationType: values.annotationType,
           taskType: values.taskType,
           source: values.source === 'local' ? '本地上传' : 'Notebook 获取',
-          weightFile: values.weightFile || (values.source === 'local' ? 'model.pt' : 'notebook://请选择 Notebook/model.pt'),
-          tokenizer: values.tokenizer,
+          weightFile: normalizeUploadFileName(values.weightFile) || (values.source === 'local' ? 'model.pt' : 'notebook://请选择 Notebook/model.pt'),
+          tokenizer: normalizeUploadFileName(values.tokenizer),
           network: values.network,
           description: values.description,
           createdAt: new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-'),
@@ -118,7 +133,23 @@ const MLModelManagement: React.FC = () => {
       render: (_, record) => (
         <Space size={0}>
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setDetailRecord(record)}>查看详情</Button>
-          <Popconfirm title="确认删除该模型？" okText="删除" cancelText="取消" onConfirm={() => setModels(prev => prev.filter(item => item.id !== record.id))}>
+          <Popconfirm
+            title="确认删除该模型？"
+            okText="删除"
+            cancelText="取消"
+            onConfirm={() => {
+              const locks = getModelReferenceLocks(record.name)
+              if (locks.length) {
+                Modal.warning({
+                  title: '模型正在被引用，暂不可删除',
+                  content: formatResourceLockMessage(record.name, locks),
+                })
+                return
+              }
+
+              setModels(prev => prev.filter(item => item.id !== record.id))
+            }}
+          >
             <Button type="link" size="small" icon={<DeleteOutlined />} danger>删除</Button>
           </Popconfirm>
         </Space>
@@ -206,7 +237,11 @@ const MLModelManagement: React.FC = () => {
                   ]}
                 />
               ) : (
-                <Input placeholder="请输入本地上传的 .pt 权重文件名" />
+                <ResumableUpload
+                  accept=".pt,.pth,.onnx,.pkl"
+                  title="点击或拖拽权重文件到此区域上传"
+                  hint="支持 .pt/.pth/.onnx/.pkl 等模型权重文件；失败或取消后可继续上传"
+                />
               )}
             </Form.Item>
             <Form.Item label="分词器" name="tokenizer">
@@ -219,7 +254,11 @@ const MLModelManagement: React.FC = () => {
                   ]}
                 />
               ) : (
-                <Input placeholder="请输入 tokenizer.json 等分词器文件名" />
+                <ResumableUpload
+                  accept=".json,.txt,.model"
+                  title="点击或拖拽分词器文件到此区域上传"
+                  hint="支持 tokenizer.json 等分词器文件；失败或取消后可继续上传"
+                />
               )}
             </Form.Item>
             <Form.Item label="网络结构" name="network">

@@ -53,12 +53,32 @@ const { Title, Text } = Typography
 /** 与参考页一致：表格中指标值使用主题蓝 */
 const METRIC_VALUE_BLUE = '#1677ff'
 
+const GPU_MODEL_LABELS: Record<string, string> = {
+  A100: 'NVIDIA A100',
+  V100: 'NVIDIA V100',
+  T4: 'NVIDIA T4',
+  H100: 'NVIDIA H100',
+}
+
 function formatMetricTableValue(v: number): string {
   const a = Math.abs(v)
   if (Number.isNaN(v)) return '--'
   if (a === 0) return '0.0000'
   if (a >= 10000 || a < 0.0001) return v.toExponential(4)
   return v.toFixed(4)
+}
+
+function formatGpuModel(value?: string): string {
+  if (!value) return '--'
+  return GPU_MODEL_LABELS[value] ?? value
+}
+
+function formatCardCount(value?: number): string {
+  return value ? `${value}卡` : '--'
+}
+
+function formatResourceValue(value?: number, unit?: string): string {
+  return value ? `${value}${unit ? ` ${unit}` : ''}` : '--'
 }
 
 /** 训练曲线展示顺序（与参考页一致：loss / eval_loss / epoch / learning_rate 等） */
@@ -301,20 +321,34 @@ const VersionDetail: React.FC = () => {
     <Text type="secondary">暂无数据集信息</Text>
   )
 
-  // 显卡资源配置 Tab
-  const gpuContent = version.gpuConfig ? (
+  // 显卡资源配置 Tab：字段口径与创建页保持一致
+  const resourceConfig = version.config ?? {}
+  const hasResourceConfig = Boolean(
+    version.gpuConfig ||
+      resourceConfig.cpuRequest ||
+      resourceConfig.cpuLimit ||
+      resourceConfig.memoryRequest ||
+      resourceConfig.memoryLimit,
+  )
+  const gpuContent = hasResourceConfig ? (
     <Descriptions bordered column={2} size="small" style={{ borderRadius: 12, overflow: 'hidden' }}>
-      <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>显卡类型</span>}>
-        {version.gpuConfig.gpuType ?? 'GPU'}
+      <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>显卡类型及型号</span>}>
+        {formatGpuModel(version.gpuConfig?.gpuModel)}
       </Descriptions.Item>
-      <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>显卡型号</span>}>
-        {version.gpuConfig.gpuModel ?? '--'}
+      <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>显卡卡数配置</span>}>
+        {formatCardCount(version.gpuConfig?.gpuCount)}
       </Descriptions.Item>
-      <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>显卡内存</span>}>
-        {version.gpuConfig.gpuMemory ?? '--'}
+      <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>CPU请求</span>}>
+        {formatResourceValue(resourceConfig.cpuRequest, 'Core')}
       </Descriptions.Item>
-      <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>显卡张数</span>}>
-        {version.gpuConfig.gpuCount ?? '--'} 张
+      <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>CPU限制</span>}>
+        {formatResourceValue(resourceConfig.cpuLimit, 'Core')}
+      </Descriptions.Item>
+      <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>内存请求</span>}>
+        {formatResourceValue(resourceConfig.memoryRequest, 'GB')}
+      </Descriptions.Item>
+      <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>内存限制</span>}>
+        {formatResourceValue(resourceConfig.memoryLimit, 'GB')}
       </Descriptions.Item>
     </Descriptions>
   ) : (

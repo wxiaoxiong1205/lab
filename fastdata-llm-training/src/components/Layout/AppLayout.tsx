@@ -692,6 +692,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         <Content
           style={{
             marginLeft: showMainSider ? 248 : 0,
+            width: showMainSider ? 'calc(100% - 248px)' : '100%',
+            maxWidth: showMainSider ? 'calc(100% - 248px)' : '100%',
             background: 'linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)',
             minHeight: 'calc(100vh - 72px)',
             overflow: 'auto',

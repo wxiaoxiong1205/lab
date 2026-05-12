@@ -22,6 +22,7 @@ import {
   TASK_LIFECYCLE_TAG,
   type TaskLifecycleStatus,
 } from '../../services/taskLifecycle'
+import { formatResourceLockMessage, getModelReferenceLocks } from '../../services/resourceReferenceGuard'
 
 const { Text, Title } = Typography
 
@@ -101,7 +102,18 @@ const ModelManagement: React.FC = () => {
             size="small"
             danger
             disabled={!canRunTaskLifecycleAction(record.status, 'delete')}
-            onClick={() => setRows(previous => previous.filter(item => item.id !== record.id))}
+            onClick={() => {
+              const locks = getModelReferenceLocks(record.name)
+              if (locks.length) {
+                Modal.warning({
+                  title: '模型正在被引用，暂不可删除',
+                  content: formatResourceLockMessage(record.name, locks),
+                })
+                return
+              }
+
+              setRows(previous => previous.filter(item => item.id !== record.id))
+            }}
           >
             删除
           </Button>

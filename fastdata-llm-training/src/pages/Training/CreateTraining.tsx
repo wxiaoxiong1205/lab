@@ -249,10 +249,6 @@ const BaseModelModalPicker: React.FC<{
                   {trainingType === 'vision' ? '图像理解' : '文本生成'} · {currentModels.length} 个模型
                 </Text>
               </div>
-              <Space size={6}>
-                <Tag color="green">已适配</Tag>
-                <Tag color="orange">未适配</Tag>
-              </Space>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12, maxHeight: 360, overflow: 'auto', paddingRight: 4 }}>

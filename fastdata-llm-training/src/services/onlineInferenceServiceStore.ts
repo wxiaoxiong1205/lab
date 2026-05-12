@@ -101,4 +101,7 @@ export const onlineInferenceServiceActions = {
   updateService(id: string, updater: (record: OnlineInferenceServiceRecord) => OnlineInferenceServiceRecord) {
     persist(memoryState.map(item => (item.id === id ? updater(item) : item)))
   },
+  deleteService(id: string) {
+    persist(memoryState.filter(item => item.id !== id))
+  },
 }

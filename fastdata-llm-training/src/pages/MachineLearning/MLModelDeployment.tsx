@@ -14,7 +14,6 @@ import {
   Table,
   Tag,
   Typography,
-  Upload,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
@@ -22,7 +21,6 @@ import {
   CloudServerOutlined,
   CodeOutlined,
   DownloadOutlined,
-  InboxOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -42,6 +40,7 @@ import {
   type ResourceConfig,
   type StandardDeploymentConfig,
 } from '../../services/machineDeploymentStore'
+import ResumableUpload from '../../components/ResumableUpload'
 
 const { Title, Text } = Typography
 
@@ -140,6 +139,23 @@ function buildImageSummary(config: CustomDeploymentConfig) {
   return imageName ? `镜像部署 / ${imageName}` : '镜像部署'
 }
 
+function normalizeUploadFileName(value: unknown): string | undefined {
+  if (!value) {
+    return undefined
+  }
+  if (typeof value === 'string') {
+    return value
+  }
+  if (Array.isArray(value)) {
+    const first = value[0] as { name?: string } | undefined
+    return first?.name
+  }
+  if (typeof value === 'object' && 'name' in value) {
+    return String((value as { name?: string }).name ?? '')
+  }
+  return undefined
+}
+
 function getStatusTag(status: TaskLifecycleStatus) {
   const config = TASK_LIFECYCLE_TAG[status]
   return <Tag color={config.color}>{config.label}</Tag>
@@ -210,13 +226,18 @@ function buildDeploymentPayload(values: CreateFormValues, deploymentType: Deploy
   const standard = values.standard
 
   if (deploymentType === 'standard') {
+    const standardConfig = {
+      ...standard,
+      pythonFile: normalizeUploadFileName(standard.pythonFile),
+    }
+
     return {
       name: values.name?.trim() ?? '',
       deploymentType,
       targetSummary: `${standard.model ?? '-'} / ${standard.network ?? '-'}`,
       resourceSummary: buildResourceSummary(standard.resources),
       instanceCount: buildInstanceCount(standard.resources),
-      standardConfig: standard,
+      standardConfig,
       customConfig: undefined,
     }
   }
@@ -745,21 +766,13 @@ const MLModelDeployment: React.FC = () => {
                       <Form.Item
                         label="Python文件"
                         name={['standard', 'pythonFile']}
-                        valuePropName="fileList"
-                        getValueFromEvent={event => event?.fileList ?? []}
                         rules={[{ required: true, message: '请上传 Python 文件' }]}
                       >
-                        <Upload.Dragger
+                        <ResumableUpload
                           accept=".py"
-                          maxCount={1}
-                          beforeUpload={() => false}
-                        >
-                          <p className="ant-upload-drag-icon">
-                            <InboxOutlined />
-                          </p>
-                          <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-                          <p className="ant-upload-hint">支持 model.py 文件拖到此处，或点击上传</p>
-                        </Upload.Dragger>
+                          title="点击或拖拽文件到此区域上传"
+                          hint="支持 model.py 文件拖到此处，或点击上传；失败或取消后可继续上传"
+                        />
                       </Form.Item>
                     ) : (
                       <Form.Item

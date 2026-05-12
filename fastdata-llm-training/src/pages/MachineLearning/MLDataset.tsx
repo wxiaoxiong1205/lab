@@ -1,12 +1,11 @@
 import React, { useMemo, useState } from 'react'
-import { ArrowLeftOutlined, CheckCircleOutlined, DeleteOutlined, EyeOutlined, PlusOutlined, SearchOutlined, UploadOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, DeleteOutlined, EyeOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import {
   Button,
   Card,
   Descriptions,
   Form,
   Input,
-  List,
   Modal,
   Popconfirm,
   Radio,
@@ -14,11 +13,13 @@ import {
   Space,
   Table,
   Typography,
-  Upload,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { UploadFile } from 'antd/es/upload/interface'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { getCurrentUser } from '../../services/permissionStore'
+import { formatResourceLockMessage, getCreatorDeletePermission, getOnlineAnnotationServiceReferenceLocks } from '../../services/resourceReferenceGuard'
+import ResumableUpload from '../../components/ResumableUpload'
 
 const { Title, Text } = Typography
 
@@ -43,6 +44,7 @@ type MLDatasetRecord = {
   description?: string
   labelStatus: '无标注信息' | '有标注信息'
   dataSource: '本地上传' | 'Notebook 获取'
+  creator: string
   createdAt: string
 }
 
@@ -64,12 +66,12 @@ const annotationTypesByDataType: Record<string, Array<{ value: string; label: st
 }
 
 const initialDatasetRows: MLDatasetRecord[] = [
-  { id: '1', name: 'basion-物体检测', version: 'V1', dataType: '图片', annotationType: '物体检测', annotationTemplate: '矩阵框标注', labelStatus: '有标注信息', dataSource: '本地上传', createdAt: '2026-04-24 14:13:09' },
-  { id: '2', name: 'qeqwe', version: 'V1', dataType: '文本', annotationType: '实体识别', annotationTemplate: '文本实体识别', labelStatus: '无标注信息', dataSource: 'Notebook 获取', createdAt: '2026-04-22 15:11:38' },
-  { id: '3', name: 'basion-文本实体识别', version: 'V3', dataType: '文本', annotationType: '实体识别', annotationTemplate: '文本实体识别', labelStatus: '有标注信息', dataSource: '本地上传', createdAt: '2026-04-15 09:35:59' },
-  { id: '4', name: '图像分类-多-1', version: 'V3', dataType: '图片', annotationType: '图像分类', annotationTemplate: '单图多标签', labelStatus: '有标注信息', dataSource: '本地上传', createdAt: '2026-04-14 17:43:06' },
-  { id: '5', name: 'basion-文本分类-多标签-无标注', version: 'V2', dataType: '文本', annotationType: '文本分类', annotationTemplate: '文本多标签', labelStatus: '无标注信息', dataSource: '本地上传', createdAt: '2026-04-14 16:33:51' },
-  { id: '6', name: 'basion-图像分割-实例分割-无标注', version: 'V1', dataType: '图片', annotationType: '图像分割', annotationTemplate: '实例分割', labelStatus: '无标注信息', dataSource: '本地上传', createdAt: '2026-03-01 09:10:00' },
+  { id: '1', name: 'basion-物体检测', version: 'V1', dataType: '图片', annotationType: '物体检测', annotationTemplate: '矩阵框标注', labelStatus: '有标注信息', dataSource: '本地上传', creator: 'lab1', createdAt: '2026-04-24 14:13:09' },
+  { id: '2', name: 'qeqwe', version: 'V1', dataType: '文本', annotationType: '实体识别', annotationTemplate: '文本实体识别', labelStatus: '无标注信息', dataSource: 'Notebook 获取', creator: 'lisi', createdAt: '2026-04-22 15:11:38' },
+  { id: '3', name: 'basion-文本实体识别', version: 'V3', dataType: '文本', annotationType: '实体识别', annotationTemplate: '文本实体识别', labelStatus: '有标注信息', dataSource: '本地上传', creator: 'lab1', createdAt: '2026-04-15 09:35:59' },
+  { id: '4', name: '图像分类-多-1', version: 'V3', dataType: '图片', annotationType: '图像分类', annotationTemplate: '单图多标签', labelStatus: '有标注信息', dataSource: '本地上传', creator: 'admin', createdAt: '2026-04-14 17:43:06' },
+  { id: '5', name: 'basion-文本分类-多标签-无标注', version: 'V2', dataType: '文本', annotationType: '文本分类', annotationTemplate: '文本多标签', labelStatus: '无标注信息', dataSource: '本地上传', creator: 'wangwu', createdAt: '2026-04-14 16:33:51' },
+  { id: '6', name: 'basion-图像分割-实例分割-无标注', version: 'V1', dataType: '图片', annotationType: '图像分割', annotationTemplate: '实例分割', labelStatus: '无标注信息', dataSource: '本地上传', creator: 'lab1', createdAt: '2026-03-01 09:10:00' },
 ]
 
 const MLDataset: React.FC = () => {
@@ -119,6 +121,7 @@ const MLDataset: React.FC = () => {
           description: values.description,
           labelStatus: values.labelStatus === 'with-label' ? '有标注信息' : '无标注信息',
           dataSource: values.dataSource === 'notebook' ? 'Notebook 获取' : '本地上传',
+          creator: getCurrentUser().account,
           createdAt: new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-'),
         },
         ...prev,
@@ -131,6 +134,25 @@ const MLDataset: React.FC = () => {
   }
 
   const deleteRecord = (id: string) => {
+    const record = rows.find(item => item.id === id)
+    const permission = getCreatorDeletePermission(record?.creator)
+    if (record && !permission.allowed) {
+      Modal.warning({
+        title: '无权删除该数据集',
+        content: permission.reason,
+      })
+      return
+    }
+
+    const locks = record ? getOnlineAnnotationServiceReferenceLocks(record.name, `${record.annotationType}/${record.name}-${record.version}`) : []
+    if (record && locks.length) {
+      Modal.warning({
+        title: '数据集正在被引用，暂不可删除',
+        content: formatResourceLockMessage(record.name, locks),
+      })
+      return
+    }
+
     setRows(prev => prev.filter(item => item.id !== id))
   }
 
@@ -140,6 +162,7 @@ const MLDataset: React.FC = () => {
     { title: '数据类型', dataIndex: 'dataType', key: 'dataType', width: 110 },
     { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 130 },
     { title: '标注模板', dataIndex: 'annotationTemplate', key: 'annotationTemplate', width: 150 },
+    { title: '创建人', dataIndex: 'creator', key: 'creator', width: 110 },
     {
       title: '操作',
       key: 'action',
@@ -233,30 +256,13 @@ const MLDataset: React.FC = () => {
               />
             </Form.Item>
             <Form.Item label="上传数据">
-              <Upload.Dragger
-                showUploadList={false}
-                customRequest={({ file, onSuccess }: any) => {
-                  setSelectedFile({ uid: file.uid, name: file.name, status: 'done' } as UploadFile)
-                  window.setTimeout(() => onSuccess?.('ok'), 100)
-                }}
-              >
-                <p><UploadOutlined style={{ fontSize: 38, color: '#1677ff' }} /></p>
-                <p>点击或拖拽文件到此区域上传</p>
-                <p style={{ color: '#94a3b8' }}>支持文本、图片等机器学习任务数据格式</p>
-              </Upload.Dragger>
-            </Form.Item>
-            {selectedFile && (
-              <List
-                size="small"
-                bordered
-                dataSource={[selectedFile]}
-                renderItem={item => (
-                  <List.Item actions={[<Button key="remove" type="link" danger size="small" onClick={() => setSelectedFile(null)}>删除</Button>]}>
-                    <List.Item.Meta avatar={<CheckCircleOutlined style={{ color: '#52c41a' }} />} title={item.name} description="上传完成" />
-                  </List.Item>
-                )}
+              <ResumableUpload
+                title="点击或拖拽文件到此区域上传"
+                hint="支持文本、图片等机器学习任务数据格式"
+                value={selectedFile}
+                onChange={setSelectedFile}
               />
-            )}
+            </Form.Item>
           </Card>
 
           <Space>
@@ -326,6 +332,7 @@ const MLDataset: React.FC = () => {
             <Descriptions.Item label="标注模板">{detailRecord.annotationTemplate}</Descriptions.Item>
             <Descriptions.Item label="数据标注状态">{detailRecord.labelStatus}</Descriptions.Item>
             <Descriptions.Item label="数据来源">{detailRecord.dataSource}</Descriptions.Item>
+            <Descriptions.Item label="创建人">{detailRecord.creator}</Descriptions.Item>
             <Descriptions.Item label="描述" span={2}>{detailRecord.description || '-'}</Descriptions.Item>
             <Descriptions.Item label="创建时间" span={2}>{detailRecord.createdAt}</Descriptions.Item>
           </Descriptions>

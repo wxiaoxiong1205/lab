@@ -52,6 +52,14 @@ export const TRAINING_METHOD_FORMATS: Record<TrainingMethod, string[]> = {
   RFT: ['Completion_Reward'],
 }
 
+function getAllowedFormats(trainingType: TrainingType, trainingMethod?: TrainingMethod): Set<string> | null {
+  if (!trainingMethod) return null
+  if (trainingType === 'vision' && trainingMethod === 'SFT') {
+    return new Set(['ROLE_BASED'])
+  }
+  return new Set(TRAINING_METHOD_FORMATS[trainingMethod])
+}
+
 /** 根据 trainingType 计算 dataUsage 默认值 */
 function getDefaultDataUsage(trainingType: TrainingType): string {
   return trainingType === 'vision' ? '图像理解' : trainingType === 'text' ? '文本生成' : ''
@@ -141,7 +149,10 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
   }, [DATA_TYPES])
 
   // ─── 筛选逻辑 ───
-  const allowedFormats = trainingMethod ? new Set(TRAINING_METHOD_FORMATS[trainingMethod]) : null
+  const allowedFormats = useMemo(
+    () => getAllowedFormats(trainingType, trainingMethod),
+    [trainingType, trainingMethod],
+  )
 
   const filteredCatalog = useMemo(() => {
     let list = DATASET_PICKER_CATALOG

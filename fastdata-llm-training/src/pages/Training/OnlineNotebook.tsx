@@ -33,6 +33,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from 'antd'
@@ -50,6 +51,7 @@ import { PUBLISH_CASE_NOTICE } from '../notebookCaseNotice'
 const { Text, Title, Paragraph } = Typography
 
 type NotebookStatus = TaskLifecycleStatus
+type NotebookAccessScope = 'public' | 'private'
 
 type OpenPortRecord = {
   id: string
@@ -76,6 +78,8 @@ type MyNotebookRecord = {
   createdAt: string
   updatedAt: string
   creator: string
+  creatorAccount: string
+  accessScope: NotebookAccessScope
   aiService?: string
   dataset?: string
   model?: string
@@ -149,6 +153,7 @@ type CustomMirrorTagFormValues = {
 interface CreateFormValues {
   name?: string
   description?: string
+  accessScope?: NotebookAccessScope
   aiService?: string[]
   dataset?: string
   model?: string
@@ -330,6 +335,8 @@ const myNotebooksSeed: MyNotebookRecord[] = [
     createdAt: '2026/4/14 15:21:19',
     updatedAt: '2026/4/21 11:03:18',
     creator: 'deepexilab',
+    creatorAccount: 'zhangsan',
+    accessScope: 'public',
     aiService: '在线推理服务 / Qwen3-Next-80B-A3B-Instruct-文本生成-在线推理服务',
     dataset: '训练数据集/roleBased-V5',
     model: 'Qwen2.5-7B-Instruct',
@@ -361,6 +368,8 @@ const myNotebooksSeed: MyNotebookRecord[] = [
     createdAt: '2026/3/25 15:19:10',
     updatedAt: '2026/4/20 09:21:10',
     creator: 'lab1',
+    creatorAccount: 'lisi',
+    accessScope: 'private',
     aiService: '-',
     dataset: '训练数据集/小量训练数据-xjh-test-V3',
     model: 'Qwen3-8B',
@@ -500,10 +509,19 @@ function statusTag(status: NotebookStatus): React.ReactNode {
   return <Tag color={config.color}>{config.label}</Tag>
 }
 
+function accessScopeTag(scope?: NotebookAccessScope): React.ReactNode {
+  return scope === 'private' ? <Tag color="orange">私有</Tag> : <Tag color="blue">公开</Tag>
+}
+
+function canOperateNotebook(record: Pick<MyNotebookRecord, 'accessScope' | 'creatorAccount'>, currentAccount: string): boolean {
+  return record.accessScope !== 'private' || record.creatorAccount === currentAccount
+}
+
 function getCreateInitialValues(): CreateFormValues {
   return {
     name: '',
     description: '',
+    accessScope: 'public',
     aiService: undefined,
     dataset: undefined,
     model: undefined,
@@ -562,6 +580,7 @@ function toEditFormValues(record: MyNotebookRecord): CreateFormValues {
   return {
     name: record.name,
     description: record.description,
+    accessScope: record.accessScope ?? 'public',
     aiService: parseAiServiceValue(record.aiService),
     dataset: record.dataset,
     model: record.model,
@@ -1116,6 +1135,13 @@ const OnlineNotebook: React.FC = () => {
       render: value => statusTag(value),
     },
     {
+      title: '访问权限',
+      dataIndex: 'accessScope',
+      key: 'accessScope',
+      width: 110,
+      render: value => accessScopeTag(value),
+    },
+    {
       title: '资源规格',
       dataIndex: 'spec',
       key: 'spec',
@@ -1129,78 +1155,91 @@ const OnlineNotebook: React.FC = () => {
       title: '操作',
       key: 'action',
       width: 430,
-      render: (_, record) => (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            minWidth: 390,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {record.status === '运行中' ? (
-            <>
-              <Button type="link" size="small" disabled={!canOpenNotebook(record.status)} onClick={() => message.success('正在打开 Notebook')}>
-                打开
+      render: (_, record) => {
+        const operable = canOperateNotebook(record, currentUser.account)
+        if (!operable) {
+          return (
+            <Tooltip title="私有 Notebook 仅创建人可操作">
+              <Button size="small" disabled>
+                不可操作
               </Button>
-              <Button type="link" size="small" onClick={() => openSaveEnvironment(record)}>
-                保存环境
-              </Button>
-              <Button
-                type="link"
-                size="small"
-                disabled={!canRunTaskLifecycleAction(record.status, 'terminate')}
-                onClick={() => openStopNotebook(record)}
-              >
-                停止
-              </Button>
-              <Button type="link" size="small" onClick={() => navigate(`/finetune/notebooks/${record.id}`)}>
-                查看详情
-              </Button>
-              <Button type="link" size="small" onClick={() => navigate(`/finetune/notebooks/${record.id}/publish-case`)}>
-                发布为案例
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                type="link"
-                size="small"
-                disabled={!canStartNotebookTask(record.status)}
-                onClick={() => startNotebookTask(record.id)}
-              >
-                启动
-              </Button>
-              <Button
-                type="link"
-                size="small"
-                disabled={!canEditNotebook(record.status)}
-                onClick={() => navigate(`/finetune/notebooks/${record.id}/edit`)}
-              >
-                编辑
-              </Button>
-              <Button type="link" size="small" onClick={() => navigate(`/finetune/notebooks/${record.id}`)}>
-                查看详情
-              </Button>
-              <Button type="link" size="small" onClick={() => navigate(`/finetune/notebooks/${record.id}/publish-case`)}>
-                发布为案例
-              </Button>
-            </>
-          )}
-          <Dropdown
-            trigger={['click']}
-            menu={{
-              items: [{ key: 'delete', label: '删除', danger: true }],
-              onClick: () => {
-                deleteNotebook(record.id)
-              },
+            </Tooltip>
+          )
+        }
+
+        return (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              minWidth: 390,
+              whiteSpace: 'nowrap',
             }}
           >
-            <Button type="text" size="small" icon={<MoreOutlined />} />
-          </Dropdown>
-        </div>
-      ),
+            {record.status === '运行中' ? (
+              <>
+                <Button type="link" size="small" disabled={!canOpenNotebook(record.status)} onClick={() => message.success('正在打开 Notebook')}>
+                  打开
+                </Button>
+                <Button type="link" size="small" onClick={() => openSaveEnvironment(record)}>
+                  保存环境
+                </Button>
+                <Button
+                  type="link"
+                  size="small"
+                  disabled={!canRunTaskLifecycleAction(record.status, 'terminate')}
+                  onClick={() => openStopNotebook(record)}
+                >
+                  停止
+                </Button>
+                <Button type="link" size="small" onClick={() => navigate(`/finetune/notebooks/${record.id}`)}>
+                  查看详情
+                </Button>
+                <Button type="link" size="small" onClick={() => navigate(`/finetune/notebooks/${record.id}/publish-case`)}>
+                  发布为案例
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  type="link"
+                  size="small"
+                  disabled={!canStartNotebookTask(record.status)}
+                  onClick={() => startNotebookTask(record.id)}
+                >
+                  启动
+                </Button>
+                <Button
+                  type="link"
+                  size="small"
+                  disabled={!canEditNotebook(record.status)}
+                  onClick={() => navigate(`/finetune/notebooks/${record.id}/edit`)}
+                >
+                  编辑
+                </Button>
+                <Button type="link" size="small" onClick={() => navigate(`/finetune/notebooks/${record.id}`)}>
+                  查看详情
+                </Button>
+                <Button type="link" size="small" onClick={() => navigate(`/finetune/notebooks/${record.id}/publish-case`)}>
+                  发布为案例
+                </Button>
+              </>
+            )}
+            <Dropdown
+              trigger={['click']}
+              menu={{
+                items: [{ key: 'delete', label: '删除', danger: true }],
+                onClick: () => {
+                  deleteNotebook(record.id)
+                },
+              }}
+            >
+              <Button type="text" size="small" icon={<MoreOutlined />} />
+            </Dropdown>
+          </div>
+        )
+      },
     },
   ]
 
@@ -1292,6 +1331,8 @@ const OnlineNotebook: React.FC = () => {
         createdAt: nowText(),
         updatedAt: nowText(),
         creator: currentUser.username,
+        creatorAccount: currentUser.account,
+        accessScope: values.accessScope ?? 'public',
         aiService: formatAiServiceLabel(values.aiService),
         dataset: values.dataset,
         model: values.model,
@@ -1332,6 +1373,7 @@ const OnlineNotebook: React.FC = () => {
                 ...item,
                 name: values.name || item.name,
                 description: values.description?.trim() || '',
+                accessScope: values.accessScope ?? item.accessScope,
                 image: values.image || item.image,
                 spec: buildSpecSummary(values),
                 runtimeLimit: buildRuntimeLimit(values),
@@ -1499,7 +1541,11 @@ const OnlineNotebook: React.FC = () => {
     </>
   )
 
-  if (isEditRoute && (!editingNotebook || !canEditNotebook(editingNotebook.status))) {
+  if (
+    isEditRoute &&
+    (!editingNotebook || !canOperateNotebook(editingNotebook, currentUser.account) || !canEditNotebook(editingNotebook.status))
+  ) {
+    const isPrivateReadonly = editingNotebook && !canOperateNotebook(editingNotebook, currentUser.account)
     return (
       <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(editingNotebook ? `/finetune/notebooks/${editingNotebook.id}` : '/finetune/notebooks')} style={{ marginBottom: 20 }}>
@@ -1508,8 +1554,8 @@ const OnlineNotebook: React.FC = () => {
         <Alert
           type="warning"
           showIcon
-          message={editingNotebook ? '运行中的 Notebook 暂不支持编辑配置' : 'Notebook 不存在'}
-          description={editingNotebook ? '请先停止 Notebook，停止后可进入编辑页修改原创建配置；再次启动前可反复编辑。' : '请返回列表重新选择要编辑的 Notebook。'}
+          message={isPrivateReadonly ? '私有 Notebook 仅创建人可操作' : editingNotebook ? '运行中的 Notebook 暂不支持编辑配置' : 'Notebook 不存在'}
+          description={isPrivateReadonly ? '该 Notebook 对你可见，但不能进入详情或执行启动、停止、编辑、删除、发布等操作。' : editingNotebook ? '请先停止 Notebook，停止后可进入编辑页修改原创建配置；再次启动前可反复编辑。' : '请返回列表重新选择要编辑的 Notebook。'}
         />
       </div>
     )
@@ -1538,6 +1584,12 @@ const OnlineNotebook: React.FC = () => {
                 <Text type="secondary" style={{ display: 'block', marginBottom: 18 }}>设置Notebook基本信息。</Text>
                 <Form.Item label="名称" name="name" rules={[{ required: true, message: '请输入名称' }]}>
                   <Input maxLength={50} showCount placeholder="请输入Notebook名称" />
+                </Form.Item>
+                <Form.Item label="访问权限" name="accessScope" rules={[{ required: true, message: '请选择访问权限' }]}>
+                  <Radio.Group>
+                    <Radio.Button value="public">公开</Radio.Button>
+                    <Radio.Button value="private">私有</Radio.Button>
+                  </Radio.Group>
                 </Form.Item>
                 <Form.Item label="描述" name="description">
                   <Input.TextArea rows={4} maxLength={300} showCount placeholder="请输入描述（可选）" />
@@ -1912,6 +1964,21 @@ const OnlineNotebook: React.FC = () => {
   }
 
   if (isPublishCaseRoute || isCaseEditRoute) {
+    if (isPublishCaseRoute && sourceNotebook && !canOperateNotebook(sourceNotebook, currentUser.account)) {
+      return (
+        <div style={{ padding: '28px 32px' }}>
+          <Card style={cardStyle}>
+            <Alert
+              type="warning"
+              showIcon
+              message="私有 Notebook 仅创建人可操作"
+              description="该 Notebook 对你可见，但不能发布为案例。"
+            />
+          </Card>
+        </div>
+      )
+    }
+
     if ((isPublishCaseRoute && !sourceNotebook) || (isCaseEditRoute && !caseDetail)) {
       return (
         <div style={{ padding: '28px 32px' }}>
@@ -2183,6 +2250,22 @@ const OnlineNotebook: React.FC = () => {
     )
   }
 
+  if (isDetailRoute && notebookDetail && !canOperateNotebook(notebookDetail, currentUser.account)) {
+    return (
+      <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/finetune/notebooks')} style={{ marginBottom: 20 }}>
+          返回
+        </Button>
+        <Alert
+          type="warning"
+          showIcon
+          message="私有 Notebook 仅创建人可操作"
+          description="该 Notebook 对你可见，但不能进入详情或执行启动、停止、编辑、删除、发布等操作。"
+        />
+      </div>
+    )
+  }
+
   if (isDetailRoute && notebookDetail) {
     return (
       <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
@@ -2256,6 +2339,7 @@ const OnlineNotebook: React.FC = () => {
               <div style={{ display: 'grid', gap: 12, fontSize: 16 }}>
                 <div><Text strong>名称：</Text>{notebookDetail.name}</div>
                 <div><Text strong>描述：</Text>{notebookDetail.description || '无'}</div>
+                <div><Text strong>访问权限：</Text>{accessScopeTag(notebookDetail.accessScope)}</div>
                 <div><Text strong>状态：</Text>{statusTag(notebookDetail.status)}</div>
                 <div>
                   <Text strong>镜像：</Text>
@@ -2464,7 +2548,7 @@ const OnlineNotebook: React.FC = () => {
               rowKey="id"
               columns={notebookColumns}
               dataSource={notebookList}
-              scroll={{ x: 1600 }}
+              scroll={{ x: 1710 }}
               tableLayout="fixed"
               pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条数据` }}
             />

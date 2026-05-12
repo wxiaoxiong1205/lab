@@ -22,6 +22,7 @@ import {
   useOnlineInferenceServices,
 } from '../../services/onlineInferenceServiceStore'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { formatResourceLockMessage, getOnlineInferenceServiceReferenceLocks } from '../../services/resourceReferenceGuard'
 
 const { Title, Text } = Typography
 
@@ -90,7 +91,7 @@ const OnlineInferenceService: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 260,
+      width: 320,
       render: (_, record) => (
         <Space size={0}>
           <Button type="link" size="small" onClick={() => setDetailRecord(record)}>查看详情</Button>
@@ -112,7 +113,35 @@ const OnlineInferenceService: React.FC = () => {
           >
             连接测试
           </Button>
-          <Button type="text" size="small">...</Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            onClick={() => {
+              const locks = getOnlineInferenceServiceReferenceLocks(record.name)
+              if (locks.length) {
+                Modal.warning({
+                  title: '在线推理服务正在被引用，暂不可删除',
+                  content: formatResourceLockMessage(record.name, locks),
+                })
+                return
+              }
+
+              Modal.confirm({
+                title: '确认删除在线推理服务？',
+                content: `删除后服务「${record.name}」将从列表移除，请确认是否继续。`,
+                okText: '删除',
+                cancelText: '取消',
+                okButtonProps: { danger: true },
+                onOk: () => {
+                  onlineInferenceServiceActions.deleteService(record.id)
+                  message.success(`已删除在线推理服务：${record.name}`)
+                },
+              })
+            }}
+          >
+            删除
+          </Button>
         </Space>
       ),
     },

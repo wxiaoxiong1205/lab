@@ -32,6 +32,10 @@ const MOCK_SFT_CONFIG = {
   bestModelMetric: 'loss',
   perDeviceEvalBatchSize: 2,
   loggingSteps: 5,
+  cpuRequest: 8,
+  cpuLimit: 16,
+  memoryRequest: 32,
+  memoryLimit: 64,
 }
 
 /** 参考真实页面数据的指标 + 训练过程曲线 */

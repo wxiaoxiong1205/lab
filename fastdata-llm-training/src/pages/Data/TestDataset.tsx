@@ -1,20 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { message, Modal, Form, Input, Select, Upload, Button, Typography, Space, Divider, List, Descriptions, Tag, Progress, Table, Card, Dropdown, Switch, Radio, Cascader } from 'antd'
-import { DatabaseOutlined, UploadOutlined, CheckCircleOutlined, PlusOutlined, DownloadOutlined, DeleteOutlined, FileTextOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { message, Modal, Form, Input, Select, Button, Typography, Space, Divider, Descriptions, Tag, Table, Card, Dropdown, Switch, Radio } from 'antd'
+import { DatabaseOutlined, PlusOutlined, DownloadOutlined, DeleteOutlined, FileTextOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { nextVersionLabel, parseVersionNum } from './TrainingDataset'
 import type { PaginatedResult } from '../../services/dataServiceApi'
 import { dataServiceApi, selectDatasets, useDataServiceSnapshot } from '../../services/dataServiceApi'
-import {
-  DATASET_USAGE_CASCADER_OPTIONS,
-  DATASET_USAGE_TAGS,
-  getDatasetUsagePath,
-  resolveDatasetUsageFromPath,
-} from '../../services/datasetUsage'
+import { formatResourceLockMessage, getCreatorDeletePermission, getDatasetReferenceLocks } from '../../services/resourceReferenceGuard'
+import ResumableUpload from '../../components/ResumableUpload'
 
 const { Text } = Typography
+
+const TEST_DATA_USAGE_OPTIONS = [
+  { value: '文本生成', label: '文本生成', color: 'blue' },
+  { value: '图像理解', label: '图像理解', color: 'purple' },
+] as const
 
 const statusMap: Record<string, { color: string; label: string }> = {
   '处理完成': { color: 'success', label: '处理完成' },
@@ -65,8 +66,12 @@ function isDpoUsage(value?: string): boolean {
   return String(value ?? '').startsWith('DPO-')
 }
 
-function isRftUsage(value?: string): boolean {
-  return String(value ?? '').startsWith('RFT-PPO-') || String(value ?? '').startsWith('RFT-GRPO-')
+function resolveTestUsageLabel(value?: string): '文本生成' | '图像理解' {
+  return String(value ?? '').includes('图像理解') ? '图像理解' : '文本生成'
+}
+
+function resolveTestUsageColor(value?: string): string {
+  return resolveTestUsageLabel(value) === '图像理解' ? 'purple' : 'blue'
 }
 
 function resolveFormatLabel(dataUsage?: string, dataFormat?: string): string {
@@ -179,11 +184,6 @@ const TestDataset: React.FC = () => {
   const [form] = Form.useForm()
   const [addVersionForm] = Form.useForm()
   const inheritHistoryVersion = Form.useWatch('inheritHistoryVersion', addVersionForm)
-  const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [selectedFile, setSelectedFile] = useState<UploadFile | null>(null)
-  const [addVersionUploading, setAddVersionUploading] = useState(false)
-  const [addVersionProgress, setAddVersionProgress] = useState(0)
   const [addVersionFile, setAddVersionFile] = useState<UploadFile | null>(null)
   const [creating, setCreating] = useState(false)
   const [addingVersion, setAddingVersion] = useState(false)
@@ -192,8 +192,6 @@ const TestDataset: React.FC = () => {
   const [listLoading, setListLoading] = useState(false)
   const [listResult, setListResult] = useState<PaginatedResult<TestDatasetRecord>>({ items: [], total: 0 })
   const [activeVersionId, setActiveVersionId] = useState<string>()
-  const selectedCreateUsagePath = Form.useWatch('dataUsage', form) as string[] | undefined
-  const selectedCreateUsage = resolveDatasetUsageFromPath(selectedCreateUsagePath) ?? 'SFT-文本生成'
   const isCreateRoute = location.pathname === '/measurement/testing/create'
   const isNewVersionRoute = location.pathname.endsWith('/new-version')
   const isDetailRoute = location.pathname.startsWith('/measurement/testing/') && !isCreateRoute && !isNewVersionRoute
@@ -237,46 +235,19 @@ const TestDataset: React.FC = () => {
     navigate('/measurement/testing/create?type=test')
   }
 
-  const handleFileChange = (info: any) => {
-    const file = info.file
-    if (file.status === 'uploading') {
-      setUploading(true)
-      let progress = 0
-      const timer = setInterval(() => {
-        progress += 10
-        setUploadProgress(progress)
-        if (progress >= 100) {
-          clearInterval(timer)
-          setUploading(false)
-          setSelectedFile({ uid: file.uid, name: file.name, status: 'done' } as UploadFile)
-          message.success(`${file.name} 上传成功`)
-        }
-      }, 200)
-    } else if (file.status === 'done') {
-      setUploading(false)
-      setUploadProgress(100)
-    } else if (file.status === 'error') {
-      setUploading(false)
-      message.error(`${file.name} 上传失败`)
-    }
-  }
-
   const handleSubmit = async () => {
     try {
       await form.validateFields()
       const values = form.getFieldsValue()
       setCreating(true)
-      const datasetUsage = resolveDatasetUsageFromPath(values.dataUsage) ?? 'SFT-文本生成'
       await dataServiceApi.createDataset('test', {
         name: values.name,
-        dataUsage: datasetUsage,
+        dataUsage: values.dataUsage ?? '文本生成',
         dataFormat: values.dataFormat,
       })
       message.success('创建成功')
       setCreateModalVisible(false)
       form.resetFields()
-      setSelectedFile(null)
-      setUploadProgress(0)
       navigate('/measurement')
     } catch {
       /* 校验失败 */
@@ -288,8 +259,6 @@ const TestDataset: React.FC = () => {
   const handleCancel = () => {
     setCreateModalVisible(false)
     form.resetFields()
-    setSelectedFile(null)
-    setUploadProgress(0)
 
     if (isCreateRoute) {
       navigate('/measurement')
@@ -318,31 +287,6 @@ const TestDataset: React.FC = () => {
     setAddVersionTarget(null)
     addVersionForm.resetFields()
     setAddVersionFile(null)
-    setAddVersionProgress(0)
-  }
-
-  const handleAddVersionFileChange = (info: any) => {
-    const file = info.file
-    if (file.status === 'uploading') {
-      setAddVersionUploading(true)
-      let progress = 0
-      const timer = setInterval(() => {
-        progress += 10
-        setAddVersionProgress(progress)
-        if (progress >= 100) {
-          clearInterval(timer)
-          setAddVersionUploading(false)
-          setAddVersionFile({ uid: file.uid, name: file.name, status: 'done' } as UploadFile)
-          message.success(`${file.name} 上传成功`)
-        }
-      }, 200)
-    } else if (file.status === 'done') {
-      setAddVersionUploading(false)
-      setAddVersionProgress(100)
-    } else if (file.status === 'error') {
-      setAddVersionUploading(false)
-      message.error(`${file.name} 上传失败`)
-    }
   }
 
   const handleSubmitAddVersion = async () => {
@@ -388,8 +332,8 @@ const TestDataset: React.FC = () => {
       key: 'dataUsage',
       width: 130,
       render: (val: string) => {
-        const t = DATASET_USAGE_TAGS[val as keyof typeof DATASET_USAGE_TAGS] || { color: 'default', text: val }
-        return <Tag color={t.color}>{t.text}</Tag>
+        const label = resolveTestUsageLabel(val)
+        return <Tag color={resolveTestUsageColor(val)}>{label}</Tag>
       },
     },
     {
@@ -413,6 +357,24 @@ const TestDataset: React.FC = () => {
             size="small"
             danger
             onClick={async () => {
+              const permission = getCreatorDeletePermission(record.creator)
+              if (!permission.allowed) {
+                Modal.warning({
+                  title: '无权删除该数据集',
+                  content: permission.reason,
+                })
+                return
+              }
+
+              const locks = getDatasetReferenceLocks('test', record.id)
+              if (locks.length) {
+                Modal.warning({
+                  title: '数据集正在被引用，暂不可删除',
+                  content: formatResourceLockMessage(record.name, locks),
+                })
+                return
+              }
+
               await dataServiceApi.deleteDataset('test', record.id)
               message.success(`已删除：${record.name}`)
             }}
@@ -437,8 +399,6 @@ const TestDataset: React.FC = () => {
   useEffect(() => {
     if (isCreateRoute) {
       form.resetFields()
-      setSelectedFile(null)
-      setUploadProgress(0)
       setCreateModalVisible(true)
       form.setFieldValue('dataFormat', 'PROMPT_RESPONSE')
       return
@@ -446,12 +406,6 @@ const TestDataset: React.FC = () => {
 
     setCreateModalVisible(false)
   }, [form, isCreateRoute])
-
-  useEffect(() => {
-    if (isDpoUsage(selectedCreateUsage) || isRftUsage(selectedCreateUsage)) {
-      form.setFieldValue('dataFormat', 'PROMPT_RESPONSE')
-    }
-  }, [form, selectedCreateUsage])
 
   useEffect(() => {
     if (!isDetailRoute && !isNewVersionRoute) {
@@ -511,7 +465,7 @@ const TestDataset: React.FC = () => {
     <Form
       form={form}
       layout="vertical"
-      initialValues={{ dataSource: 'local', dataUsage: getDatasetUsagePath('SFT-文本生成') }}
+      initialValues={{ dataSource: 'local', dataUsage: '文本生成', dataFormat: 'PROMPT_RESPONSE' }}
     >
       <Divider plain style={{ margin: '0 0 16px', color: '#64748b', fontSize: 12 }}>基本信息</Divider>
 
@@ -532,11 +486,7 @@ const TestDataset: React.FC = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
         <Form.Item label="数据用途" name="dataUsage" rules={[{ required: true, message: '请选择数据用途' }]}>
-          <Cascader
-            placeholder="请先选文本生成或图像理解，再选训练方式"
-            options={DATASET_USAGE_CASCADER_OPTIONS}
-            displayRender={labels => labels.join(' / ')}
-          />
+          <Select placeholder="请选择数据用途" options={TEST_DATA_USAGE_OPTIONS.map(({ value, label }) => ({ value, label }))} />
         </Form.Item>
 
         <Form.Item label="数据属性" name="dataAttribute">
@@ -546,16 +496,8 @@ const TestDataset: React.FC = () => {
 
       <Form.Item label="数据格式" name="dataFormat" rules={[{ required: true, message: '请选择数据格式' }]}>
         <Select placeholder="请选择数据格式">
-          {isDpoUsage(selectedCreateUsage) ? (
-            <Select.Option value="PROMPT_RESPONSE">CHOSEN_REJECTED</Select.Option>
-          ) : isRftUsage(selectedCreateUsage) ? (
-            <Select.Option value="PROMPT_RESPONSE">PROMPT_RESPONSE</Select.Option>
-          ) : (
-            <>
-              <Select.Option value="PROMPT_RESPONSE">PROMPT_RESPONSE</Select.Option>
-              <Select.Option value="ROLE_BASED">ROLE_BASED</Select.Option>
-            </>
-          )}
+          <Select.Option value="PROMPT_RESPONSE">PROMPT_RESPONSE</Select.Option>
+          <Select.Option value="ROLE_BASED">ROLE_BASED</Select.Option>
         </Select>
       </Form.Item>
 
@@ -568,17 +510,11 @@ const TestDataset: React.FC = () => {
       </Form.Item>
 
       <Form.Item label="上传文件" name="file" rules={[{ required: true, message: '请上传数据文件' }]} style={{ marginBottom: 8 }}>
-        <Upload.Dragger
+        <ResumableUpload
           accept=".jsonl,.json,.csv"
-          showUploadList={false}
-          customRequest={({ onSuccess }: any) => { setTimeout(() => onSuccess?.('ok'), 100) }}
-          onChange={handleFileChange}
-          disabled={uploading}
-        >
-          <p style={{ fontSize: 40, color: '#94a3b8', margin: 0 }}><UploadOutlined /></p>
-          <p style={{ color: '#64748b' }}>点击或拖拽文件到此区域上传</p>
-          <p style={{ color: '#94a3b8', fontSize: 12 }}>支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB</p>
-        </Upload.Dragger>
+          title="点击或拖拽文件到此区域上传"
+          hint="支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB"
+        />
       </Form.Item>
 
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -587,18 +523,7 @@ const TestDataset: React.FC = () => {
           <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }}>JSON 格式</Button>
           <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }}>CSV 格式</Button>
         </Space>
-        {uploading && <Progress percent={uploadProgress} size="small" status="active" style={{ width: 160 }} />}
       </div>
-
-      {selectedFile && (
-        <List size="small" bordered dataSource={[selectedFile]} style={{ background: '#f8fafc' }}
-          renderItem={(item: UploadFile) => (
-            <List.Item actions={[<Button key="delete-file" type="link" danger size="small" onClick={() => setSelectedFile(null)}>删除</Button>]}>
-              <List.Item.Meta avatar={<CheckCircleOutlined style={{ color: '#52c41a' }} />} title={item.name} description="上传完成" />
-            </List.Item>
-          )}
-        />
-      )}
     </Form>
   )
 
@@ -610,7 +535,7 @@ const TestDataset: React.FC = () => {
         <Descriptions.Item label="最新处理状态">
           <Tag color={(statusMap[selectedRecord.versionStatus] || { color: 'default' }).color}>{selectedRecord.versionStatus}</Tag>
         </Descriptions.Item>
-        <Descriptions.Item label="数据用途">{selectedRecord.dataUsage}</Descriptions.Item>
+        <Descriptions.Item label="数据用途">{resolveTestUsageLabel(selectedRecord.dataUsage)}</Descriptions.Item>
         <Descriptions.Item label="数据格式">{resolveFormatLabel(selectedRecord.dataUsage, selectedRecord.dataFormat)}</Descriptions.Item>
         <Descriptions.Item label="创建人">{selectedRecord.creator}</Descriptions.Item>
         <Descriptions.Item label="最近更新时间">{selectedRecord.createdAt}</Descriptions.Item>
@@ -709,6 +634,24 @@ const TestDataset: React.FC = () => {
               danger
               icon={<DeleteOutlined />}
               onClick={async () => {
+                const permission = getCreatorDeletePermission(selectedRecord.creator)
+                if (!permission.allowed) {
+                  Modal.warning({
+                    title: '无权删除该数据集',
+                    content: permission.reason,
+                  })
+                  return
+                }
+
+                const locks = getDatasetReferenceLocks('test', selectedRecord.id)
+                if (locks.length) {
+                  Modal.warning({
+                    title: '数据集正在被引用，暂不可删除',
+                    content: formatResourceLockMessage(selectedRecord.name, locks),
+                  })
+                  return
+                }
+
                 await dataServiceApi.deleteDataset('test', selectedRecord.id)
                 handleCloseDetail()
                 message.success(`已删除：${selectedRecord.name}`)
@@ -758,7 +701,7 @@ const TestDataset: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', rowGap: 26, columnGap: 24 }}>
                 <div><Text type="secondary">数据集名称：</Text><Text strong>{selectedRecord.name}</Text></div>
                 <div><Text type="secondary">数据量：</Text><Text strong>{activeVersion?.sampleCount ?? 0} 条</Text></div>
-                <div><Text type="secondary">数据用途：</Text><Text strong>{selectedRecord.dataUsage}</Text></div>
+                <div><Text type="secondary">数据用途：</Text><Text strong>{resolveTestUsageLabel(selectedRecord.dataUsage)}</Text></div>
                 <div><Text type="secondary">数据格式：</Text><Tag>{resolveFormatLabel(selectedRecord.dataUsage, selectedRecord.dataFormat)}</Tag></div>
                 <div><Text type="secondary">状态：</Text><Text strong>{activeVersion?.processStatus ?? selectedRecord.versionStatus}</Text></div>
                 <div><Text type="secondary">文件大小：</Text><Text strong>{formatFileSizeMB(activeVersion?.sampleCount ?? 0)}</Text></div>
@@ -813,7 +756,7 @@ const TestDataset: React.FC = () => {
               </Form.Item>
 
               <Text strong style={{ fontSize: 15, paddingTop: 10 }}>数据用途：</Text>
-              <Text strong style={{ fontSize: 16 }}>{addVersionTarget.dataUsage}</Text>
+              <Text strong style={{ fontSize: 16 }}>{resolveTestUsageLabel(addVersionTarget.dataUsage)}</Text>
 
               <Text strong style={{ fontSize: 15, paddingTop: 10 }}>数据格式：</Text>
               <Text strong style={{ fontSize: 16 }}>{resolveFormatLabel(addVersionTarget.dataUsage, addVersionTarget.dataFormat)}</Text>
@@ -833,35 +776,18 @@ const TestDataset: React.FC = () => {
 
               <Text strong style={{ fontSize: 15, paddingTop: 10 }}>上传文件：</Text>
               <div>
-                <Upload.Dragger
+                <ResumableUpload
                   accept=".jsonl,.json,.csv"
-                  showUploadList={false}
-                  customRequest={({ onSuccess }: any) => { setTimeout(() => onSuccess?.('ok'), 100) }}
-                  onChange={handleAddVersionFileChange}
-                  disabled={addVersionUploading || inheritHistoryVersion}
-                  style={{ opacity: inheritHistoryVersion ? 0.55 : 1 }}
-                >
-                  <p style={{ fontSize: 44, color: '#3b82f6', margin: 0 }}><UploadOutlined /></p>
-                  <p style={{ color: '#0f172a', fontSize: 24, margin: '12px 0 8px' }}>点击或拖拽文件到此区域上传</p>
-                  <p style={{ color: '#94a3b8', fontSize: 14 }}>支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB</p>
-                </Upload.Dragger>
+                  disabled={inheritHistoryVersion}
+                  title="点击或拖拽文件到此区域上传"
+                  hint="支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB"
+                  value={addVersionFile}
+                  onChange={setAddVersionFile}
+                />
                 {inheritHistoryVersion && (
                   <div style={{ marginTop: 12 }}>
                     <Text type="secondary">已开启继承历史版本，将直接继承 {addVersionTarget.latestVersion} 的数据详情。</Text>
                   </div>
-                )}
-                {addVersionFile && (
-                  <List
-                    size="small"
-                    bordered
-                    dataSource={[addVersionFile]}
-                    style={{ background: '#f8fafc', marginTop: 12 }}
-                    renderItem={(item: UploadFile) => (
-                      <List.Item actions={[<Button key="delete-file" type="link" danger size="small" onClick={() => setAddVersionFile(null)}>删除</Button>]}>
-                        <List.Item.Meta avatar={<CheckCircleOutlined style={{ color: '#52c41a' }} />} title={item.name} description="上传完成" />
-                      </List.Item>
-                    )}
-                  />
                 )}
                 <div style={{ marginTop: 16, display: 'flex', gap: 28 }}>
                   <Button type="link" icon={<DownloadOutlined />}>JSONL 格式</Button>
@@ -916,14 +842,13 @@ const TestDataset: React.FC = () => {
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', flex: '1 1 520px', minWidth: 0 }}>
-              <Cascader
+              <Select
                 placeholder="数据用途"
                 allowClear
                 style={{ width: 220 }}
-                value={dataUsage ? getDatasetUsagePath(dataUsage) : undefined}
-                onChange={value => setDataUsage(resolveDatasetUsageFromPath(value as string[]))}
-                options={DATASET_USAGE_CASCADER_OPTIONS}
-                displayRender={labels => labels.join(' / ')}
+                value={dataUsage}
+                onChange={value => setDataUsage(value)}
+                options={TEST_DATA_USAGE_OPTIONS.map(({ value, label }) => ({ value, label }))}
               />
               <Input
                 prefix={<span style={{ color: '#94a3b8' }}>🔍</span>}
@@ -1042,30 +967,13 @@ const TestDataset: React.FC = () => {
           </Form.Item>
           <Divider plain style={{ margin: '12px 0', color: '#64748b', fontSize: 12 }}>数据上传</Divider>
           <Form.Item label="上传文件" name="file">
-            <Upload.Dragger
+            <ResumableUpload
               accept=".jsonl,.json,.csv"
-              showUploadList={false}
-              customRequest={({ onSuccess }: any) => { setTimeout(() => onSuccess?.('ok'), 100) }}
-              onChange={handleAddVersionFileChange}
-              disabled={addVersionUploading}
-            >
-              <p style={{ fontSize: 40, color: '#94a3b8', margin: 0 }}><UploadOutlined /></p>
-              <p style={{ color: '#64748b' }}>上传新版本数据文件</p>
-              <p style={{ color: '#94a3b8', fontSize: 12 }}>
-                格式需与数据集一致：{addVersionTarget ? resolveFormatLabel(addVersionTarget.dataUsage, addVersionTarget.dataFormat) : '-'}
-              </p>
-            </Upload.Dragger>
-          </Form.Item>
-          {addVersionUploading && <Progress percent={addVersionProgress} size="small" status="active" style={{ marginBottom: 12 }} />}
-          {addVersionFile && (
-            <List size="small" bordered dataSource={[addVersionFile]} style={{ background: '#f8fafc' }}
-              renderItem={(item: UploadFile) => (
-                <List.Item actions={[<Button type="link" danger size="small" onClick={() => setAddVersionFile(null)}>删除</Button>]}>
-                  <List.Item.Meta avatar={<CheckCircleOutlined style={{ color: '#52c41a' }} />} title={item.name} description="上传完成" />
-                </List.Item>
-              )}
+              title="上传新版本数据文件"
+              hint={`格式需与数据集一致：${addVersionTarget ? resolveFormatLabel(addVersionTarget.dataUsage, addVersionTarget.dataFormat) : '-'}`}
+              onFileChange={setAddVersionFile}
             />
-          )}
+          </Form.Item>
         </Form>
       </Modal>
     </>
