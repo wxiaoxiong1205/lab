@@ -450,7 +450,7 @@ const pageDocs: PageDocEntry[] = [
       fields: [
         { name: 'Notebook 名称', location: '列表/表单', type: '文本', required: '是', description: 'Notebook 主名称。' },
         { name: '描述', location: '表单', type: '长文本', required: '否', description: '补充说明用途。' },
-        { name: '访问权限', location: '列表/创建页/编辑页/详情页', type: '单选枚举', required: '是', description: '创建 Notebook 时选择公开或私有；私有 Notebook 对其他用户可见，但不可进入详情或执行操作。' },
+        { name: '访问权限', location: '列表/创建页/编辑页/详情页', type: '单选枚举', required: '是', description: '创建 Notebook 时默认私有，可切换为公开；私有 Notebook 对其他用户可见，但不可进入详情或执行操作。' },
         { name: 'AI服务', location: '创建页/详情页', type: '二级级联选择', required: '否', description: '一级选择在线推理服务分类，二级从模型服务中的在线推理服务列表选择具体服务；创建后在详情页记录展示。' },
         { name: '数据集', location: '创建页/详情页', type: '下拉选择', required: '否', description: '数据集与模型拆分为两个独立字段；机器学习在线Notebook仅可选择机器学习-数据管理中的数据集。' },
         { name: '大模型', location: '创建页/详情页', type: '下拉选择', required: '否', description: '如果创建时已选择，需要在详情页完整展示；机器学习在线Notebook仅可选择机器学习-模型管理中的模型。' },
@@ -503,6 +503,7 @@ const pageDocs: PageDocEntry[] = [
         '自定义镜像编辑标签弹窗按 test、框架、python版本、测试等标签类型分组，每个分组只允许选择一种标签。',
         'AI服务选择从页面静态选项调整为读取模型服务中的在线推理服务列表，测试失败的服务可见但不可选。',
         '当前页以用户迭代需求为基线。旧结构：Notebook 创建不区分访问权限，列表行默认都可操作；新结构：创建/编辑页新增公开/私有选择，私有 Notebook 对其他用户仍展示在列表中，但行操作置为不可操作，直接进入详情、编辑或发布页时也会拦截。',
+        '根据用户最新要求，在线Notebook创建页访问权限默认选中私有，选项顺序调整为私有在前、公开在后。',
       ],
       productionComparison: ['本轮按用户明确要求直接查看生产环境在线Notebook，当前列表、创建页分段、广场卡片和主要操作文案按生产环境对齐。'],
       userChanges: [
@@ -525,6 +526,7 @@ const pageDocs: PageDocEntry[] = [
         '根据本轮要求，大模型和机器学习 Notebook 创建页新增可选择模型服务在线推理服务的 AI 服务选择，并在 Notebook 详情页展示创建时选中的 AI 服务。',
         '根据本轮需求，Notebook 停止后可编辑原创建配置，保存后未再次启动前仍可反复编辑；大模型和机器学习 Notebook 行为保持一致。',
         '根据用户最新需求，在线Notebook创建时新增访问权限，可选择公开或私有；私有 Notebook 对其他用户可见但无法进入或执行启动、停止、编辑、删除、发布等操作。',
+        '根据用户最新要求，在线Notebook创建时访问权限默认私有，并将公开/私有的位置调整为私有/公开。',
       ],
     }),
   },

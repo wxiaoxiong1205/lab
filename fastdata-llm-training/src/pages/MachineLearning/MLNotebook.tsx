@@ -536,7 +536,7 @@ function getCreateInitialValues(): CreateFormValues {
   return {
     name: '',
     description: '',
-    accessScope: 'public',
+    accessScope: 'private',
     aiService: undefined,
     dataset: undefined,
     model: undefined,
@@ -1397,7 +1397,7 @@ const MLNotebook: React.FC = () => {
         updatedAt: nowText(),
         creator: currentUser.username,
         creatorAccount: currentUser.account,
-        accessScope: values.accessScope ?? 'public',
+        accessScope: values.accessScope ?? 'private',
         aiService: formatAiServiceLabel(values.aiService),
         dataset: values.dataset,
         model: values.model,
@@ -1674,8 +1674,8 @@ const MLNotebook: React.FC = () => {
                 </Form.Item>
                 <Form.Item label="访问权限" name="accessScope" rules={[{ required: true, message: '请选择访问权限' }]}>
                   <Radio.Group>
-                    <Radio.Button value="public">公开</Radio.Button>
                     <Radio.Button value="private">私有</Radio.Button>
+                    <Radio.Button value="public">公开</Radio.Button>
                   </Radio.Group>
                 </Form.Item>
                 <Form.Item label="描述" name="description">
