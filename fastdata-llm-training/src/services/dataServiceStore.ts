@@ -58,11 +58,14 @@ export interface DatasetRecord {
 export interface InferenceResultRecord {
   id: string
   name: string
+  description?: string
   progress: TaskLifecycleStatus
   dataUsage: '文本生成' | '图像理解'
+  inferenceMode?: '离线推理' | '在线推理' | '导入推理结果集'
+  importFile?: string
   pendingData: string
   pendingModel: string
-  dataVolume: number
+  dataVolume: number | '-'
   createdAt: string
 }
 
@@ -86,6 +89,7 @@ export interface AnnotationTaskRecord {
 export interface CleaningTaskRecord {
   id: string
   name: string
+  description?: string
   status: TaskLifecycleStatus
   preDataset: string
   postDataset: string
@@ -317,9 +321,10 @@ const seedState: DataServiceState = {
     makeDataset({ id: 'test-4', name: '属性回归测试-22-333-444', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/04/09 10:00:00', sampleCount: 5 }),
   ],
   inferenceResults: [
-    { id: 'inf-1', name: '属性回归-推理结果集-22-333-444', progress: '已完成', dataUsage: '文本生成', pendingData: '测试数据集/属性回归测试-22-333-444>V1', pendingModel: 'qwen3-vl-plus-图像理解-在线推理服务1', dataVolume: 5, createdAt: '2026/04/03 15:41:36' },
-    { id: 'inf-2', name: '删除测试3', progress: '已创建', dataUsage: '文本生成', pendingData: '测试数据集/测试-role-多轮-1>V1', pendingModel: 'Qwen2-VL-2B-Instruct', dataVolume: 4, createdAt: '2026/04/02 14:49:02' },
-    { id: 'inf-3', name: '图像理解-模型管理', progress: '已完成', dataUsage: '图像理解', pendingData: '验证数据集/图像-单轮多轮交叉-2>V1', pendingModel: '图像理解-模型管理', dataVolume: 12, createdAt: '2026/04/01 14:43:25' },
+    { id: 'inf-1', name: '推理结果集_2026_03_26_09_34_47', description: '', progress: '已完成', dataUsage: '文本生成', inferenceMode: '离线推理', pendingData: '验证数据集/验证-示例-1-json>V6', pendingModel: '123123', dataVolume: 20, createdAt: '2026/03/26 09:36:42' },
+    { id: 'inf-2', name: '测试111', description: '', progress: '已创建', dataUsage: '文本生成', inferenceMode: '离线推理', pendingData: '验证集/多轮---1>V1', pendingModel: '123123', dataVolume: 6, createdAt: '2026/03/24 18:55:23' },
+    { id: 'inf-3', name: '导入-文本生成-PROMPT_RESPONSE格式-推理结果集', description: '', progress: '已完成', dataUsage: '文本生成', inferenceMode: '导入推理结果集', importFile: 'PROMPT_RESPONSE_导入样例.csv', pendingData: '外部导入', pendingModel: '手输模型', dataVolume: 273, createdAt: '2026/03/24 11:06:59' },
+    { id: 'inf-4', name: '推理结果集_2026_03_18_16_46_47', description: '', progress: '已完成', dataUsage: '图像理解', inferenceMode: '在线推理', pendingData: '外部导入', pendingModel: '手输模型', dataVolume: 18, createdAt: '2026/03/18 16:47:08' },
   ],
   annotationTasks: [
     { id: 'ann-1', name: '财税问答-人工标注-未开始', dataVolume: 12, progress: 0, status: '未开始', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '训练数据集/多轮指令精调-SFT-财税问答-V3', postDataset: '-', creator: 'deepexilab', createdAt: '2026-04-29 09:10:21' },
@@ -332,9 +337,9 @@ const seedState: DataServiceState = {
     { id: 'ann-8', name: '文本生成-标注服务失败', dataVolume: 10, progress: null, status: '失败', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '测试数据集/偏好对测试集-DPO-A-V1', postDataset: '-', creator: 'lab1', createdAt: '2026-04-22 13:09:18' },
   ],
   cleaningTasks: [
-    { id: 'clean-1', name: '多人标注任务清洗', status: '已完成', preDataset: '训练数据集/roleBased-V4', postDataset: '训练数据集/roleBased-V5', creator: 'deepexilab', createdAt: '2026/03/24 11:53:50' },
-    { id: 'clean-2', name: '多人-1', status: '启动中', preDataset: '训练数据集/训练测试-1-V8', postDataset: '-', creator: 'lab1', createdAt: '2026/03/20 09:45:19' },
-    { id: 'clean-3', name: '异常-2', status: '已完成', preDataset: '测试数据集/多文件-10-V1', postDataset: '测试数据集/多文件-10-V2', creator: 'lab1', createdAt: '2026/03/13 15:18:51' },
+    { id: 'clean-1', name: '多人标注任务清洗', description: '', status: '已完成', preDataset: '训练数据集/roleBased-V4', postDataset: '训练数据集/roleBased-V5', creator: 'deepexilab', createdAt: '2026/03/24 11:53:50' },
+    { id: 'clean-2', name: '多人-1', description: '', status: '启动中', preDataset: '训练数据集/训练测试-1-V8', postDataset: '-', creator: 'lab1', createdAt: '2026/03/20 09:45:19' },
+    { id: 'clean-3', name: '异常-2', description: '', status: '已完成', preDataset: '测试数据集/多文件-10-V1', postDataset: '测试数据集/多文件-10-V2', creator: 'lab1', createdAt: '2026/03/13 15:18:51' },
   ],
 }
 
@@ -552,23 +557,67 @@ export const dataServiceActions = {
     })
   },
 
+  deleteDatasetDetailRow(
+    kind: 'training' | 'validation' | 'test',
+    id: string,
+    versionId: string,
+    rowKey: string,
+    currentRows: DatasetDetailRowRecord[],
+  ) {
+    update(draft => {
+      const list =
+        kind === 'training'
+          ? draft.trainingDatasets
+          : kind === 'validation'
+            ? draft.validationDatasets
+            : draft.testDatasets
+      const target = list.find(item => item.id === id)
+      const version = target?.versions.find(item => item.id === versionId)
+      if (!target || !version) return
+
+      const sourceRows = version.detailRows?.length ? version.detailRows : currentRows
+      version.detailRows = sourceRows.filter(item => item.key !== rowKey)
+      version.sampleCount = version.detailRows.length
+
+      if (version.version === target.latestVersion) {
+        target.sampleCount = version.sampleCount
+      }
+    })
+  },
+
   createInferenceResult(params: {
     name: string
+    description?: string
     dataUsage: '文本生成' | '图像理解'
+    inferenceMode?: '离线推理' | '在线推理' | '导入推理结果集'
+    importFile?: string
     pendingData: string
     pendingModel: string
+    dataVolume?: number | '-'
   }) {
     update(draft => {
       draft.inferenceResults.unshift({
         id: `inf-${Date.now()}`,
         name: params.name,
+        description: params.description ?? '',
         progress: '已创建',
         dataUsage: params.dataUsage,
+        inferenceMode: params.inferenceMode,
+        importFile: params.importFile,
         pendingData: params.pendingData,
         pendingModel: params.pendingModel,
-        dataVolume: Math.max(1, Math.floor(Math.random() * 20) + 1),
+        dataVolume: params.dataVolume ?? Math.max(1, Math.floor(Math.random() * 20) + 1),
         createdAt: nowText(),
       })
+    })
+  },
+
+  updateInferenceResultMeta(id: string, value: { name: string; description?: string }) {
+    update(draft => {
+      const target = draft.inferenceResults.find(item => item.id === id)
+      if (!target) return
+      target.name = value.name
+      target.description = value.description ?? ''
     })
   },
 
@@ -635,6 +684,7 @@ export const dataServiceActions = {
 
   createCleaningTask(params: {
     name: string
+    description?: string
     preDataset: string
     postDataset?: string
     operatorValues?: string[]
@@ -643,6 +693,7 @@ export const dataServiceActions = {
       draft.cleaningTasks.unshift({
         id: `clean-${Date.now()}`,
         name: params.name,
+        description: params.description ?? '',
         status: '启动中',
         preDataset: params.preDataset,
         postDataset: params.postDataset ?? '-',
@@ -656,6 +707,15 @@ export const dataServiceActions = {
   deleteCleaningTask(id: string) {
     update(draft => {
       draft.cleaningTasks = draft.cleaningTasks.filter(item => item.id !== id)
+    })
+  },
+
+  updateCleaningTaskMeta(id: string, value: { name: string; description?: string }) {
+    update(draft => {
+      const target = draft.cleaningTasks.find(item => item.id === id)
+      if (!target) return
+      target.name = value.name
+      target.description = value.description ?? ''
     })
   },
 

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { ArrowLeftOutlined, DeleteOutlined, EyeOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, DeleteOutlined, DownloadOutlined, EyeOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import {
   Button,
   Card,
@@ -12,11 +12,12 @@ import {
   Select,
   Space,
   Table,
+  Tag,
   Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { UploadFile } from 'antd/es/upload/interface'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { getCurrentUser } from '../../services/permissionStore'
 import { formatResourceLockMessage, getCreatorDeletePermission, getOnlineAnnotationServiceReferenceLocks } from '../../services/resourceReferenceGuard'
 import ResumableUpload from '../../components/ResumableUpload'
@@ -34,6 +35,16 @@ type MLDatasetFormValues = {
   dataSource: 'local' | 'notebook'
 }
 
+type MLDatasetVersion = {
+  version: string
+  creator: string
+  createdAt: string
+  description?: string
+  labelStatus: '无标注信息' | '有标注信息'
+  dataSource: '本地上传' | 'Notebook 获取'
+  detailRows: MLDatasetDetailRow[]
+}
+
 type MLDatasetRecord = {
   id: string
   name: string
@@ -46,6 +57,26 @@ type MLDatasetRecord = {
   dataSource: '本地上传' | 'Notebook 获取'
   creator: string
   createdAt: string
+  detailRows?: MLDatasetDetailRow[]
+  versions?: MLDatasetVersion[]
+}
+
+type MLDatasetDetailRow = {
+  key: string
+  sampleName: string
+  content: string
+  label: string | string[]
+  status: string
+  imageDescription?: string
+  boxes?: Array<{ id: string; label: string; x: number; y: number; width: number; height: number }>
+  segments?: Array<{ id: string; label: string; points: string }>
+}
+
+type AddVersionFormValues = {
+  version: string
+  labelStatus: '无标注信息' | '有标注信息'
+  dataSource: '本地上传' | 'Notebook 获取'
+  description?: string
 }
 
 const dataTypes = [
@@ -74,18 +105,180 @@ const initialDatasetRows: MLDatasetRecord[] = [
   { id: '6', name: 'basion-图像分割-实例分割-无标注', version: 'V1', dataType: '图片', annotationType: '图像分割', annotationTemplate: '实例分割', labelStatus: '无标注信息', dataSource: '本地上传', creator: 'lab1', createdAt: '2026-03-01 09:10:00' },
 ]
 
+function buildMLDatasetDetailRows(record: MLDatasetRecord): MLDatasetDetailRow[] {
+  if (record.detailRows) {
+    return record.detailRows
+  }
+
+  const sampleType = record.dataType === '图片' ? '图片样本' : '文本样本'
+  return Array.from({ length: 3 }, (_, index) => ({
+    key: `${record.id}-sample-${index + 1}`,
+    sampleName: `${sampleType}-${String(index + 1).padStart(3, '0')}`,
+    content: record.dataType === '图片'
+      ? ['大象在草地上行走', '海边人物与风筝', '街区车辆与行人'][index] ?? `图片样本 ${index + 1}`
+      : `这是 ${record.name} ${record.version} 的第 ${index + 1} 条样本文本。`,
+    label: record.labelStatus === '有标注信息'
+      ? record.dataType === '图片'
+        ? [['动物'], ['人物', '物体'], ['车辆', '文字']][index] ?? ['图片标签']
+        : `${record.annotationTemplate}标签${index + 1}`
+      : '-',
+    status: record.labelStatus === '有标注信息' ? '已标注' : '未标注',
+    boxes: record.annotationType === '物体检测'
+      ? [
+          { id: `${record.id}-box-${index}-1`, label: ['食品', '人物', '物体'][index] ?? '物体', x: 18 + index * 8, y: 16 + index * 5, width: 42, height: 34 },
+        ]
+      : undefined,
+    segments: record.annotationType === '图像分割'
+      ? [
+          { id: `${record.id}-seg-${index}-1`, label: ['道路', '建筑', '植被'][index] ?? '区域', points: '28,18 76,22 88,64 34,72' },
+        ]
+      : undefined,
+  }))
+}
+
+function getDatasetVersions(record: MLDatasetRecord): MLDatasetVersion[] {
+  if (record.versions?.length) {
+    return [...record.versions].sort((a, b) => getVersionNumber(b.version) - getVersionNumber(a.version))
+  }
+
+  const latestNumber = Number(record.version.replace(/^V/i, '')) || 1
+  return Array.from({ length: latestNumber }, (_, index) => {
+    const version = `V${latestNumber - index}`
+    return {
+      version,
+      creator: record.creator,
+      createdAt: index === 0 ? record.createdAt : `2026-04-${String(20 - index).padStart(2, '0')} 10:00:00`,
+      description: index === 0 ? record.description : `${record.name} ${version} 历史版本。`,
+      labelStatus: record.labelStatus,
+      dataSource: record.dataSource,
+      detailRows: buildMLDatasetDetailRows({ ...record, version }).map(row => ({
+        ...row,
+        key: `${record.id}-${version}-${row.key}`,
+        content: record.dataType === '图片' ? row.content : `这是 ${record.name} ${version} 的样本文本。`,
+      })),
+    }
+  })
+}
+
+function getVersionNumber(version: string) {
+  return Number(version.replace(/^V/i, '')) || 1
+}
+
+function getNextVersionLabel(record: MLDatasetRecord) {
+  const maxVersion = Math.max(...getDatasetVersions(record).map(item => getVersionNumber(item.version)))
+  return `V${maxVersion + 1}`
+}
+
+function getActiveDatasetVersion(record: MLDatasetRecord, activeVersion?: string) {
+  const versions = getDatasetVersions(record)
+  return versions.find(item => item.version === activeVersion) ?? versions[0]
+}
+
+function buildVersionDetailRows(record: MLDatasetRecord, values: AddVersionFormValues): MLDatasetDetailRow[] {
+  const baseRows = buildMLDatasetDetailRows({
+    ...record,
+    version: values.version,
+    labelStatus: values.labelStatus,
+    dataSource: values.dataSource,
+    detailRows: undefined,
+  })
+
+  return [
+    ...baseRows,
+    {
+      key: `${record.id}-${values.version}-sample-${Date.now()}`,
+      sampleName: `${record.dataType === '图片' ? '图片样本' : '文本样本'}-新增`,
+      content: record.dataType === '图片' ? '新增版本上传样本预览' : `这是 ${record.name} ${values.version} 新增上传的样本文本。`,
+      label: values.labelStatus === '有标注信息' ? (record.dataType === '图片' ? ['新增标签'] : '新增标签') : '-',
+      status: values.labelStatus === '有标注信息' ? '已标注' : '未标注',
+    },
+  ]
+}
+
+function renderDatasetSample(record: MLDatasetRecord, row: MLDatasetDetailRow) {
+  if (record.dataType !== '图片') {
+    return <Text>{row.content}</Text>
+  }
+
+  const gradients = [
+    'linear-gradient(135deg, #8b5e34 0%, #d8a15d 42%, #bfdbfe 100%)',
+    'linear-gradient(135deg, #0ea5e9 0%, #38bdf8 45%, #fef3c7 100%)',
+    'linear-gradient(135deg, #334155 0%, #64748b 50%, #f97316 100%)',
+  ]
+  const color = gradients[Math.abs(row.key.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)) % gradients.length]
+  return (
+    <div
+      style={{
+        width: 148,
+        height: 96,
+        borderRadius: 8,
+        background: color,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontWeight: 600,
+        textAlign: 'center',
+        padding: 10,
+      }}
+    >
+      {row.content}
+    </div>
+  )
+}
+
+function renderDatasetLabels(value: MLDatasetDetailRow['label']) {
+  if (Array.isArray(value)) {
+    return (
+      <Space wrap>
+        {value.map((label, index) => (
+          <Tag key={label} color={index % 2 === 0 ? 'blue' : 'green'}>{label}</Tag>
+        ))}
+      </Space>
+    )
+  }
+
+  return value === '-' ? <Text type="secondary">-</Text> : <Tag color="blue">{value}</Tag>
+}
+
+function renderInfoGrid(items: Array<{ label: string; value: React.ReactNode }>) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', columnGap: 48, rowGap: 18 }}>
+      {items.map(item => (
+        <div key={item.label} style={{ minWidth: 0 }}>
+          <div style={{ color: '#8c8c8c', fontSize: 13, lineHeight: '20px', marginBottom: 4 }}>{item.label}</div>
+          <div style={{ color: '#1f2937', fontSize: 14, lineHeight: '22px', wordBreak: 'break-word' }}>{item.value}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function renderTagGroup(labels: string[]) {
+  return (
+    <Space wrap size={[4, 6]}>
+      {labels.map(label => <Tag key={label} color="blue">{label}</Tag>)}
+    </Space>
+  )
+}
+
 const MLDataset: React.FC = () => {
   const [form] = Form.useForm<MLDatasetFormValues>()
+  const [addVersionForm] = Form.useForm<AddVersionFormValues>()
   const location = useLocation()
   const navigate = useNavigate()
+  const { datasetId } = useParams()
   const isCreateRoute = location.pathname === '/machine-data-management/create'
+  const isDetailRoute = Boolean(datasetId)
   const [rows, setRows] = useState<MLDatasetRecord[]>(initialDatasetRows)
-  const [detailRecord, setDetailRecord] = useState<MLDatasetRecord | null>(null)
+  const [activeVersion, setActiveVersion] = useState<string>()
   const [annotationTypeFilter, setAnnotationTypeFilter] = useState<string>('全部')
   const [searchValue, setSearchValue] = useState('')
   const [selectedDataType, setSelectedDataType] = useState<'text' | 'image'>('text')
   const [selectedAnnotationType, setSelectedAnnotationType] = useState('文本分类')
   const [selectedFile, setSelectedFile] = useState<UploadFile | null>(null)
+  const [addVersionOpen, setAddVersionOpen] = useState(false)
+  const [addVersionFile, setAddVersionFile] = useState<UploadFile | null>(null)
 
   const filteredRows = useMemo(
     () =>
@@ -99,6 +292,59 @@ const MLDataset: React.FC = () => {
 
   const availableAnnotationTypes = annotationTypesByDataType[selectedDataType]
   const availableTemplates = availableAnnotationTypes.find(item => item.value === selectedAnnotationType)?.templates ?? []
+  const selectedDetailRecord = useMemo(
+    () => (datasetId ? rows.find(item => item.id === datasetId) ?? null : null),
+    [datasetId, rows],
+  )
+  const detailVersion = activeVersion ?? selectedDetailRecord?.version
+
+  const openAddVersion = (record: MLDatasetRecord) => {
+    const nextVersion = getNextVersionLabel(record)
+    addVersionForm.setFieldsValue({
+      version: nextVersion,
+      labelStatus: record.labelStatus,
+      dataSource: record.dataSource,
+      description: '',
+    })
+    setAddVersionFile(null)
+    setAddVersionOpen(true)
+  }
+
+  const submitAddVersion = async (record: MLDatasetRecord) => {
+    try {
+      const values = await addVersionForm.validateFields()
+      const nextVersion: MLDatasetVersion = {
+        version: values.version,
+        creator: getCurrentUser().account,
+        createdAt: new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-'),
+        description: values.description,
+        labelStatus: values.labelStatus,
+        dataSource: values.dataSource,
+        detailRows: buildVersionDetailRows(record, values),
+      }
+
+      setRows(prev => prev.map(item => {
+        if (item.id !== record.id) return item
+        const existingVersions = getDatasetVersions(item).filter(version => version.version !== nextVersion.version)
+        return {
+          ...item,
+          version: nextVersion.version,
+          labelStatus: nextVersion.labelStatus,
+          dataSource: nextVersion.dataSource,
+          creator: nextVersion.creator,
+          createdAt: nextVersion.createdAt,
+          description: nextVersion.description,
+          versions: [nextVersion, ...existingVersions],
+        }
+      }))
+      setActiveVersion(nextVersion.version)
+      setAddVersionOpen(false)
+      setAddVersionFile(null)
+      addVersionForm.resetFields()
+    } catch {
+      return
+    }
+  }
 
   const resetCreateState = () => {
     form.resetFields()
@@ -141,7 +387,7 @@ const MLDataset: React.FC = () => {
         title: '无权删除该数据集',
         content: permission.reason,
       })
-      return
+      return false
     }
 
     const locks = record ? getOnlineAnnotationServiceReferenceLocks(record.name, `${record.annotationType}/${record.name}-${record.version}`) : []
@@ -150,10 +396,37 @@ const MLDataset: React.FC = () => {
         title: '数据集正在被引用，暂不可删除',
         content: formatResourceLockMessage(record.name, locks),
       })
-      return
+      return false
     }
 
     setRows(prev => prev.filter(item => item.id !== id))
+    return true
+  }
+
+  const deleteDetailRow = (record: MLDatasetRecord, row: MLDatasetDetailRow) => {
+    Modal.confirm({
+      title: '确认删除该条数据？',
+      content: '删除后不可恢复，请确认是否继续。',
+      okText: '确认删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        const targetVersion = getActiveDatasetVersion(record, detailVersion)
+        setRows(prev => prev.map(item => {
+          if (item.id !== record.id) return item
+          const versions = getDatasetVersions(item).map(version => (
+            version.version === targetVersion.version
+              ? { ...version, detailRows: version.detailRows.filter(detail => detail.key !== row.key) }
+              : version
+          ))
+          return {
+            ...item,
+            detailRows: targetVersion.version === item.version ? versions.find(version => version.version === targetVersion.version)?.detailRows : item.detailRows,
+            versions,
+          }
+        }))
+      },
+    })
   }
 
   const columns: ColumnsType<MLDatasetRecord> = [
@@ -169,7 +442,7 @@ const MLDataset: React.FC = () => {
       width: 180,
       render: (_, record) => (
         <Space size={0}>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setDetailRecord(record)}>查看详情</Button>
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => { setActiveVersion(record.version); navigate(`/machine-data-management/${record.id}`) }}>查看详情</Button>
           <Popconfirm title="确认删除该数据集？" okText="删除" cancelText="取消" onConfirm={() => deleteRecord(record.id)}>
             <Button type="link" size="small" icon={<DeleteOutlined />} danger>删除</Button>
           </Popconfirm>
@@ -258,7 +531,7 @@ const MLDataset: React.FC = () => {
             <Form.Item label="上传数据">
               <ResumableUpload
                 title="点击或拖拽文件到此区域上传"
-                hint="支持文本、图片等机器学习任务数据格式"
+                hint="支持文本、图片等机器学习任务数据格式，文件大小不设前端限制"
                 value={selectedFile}
                 onChange={setSelectedFile}
               />
@@ -270,6 +543,164 @@ const MLDataset: React.FC = () => {
             <Button type="primary" onClick={submitCreate}>确定</Button>
           </Space>
         </Form>
+      </div>
+    )
+  }
+
+  if (isDetailRoute) {
+    if (!selectedDetailRecord) {
+      return (
+        <div style={{ padding: '28px 32px', minHeight: '100%' }}>
+          <Card style={{ borderRadius: 12 }}>
+            <Space direction="vertical">
+              <Title level={3} style={{ margin: 0 }}>数据集不存在</Title>
+              <Text type="secondary">当前机器学习数据集不存在或已被删除。</Text>
+              <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/machine-data-management')}>返回列表</Button>
+            </Space>
+          </Card>
+        </div>
+      )
+    }
+
+    const versions = getDatasetVersions(selectedDetailRecord)
+    const activeDatasetVersion = getActiveDatasetVersion(selectedDetailRecord, detailVersion)
+    const detailRows = activeDatasetVersion.detailRows
+    const datasetLabels = selectedDetailRecord.dataType === '图片'
+      ? ['食品', '人物', '物体', '动物', '文字', '车辆']
+      : ['正向', '负向', '中性', '实体']
+    return (
+      <div style={{ padding: '24px 32px', minHeight: '100%', background: '#f7f8fa' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
+          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/machine-data-management')}>返回</Button>
+          <Space>
+            <Button icon={<DownloadOutlined />} onClick={() => Modal.info({ title: '导出数据集', content: '已生成当前版本数据导出任务。' })}>导出</Button>
+            <Popconfirm title="确认删除该数据集？" okText="删除" cancelText="取消" onConfirm={() => { if (deleteRecord(selectedDetailRecord.id)) navigate('/machine-data-management') }}>
+              <Button danger icon={<DeleteOutlined />}>删除</Button>
+            </Popconfirm>
+          </Space>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '180px minmax(0, 1fr)', gap: 16 }}>
+          <Card style={{ borderRadius: 12, border: '1px solid #e5e7eb' }} styles={{ body: { padding: 14 } }}>
+            <Button type="primary" block icon={<PlusOutlined />} style={{ height: 44, marginBottom: 16 }} onClick={() => openAddVersion(selectedDetailRecord)}>
+              新增版本
+            </Button>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              {versions.map(version => (
+                <Button
+                  key={version.version}
+                  block
+                  type={activeDatasetVersion.version === version.version ? 'primary' : 'text'}
+                  onClick={() => setActiveVersion(version.version)}
+                  style={{ justifyContent: 'flex-start', height: 42 }}
+                >
+                  <Space direction="vertical" size={0} align="start">
+                    <span>{version.version}</span>
+                    <Text type="secondary" style={{ fontSize: 11 }}>{version.detailRows.length} 条样本</Text>
+                  </Space>
+                </Button>
+              ))}
+            </Space>
+          </Card>
+
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            <Card title="基本信息" style={{ borderRadius: 12, border: '1px solid #e5e7eb' }}>
+              {renderInfoGrid([
+                { label: '数据集名称', value: selectedDetailRecord.name },
+                { label: '当前版本', value: activeDatasetVersion.version },
+                { label: '数据量', value: `${detailRows.length} 条` },
+                { label: '数据类型', value: selectedDetailRecord.dataType },
+                { label: '标注类型', value: selectedDetailRecord.annotationType },
+                { label: '标注模板', value: selectedDetailRecord.annotationTemplate },
+                { label: '数据标注状态', value: <Tag color={activeDatasetVersion.labelStatus === '有标注信息' ? 'green' : 'default'}>{activeDatasetVersion.labelStatus}</Tag> },
+                { label: '数据来源', value: activeDatasetVersion.dataSource },
+                { label: '标签', value: renderTagGroup(datasetLabels) },
+                { label: '创建人', value: activeDatasetVersion.creator },
+                { label: '创建时间', value: activeDatasetVersion.createdAt },
+                { label: '描述', value: activeDatasetVersion.description || '-' },
+              ])}
+            </Card>
+
+            <Card title="数据详情" style={{ borderRadius: 12, border: '1px solid #e5e7eb' }}>
+              <Table<MLDatasetDetailRow>
+                rowKey="key"
+                pagination={{ pageSize: 5, showTotal: total => `共 ${total} 条` }}
+                columns={[
+                  { title: '序号', key: 'index', width: 100, align: 'center', render: (_value, _row, index) => index + 1 },
+                  {
+                    title: selectedDetailRecord.dataType === '图片' ? '图片' : '数据内容',
+                    key: 'content',
+                    render: (_value, row) => renderDatasetSample(selectedDetailRecord, row),
+                  },
+                  { title: '标签', dataIndex: 'label', key: 'label', width: 240, render: renderDatasetLabels },
+                  {
+                    title: '操作',
+                    key: 'action',
+                    width: 100,
+                    render: (_value, row) => (
+                      <Button type="link" size="small" danger onClick={() => deleteDetailRow(selectedDetailRecord, row)}>
+                        删除
+                      </Button>
+                    ),
+                  },
+                ]}
+                dataSource={detailRows}
+              />
+            </Card>
+          </Space>
+        </div>
+
+        <Modal
+          title="新增版本"
+          open={addVersionOpen}
+          width={720}
+          okText="提交"
+          cancelText="取消"
+          onOk={() => submitAddVersion(selectedDetailRecord)}
+          onCancel={() => setAddVersionOpen(false)}
+          destroyOnClose
+        >
+          <Form
+            form={addVersionForm}
+            layout="vertical"
+            initialValues={{
+              version: getNextVersionLabel(selectedDetailRecord),
+              labelStatus: selectedDetailRecord.labelStatus,
+              dataSource: selectedDetailRecord.dataSource,
+            }}
+          >
+            <Form.Item label="新版本号" name="version" rules={[{ required: true, message: '请确认新版本号' }]}>
+              <Input readOnly />
+            </Form.Item>
+            <Form.Item label="数据标注状态" name="labelStatus" rules={[{ required: true, message: '请选择数据标注状态' }]}>
+              <Radio.Group
+                options={[
+                  { value: '无标注信息', label: '无标注信息' },
+                  { value: '有标注信息', label: '有标注信息' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item label="数据来源" name="dataSource" rules={[{ required: true, message: '请选择数据来源' }]}>
+              <Radio.Group
+                options={[
+                  { value: '本地上传', label: '本地上传' },
+                  { value: 'Notebook 获取', label: 'Notebook 获取' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item label="上传数据">
+              <ResumableUpload
+                title="上传新版本数据"
+                hint="提交后将生成新版本并自动切换到该版本；当前为本地 mock 闭环。"
+                value={addVersionFile}
+                onChange={setAddVersionFile}
+              />
+            </Form.Item>
+            <Form.Item label="描述" name="description">
+              <Input.TextArea rows={3} maxLength={200} showCount placeholder="请输入新版本描述" />
+            </Form.Item>
+          </Form>
+        </Modal>
       </div>
     )
   }
@@ -322,22 +753,6 @@ const MLDataset: React.FC = () => {
         </Card>
       </div>
 
-      <Modal title="数据集详情" open={Boolean(detailRecord)} onCancel={() => setDetailRecord(null)} footer={<Button onClick={() => setDetailRecord(null)}>关闭</Button>} width={720}>
-        {detailRecord && (
-          <Descriptions column={2} bordered size="small">
-            <Descriptions.Item label="数据集名称" span={2}>{detailRecord.name}</Descriptions.Item>
-            <Descriptions.Item label="最新版本">{detailRecord.version}</Descriptions.Item>
-            <Descriptions.Item label="数据类型">{detailRecord.dataType}</Descriptions.Item>
-            <Descriptions.Item label="标注类型">{detailRecord.annotationType}</Descriptions.Item>
-            <Descriptions.Item label="标注模板">{detailRecord.annotationTemplate}</Descriptions.Item>
-            <Descriptions.Item label="数据标注状态">{detailRecord.labelStatus}</Descriptions.Item>
-            <Descriptions.Item label="数据来源">{detailRecord.dataSource}</Descriptions.Item>
-            <Descriptions.Item label="创建人">{detailRecord.creator}</Descriptions.Item>
-            <Descriptions.Item label="描述" span={2}>{detailRecord.description || '-'}</Descriptions.Item>
-            <Descriptions.Item label="创建时间" span={2}>{detailRecord.createdAt}</Descriptions.Item>
-          </Descriptions>
-        )}
-      </Modal>
     </>
   )
 }

@@ -25,12 +25,15 @@ import {
   TASK_LIFECYCLE_TAG,
   type TaskLifecycleStatus,
 } from '../../services/taskLifecycle'
+import TaskMetadataEditor from '../../components/TaskMetadataEditor'
+import { createTaskNotification } from '../../services/notificationStore'
 
 const { Text, Title } = Typography
 
 type ServiceRecord = {
   id: string
   name: string
+  description?: string
   modelName: string
   modelSource: string
   instanceCount: number
@@ -40,8 +43,8 @@ type ServiceRecord = {
 }
 
 const services: ServiceRecord[] = [
-  { id: 'svc-1', name: '服务名称-7B', modelName: 'Qwen2.5-7B-Instruct', modelSource: '基础模型', instanceCount: 2, status: '运行中', creator: 'admin', createdAt: '2026/03/19 11:00:00' },
-  { id: 'svc-2', name: '服务名称-1.5B', modelName: 'Qwen2.5-1.5B-Instruct', modelSource: '基础模型', instanceCount: 1, status: '已创建', creator: 'lab1', createdAt: '2026/03/17 08:30:00' },
+  { id: 'svc-1', name: '服务名称-7B', description: 'Qwen2.5 7B 在线部署任务', modelName: 'Qwen2.5-7B-Instruct', modelSource: '基础模型', instanceCount: 2, status: '运行中', creator: 'admin', createdAt: '2026/03/19 11:00:00' },
+  { id: 'svc-2', name: '服务名称-1.5B', description: '轻量模型部署验证任务', modelName: 'Qwen2.5-1.5B-Instruct', modelSource: '基础模型', instanceCount: 1, status: '已创建', creator: 'lab1', createdAt: '2026/03/17 08:30:00' },
 ]
 
 function statusTag(status: ServiceRecord['status']): React.ReactNode {
@@ -72,7 +75,20 @@ const ModelDeployment: React.FC = () => {
   }
 
   const columns: ColumnsType<ServiceRecord> = [
-    { title: '服务名称', dataIndex: 'name', key: 'name' },
+    {
+      title: '服务名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 240,
+      render: (_value, record) => (
+        <TaskMetadataEditor
+          name={record.name}
+          description={record.description}
+          editable={canRunTaskLifecycleAction(record.status, 'edit')}
+          onSave={value => updateService(record.id, item => ({ ...item, ...value }))}
+        />
+      ),
+    },
     { title: '模型名称', dataIndex: 'modelName', key: 'modelName' },
     { title: '模型来源', dataIndex: 'modelSource', key: 'modelSource' },
     { title: '实例数', dataIndex: 'instanceCount', key: 'instanceCount', width: 80 },
@@ -96,10 +112,24 @@ const ModelDeployment: React.FC = () => {
               type="link"
               size="small"
               onClick={() =>
-                updateService(record.id, item => ({
-                  ...item,
-                  status: getPrimaryTaskLifecycleAction(item.status) === 'start' ? '启动中' : '已创建',
-                }))
+                {
+                  const nextStatus = getPrimaryTaskLifecycleAction(record.status) === 'start' ? '启动中' : '已创建'
+                  updateService(record.id, item => ({
+                    ...item,
+                    status: nextStatus,
+                  }))
+                  createTaskNotification({
+                    type: 'deployment',
+                    status: 'started',
+                    severity: 'info',
+                    taskId: record.id,
+                    taskName: record.name,
+                    taskModule: '大模型部署',
+                    title: '模型部署任务已启动',
+                    content: `${record.name} 已进入${nextStatus}。`,
+                    targetPath: '/service/inference/hosted',
+                  })
+                }
               }
             >
               {getPrimaryTaskLifecycleAction(record.status) === 'start' ? '启动' : '重新提交'}
@@ -121,6 +151,17 @@ const ModelDeployment: React.FC = () => {
                 return message.warning(STARTING_TERMINATE_BLOCKED_MESSAGE)
               }
               updateService(record.id, item => ({ ...item, status: '已终止' }))
+              createTaskNotification({
+                type: 'deployment',
+                status: 'terminated',
+                severity: 'warning',
+                taskId: record.id,
+                taskName: record.name,
+                taskModule: '大模型部署',
+                title: '模型部署任务已终止',
+                content: `${record.name} 已终止。`,
+                targetPath: '/service/inference/hosted',
+              })
             }}
           >
             终止
@@ -152,6 +193,33 @@ const ModelDeployment: React.FC = () => {
   const submitCreate = async () => {
     try {
       await form.validateFields()
+      const values = form.getFieldsValue()
+      const nextRecord: ServiceRecord = {
+        id: `svc-${Date.now()}`,
+        name: values.name,
+        description: values.description ?? '',
+        modelName: values.model ?? 'Qwen2.5-7B-Instruct',
+        modelSource: values.modelSource === 'base' ? '基础模型' : '训练生成',
+        instanceCount: values.instanceCount ?? 1,
+        status: '已创建',
+        creator: 'deepexilab',
+        createdAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      }
+      setServiceRows(previous => [
+        nextRecord,
+        ...previous,
+      ])
+      createTaskNotification({
+        type: 'deployment',
+        status: 'created',
+        severity: 'info',
+        taskId: nextRecord.id,
+        taskName: nextRecord.name,
+        taskModule: '大模型部署',
+        title: '模型部署任务已创建',
+        content: `${nextRecord.name} 已创建，等待启动。`,
+        targetPath: '/service/inference/hosted',
+      })
       closeCreate()
     } catch {
       return
@@ -178,6 +246,10 @@ const ModelDeployment: React.FC = () => {
 
             <Form.Item label="服务名称" name="name" rules={[{ required: true, message: '请输入服务名称' }]}>
               <Input placeholder="请输入服务名称" />
+            </Form.Item>
+
+            <Form.Item label="服务描述" name="description">
+              <Input.TextArea rows={3} maxLength={300} showCount placeholder="请输入服务描述，最多 300 字" />
             </Form.Item>
 
             <Divider />
@@ -263,6 +335,7 @@ const ModelDeployment: React.FC = () => {
         {detailRecord && (
           <Descriptions column={2} bordered size="small">
             <Descriptions.Item label="服务名称" span={2}>{detailRecord.name}</Descriptions.Item>
+            <Descriptions.Item label="服务描述" span={2}>{detailRecord.description || '-'}</Descriptions.Item>
             <Descriptions.Item label="模型名称">{detailRecord.modelName}</Descriptions.Item>
             <Descriptions.Item label="模型来源">{detailRecord.modelSource}</Descriptions.Item>
             <Descriptions.Item label="实例数">{detailRecord.instanceCount}</Descriptions.Item>

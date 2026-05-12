@@ -4,6 +4,7 @@ import {
   getDataServiceState,
   replaceDataServiceState,
   type DataServiceState,
+  type DatasetDetailRowRecord,
   type DatasetRecord,
   type InferenceResultRecord,
   type AnnotationTaskRecord,
@@ -11,6 +12,7 @@ import {
   useDataServiceStore,
 } from './dataServiceStore'
 import { type TrainingDatasetUsage } from './datasetUsage'
+import { createTaskNotification } from './notificationStore'
 
 export type DatasetKind = 'training' | 'validation' | 'test'
 export type AnnotationDatasetType = 'text-generation' | 'image-understanding'
@@ -32,11 +34,21 @@ export interface AddDatasetVersionParams {
   description?: string
 }
 
+export interface DeleteDatasetDetailRowParams {
+  versionId: string
+  rowKey: string
+  currentRows: DatasetDetailRowRecord[]
+}
+
 export interface CreateInferenceResultParams {
   name: string
+  description?: string
   dataUsage: '文本生成' | '图像理解'
+  inferenceMode?: '离线推理' | '在线推理' | '导入推理结果集'
+  importFile?: string
   pendingData: string
   pendingModel: string
+  dataVolume?: number | '-'
 }
 
 export interface CreateAnnotationTaskParams {
@@ -53,9 +65,15 @@ export interface CreateAnnotationTaskParams {
 
 export interface CreateCleaningTaskParams {
   name: string
+  description?: string
   preDataset: string
   postDataset?: string
   operatorValues?: string[]
+}
+
+export interface UpdateTaskMetaParams {
+  name: string
+  description?: string
 }
 
 export interface ListQueryParams {
@@ -381,6 +399,23 @@ export const dataServiceApi = {
     dataServiceActions.deleteDataset(kind, id)
   },
 
+  async deleteDatasetDetailRow(kind: DatasetKind, id: string, params: DeleteDatasetDetailRowParams): Promise<void> {
+    const snapshot = await requestSnapshot(
+      `${API_ROOT}/datasets/${kind}/${encodeURIComponent(id)}/versions/${encodeURIComponent(params.versionId)}/rows/${encodeURIComponent(params.rowKey)}`,
+      {
+        method: 'DELETE',
+        body: JSON.stringify({ currentRows: params.currentRows }),
+      },
+    )
+
+    if (syncSnapshot(snapshot)) {
+      return
+    }
+
+    await delay()
+    dataServiceActions.deleteDatasetDetailRow(kind, id, params.versionId, params.rowKey, params.currentRows)
+  },
+
   async createInferenceResult(params: CreateInferenceResultParams): Promise<void> {
     const snapshot = await requestSnapshot(`${API_ROOT}/inference-results`, {
       method: 'POST',
@@ -388,11 +423,33 @@ export const dataServiceApi = {
     })
 
     if (syncSnapshot(snapshot)) {
+      createTaskNotification({
+        type: 'inference',
+        status: 'created',
+        severity: 'info',
+        taskId: `inference-${Date.now()}`,
+        taskName: params.name,
+        taskModule: '推理结果集',
+        title: '推理结果集任务已创建',
+        content: `${params.name} 已创建，等待启动处理。`,
+        targetPath: '/inference',
+      })
       return
     }
 
     await delay()
     dataServiceActions.createInferenceResult(params)
+    createTaskNotification({
+      type: 'inference',
+      status: 'created',
+      severity: 'info',
+      taskId: `inference-${Date.now()}`,
+      taskName: params.name,
+      taskModule: '推理结果集',
+      title: '推理结果集任务已创建',
+      content: `${params.name} 已创建，等待启动处理。`,
+      targetPath: '/inference',
+    })
   },
 
   async deleteInferenceResult(id: string): Promise<void> {
@@ -408,7 +465,22 @@ export const dataServiceApi = {
     dataServiceActions.deleteInferenceResult(id)
   },
 
+  async updateInferenceResultMeta(id: string, params: UpdateTaskMetaParams): Promise<void> {
+    const snapshot = await requestSnapshot(`${API_ROOT}/inference-results/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(params),
+    })
+
+    if (syncSnapshot(snapshot)) {
+      return
+    }
+
+    await delay()
+    dataServiceActions.updateInferenceResultMeta(id, params)
+  },
+
   async startInferenceResult(id: string): Promise<void> {
+    const target = getDataServiceState().inferenceResults.find(item => item.id === id)
     const snapshot = await requestSnapshot(`${API_ROOT}/inference-results/${encodeURIComponent(id)}/start`, {
       method: 'POST',
     })
@@ -419,9 +491,23 @@ export const dataServiceApi = {
 
     await delay()
     dataServiceActions.startInferenceResult(id)
+    if (target) {
+      createTaskNotification({
+        type: 'inference',
+        status: 'started',
+        severity: 'info',
+        taskId: target.id,
+        taskName: target.name,
+        taskModule: '推理结果集',
+        title: '推理结果集任务已启动',
+        content: `${target.name} 已进入启动中。`,
+        targetPath: '/inference',
+      })
+    }
   },
 
   async terminateInferenceResult(id: string): Promise<void> {
+    const target = getDataServiceState().inferenceResults.find(item => item.id === id)
     const snapshot = await requestSnapshot(`${API_ROOT}/inference-results/${encodeURIComponent(id)}/terminate`, {
       method: 'POST',
     })
@@ -432,6 +518,19 @@ export const dataServiceApi = {
 
     await delay()
     dataServiceActions.terminateInferenceResult(id)
+    if (target) {
+      createTaskNotification({
+        type: 'inference',
+        status: 'terminated',
+        severity: 'warning',
+        taskId: target.id,
+        taskName: target.name,
+        taskModule: '推理结果集',
+        title: '推理结果集任务已终止',
+        content: `${target.name} 已终止。`,
+        targetPath: '/inference',
+      })
+    }
   },
 
   async createAnnotationTask(params: CreateAnnotationTaskParams): Promise<void> {
@@ -446,6 +545,17 @@ export const dataServiceApi = {
 
     await delay()
     dataServiceActions.createAnnotationTask(params)
+    createTaskNotification({
+      type: 'annotation',
+      status: 'created',
+      severity: 'info',
+      taskId: `annotation-${Date.now()}`,
+      taskName: params.name,
+      taskModule: '数据标注',
+      title: '标注任务已创建',
+      content: `${params.name} 已创建，等待分配或开始标注。`,
+      targetPath: '/data-annotation',
+    })
   },
 
   async deleteAnnotationTask(id: string): Promise<void> {
@@ -473,6 +583,17 @@ export const dataServiceApi = {
 
     await delay()
     dataServiceActions.createCleaningTask(params)
+    createTaskNotification({
+      type: 'cleaning',
+      status: 'started',
+      severity: 'info',
+      taskId: `cleaning-${Date.now()}`,
+      taskName: params.name,
+      taskModule: '数据清洗',
+      title: '清洗任务已启动',
+      content: `${params.name} 已进入启动中。`,
+      targetPath: '/data-cleaning',
+    })
   },
 
   async deleteCleaningTask(id: string): Promise<void> {
@@ -488,7 +609,22 @@ export const dataServiceApi = {
     dataServiceActions.deleteCleaningTask(id)
   },
 
+  async updateCleaningTaskMeta(id: string, params: UpdateTaskMetaParams): Promise<void> {
+    const snapshot = await requestSnapshot(`${API_ROOT}/cleaning-tasks/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(params),
+    })
+
+    if (syncSnapshot(snapshot)) {
+      return
+    }
+
+    await delay()
+    dataServiceActions.updateCleaningTaskMeta(id, params)
+  },
+
   async startCleaningTask(id: string): Promise<void> {
+    const target = getDataServiceState().cleaningTasks.find(item => item.id === id)
     const snapshot = await requestSnapshot(`${API_ROOT}/cleaning-tasks/${encodeURIComponent(id)}/start`, {
       method: 'POST',
     })
@@ -499,5 +635,18 @@ export const dataServiceApi = {
 
     await delay()
     dataServiceActions.startCleaningTask(id)
+    if (target) {
+      createTaskNotification({
+        type: 'cleaning',
+        status: 'started',
+        severity: 'info',
+        taskId: target.id,
+        taskName: target.name,
+        taskModule: '数据清洗',
+        title: '清洗任务已启动',
+        content: `${target.name} 已进入启动中。`,
+        targetPath: '/data-cleaning',
+      })
+    }
   },
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Layout, Menu, Dropdown, Button, Badge, Avatar, Tooltip, Result, Tag } from 'antd'
+import { Layout, Menu, Dropdown, Button, Badge, Avatar, Tooltip, Result, Tag, Drawer, Empty, Segmented, Space, Typography } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
@@ -33,8 +33,17 @@ import {
   usePermissionStore,
 } from '../../services/permissionStore'
 import { resolveRouteAccess } from '../../services/permissionCatalog'
+import {
+  getUnreadCount,
+  markAllRead,
+  markRead,
+  taskNotificationLabels,
+  useNotifications,
+  type TaskNotification,
+} from '../../services/notificationStore'
 
 const { Header, Sider, Content } = Layout
+const { Text } = Typography
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -140,6 +149,13 @@ const mlTopNavItems = [
   { key: 'machine-learning', label: '机器学习', icon: <AppstoreOutlined />, route: '/machine-data-management' },
 ] as const
 
+const notificationSeverityColor: Record<TaskNotification['severity'], string> = {
+  info: 'blue',
+  success: 'green',
+  warning: 'gold',
+  error: 'red',
+}
+
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -147,6 +163,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const isDocsRoute = location.pathname.startsWith('/docs')
   const isWorkspaceRoute = location.pathname === '/workspace'
   const isAdminRoute = location.pathname.startsWith('/admin')
+  const isOpenPlatformRoute = location.pathname.startsWith('/open-platform')
   const [docPanelOpen, setDocPanelOpen] = useState(() => {
     if (typeof window === 'undefined') {
       return false
@@ -154,13 +171,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
     return window.localStorage.getItem('design-doc-panel-open') === 'true'
   })
+  const [notificationOpen, setNotificationOpen] = useState(false)
+  const [notificationFilter, setNotificationFilter] = useState<'all' | 'unread'>('all')
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1440 : window.innerWidth))
+  const notifications = useNotifications()
   const currentDoc = getPageDesignDoc(location.pathname)
   const currentUser = getCurrentUser(permissionState)
   const currentProject = getCurrentProject(permissionState)
   const currentProjectMode = getCurrentProjectMode(permissionState)
   const routeAccess = canViewCurrentRoute(location.pathname, permissionState)
   const shouldRedirectToWorkspace = routeAccess.reason === 'no-project' && !isWorkspaceRoute
+  const visibleNotifications = useMemo(
+    () => notifications.filter(item => item.recipientAccounts.includes(currentUser.account)),
+    [currentUser.account, notifications],
+  )
+  const unreadCount = getUnreadCount(currentUser.account)
+  const displayedNotifications = notificationFilter === 'unread'
+    ? visibleNotifications.filter(item => !item.readAccounts.includes(currentUser.account))
+    : visibleNotifications
 
   const filterMenuItems = (items: MenuItemList): MenuItemList =>
     items
@@ -178,7 +206,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       .filter(Boolean) as MenuItemList
 
   const activeTopTab = isAdminRoute ? 'system' : 'workspace'
-  const showProjectMenus = !isDocsRoute && !isWorkspaceRoute && !isAdminRoute && Boolean(currentProject)
+  const showProjectMenus = !isDocsRoute && !isWorkspaceRoute && !isAdminRoute && !isOpenPlatformRoute && Boolean(currentProject)
   const projectTopNavItems = showProjectMenus
     ? (currentProjectMode === 'ml' ? mlTopNavItems : llmTopNavItems)
     : []
@@ -313,6 +341,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   const toggleDocPanel = () => {
     setDocPanelOpen(previous => !previous)
+  }
+
+  const openNotification = (notice: TaskNotification) => {
+    markRead(notice.id, currentUser.account)
+    setNotificationOpen(false)
+    navigate(notice.targetPath)
   }
 
   const compactHeader = viewportWidth < 1280
@@ -496,10 +530,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </Tooltip>
 
           <Tooltip title="通知中心">
-            <Badge count={3} size="small" offset={[-2, 2]}>
+            <Badge count={unreadCount} size="small" offset={[-2, 2]}>
               <Button
                 type="text"
                 icon={<BellOutlined />}
+                onClick={() => setNotificationOpen(true)}
                 style={{
                   color: '#475569',
                   fontSize: 18,
@@ -547,7 +582,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   label: `${user.account} · ${getUserRoleLabels(user.account, permissionState).join(' / ')}`,
                 })),
                 { type: 'divider' as const },
-                { key: 'open-platform-api', icon: <ApiOutlined />, label: '开放平台 API' },
+                { key: 'open-platform-api', icon: <ApiOutlined />, label: 'API访问密钥' },
                 { key: 'profile', label: '个人中心' },
                 { key: 'settings', label: '设置' },
               ],
@@ -711,6 +746,73 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           )}
         </Content>
       </Layout>
+      <Drawer
+        title="消息中心"
+        placement="right"
+        width={420}
+        open={notificationOpen}
+        onClose={() => setNotificationOpen(false)}
+        extra={
+          <Button type="link" disabled={!unreadCount} onClick={() => markAllRead(currentUser.account)}>
+            全部已读
+          </Button>
+        }
+      >
+        <div style={{ display: 'grid', gap: 14 }}>
+          <Segmented
+            block
+            value={notificationFilter}
+            onChange={value => setNotificationFilter(value as 'all' | 'unread')}
+            options={[
+              { label: `全部 ${visibleNotifications.length}`, value: 'all' },
+              { label: `未读 ${unreadCount}`, value: 'unread' },
+            ]}
+          />
+
+          {displayedNotifications.length ? (
+            <div style={{ display: 'grid', gap: 10 }}>
+              {displayedNotifications.map(notice => {
+                const isUnread = !notice.readAccounts.includes(currentUser.account)
+                return (
+                  <button
+                    key={notice.id}
+                    type="button"
+                    onClick={() => openNotification(notice)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      border: `1px solid ${isUnread ? '#bfdbfe' : '#e2e8f0'}`,
+                      background: isUnread ? '#eff6ff' : '#ffffff',
+                      borderRadius: 8,
+                      padding: 14,
+                      cursor: 'pointer',
+                      boxShadow: isUnread ? '0 8px 20px rgba(37, 99, 235, 0.08)' : 'none',
+                    }}
+                  >
+                    <Space size={6} wrap style={{ marginBottom: 8 }}>
+                      <Tag color={notificationSeverityColor[notice.severity]}>{taskNotificationLabels.type[notice.type]}</Tag>
+                      <Tag>{taskNotificationLabels.status[notice.status]}</Tag>
+                      {isUnread && <Tag color="blue">未读</Tag>}
+                    </Space>
+                    <div style={{ color: '#0f172a', fontSize: 14, fontWeight: 700, lineHeight: 1.45, marginBottom: 6 }}>
+                      {notice.title}
+                    </div>
+                    <div style={{ color: '#475569', fontSize: 13, lineHeight: 1.6, marginBottom: 10 }}>
+                      {notice.content}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                      <Text type="secondary" style={{ fontSize: 12 }}>{notice.taskModule}</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>{notice.createdAt}</Text>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={notificationFilter === 'unread' ? '暂无未读消息' : '暂无消息'} />
+          )}
+        </div>
+      </Drawer>
     </Layout>
   )
 }

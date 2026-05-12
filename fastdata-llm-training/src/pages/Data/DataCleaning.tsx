@@ -37,14 +37,17 @@ import {
   selectCleaningTasks,
   useDataServiceSnapshot,
 } from '../../services/dataServiceApi'
+import { canRunTaskLifecycleAction, type TaskLifecycleStatus } from '../../services/taskLifecycle'
 import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
+import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 
 const { Text, Title } = Typography
 
 type CleaningTask = {
   id: string
   name: string
-  status: '已完成' | '启动中' | '已终止'
+  description?: string
+  status: TaskLifecycleStatus
   preDataset: string
   postDataset: string
   operatorValues?: string[]
@@ -281,7 +284,20 @@ const DataCleaning: React.FC = () => {
   )
 
   const listColumns: ColumnsType<CleaningTask> = [
-    { title: '任务名称', dataIndex: 'name', key: 'name' },
+    {
+      title: '任务名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 260,
+      render: (_value, record) => (
+        <TaskMetadataEditor
+          name={record.name}
+          description={record.description}
+          editable={canRunTaskLifecycleAction(record.status, 'edit')}
+          onSave={metadata => dataServiceApi.updateCleaningTaskMeta(record.id, metadata)}
+        />
+      ),
+    },
     { title: '清洗状态', dataIndex: 'status', key: 'status', width: 100, render: value => statusTag(value) },
     { title: '清洗前数据集', dataIndex: 'preDataset', key: 'preDataset', ellipsis: true },
     { title: '清洗后数据集', dataIndex: 'postDataset', key: 'postDataset', ellipsis: true },
@@ -346,6 +362,7 @@ const DataCleaning: React.FC = () => {
     try {
       await dataServiceApi.createCleaningTask({
         name: form.getFieldValue('name'),
+        description: form.getFieldValue('description') ?? '',
         preDataset: selectedDatasetLabel,
         postDataset: form.getFieldValue('outputName'),
         operatorValues: selectedOperators,
@@ -359,6 +376,13 @@ const DataCleaning: React.FC = () => {
   React.useEffect(() => {
     setPage(1)
   }, [searchValue, statusFilter])
+
+  React.useEffect(() => {
+    if (!detailTask) {
+      return
+    }
+    setDetailTask(cleaningTasks.find(item => item.id === detailTask.id) as CleaningTask | undefined ?? null)
+  }, [cleaningTasks, detailTask])
 
   React.useEffect(() => {
     let active = true
@@ -404,6 +428,10 @@ const DataCleaning: React.FC = () => {
 
             <Form.Item label="任务名称" name="name" rules={[{ required: true, message: '请输入任务名称' }]}>
               <Input placeholder="请输入任务名称" />
+            </Form.Item>
+
+            <Form.Item label="任务描述" name="description">
+              <Input.TextArea rows={3} maxLength={300} showCount placeholder="请输入任务描述，最多 300 字" />
             </Form.Item>
 
             <Form.Item label="数据来源" name="sourceType">
@@ -748,9 +776,10 @@ const DataCleaning: React.FC = () => {
                       >
                         {[
                           ['任务名称', detailTask.name, '任务状态', statusTag(detailTask.status)],
-                          ['数据来源', '已有数据集', '清洗前数据集', detailTask.preDataset],
-                          ['清洗后数据集', detailTask.postDataset, '创建人', detailTask.creator],
-                          ['创建时间', detailTask.createdAt, '完成时间', detailTask.status === '已完成' ? detailTask.createdAt : '-'],
+                          ['任务描述', detailTask.description || '-', '数据来源', '已有数据集'],
+                          ['清洗前数据集', detailTask.preDataset, '清洗后数据集', detailTask.postDataset],
+                          ['创建人', detailTask.creator, '创建时间', detailTask.createdAt],
+                          ['完成时间', detailTask.status === '已完成' ? detailTask.createdAt : '-', '', ''],
                         ].map((row, rowIndex) => (
                           <React.Fragment key={`${row[0]}-${rowIndex}`}>
                             <div style={{ padding: '12px 14px', background: '#f8fafc', borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', color: '#64748b' }}>

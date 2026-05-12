@@ -23,8 +23,14 @@ import {
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useNavigate } from 'react-router-dom'
-import { mockTasks } from '../../data/mockData'
 import type { TrainingTask } from '../../types/training'
+import TaskMetadataEditor from '../../components/TaskMetadataEditor'
+import { canRunTaskLifecycleAction } from '../../services/taskLifecycle'
+import {
+  getTrainingTaskLifecycleStatus,
+  trainingTaskActions,
+  useTrainingTasks,
+} from '../../services/trainingTaskStore'
 import { isVersionInExecution } from './trainingVersionActions'
 
 const { Title, Text } = Typography
@@ -32,7 +38,7 @@ const { Title, Text } = Typography
 const TrainingList: React.FC = () => {
   const navigate = useNavigate()
   const [searchText, setSearchText] = useState('')
-  const [data, setData] = useState<TrainingTask[]>(mockTasks)
+  const data = useTrainingTasks()
 
   // 搜索过滤
   const filteredData = data.filter(item =>
@@ -49,7 +55,7 @@ const TrainingList: React.FC = () => {
       dataIndex: 'name',
       key: 'name',
       width: 280,
-      render: (name: string, record: TrainingTask) => (
+      render: (_name: string, record: TrainingTask) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div
             style={{
@@ -65,19 +71,13 @@ const TrainingList: React.FC = () => {
           >
             <DatabaseOutlined style={{ color: '#2563eb', fontSize: 18 }} />
           </div>
-          <a
-            onClick={() => navigate(`/training/detail/${record.id}`)}
-            style={{
-              color: '#0f172a',
-              fontWeight: 600,
-              fontSize: 14,
-              transition: 'color 0.2s',
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = '#2563eb'}
-            onMouseLeave={(e) => e.currentTarget.style.color = '#0f172a'}
-          >
-            {name}
-          </a>
+          <TaskMetadataEditor
+            name={record.name}
+            description={record.description}
+            editable={canRunTaskLifecycleAction(getTrainingTaskLifecycleStatus(record), 'edit')}
+            onNameClick={() => navigate(`/training/detail/${record.id}`)}
+            onSave={value => trainingTaskActions.updateTrainingTaskMeta(record.id, value)}
+          />
         </div>
       ),
     },
@@ -203,7 +203,7 @@ const TrainingList: React.FC = () => {
 
   // 删除处理
   const handleDelete = (id: string) => {
-    setData(prev => prev.filter(item => item.id !== id))
+    trainingTaskActions.deleteTrainingTask(id)
     message.success('删除成功')
   }
 

@@ -46,6 +46,7 @@ import {
 } from '../../services/taskLifecycle'
 import { getCurrentUser, usePermissionStore } from '../../services/permissionStore'
 import { useOnlineInferenceServices } from '../../services/onlineInferenceServiceStore'
+import { createTaskNotification } from '../../services/notificationStore'
 import { PUBLISH_CASE_NOTICE } from '../notebookCaseNotice'
 
 const { Text, Title, Paragraph } = Typography
@@ -881,9 +882,23 @@ const OnlineNotebook: React.FC = () => {
   }
 
   const stopNotebook = (notebookId: string, options?: { silent?: boolean }) => {
+    const target = rows.find(item => item.id === notebookId)
     setRows(previous =>
       previous.map(item => (item.id === notebookId ? { ...item, status: '已终止', updatedAt: nowText() } : item)),
     )
+    if (target) {
+      createTaskNotification({
+        type: 'notebook',
+        status: 'terminated',
+        severity: 'warning',
+        taskId: target.id,
+        taskName: target.name,
+        taskModule: '在线Notebook',
+        title: 'Notebook 已停止',
+        content: `${target.name} 已停止运行。`,
+        targetPath: `/finetune/notebooks/${target.id}`,
+      })
+    }
     if (!options?.silent) {
       message.success('Notebook 已停止')
     }
@@ -905,6 +920,17 @@ const OnlineNotebook: React.FC = () => {
       },
       ...previous,
     ])
+    createTaskNotification({
+      type: 'image_build',
+      status: 'completed',
+      severity: 'success',
+      taskId: `mirror-${Date.now()}`,
+      taskName: values.imageName?.trim() || `${record.name}-env`,
+      taskModule: '自定义镜像',
+      title: 'Notebook 环境镜像已生成',
+      content: `${record.name} 的环境已保存为自定义镜像。`,
+      targetPath: '/finetune/notebooks/mirror',
+    })
   }
 
   const setSaveEnvironmentDefaults = (record: MyNotebookRecord) => {
@@ -992,6 +1018,17 @@ const OnlineNotebook: React.FC = () => {
         },
         ...previous,
       ])
+      createTaskNotification({
+        type: 'image_build',
+        status: 'completed',
+        severity: 'success',
+        taskId: `mirror-custom-${Date.now()}`,
+        taskName: values.imageName || 'jupyter/deepexi-notebook',
+        taskModule: '自定义镜像',
+        title: '自定义镜像已添加',
+        content: `${values.imageName || 'jupyter/deepexi-notebook'} 已添加到自定义镜像。`,
+        targetPath: '/finetune/notebooks/mirror',
+      })
       setCustomMirrorModalOpen(false)
       customMirrorForm.resetFields()
       message.success('镜像已添加')
@@ -1047,7 +1084,21 @@ const OnlineNotebook: React.FC = () => {
   const canStartNotebookTask = (status: NotebookStatus) => !['启动中', '排队中', '运行中'].includes(status)
 
   const startNotebookTask = (notebookId: string) => {
+    const target = rows.find(item => item.id === notebookId)
     setRows(previous => previous.map(item => (item.id === notebookId ? { ...item, status: '启动中' } : item)))
+    if (target) {
+      createTaskNotification({
+        type: 'notebook',
+        status: 'started',
+        severity: 'info',
+        taskId: target.id,
+        taskName: target.name,
+        taskModule: '在线Notebook',
+        title: 'Notebook 已启动',
+        content: `${target.name} 已进入启动中。`,
+        targetPath: `/finetune/notebooks/${target.id}`,
+      })
+    }
     message.success('Notebook 已进入启动中')
   }
 
@@ -1351,6 +1402,17 @@ const OnlineNotebook: React.FC = () => {
       }
 
       setRows(previous => [newRecord, ...previous])
+      createTaskNotification({
+        type: 'notebook',
+        status: 'created',
+        severity: 'info',
+        taskId: newRecord.id,
+        taskName: newRecord.name,
+        taskModule: '在线Notebook',
+        title: 'Notebook 已创建',
+        content: `${newRecord.name} 已创建，等待启动。`,
+        targetPath: `/finetune/notebooks/${newRecord.id}`,
+      })
       message.success('Notebook 创建成功')
       closeCreate()
     } catch {
@@ -1437,6 +1499,17 @@ const OnlineNotebook: React.FC = () => {
         publishStartedAt: Date.now(),
       }
       setSquareRows(previous => [nextRecord, ...previous])
+      createTaskNotification({
+        type: 'notebook_case',
+        status: 'started',
+        severity: 'info',
+        taskId: nextRecord.id,
+        taskName: nextRecord.name,
+        taskModule: 'Notebook案例',
+        title: 'Notebook 案例发布任务已提交',
+        content: `${nextRecord.name} 正在生成案例。`,
+        targetPath: '/finetune/notebooks?tab=square',
+      })
       setActiveTab('square')
       setSearchValue('')
       message.success('案例发布任务已提交，正在生成案例')

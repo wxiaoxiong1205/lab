@@ -104,8 +104,10 @@ const App: React.FC = () => {
               {/* 机器学习 */}
               <Route path="/machine-data-management" element={<MLDataset />} />
               <Route path="/machine-data-management/create" element={<MLDataset />} />
+              <Route path="/machine-data-management/:datasetId" element={<MLDataset />} />
               <Route path="/machine-annotation" element={<MLAnnotation />} />
               <Route path="/machine-annotation/create" element={<MLAnnotation />} />
+              <Route path="/machine-annotation/online/:taskId" element={<MLAnnotation />} />
               <Route path="/machine-annotation/annotate/:assignmentId" element={<MLAnnotation />} />
               <Route path="/machine-annotation/review/:assignmentId" element={<MLAnnotation />} />
               <Route path="/machine-model-management" element={<MLModelManagement />} />

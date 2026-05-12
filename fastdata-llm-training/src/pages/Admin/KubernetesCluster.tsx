@@ -32,19 +32,16 @@ const KubernetesClusterPage: React.FC = () => {
   const [form] = Form.useForm()
   const [createOpen, setCreateOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<KubernetesCluster | null>(null)
-  const [editingKubeconfig, setEditingKubeconfig] = useState('')
   const [rows, setRows] = useState<KubernetesCluster[]>(mockKubernetesClusters)
 
   const openCreate = () => {
     setEditingRecord(null)
-    setEditingKubeconfig('')
     form.resetFields()
     setCreateOpen(true)
   }
 
   const openEdit = (record: KubernetesCluster) => {
     setEditingRecord(record)
-    setEditingKubeconfig(record.kubeconfig ?? '')
     form.setFieldsValue({
       name: record.name,
       description: record.description,
@@ -57,7 +54,6 @@ const KubernetesClusterPage: React.FC = () => {
   const closeCreate = () => {
     setCreateOpen(false)
     setEditingRecord(null)
-    setEditingKubeconfig('')
     form.resetFields()
   }
 
@@ -162,8 +158,8 @@ const KubernetesClusterPage: React.FC = () => {
                   ...item,
                   name: values.name,
                   description: values.description,
-                  apiServer: values.apiServer?.trim() || extractApiServer(values.kubeconfig),
-                  kubeconfig: values.kubeconfig,
+                  apiServer: values.apiServer?.trim() || extractApiServer(item.kubeconfig),
+                  kubeconfig: item.kubeconfig,
                   connectionStatus: 'untested',
                 }
               : item,
@@ -248,12 +244,8 @@ const KubernetesClusterPage: React.FC = () => {
               <Form.Item label="集群配置 (YAML格式)" name="kubeconfig">
                 <TextArea
                   rows={14}
-                  value={editingKubeconfig}
-                  placeholder="请输入集群配置信息，支持YAML格式..."
-                  onChange={event => {
-                    setEditingKubeconfig(event.target.value)
-                    form.setFieldValue('kubeconfig', event.target.value)
-                  }}
+                  disabled
+                  placeholder="编辑时不可修改集群配置"
                 />
               </Form.Item>
             </>

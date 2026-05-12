@@ -33,8 +33,8 @@ const actionMap: Record<TaskLifecycleStatus, TaskLifecycleAction[]> = {
   排队中: ['terminate', 'detail'],
   运行中: ['terminate', 'detail'],
   已完成: ['detail', 'delete'],
-  失败: ['resubmit', 'detail', 'delete'],
-  已终止: ['resubmit', 'detail', 'delete'],
+  失败: ['resubmit', 'edit', 'detail', 'delete'],
+  已终止: ['resubmit', 'edit', 'detail', 'delete'],
 }
 
 export function getAllowedTaskLifecycleActions(status: TaskLifecycleStatus): TaskLifecycleAction[] {

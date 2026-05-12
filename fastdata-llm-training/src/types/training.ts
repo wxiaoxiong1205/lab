@@ -107,6 +107,7 @@ export interface BaseModel extends BaseModelVariant {
 export interface TrainingTask {
   id: string
   name: string
+  description?: string
   baseModel: string
   trainingType: TrainingType
   trainingMethod: TrainingMethod

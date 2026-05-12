@@ -4,6 +4,7 @@ import {
   Breadcrumb,
   Button,
   Card,
+  Checkbox,
   DatePicker,
   Descriptions,
   Empty,
@@ -24,6 +25,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import {
+  ArrowLeftOutlined,
   AuditOutlined,
   CheckCircleOutlined,
   DatabaseOutlined,
@@ -45,6 +47,8 @@ const { Title, Text } = Typography
 type MLAnnotationRecord = {
   id: string
   name: string
+  dataType: '文本' | '图片'
+  annotationType: string
   count: number
   progress: number | null
   preDataset: string
@@ -57,6 +61,7 @@ type MLAnnotationRecord = {
 type MultiAnnotationRecord = {
   id: string
   name: string
+  annotationType: string
   count: number
   status: '草稿' | '已发布'
   annotationProgress: number
@@ -95,6 +100,8 @@ const onlineRecords: MLAnnotationRecord[] = [
   {
     id: '1',
     name: 'Phoena-文本分类-文本多标签-标注',
+    dataType: '文本',
+    annotationType: '文本分类',
     count: 10,
     progress: 100,
     preDataset: '文本分类/Phoena-文本分类-文本多标签-无标注-V1',
@@ -106,6 +113,8 @@ const onlineRecords: MLAnnotationRecord[] = [
   {
     id: '2',
     name: 'Phoena-文本分类-文本单标签-标注',
+    dataType: '文本',
+    annotationType: '文本分类',
     count: 10,
     progress: 100,
     preDataset: '文本分类/Phoena-文本分类-文本单标签-无标注-V1',
@@ -117,6 +126,8 @@ const onlineRecords: MLAnnotationRecord[] = [
   {
     id: '3',
     name: 'Phoena-图像分类-单图单标签-标注',
+    dataType: '图片',
+    annotationType: '图像分类',
     count: 21,
     progress: 100,
     preDataset: '图像分类/Phoena-图像分类-单图单标签-有标注-V2',
@@ -128,6 +139,8 @@ const onlineRecords: MLAnnotationRecord[] = [
   {
     id: '4',
     name: 'Phoena-图像分类-单图多标签-标注',
+    dataType: '图片',
+    annotationType: '图像分类',
     count: 22,
     progress: 9,
     preDataset: '图像分类/Phoena-图像分类-单图多标签-有标注-V2',
@@ -136,12 +149,78 @@ const onlineRecords: MLAnnotationRecord[] = [
     createdAt: '2026-04-14 14:25:09',
     status: '草稿',
   },
+  {
+    id: '5',
+    name: '实体识别-商品属性抽取-标注',
+    dataType: '文本',
+    annotationType: '实体识别',
+    count: 30,
+    progress: 64,
+    preDataset: '实体识别/商品属性抽取-无标注-V1',
+    postDataset: '-',
+    creator: 'lab2',
+    createdAt: '2026-04-13 11:05:22',
+    status: '草稿',
+  },
+  {
+    id: '6',
+    name: '物体检测-货架商品框选-标注',
+    dataType: '图片',
+    annotationType: '物体检测',
+    count: 48,
+    progress: 32,
+    preDataset: '物体检测/货架商品框选-无标注-V1',
+    postDataset: '-',
+    creator: 'admin',
+    createdAt: '2026-04-12 10:18:31',
+    status: '草稿',
+  },
+  {
+    id: '7',
+    name: '文本分类-客服意图单标签-标注',
+    dataType: '文本',
+    annotationType: '文本分类',
+    count: 36,
+    progress: 100,
+    preDataset: '文本分类/客服意图单标签-无标注-V1',
+    postDataset: '文本分类/客服意图单标签-有标注-V2',
+    creator: 'lab5',
+    createdAt: '2026-04-11 16:40:20',
+    status: '已完成',
+  },
+  {
+    id: '8',
+    name: '图像分类-设备缺陷多标签-标注',
+    dataType: '图片',
+    annotationType: '图像分类',
+    count: 52,
+    progress: 72,
+    preDataset: '图像分类/设备缺陷多标签-无标注-V1',
+    postDataset: '-',
+    creator: 'deepexilab',
+    createdAt: '2026-04-10 09:24:18',
+    status: '草稿',
+  },
+  {
+    id: '9',
+    name: '图像分割-道路场景实例分割-标注',
+    dataType: '图片',
+    annotationType: '图像分割',
+    count: 18,
+    progress: 28,
+    preDataset: '图像分割/道路场景实例分割-无标注-V1',
+    postDataset: '-',
+    creator: 'lab1',
+    createdAt: '2026-04-09 10:08:12',
+    status: '草稿',
+  },
 ]
 
 const multiRecords: MultiAnnotationRecord[] = [
   {
     id: 'multi-1',
     name: '标签测试0025',
+    annotationType: '图像分类',
     count: 13,
     status: '草稿',
     annotationProgress: 85,
@@ -156,6 +235,7 @@ const multiRecords: MultiAnnotationRecord[] = [
   {
     id: 'multi-2',
     name: '有有有有有有有有有有有有',
+    annotationType: '文本分类',
     count: 10,
     status: '草稿',
     annotationProgress: 100,
@@ -170,6 +250,7 @@ const multiRecords: MultiAnnotationRecord[] = [
   {
     id: 'multi-3',
     name: '标注数据集测试001',
+    annotationType: '文本分类',
     count: 10,
     status: '草稿',
     annotationProgress: 100,
@@ -184,6 +265,7 @@ const multiRecords: MultiAnnotationRecord[] = [
   {
     id: 'multi-4',
     name: '标注测试00000000',
+    annotationType: '实体识别',
     count: 10,
     status: '已发布',
     annotationProgress: 100,
@@ -194,6 +276,36 @@ const multiRecords: MultiAnnotationRecord[] = [
     outputDataset: '-',
     annotators: ['lab1', 'lab5'],
     reviewers: ['deepexilab'],
+  },
+  {
+    id: 'multi-5',
+    name: '货架商品检测多人标注',
+    annotationType: '物体检测',
+    count: 48,
+    status: '草稿',
+    annotationProgress: 46,
+    reviewProgress: 18,
+    creator: 'admin',
+    createdAt: '2026-04-18 10:22:41',
+    dataset: '物体检测/货架商品框选-无标注-V1',
+    outputDataset: '物体检测/货架商品框选-有标注-V2',
+    annotators: ['lab1', 'lab2', 'deepexilab'],
+    reviewers: ['admin', 'lab5'],
+  },
+  {
+    id: 'multi-6',
+    name: '客服意图分类多人标注',
+    annotationType: '文本分类',
+    count: 36,
+    status: '已发布',
+    annotationProgress: 100,
+    reviewProgress: 72,
+    creator: 'lab2',
+    createdAt: '2026-04-16 09:12:36',
+    dataset: '文本分类/客服意图单标签-无标注-V1',
+    outputDataset: '文本分类/客服意图单标签-有标注-V2',
+    annotators: ['lab1', 'lab5'],
+    reviewers: ['admin'],
   },
 ]
 
@@ -237,6 +349,34 @@ const annotationAssignments: AssignmentRecord[] = [
     postDataset: '-',
     creator: 'lab1',
     createdAt: '2026-04-20 13:51:43',
+    deadline: '2026-04-22 18:00:00',
+    status: '已完成',
+  },
+  {
+    id: 'a4',
+    taskName: '货架商品检测多人标注',
+    member: 'deepexilab',
+    annotationType: '物体检测',
+    amount: 16,
+    completed: 7,
+    preDataset: '物体检测/货架商品框选-无标注-V1',
+    postDataset: '物体检测/货架商品框选-有标注-V2',
+    creator: 'admin',
+    createdAt: '2026-04-18 10:22:41',
+    deadline: '2026-04-26 18:00:00',
+    status: '进行中',
+  },
+  {
+    id: 'a5',
+    taskName: '客服意图分类多人标注',
+    member: 'lab5',
+    annotationType: '文本分类',
+    amount: 18,
+    completed: 18,
+    preDataset: '文本分类/客服意图单标签-无标注-V1',
+    postDataset: '文本分类/客服意图单标签-有标注-V2',
+    creator: 'lab2',
+    createdAt: '2026-04-16 09:12:36',
     deadline: '2026-04-22 18:00:00',
     status: '已完成',
   },
@@ -285,6 +425,34 @@ const reviewAssignments: AssignmentRecord[] = [
     deadline: '2026-04-23 18:00:00',
     status: '已完成',
   },
+  {
+    id: 'r4',
+    taskName: '货架商品检测多人标注',
+    member: 'admin',
+    annotationType: '物体检测',
+    amount: 24,
+    completed: 5,
+    preDataset: '物体检测/货架商品框选-无标注-V1',
+    postDataset: '物体检测/货架商品框选-有标注-V2',
+    creator: 'admin',
+    createdAt: '2026-04-18 10:22:41',
+    deadline: '2026-04-27 18:00:00',
+    status: '进行中',
+  },
+  {
+    id: 'r5',
+    taskName: '客服意图分类多人标注',
+    member: 'admin',
+    annotationType: '文本分类',
+    amount: 36,
+    completed: 26,
+    preDataset: '文本分类/客服意图单标签-无标注-V1',
+    postDataset: '文本分类/客服意图单标签-有标注-V2',
+    creator: 'lab2',
+    createdAt: '2026-04-16 09:12:36',
+    deadline: '2026-04-23 18:00:00',
+    status: '进行中',
+  },
 ]
 
 const workbenchSamples = [
@@ -293,11 +461,24 @@ const workbenchSamples = [
   { id: 'sample-3', title: '样本 003', content: '图片主体存在遮挡，建议审核时重点检查标注边界和标签一致性。', label: '待复核', status: '已完成' },
 ]
 
+type WorkbenchKind = 'text-classification' | 'entity' | 'image-classification' | 'object-detection' | 'image-segmentation'
+
+type DetectionBox = { id: string; label: string; x: number; y: number; width: number; height: number }
+
+type SegmentationRegion = { id: string; label: string; points: string; color: string }
+
 const datasetOptions = [
-  { value: 'image-multi-v2', label: '图像分类/Phoena-图像分类-单图多标签-有标注-V2', count: 13, output: '图像分类/Phoena-图像分类-单图多标签-有标注-V3' },
-  { value: 'text-single-v1', label: '文本分类/Phoena-文本分类-文本单标签-无标注-V1', count: 10, output: '文本分类/Phoena-文本分类-文本单标签-有标注-V2' },
-  { value: 'entity-v1', label: '实体识别/实体识别---123-V1', count: 30, output: '实体识别/实体识别---123-V2' },
+  { value: 'image-multi-v2', label: '图像分类/Phoena-图像分类-单图多标签-有标注-V2', dataType: '图片', annotationType: '图像分类', count: 13, output: '图像分类/Phoena-图像分类-单图多标签-有标注-V3' },
+  { value: 'image-single-v1', label: '图像分类/Phoena-图像分类-单图单标签-无标注-V1', dataType: '图片', annotationType: '图像分类', count: 21, output: '图像分类/Phoena-图像分类-单图单标签-有标注-V2' },
+  { value: 'object-detection-v1', label: '物体检测/货架商品框选-无标注-V1', dataType: '图片', annotationType: '物体检测', count: 48, output: '物体检测/货架商品框选-有标注-V2' },
+  { value: 'defect-image-v1', label: '图像分类/设备缺陷多标签-无标注-V1', dataType: '图片', annotationType: '图像分类', count: 52, output: '图像分类/设备缺陷多标签-有标注-V2' },
+  { value: 'text-single-v1', label: '文本分类/Phoena-文本分类-文本单标签-无标注-V1', dataType: '文本', annotationType: '文本分类', count: 10, output: '文本分类/Phoena-文本分类-文本单标签-有标注-V2' },
+  { value: 'text-multi-v1', label: '文本分类/Phoena-文本分类-文本多标签-无标注-V1', dataType: '文本', annotationType: '文本分类', count: 10, output: '文本分类/Phoena-文本分类-文本多标签-有标注-V2' },
+  { value: 'entity-v1', label: '实体识别/实体识别---123-V1', dataType: '文本', annotationType: '实体识别', count: 30, output: '实体识别/实体识别---123-V2' },
+  { value: 'intent-v1', label: '文本分类/客服意图单标签-无标注-V1', dataType: '文本', annotationType: '文本分类', count: 36, output: '文本分类/客服意图单标签-有标注-V2' },
 ]
+
+type MachineAnnotationDatasetOption = (typeof datasetOptions)[number]
 
 const memberOptions = [
   { value: 'lab1', label: 'lab1' },
@@ -335,9 +516,57 @@ function progressCell(value: number | null) {
 }
 
 const cardStyle: React.CSSProperties = { borderRadius: 6, border: '1px solid #edf0f5' }
+const tableContainerStyle: React.CSSProperties = {
+  width: '100%',
+  maxWidth: '100%',
+  minWidth: 0,
+  overflowX: 'auto',
+  WebkitOverflowScrolling: 'touch',
+}
+
+const labelOptions = ['食品', '人物', '物体', '动物', '文字', '车辆', '正向', '负向', '中性']
+const entityLabels = ['LOC', '企业', '学校', '人名', '产品', '药物']
+const detectionLabelOptions = ['商品', '价签', '货架', '人物', '缺陷']
+const segmentationLabelOptions = ['道路', '建筑', '车辆', '天空', '植被']
+
+function getAnnotationWorkbenchKind(record: { annotationType: string; name?: string; taskName?: string }): WorkbenchKind {
+  if (record.annotationType === '实体识别') return 'entity'
+  if (record.annotationType === '图像分类') return 'image-classification'
+  if (record.annotationType === '物体检测') return 'object-detection'
+  if (record.annotationType === '图像分割') return 'image-segmentation'
+  return 'text-classification'
+}
+
+function isMultiLabelTask(name: string) {
+  return name.includes('多标签') || name.includes('多')
+}
+
+function renderMockImage(title: string, height = 280) {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        height,
+        borderRadius: 10,
+        overflow: 'hidden',
+        background: 'linear-gradient(135deg, #1d4ed8 0%, #38bdf8 42%, #fef3c7 100%)',
+        border: '1px solid #dbeafe',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: 700,
+      }}
+    >
+      {title}
+    </div>
+  )
+}
 
 const MLAnnotation: React.FC = () => {
   const [form] = Form.useForm()
+  const [onlineForm] = Form.useForm()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
@@ -346,20 +575,38 @@ const MLAnnotation: React.FC = () => {
   const currentUser = getCurrentUser(permissionState)
   const currentProjectMember = getCurrentProjectMember(permissionState)
   const isCreateRoute = location.pathname === '/machine-annotation/create'
+  const onlineRouteMatch = location.pathname.match(/^\/machine-annotation\/online\/([^/]+)$/)
   const annotateRouteMatch = location.pathname.match(/^\/machine-annotation\/annotate\/([^/]+)$/)
   const reviewRouteMatch = location.pathname.match(/^\/machine-annotation\/review\/([^/]+)$/)
   const workbenchMode: 'annotation' | 'review' | null = annotateRouteMatch ? 'annotation' : reviewRouteMatch ? 'review' : null
+  const onlineTaskId = onlineRouteMatch?.[1]
   const workbenchId = annotateRouteMatch?.[1] ?? reviewRouteMatch?.[1]
   const canManageMultiAnnotation = currentUser.roleKeys.includes('platform_admin') || currentProjectMember?.roleKey === 'project_admin'
   const [activeTab, setActiveTab] = useState<'online' | 'multi'>(searchParams.get('tab') === 'multi' || isCreateRoute ? 'multi' : 'online')
   const [multiSubTab, setMultiSubTab] = useState<'overview' | 'annotation' | 'review'>(canManageMultiAnnotation ? 'overview' : 'annotation')
   const [onlineCreateOpen, setOnlineCreateOpen] = useState(false)
+  const [onlineDatasetType, setOnlineDatasetType] = useState<'文本' | '图片'>('图片')
+  const [onlineDatasetPickerOpen, setOnlineDatasetPickerOpen] = useState(false)
+  const [onlineSelectedDatasetValue, setOnlineSelectedDatasetValue] = useState<string>()
   const [detailRecord, setDetailRecord] = useState<MLAnnotationRecord | MultiAnnotationRecord | null>(null)
   const [memberRecord, setMemberRecord] = useState<MultiAnnotationRecord | null>(null)
   const [annotatorDrafts, setAnnotatorDrafts] = useState<MemberDraft[]>([])
   const [reviewerDrafts, setReviewerDrafts] = useState<MemberDraft[]>([])
   const [selectedDataset, setSelectedDataset] = useState(datasetOptions[0])
+  const onlineDatasetOptions = datasetOptions.filter(item => item.dataType === onlineDatasetType)
+  const onlineSelectedDataset = datasetOptions.find(item => item.value === onlineSelectedDatasetValue)
+  const [workbenchSampleRows, setWorkbenchSampleRows] = useState(workbenchSamples)
   const [activeSampleId, setActiveSampleId] = useState(workbenchSamples[0].id)
+  const [workbenchSubmitted, setWorkbenchSubmitted] = useState(false)
+  const [detectionBoxes, setDetectionBoxes] = useState<DetectionBox[]>([
+    { id: 'box-1', label: '商品', x: 16, y: 18, width: 38, height: 34 },
+    { id: 'box-2', label: '价签', x: 58, y: 54, width: 24, height: 18 },
+  ])
+  const [segmentationRegions, setSegmentationRegions] = useState<SegmentationRegion[]>([
+    { id: 'seg-1', label: '道路', points: '12,68 92,62 98,96 8,98', color: 'rgba(59, 130, 246, 0.42)' },
+    { id: 'seg-2', label: '建筑', points: '18,16 56,10 62,48 22,54', color: 'rgba(245, 158, 11, 0.46)' },
+  ])
+  const currentOnlineTask = onlineTaskId ? onlineRecords.find(item => item.id === onlineTaskId) : undefined
   const visibleAnnotationAssignments = canManageMultiAnnotation
     ? annotationAssignments
     : annotationAssignments.filter(item => item.member === currentUser.account)
@@ -371,7 +618,7 @@ const MLAnnotation: React.FC = () => {
     : workbenchMode === 'review'
       ? visibleReviewAssignments.find(item => item.id === workbenchId)
       : undefined
-  const activeSample = workbenchSamples.find(item => item.id === activeSampleId) ?? workbenchSamples[0]
+  const activeSample = workbenchSampleRows.find(item => item.id === activeSampleId) ?? workbenchSampleRows[0]
   const multiTabItems = [
     ...(canManageMultiAnnotation ? [{ key: 'overview', label: '任务总览' }] : []),
     { key: 'annotation', label: '标注任务' },
@@ -384,12 +631,36 @@ const MLAnnotation: React.FC = () => {
     }
   }, [canManageMultiAnnotation, multiSubTab])
 
+  useEffect(() => {
+    if (workbenchSampleRows.length && !workbenchSampleRows.some(item => item.id === activeSampleId)) {
+      setActiveSampleId(workbenchSampleRows[0].id)
+    }
+  }, [activeSampleId, workbenchSampleRows])
+
+  useEffect(() => {
+    if (workbenchMode || onlineTaskId) {
+      setWorkbenchSampleRows(workbenchSamples)
+      setActiveSampleId(workbenchSamples[0].id)
+      setWorkbenchSubmitted(false)
+      setDetectionBoxes([
+        { id: 'box-1', label: '商品', x: 16, y: 18, width: 38, height: 34 },
+        { id: 'box-2', label: '价签', x: 58, y: 54, width: 24, height: 18 },
+      ])
+      setSegmentationRegions([
+        { id: 'seg-1', label: '道路', points: '12,68 92,62 98,96 8,98', color: 'rgba(59, 130, 246, 0.42)' },
+        { id: 'seg-2', label: '建筑', points: '18,16 56,10 62,48 22,54', color: 'rgba(245, 158, 11, 0.46)' },
+      ])
+    }
+  }, [onlineTaskId, workbenchId, workbenchMode])
+
   const onlineColumns: ColumnsType<MLAnnotationRecord> = [
-    { title: '任务名称', dataIndex: 'name', key: 'name', ellipsis: true },
+    { title: '任务名称', dataIndex: 'name', key: 'name', width: 260, ellipsis: true },
+    { title: '数据类型', dataIndex: 'dataType', key: 'dataType', width: 96 },
+    { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 120 },
     { title: '数据量', dataIndex: 'count', key: 'count', width: 90 },
-    { title: '标注进度', dataIndex: 'progress', key: 'progress', width: 160, render: progressCell },
-    { title: '标注前数据集', dataIndex: 'preDataset', key: 'preDataset', ellipsis: true },
-    { title: '标注后数据集', dataIndex: 'postDataset', key: 'postDataset', ellipsis: true },
+    { title: '标注进度', dataIndex: 'progress', key: 'progress', width: 180, render: progressCell },
+    { title: '标注前数据集', dataIndex: 'preDataset', key: 'preDataset', width: 280, ellipsis: true },
+    { title: '标注后数据集', dataIndex: 'postDataset', key: 'postDataset', width: 280, ellipsis: true },
     { title: '创建人', dataIndex: 'creator', key: 'creator', width: 100 },
     { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 170 },
     { title: '状态', dataIndex: 'status', key: 'status', width: 90, render: statusTag },
@@ -399,7 +670,7 @@ const MLAnnotation: React.FC = () => {
       width: 130,
       render: (_, record) => (
         <Space size={0}>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setDetailRecord(record)}>详情</Button>
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/machine-annotation/online/${record.id}`)}>详情</Button>
           <Button type="link" size="small" icon={<DeleteOutlined />} disabled={record.status === '已完成'} danger>删除</Button>
         </Space>
       ),
@@ -407,7 +678,8 @@ const MLAnnotation: React.FC = () => {
   ]
 
   const multiColumns: ColumnsType<MultiAnnotationRecord> = [
-    { title: '标注任务', dataIndex: 'name', key: 'name', ellipsis: true },
+    { title: '标注任务', dataIndex: 'name', key: 'name', width: 240, ellipsis: true },
+    { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 120 },
     { title: '数据量', dataIndex: 'count', key: 'count', width: 90 },
     { title: '状态', dataIndex: 'status', key: 'status', width: 90, render: statusTag },
     { title: '标注进度', dataIndex: 'annotationProgress', key: 'annotationProgress', width: 150, render: progressCell },
@@ -417,7 +689,7 @@ const MLAnnotation: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 260,
+      width: 280,
       render: (_, record) => (
         <Space size={0}>
           <Button type="link" size="small" icon={<SendOutlined />} disabled={record.status !== '草稿'}>发布</Button>
@@ -430,7 +702,8 @@ const MLAnnotation: React.FC = () => {
   ]
 
   const annotationAssignmentColumns: ColumnsType<AssignmentRecord> = [
-    { title: '任务名称', dataIndex: 'taskName', key: 'taskName', ellipsis: true },
+    { title: '任务名称', dataIndex: 'taskName', key: 'taskName', width: 240, ellipsis: true },
+    { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 120 },
     { title: '数据量', dataIndex: 'amount', key: 'amount', width: 90 },
     {
       title: '标注进度',
@@ -438,8 +711,8 @@ const MLAnnotation: React.FC = () => {
       width: 180,
       render: (_, record) => progressCell(Math.round((record.completed / record.amount) * 100)),
     },
-    { title: '标注前数据集', dataIndex: 'preDataset', key: 'preDataset', ellipsis: true },
-    { title: '标注后数据集', dataIndex: 'postDataset', key: 'postDataset', ellipsis: true },
+    { title: '标注前数据集', dataIndex: 'preDataset', key: 'preDataset', width: 280, ellipsis: true },
+    { title: '标注后数据集', dataIndex: 'postDataset', key: 'postDataset', width: 280, ellipsis: true },
     { title: '创建人', dataIndex: 'creator', key: 'creator', width: 110 },
     { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 170 },
     {
@@ -453,7 +726,7 @@ const MLAnnotation: React.FC = () => {
   ]
 
   const reviewAssignmentColumns: ColumnsType<AssignmentRecord> = [
-    { title: '标注任务', dataIndex: 'taskName', key: 'taskName', ellipsis: true },
+    { title: '标注任务', dataIndex: 'taskName', key: 'taskName', width: 240, ellipsis: true },
     { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 120 },
     { title: '数据量', dataIndex: 'amount', key: 'amount', width: 90 },
     {
@@ -579,6 +852,98 @@ const MLAnnotation: React.FC = () => {
     })
   }
 
+  function handleDeleteWorkbenchSample() {
+    if (!activeSample) {
+      return
+    }
+
+    if (workbenchSubmitted || currentWorkbenchAssignment?.status === '已完成' || currentOnlineTask?.status === '已完成') {
+      Modal.warning({
+        title: '已提交数据不允许删除',
+        content: '当前标注或审核任务已提交，数据已锁定，不能再删除单条数据。',
+      })
+      return
+    }
+
+    Modal.confirm({
+      title: '确认删除该条数据？',
+      content: '删除后不可恢复，请确认是否继续。',
+      okText: '确认删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        setWorkbenchSampleRows(previous => {
+          const nextRows = previous.filter(item => item.id !== activeSample.id)
+          const nextActive = nextRows.find(item => item.id !== activeSample.id) ?? nextRows[0]
+          if (nextActive) {
+            setActiveSampleId(nextActive.id)
+          }
+          return nextRows
+        })
+        message.success('删除成功')
+      },
+    })
+  }
+
+  function openOnlineCreate() {
+    onlineForm.resetFields()
+    onlineForm.setFieldsValue({ dataType: onlineDatasetType, sourceType: '已有数据集', outputMode: '新增版本' })
+    setOnlineCreateOpen(true)
+  }
+
+  function submitOnlineCreate() {
+    onlineForm.validateFields().then(() => {
+      message.success('在线标注任务已创建')
+      setOnlineCreateOpen(false)
+      setOnlineSelectedDatasetValue(undefined)
+    })
+  }
+
+  function renderOnlineDatasetPickerModal() {
+    return (
+      <Modal
+        title="选择数据集"
+        open={onlineDatasetPickerOpen}
+        onCancel={() => setOnlineDatasetPickerOpen(false)}
+        footer={null}
+        width={820}
+        destroyOnClose
+      >
+        <Table<MachineAnnotationDatasetOption>
+          rowKey="value"
+          size="small"
+          columns={[
+            { title: '数据集名称', dataIndex: 'label', key: 'label', ellipsis: true },
+            { title: '数据类型', dataIndex: 'dataType', key: 'dataType', width: 100 },
+            { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 120 },
+            { title: '数据量', dataIndex: 'count', key: 'count', width: 100 },
+            {
+              title: '操作',
+              key: 'action',
+              width: 96,
+              render: (_, record) => (
+                <Button
+                  type="link"
+                  onClick={() => {
+                    setOnlineSelectedDatasetValue(record.value)
+                    onlineForm.setFieldValue('dataset', record.value)
+                    setOnlineDatasetPickerOpen(false)
+                  }}
+                >
+                  选择
+                </Button>
+              ),
+            },
+          ]}
+          dataSource={onlineDatasetOptions}
+          pagination={false}
+          scroll={{ x: 760 }}
+          locale={{ emptyText: '当前类型下暂无可用数据集' }}
+        />
+      </Modal>
+    )
+  }
+
   function renderStepCards() {
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 24 }}>
@@ -589,6 +954,121 @@ const MLAnnotation: React.FC = () => {
             <Text type="secondary" style={{ fontSize: 12 }}>{card.description}</Text>
           </Card>
         ))}
+      </div>
+    )
+  }
+
+  function renderOnlineWorkbench() {
+    if (!currentOnlineTask) {
+      return (
+        <div style={{ padding: '24px 32px', minHeight: '100%', background: '#f7f8fa' }}>
+          <Card style={cardStyle}>
+            <Result
+              status="404"
+              title="未找到标注任务"
+              subTitle="当前在线标注任务不存在，或已从列表中删除。"
+              extra={<Button type="primary" onClick={() => navigate('/machine-annotation')}>返回数据标注</Button>}
+            />
+          </Card>
+        </div>
+      )
+    }
+
+    const locked = workbenchSubmitted || currentOnlineTask.status === '已完成'
+    return (
+      <div style={{ padding: '24px 32px', minHeight: '100%', background: '#f7f8fa' }}>
+        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Card
+            style={cardStyle}
+            title="在线标注详情"
+            extra={<Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/machine-annotation')}>返回列表</Button>}
+          >
+            <Descriptions column={4} size="small" bordered>
+              <Descriptions.Item label="任务名称" span={2}>{currentOnlineTask.name}</Descriptions.Item>
+              <Descriptions.Item label="数据类型">{currentOnlineTask.dataType}</Descriptions.Item>
+              <Descriptions.Item label="标注类型">{currentOnlineTask.annotationType}</Descriptions.Item>
+              <Descriptions.Item label="数据量">{workbenchSampleRows.length}</Descriptions.Item>
+              <Descriptions.Item label="标注进度" span={2}>{progressCell(currentOnlineTask.progress)}</Descriptions.Item>
+              <Descriptions.Item label="状态">{statusTag(locked ? '已完成' : currentOnlineTask.status)}</Descriptions.Item>
+              <Descriptions.Item label="标注前数据集" span={2}>{currentOnlineTask.preDataset}</Descriptions.Item>
+              <Descriptions.Item label="标注后数据集" span={2}>{currentOnlineTask.postDataset}</Descriptions.Item>
+              <Descriptions.Item label="创建人">{currentOnlineTask.creator}</Descriptions.Item>
+              <Descriptions.Item label="创建时间">{currentOnlineTask.createdAt}</Descriptions.Item>
+            </Descriptions>
+          </Card>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 320px', gap: 16 }}>
+            <Card title="数据列表" style={cardStyle}>
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                {workbenchSampleRows.map(sample => (
+                  <Button
+                    key={sample.id}
+                    block
+                    type={sample.id === activeSampleId ? 'primary' : 'default'}
+                    onClick={() => setActiveSampleId(sample.id)}
+                    style={{ height: 'auto', padding: '10px 12px', textAlign: 'left' }}
+                  >
+                    <Space direction="vertical" size={2} style={{ width: '100%' }}>
+                      <Text strong>{sample.title}</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>{sample.status}</Text>
+                    </Space>
+                  </Button>
+                ))}
+                {!workbenchSampleRows.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" />}
+              </Space>
+            </Card>
+
+            <Card title="当前数据" style={cardStyle}>
+              {activeSample ? (
+                <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                  <Tag color="blue">{activeSample.label}</Tag>
+                  <div style={{ minHeight: 260, padding: 20, borderRadius: 8, border: '1px dashed #cbd5e1', background: '#fbfdff' }}>
+                    <Text>{activeSample.content}</Text>
+                  </div>
+                  <Text type="secondary">未提交前可删除当前单条数据；提交或已完成后数据锁定，不允许继续删除。</Text>
+                </Space>
+              ) : (
+                <Empty description="暂无可标注数据" />
+              )}
+            </Card>
+
+            <Card title={currentOnlineTask.status === '已完成' ? '标注结果' : '标注操作'} style={cardStyle}>
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <Select
+                  mode="multiple"
+                  value={activeSample ? [activeSample.label] : []}
+                  disabled={locked || !activeSample}
+                  options={[
+                    { value: '商品图', label: '商品图' },
+                    { value: '物流问题', label: '物流问题' },
+                    { value: '待复核', label: '待复核' },
+                    { value: '噪声数据', label: '噪声数据' },
+                  ]}
+                  style={{ width: '100%' }}
+                  placeholder="请选择标签"
+                />
+                <Input.TextArea rows={6} disabled={locked || !activeSample} placeholder="请输入标注备注" />
+                <Space wrap>
+                  <Button disabled={!activeSample}>上一条</Button>
+                  <Button disabled={locked || !activeSample} onClick={() => message.success('标注结果已保存')}>保存</Button>
+                  <Button danger disabled={locked || !activeSample} onClick={handleDeleteWorkbenchSample}>
+                    删除当前数据
+                  </Button>
+                  <Button
+                    type="primary"
+                    disabled={!activeSample || locked}
+                    onClick={() => {
+                      setWorkbenchSubmitted(true)
+                      message.success('标注任务已提交，数据已锁定')
+                    }}
+                  >
+                    提交标注
+                  </Button>
+                </Space>
+              </Space>
+            </Card>
+          </div>
+        </Space>
       </div>
     )
   }
@@ -644,7 +1124,7 @@ const MLAnnotation: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 300px', gap: 16 }}>
             <Card title="数据列表" style={cardStyle}>
               <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                {workbenchSamples.map(sample => (
+                {workbenchSampleRows.map(sample => (
                   <Button
                     key={sample.id}
                     block
@@ -662,13 +1142,17 @@ const MLAnnotation: React.FC = () => {
             </Card>
 
             <Card title="待处理数据" style={cardStyle}>
-              <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                <Tag color="blue">{activeSample.label}</Tag>
-                <div style={{ minHeight: 220, padding: 20, borderRadius: 6, border: '1px dashed #cbd5e1', background: '#fbfdff' }}>
-                  <Text>{activeSample.content}</Text>
-                </div>
-                <Text type="secondary">当前为本地 mock 工作台，用于承接列表进入标注/审核的页面流程，后续可替换为真实样本接口。</Text>
-              </Space>
+              {activeSample ? (
+                <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                  <Tag color="blue">{activeSample.label}</Tag>
+                  <div style={{ minHeight: 220, padding: 20, borderRadius: 6, border: '1px dashed #cbd5e1', background: '#fbfdff' }}>
+                    <Text>{activeSample.content}</Text>
+                  </div>
+                  <Text type="secondary">当前为本地 mock 工作台，用于承接列表进入标注/审核的页面流程，后续可替换为真实样本接口。</Text>
+                </Space>
+              ) : (
+                <Empty description="暂无可处理数据" />
+              )}
             </Card>
 
             <Card title={isReview ? '审核结果' : '标注结果'} style={cardStyle}>
@@ -687,7 +1171,7 @@ const MLAnnotation: React.FC = () => {
                   <>
                     <Select
                       mode="multiple"
-                      defaultValue={[activeSample.label]}
+                      value={activeSample ? [activeSample.label] : []}
                       options={[
                         { value: '商品图', label: '商品图' },
                         { value: '物流问题', label: '物流问题' },
@@ -703,7 +1187,17 @@ const MLAnnotation: React.FC = () => {
                 <Space wrap>
                   <Button>上一条</Button>
                   <Button onClick={() => message.success(isReview ? '审核结果已保存' : '标注结果已保存')}>保存</Button>
-                  <Button type="primary" onClick={() => message.success(isReview ? '审核任务已提交' : '标注任务已提交')}>
+                  <Button danger disabled={!activeSample || workbenchSubmitted || currentWorkbenchAssignment.status === '已完成'} onClick={handleDeleteWorkbenchSample}>
+                    删除当前数据
+                  </Button>
+                  <Button
+                    type="primary"
+                    disabled={!activeSample || workbenchSubmitted}
+                    onClick={() => {
+                      setWorkbenchSubmitted(true)
+                      message.success(isReview ? '审核任务已提交' : '标注任务已提交')
+                    }}
+                  >
                     {isReview ? '完成审核' : '完成标注'}
                   </Button>
                 </Space>
@@ -717,6 +1211,10 @@ const MLAnnotation: React.FC = () => {
 
   if (workbenchMode) {
     return renderWorkbench()
+  }
+
+  if (onlineTaskId) {
+    return renderOnlineWorkbench()
   }
 
   if (isCreateRoute) {
@@ -785,13 +1283,16 @@ const MLAnnotation: React.FC = () => {
             <Text type="secondary">数据集名称：{selectedDataset.output}</Text>
 
             <Title level={4} style={{ marginTop: 24 }}>选择标注成员</Title>
-            <Table
-              rowKey="id"
-              columns={memberDraftColumns('annotator')}
-              dataSource={annotatorDrafts}
-              pagination={false}
-              locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" /> }}
-            />
+            <div style={tableContainerStyle}>
+              <Table
+                rowKey="id"
+                columns={memberDraftColumns('annotator')}
+                dataSource={annotatorDrafts}
+                pagination={false}
+                scroll={{ x: 760 }}
+                locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" /> }}
+              />
+            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
               <Text type="secondary">分配标注数量/总计标注数量：{annotatorTotal} 条 / {selectedDataset.count} 条</Text>
               <Button icon={<PlusOutlined />} onClick={() => addDraft('annotator')}>添加标注成员</Button>
@@ -801,13 +1302,16 @@ const MLAnnotation: React.FC = () => {
             <Form.Item label="抽检比例" name="sampleRatio" extra="请填写人数或输入分配比例，默认100%">
               <InputNumber min={1} max={100} addonAfter="%" style={{ width: 180 }} />
             </Form.Item>
-            <Table
-              rowKey="id"
-              columns={memberDraftColumns('reviewer')}
-              dataSource={reviewerDrafts}
-              pagination={false}
-              locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" /> }}
-            />
+            <div style={tableContainerStyle}>
+              <Table
+                rowKey="id"
+                columns={memberDraftColumns('reviewer')}
+                dataSource={reviewerDrafts}
+                pagination={false}
+                scroll={{ x: 760 }}
+                locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" /> }}
+              />
+            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
               <Text type="secondary">分配审核数量/总计审核数量：{reviewerTotal} 条 / {selectedDataset.count} 条</Text>
               <Button icon={<PlusOutlined />} onClick={() => addDraft('reviewer')}>添加审核成员</Button>
@@ -845,14 +1349,17 @@ const MLAnnotation: React.FC = () => {
             <>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginBottom: 16 }}>
                 <Button icon={<ReloadOutlined />}>刷新</Button>
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => setOnlineCreateOpen(true)}>创建标注任务</Button>
+                <Button type="primary" icon={<PlusOutlined />} onClick={openOnlineCreate}>创建标注任务</Button>
               </div>
-              <Table
-                rowKey="id"
-                columns={onlineColumns}
-                dataSource={onlineRecords}
-                pagination={{ pageSize: 10, total: 68, showTotal: total => `共 ${total} 条记录` }}
-              />
+              <div style={tableContainerStyle}>
+                <Table
+                  rowKey="id"
+                  columns={onlineColumns}
+                  dataSource={onlineRecords}
+                  pagination={{ pageSize: 10, total: 68, showTotal: total => `共 ${total} 条记录` }}
+                  scroll={{ x: 1650 }}
+                />
+              </div>
             </>
           ) : (
             <>
@@ -871,28 +1378,37 @@ const MLAnnotation: React.FC = () => {
                 </Space>
               </div>
               {multiSubTab === 'overview' && (
-                <Table
-                  rowKey="id"
-                  columns={multiColumns}
-                  dataSource={multiRecords}
-                  pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条记录` }}
-                />
+                <div style={tableContainerStyle}>
+                  <Table
+                    rowKey="id"
+                    columns={multiColumns}
+                    dataSource={multiRecords}
+                    pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条记录` }}
+                    scroll={{ x: 1320 }}
+                  />
+                </div>
               )}
               {multiSubTab === 'annotation' && (
-                <Table
-                  rowKey="id"
-                  columns={annotationAssignmentColumns}
-                  dataSource={visibleAnnotationAssignments}
-                  pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条记录` }}
-                />
+                <div style={tableContainerStyle}>
+                  <Table
+                    rowKey="id"
+                    columns={annotationAssignmentColumns}
+                    dataSource={visibleAnnotationAssignments}
+                    pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条记录` }}
+                    scroll={{ x: 1500 }}
+                  />
+                </div>
               )}
               {multiSubTab === 'review' && (
-                <Table
-                  rowKey="id"
-                  columns={reviewAssignmentColumns}
-                  dataSource={visibleReviewAssignments}
-                  pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条记录` }}
-                />
+                <div style={tableContainerStyle}>
+                  <Table
+                    rowKey="id"
+                    columns={reviewAssignmentColumns}
+                    dataSource={visibleReviewAssignments}
+                    pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条记录` }}
+                    scroll={{ x: 1040 }}
+                  />
+                </div>
               )}
             </>
           )}
@@ -900,28 +1416,88 @@ const MLAnnotation: React.FC = () => {
       </div>
 
       <Modal
-        title="创建标注任务"
+        title="创建在线标注任务"
         open={onlineCreateOpen}
         onCancel={() => setOnlineCreateOpen(false)}
+        width={680}
+        destroyOnClose
         footer={
           <Space>
             <Button onClick={() => setOnlineCreateOpen(false)}>取消</Button>
-            <Button type="primary" onClick={() => setOnlineCreateOpen(false)}>创建</Button>
+            <Button type="primary" onClick={submitOnlineCreate}>创建</Button>
           </Space>
         }
       >
-        <Form layout="vertical">
+        <Form
+          form={onlineForm}
+          layout="vertical"
+          initialValues={{ dataType: onlineDatasetType, sourceType: '已有数据集', outputMode: '新增版本' }}
+        >
           <Form.Item label="任务名称" name="name" rules={[{ required: true, message: '请输入任务名称' }]}>
             <Input placeholder="请输入任务名称" />
           </Form.Item>
+
+          <Form.Item label="数据类型" name="dataType" rules={[{ required: true, message: '请选择数据类型' }]}>
+            <Radio.Group
+              onChange={event => {
+                const nextType = event.target.value as '文本' | '图片'
+                setOnlineDatasetType(nextType)
+                setOnlineSelectedDatasetValue(undefined)
+                onlineForm.setFieldsValue({ dataType: nextType, dataset: undefined })
+              }}
+            >
+              <Radio.Button value="文本">文本</Radio.Button>
+              <Radio.Button value="图片">图片</Radio.Button>
+            </Radio.Group>
+          </Form.Item>
+
+          <Form.Item label="数据选择" name="sourceType">
+            <Radio.Group>
+              <Radio value="已有数据集">已有数据集</Radio>
+            </Radio.Group>
+          </Form.Item>
+
           <Form.Item label="选择数据集" name="dataset" rules={[{ required: true, message: '请选择数据集' }]}>
-            <Select placeholder="请选择数据集" options={datasetOptions.map(item => ({ value: item.value, label: `${item.label}（${item.count}条）` }))} />
+            <Input.Group compact>
+              <Input
+                readOnly
+                placeholder="请选择需要标注的数据集"
+                value={onlineSelectedDataset?.label}
+                style={{ width: 'calc(100% - 88px)' }}
+              />
+              <Button
+                type="primary"
+                disabled={!onlineDatasetOptions.length}
+                onClick={() => setOnlineDatasetPickerOpen(true)}
+                style={{ width: 88 }}
+              >
+                选择
+              </Button>
+            </Input.Group>
           </Form.Item>
-          <Form.Item label="标注工具" name="tool" rules={[{ required: true, message: '请选择标注工具' }]}>
-            <Select options={[{ value: 'builtin', label: '内置标注工具' }, { value: 'custom', label: '自定义标注工具' }]} />
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginTop: -6, marginBottom: 16 }}>
+            <div>
+              <Text type="secondary">数据量：</Text>
+              <Text>{onlineSelectedDataset?.count ?? 0} 条</Text>
+            </div>
+            <div>
+              <Text type="secondary">标注类型：</Text>
+              <Text>{onlineSelectedDataset?.annotationType ?? '-'}</Text>
+            </div>
+          </div>
+
+          <Form.Item label="处理后数据集" name="outputMode">
+            <Radio.Group>
+              <Radio value="新增版本">新增版本</Radio>
+            </Radio.Group>
           </Form.Item>
+
+          <Text type="secondary">数据集名称：{onlineSelectedDataset?.output ?? '-'}</Text>
         </Form>
       </Modal>
+
+      {renderOnlineDatasetPickerModal()}
 
       <Modal
         title="标注任务详情"
@@ -935,6 +1511,7 @@ const MLAnnotation: React.FC = () => {
             <Descriptions.Item label="任务名称" span={2}>{detailRecord.name}</Descriptions.Item>
             <Descriptions.Item label="数据量">{detailRecord.count}</Descriptions.Item>
             <Descriptions.Item label="状态">{statusTag(detailRecord.status)}</Descriptions.Item>
+            <Descriptions.Item label="标注类型">{detailRecord.annotationType}</Descriptions.Item>
             {'dataset' in detailRecord ? (
               <>
                 <Descriptions.Item label="标注进度">{progressCell(detailRecord.annotationProgress)}</Descriptions.Item>

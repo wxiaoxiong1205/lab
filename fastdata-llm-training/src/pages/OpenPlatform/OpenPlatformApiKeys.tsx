@@ -1,62 +1,44 @@
-import React, { useMemo, useState } from 'react'
+import React from 'react'
 import {
   Button,
   Card,
-  Form,
-  Input,
   Modal,
-  Select,
   Space,
   Table,
-  Tag,
   Typography,
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import { useNavigate } from 'react-router-dom'
 import {
   ApiOutlined,
   CopyOutlined,
   DeleteOutlined,
+  FileTextOutlined,
   KeyOutlined,
   PlusOutlined,
-  StopOutlined,
 } from '@ant-design/icons'
 import { getCurrentUser, usePermissionStore } from '../../services/permissionStore'
 import {
-  getApiKeyComputedStatus,
   openPlatformApi,
-  type ApiKeyRecord,
-  type ApiKeyStatus,
-  useOpenPlatformApiKeys,
+  type AccessKeyRecord,
+  useOpenPlatformAccessKeys,
 } from '../../services/openPlatformApi'
 
 const { Paragraph, Text, Title } = Typography
 
-const validityOptions = [
-  { label: '7 天', value: 7 },
-  { label: '30 天', value: 30 },
-  { label: '90 天', value: 90 },
-  { label: '180 天', value: 180 },
-  { label: '永久有效', value: 0 },
-]
-
-const statusMap: Record<ApiKeyStatus, { text: string; color: string }> = {
-  active: { text: '启用中', color: 'green' },
-  disabled: { text: '已禁用', color: 'default' },
-  expired: { text: '已过期', color: 'orange' },
-}
-
-interface ApiKeyFormValues {
-  name: string
-  validityDays: number
-  remark?: string
-}
-
-function formatCompactDate(value: string | null) {
-  if (!value) return '-'
+function formatCompactDate(value: string) {
   const date = new Date(value)
   const pad = (item: number) => String(item).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function maskMiddle(value: string) {
+  if (value.length <= 12) {
+    return value
+  }
+
+  return `${value.slice(0, 8)}${'*'.repeat(Math.max(value.length - 12, 8))}${value.slice(-4)}`
 }
 
 async function copyText(value: string) {
@@ -76,80 +58,47 @@ async function copyText(value: string) {
 }
 
 const OpenPlatformApiKeys: React.FC = () => {
-  const [form] = Form.useForm<ApiKeyFormValues>()
+  const navigate = useNavigate()
   const permissionState = usePermissionStore()
   const currentUser = getCurrentUser(permissionState)
-  const records = useOpenPlatformApiKeys(currentUser.account)
-  const [createOpen, setCreateOpen] = useState(false)
+  const records = useOpenPlatformAccessKeys(currentUser.account)
   const [messageApi, contextHolder] = message.useMessage()
+  const hasAccessKey = records.length > 0
 
-  const summary = useMemo(() => {
-    const activeCount = records.filter(item => getApiKeyComputedStatus(item) === 'active').length
-    const expiredCount = records.filter(item => getApiKeyComputedStatus(item) === 'expired').length
-    return { total: records.length, activeCount, expiredCount }
-  }, [records])
+  const createRecord = () => {
+    if (hasAccessKey) {
+      messageApi.warning('每个账号仅允许创建一个 API 访问密钥')
+      return
+    }
 
-  const closeCreateModal = () => {
-    setCreateOpen(false)
-    form.resetFields()
+    openPlatformApi.createAccessKey(currentUser.account)
+    messageApi.success('API 访问密钥已创建')
   }
 
-  const submitCreate = async () => {
-    const values = await form.validateFields()
-    openPlatformApi.createApiKey({
-      ownerAccount: currentUser.account,
-      name: values.name,
-      validityDays: values.validityDays === 0 ? null : values.validityDays,
-      remark: values.remark ?? '',
-    })
-    closeCreateModal()
-    messageApi.success('API 密钥已创建')
-  }
-
-  const disableRecord = (record: ApiKeyRecord) => {
+  const deleteRecord = (record: AccessKeyRecord) => {
     Modal.confirm({
-      title: '禁用 API 密钥',
-      content: `禁用后，${record.name} 将无法继续调用开放平台 API。`,
-      okText: '禁用',
-      okButtonProps: { danger: true },
-      cancelText: '取消',
-      onOk: () => {
-        openPlatformApi.disableApiKey(record.id)
-        messageApi.success('API 密钥已禁用')
-      },
-    })
-  }
-
-  const deleteRecord = (record: ApiKeyRecord) => {
-    Modal.confirm({
-      title: '删除 API 密钥',
-      content: `删除后，${record.name} 的记录将从列表移除，且无法恢复。`,
+      title: '删除 API 访问密钥',
+      content: '删除后，该 Access Key ID 与 Secret Access Key 将无法继续使用，且无法恢复。',
       okText: '删除',
       okButtonProps: { danger: true },
       cancelText: '取消',
       onOk: () => {
-        openPlatformApi.deleteApiKey(record.id)
-        messageApi.success('API 密钥已删除')
+        openPlatformApi.deleteAccessKey(record.id)
+        messageApi.success('API 访问密钥已删除')
       },
     })
   }
 
-  const columns: ColumnsType<ApiKeyRecord> = [
+  const copyAccessValue = async (value: string, label: string) => {
+    await copyText(value)
+    messageApi.success(`${label} 已复制`)
+  }
+
+  const columns: ColumnsType<AccessKeyRecord> = [
     {
-      title: '密钥名称',
-      dataIndex: 'name',
-      width: 220,
-      render: (value: string, record) => (
-        <Space orientation="vertical" size={2}>
-          <Text strong>{value}</Text>
-          {record.remark ? <Text type="secondary">{record.remark}</Text> : null}
-        </Space>
-      ),
-    },
-    {
-      title: 'API 密钥',
-      dataIndex: 'keyPrefix',
-      width: 220,
+      title: 'Access Key ID',
+      dataIndex: 'accessKeyId',
+      width: 260,
       render: (value: string) => (
         <Space size={8} wrap={false}>
           <Text code>{value}</Text>
@@ -157,69 +106,47 @@ const OpenPlatformApiKeys: React.FC = () => {
             type="text"
             size="small"
             icon={<CopyOutlined />}
-            onClick={async () => {
-              await copyText(value)
-              messageApi.success('API 密钥已复制')
-            }}
+            onClick={() => copyAccessValue(value, 'Access Key ID')}
           />
         </Space>
       ),
     },
     {
-      title: '状态',
-      width: 96,
-      render: (_, record) => {
-        const status = getApiKeyComputedStatus(record)
-        const option = statusMap[status]
-        return <Tag color={option.color}>{option.text}</Tag>
-      },
-    },
-    {
-      title: '有效期',
-      dataIndex: 'expiresAt',
-      width: 128,
-      render: (value: string | null) => (value ? formatCompactDate(value) : '永久有效'),
+      title: 'Secret Access Key',
+      dataIndex: 'secretAccessKey',
+      width: 360,
+      render: (value: string) => (
+        <Space size={8} wrap={false}>
+          <Text code>{maskMiddle(value)}</Text>
+          <Button
+            type="text"
+            size="small"
+            icon={<CopyOutlined />}
+            onClick={() => copyAccessValue(value, 'Secret Access Key')}
+          />
+        </Space>
+      ),
     },
     {
       title: '创建时间',
       dataIndex: 'createdAt',
-      width: 128,
-      render: formatCompactDate,
-    },
-    {
-      title: '最后使用时间',
-      dataIndex: 'lastUsedAt',
-      width: 128,
+      width: 140,
       render: formatCompactDate,
     },
     {
       title: '操作',
-      width: 176,
-      render: (_, record) => {
-        const status = getApiKeyComputedStatus(record)
-        return (
-          <Space size={6} wrap={false} style={{ minWidth: 144 }}>
-            <Button
-              type="link"
-              size="small"
-              icon={<StopOutlined />}
-              disabled={status !== 'active'}
-              onClick={() => disableRecord(record)}
-            >
-              禁用
-            </Button>
-            <Button
-              type="link"
-              danger
-              size="small"
-              icon={<DeleteOutlined />}
-              onClick={() => deleteRecord(record)}
-            >
-              删除
-            </Button>
-          </Space>
-        )
-      },
+      width: 96,
+      render: (_, record) => (
+        <Button
+          type="link"
+          danger
+          size="small"
+          icon={<DeleteOutlined />}
+          onClick={() => deleteRecord(record)}
+        >
+          删除
+        </Button>
+      ),
     },
   ]
 
@@ -254,80 +181,40 @@ const OpenPlatformApiKeys: React.FC = () => {
                 <ApiOutlined />
               </span>
               <Title level={3} style={{ margin: 0 }}>
-                开放平台 API
+                API访问密钥
               </Title>
             </Space>
             <Paragraph type="secondary" style={{ marginBottom: 0, maxWidth: 720 }}>
-              管理当前账号的 API 密钥，支持按有效期创建、复制、禁用和删除。
+              用于生成访问开放平台 API 的账号级凭证，可在开发指南中查看认证方式与调用示例。
             </Paragraph>
           </div>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-            创建密钥
-          </Button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 18 }}>
-          <Card styles={{ body: { padding: 18 } }}>
-            <Text type="secondary">密钥总数</Text>
-            <div style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', marginTop: 4 }}>{summary.total}</div>
-          </Card>
-          <Card styles={{ body: { padding: 18 } }}>
-            <Text type="secondary">启用中</Text>
-            <div style={{ fontSize: 26, fontWeight: 800, color: '#059669', marginTop: 4 }}>{summary.activeCount}</div>
-          </Card>
-          <Card styles={{ body: { padding: 18 } }}>
-            <Text type="secondary">已过期</Text>
-            <div style={{ fontSize: 26, fontWeight: 800, color: '#d97706', marginTop: 4 }}>{summary.expiredCount}</div>
-          </Card>
+          <Space size={10} wrap>
+            <Button icon={<FileTextOutlined />} onClick={() => navigate('/docs/developer-guide')}>
+              开放平台文档
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} disabled={hasAccessKey} onClick={createRecord}>
+              创建密钥
+            </Button>
+          </Space>
         </div>
 
         <Card
           title={
             <Space>
               <KeyOutlined />
-              API 密钥列表
+              API访问密钥
             </Space>
           }
-          extra={<Text type="secondary">当前账号：{currentUser.account}</Text>}
         >
           <Table
             rowKey="id"
             columns={columns}
             dataSource={records}
-            pagination={{ pageSize: 8, showSizeChanger: false }}
-            scroll={{ x: 1096 }}
+            pagination={false}
+            scroll={{ x: 920 }}
           />
         </Card>
       </div>
-
-      <Modal
-        title="创建 API 密钥"
-        open={createOpen}
-        okText="创建"
-        cancelText="取消"
-        onCancel={closeCreateModal}
-        onOk={submitCreate}
-        destroyOnHidden
-      >
-        <Form form={form} layout="vertical" initialValues={{ validityDays: 30 }}>
-          <Form.Item
-            label="名称"
-            name="name"
-            rules={[
-              { required: true, message: '请输入密钥名称' },
-              { max: 32, message: '名称不能超过 32 个字符' },
-            ]}
-          >
-            <Input placeholder="例如：数据同步脚本" />
-          </Form.Item>
-          <Form.Item label="密钥有效期" name="validityDays" rules={[{ required: true, message: '请选择密钥有效期' }]}>
-            <Select options={validityOptions} />
-          </Form.Item>
-          <Form.Item label="备注" name="remark" rules={[{ max: 80, message: '备注不能超过 80 个字符' }]}>
-            <Input.TextArea rows={3} placeholder="记录使用场景，便于后续轮换和清理" />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   )
 }

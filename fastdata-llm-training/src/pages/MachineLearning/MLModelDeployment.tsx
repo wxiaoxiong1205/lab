@@ -41,11 +41,13 @@ import {
   type StandardDeploymentConfig,
 } from '../../services/machineDeploymentStore'
 import ResumableUpload from '../../components/ResumableUpload'
+import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 
 const { Title, Text } = Typography
 
 interface CreateFormValues {
   name?: string
+  description?: string
   standard: StandardDeploymentConfig
   custom: CustomDeploymentConfig
 }
@@ -164,6 +166,7 @@ function getStatusTag(status: TaskLifecycleStatus) {
 function getCreateInitialValues(): CreateFormValues {
   return {
     name: '',
+    description: '',
     standard: {
       modelSource: '模型管理',
       model: undefined,
@@ -214,6 +217,7 @@ function buildFormValuesFromRecord(record: MLDeploymentRecord): CreateFormValues
   const initialValues = getCreateInitialValues()
   return {
     name: record.name,
+    description: record.description ?? '',
     standard: record.standardConfig ?? initialValues.standard,
     custom: {
       ...(record.customConfig ?? initialValues.custom),
@@ -233,6 +237,7 @@ function buildDeploymentPayload(values: CreateFormValues, deploymentType: Deploy
 
     return {
       name: values.name?.trim() ?? '',
+      description: values.description?.trim() ?? '',
       deploymentType,
       targetSummary: `${standard.model ?? '-'} / ${standard.network ?? '-'}`,
       resourceSummary: buildResourceSummary(standard.resources),
@@ -245,6 +250,7 @@ function buildDeploymentPayload(values: CreateFormValues, deploymentType: Deploy
   const custom = values.custom
   return {
     name: values.name?.trim() ?? '',
+    description: values.description?.trim() ?? '',
     deploymentType,
     targetSummary: buildImageSummary(custom),
     resourceSummary: buildResourceSummary(custom.resources),
@@ -438,7 +444,20 @@ const MLModelDeployment: React.FC = () => {
   }
 
   const columns: ColumnsType<MLDeploymentRecord> = [
-    { title: '服务名称', dataIndex: 'name', key: 'name', width: 220 },
+    {
+      title: '服务名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 260,
+      render: (_value, record) => (
+        <TaskMetadataEditor
+          name={record.name}
+          description={record.description}
+          editable={canRunTaskLifecycleAction(record.status, 'edit')}
+          onSave={value => machineDeploymentActions.updateDeploymentMeta(record.id, value)}
+        />
+      ),
+    },
     {
       title: '模型名称',
       key: 'modelName',
@@ -611,6 +630,10 @@ const MLModelDeployment: React.FC = () => {
                   ]}
                 >
                   <Input placeholder="请输入服务名称" />
+                </Form.Item>
+
+                <Form.Item label="服务描述" name="description">
+                  <Input.TextArea rows={3} maxLength={300} showCount placeholder="请输入服务描述，最多 300 字" />
                 </Form.Item>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 18px' }}>
@@ -974,6 +997,7 @@ const DescriptionsModal: React.FC<{
       {record && (
         <Descriptions column={2} bordered size="small">
           <Descriptions.Item label="服务名称" span={2}>{record.name}</Descriptions.Item>
+          <Descriptions.Item label="服务描述" span={2}>{record.description || '-'}</Descriptions.Item>
           <Descriptions.Item label="状态">{getStatusTag(record.status)}</Descriptions.Item>
           <Descriptions.Item label="部署方式">{record.deploymentType === 'standard' ? '标准部署' : '自定义部署'}</Descriptions.Item>
           <Descriptions.Item label="模型名称">{record.standardConfig?.model ?? '-'}</Descriptions.Item>

@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { TaskLifecycleStatus } from './dataServiceStore'
+import { createTaskNotification } from './notificationStore'
 
 export type DeploymentType = 'standard' | 'custom'
 export type ImageSourceType = 'system' | 'custom'
@@ -62,6 +63,7 @@ export interface CustomDeploymentConfig {
 export interface MLDeploymentRecord {
   id: string
   name: string
+  description?: string
   deploymentType: DeploymentType
   targetSummary: string
   resourceSummary: string
@@ -79,6 +81,7 @@ interface MachineDeploymentState {
 
 interface CreateMachineDeploymentInput {
   name: string
+  description?: string
   deploymentType: DeploymentType
   targetSummary: string
   resourceSummary: string
@@ -90,6 +93,7 @@ interface CreateMachineDeploymentInput {
 
 interface UpdateMachineDeploymentInput {
   name: string
+  description?: string
   deploymentType: DeploymentType
   targetSummary: string
   resourceSummary: string
@@ -109,6 +113,7 @@ const seedState: MachineDeploymentState = {
     {
       id: 'ml-deploy-1',
       name: 'hzj_单图多标签',
+      description: '图片分类多标签模型标准部署任务',
       deploymentType: 'standard',
       targetSummary: 'hzj_图片分类多标签 / resnet34',
       resourceSummary: '4C / 16GB / NVIDIA Tesla T4 x1',
@@ -135,6 +140,7 @@ const seedState: MachineDeploymentState = {
     {
       id: 'ml-deploy-2',
       name: 'basion-classification-single',
+      description: '图像分类单标签模型标准部署任务',
       deploymentType: 'standard',
       targetSummary: 'basion-图像分类-单标签 / resnet50',
       resourceSummary: '2C / 8GB / CPU',
@@ -159,6 +165,7 @@ const seedState: MachineDeploymentState = {
     {
       id: 'ml-deploy-3',
       name: 'custom-image-classifier',
+      description: '基于自定义镜像的图片分类服务',
       deploymentType: 'custom',
       targetSummary: '镜像部署 / python-inference:3.9-ubuntu2004',
       resourceSummary: '6C / 24GB / NVIDIA Tesla T4 x1',
@@ -269,6 +276,7 @@ export const machineDeploymentActions = {
     const next: MLDeploymentRecord = {
       id: `ml-deployment-${Date.now()}`,
       name: input.name,
+      description: input.description ?? '',
       deploymentType: input.deploymentType,
       targetSummary: input.targetSummary,
       resourceSummary: input.resourceSummary,
@@ -282,6 +290,18 @@ export const machineDeploymentActions = {
 
     update(draft => {
       draft.deployments.unshift(next)
+    })
+
+    createTaskNotification({
+      type: 'deployment',
+      status: 'created',
+      severity: 'info',
+      taskId: next.id,
+      taskName: next.name,
+      taskModule: '机器学习模型部署',
+      title: '模型部署任务已创建',
+      content: `${next.name} 已创建，等待启动。`,
+      targetPath: '/machine-model-deployment',
     })
 
     return next
@@ -299,6 +319,7 @@ export const machineDeploymentActions = {
         updated = {
           ...item,
           name: input.name,
+          description: input.description ?? '',
           deploymentType: input.deploymentType,
           targetSummary: input.targetSummary,
           resourceSummary: input.resourceSummary,
@@ -315,8 +336,30 @@ export const machineDeploymentActions = {
   },
 
   setDeploymentStatus(id: string, status: TaskLifecycleStatus): void {
+    const target = state.deployments.find(item => item.id === id)
     update(draft => {
       draft.deployments = draft.deployments.map(item => (item.id === id ? { ...item, status } : item))
+    })
+    if (target) {
+      createTaskNotification({
+        type: 'deployment',
+        status: status === '已终止' ? 'terminated' : status === '失败' ? 'failed' : status === '已完成' ? 'completed' : 'started',
+        severity: status === '失败' ? 'error' : status === '已终止' ? 'warning' : status === '已完成' ? 'success' : 'info',
+        taskId: target.id,
+        taskName: target.name,
+        taskModule: '机器学习模型部署',
+        title: `模型部署任务${status}`,
+        content: `${target.name} 当前状态：${status}。`,
+        targetPath: '/machine-model-deployment',
+      })
+    }
+  },
+
+  updateDeploymentMeta(id: string, value: { name: string; description?: string }): void {
+    update(draft => {
+      draft.deployments = draft.deployments.map(item =>
+        item.id === id ? { ...item, name: value.name, description: value.description ?? '' } : item,
+      )
     })
   },
 

@@ -37,6 +37,8 @@ import {
 } from '../../services/taskLifecycle'
 import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
 import ResumableUpload from '../../components/ResumableUpload'
+import TaskMetadataEditor from '../../components/TaskMetadataEditor'
+import { dataServiceApi, selectInferenceResults, useDataServiceSnapshot } from '../../services/dataServiceApi'
 
 const { Title, Text } = Typography
 
@@ -56,6 +58,7 @@ type InferenceResultRecord = {
   dataVolume: number | '-'
   createdAt: string
   description?: string
+  detailRows?: InferenceDetailRow[]
 }
 
 type InferenceDetailRow = {
@@ -64,58 +67,6 @@ type InferenceDetailRow = {
   output: string
   status: string
 }
-
-const seedRows: InferenceResultRecord[] = [
-  {
-    id: 'inf-1',
-    name: '推理结果集_2026_03_26_09_34_47',
-    progress: '已完成',
-    dataUsage: '文本生成',
-    inferenceMode: '离线推理',
-    pendingData: '验证数据集/验证-示例-1-json>V6',
-    pendingModel: '123123',
-    dataVolume: 20,
-    createdAt: '2026/03/26 09:36:42',
-    description: '',
-  },
-  {
-    id: 'inf-2',
-    name: '测试111',
-    progress: '已创建',
-    dataUsage: '文本生成',
-    inferenceMode: '离线推理',
-    pendingData: '验证集/多轮---1>V1',
-    pendingModel: '123123',
-    dataVolume: 6,
-    createdAt: '2026/03/24 18:55:23',
-    description: '',
-  },
-  {
-    id: 'inf-3',
-    name: '导入-文本生成-PROMPT_RESPONSE格式-推理结果集',
-    progress: '已完成',
-    dataUsage: '文本生成',
-    inferenceMode: '导入推理结果集',
-    importFile: 'PROMPT_RESPONSE_导入样例.csv',
-    pendingData: '外部导入',
-    pendingModel: '手输模型',
-    dataVolume: 273,
-    createdAt: '2026/03/24 11:06:59',
-    description: '',
-  },
-  {
-    id: 'inf-4',
-    name: '推理结果集_2026_03_18_16_46_47',
-    progress: '已完成',
-    dataUsage: '图像理解',
-    inferenceMode: '在线推理',
-    pendingData: '外部导入',
-    pendingModel: '手输模型',
-    dataVolume: 18,
-    createdAt: '2026/03/18 16:47:08',
-    description: '',
-  },
-]
 
 const sectionCardStyle: React.CSSProperties = {
   borderRadius: 18,
@@ -201,6 +152,10 @@ function buildDefaultInferenceName() {
 }
 
 function buildInferenceDetailRows(record: InferenceResultRecord): InferenceDetailRow[] {
+  if (record.detailRows) {
+    return record.detailRows
+  }
+
   const inputPrefix = record.inferenceMode === '导入推理结果集' ? `${record.importFile || record.pendingData}` : record.pendingData
   return [
     {
@@ -222,8 +177,9 @@ const InferenceResult: React.FC = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const { id } = useParams()
+  const dataServiceState = useDataServiceSnapshot()
   const [form] = Form.useForm()
-  const [rows, setRows] = useState(seedRows)
+  const rows = selectInferenceResults(dataServiceState) as InferenceResultRecord[]
   const [searchValue, setSearchValue] = useState('')
   const [inferenceMode, setInferenceMode] = useState<InferenceMode | undefined>()
   const [dataUsage, setDataUsage] = useState<DataUsage | undefined>()
@@ -268,15 +224,32 @@ const InferenceResult: React.FC = () => {
     [dataUsage, inferenceMode, rows, searchValue],
   )
 
+  const handleDeleteInferenceDetailRow = (record: InferenceResultRecord, row: InferenceDetailRow) => {
+    Modal.confirm({
+      title: '确认删除该条推理明细？',
+      content: '删除后不可恢复，请确认是否继续。',
+      okText: '确认删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        message.success(`已从当前预览中移除：${row.key}`)
+      },
+    })
+  }
+
   const columns: ColumnsType<InferenceResultRecord> = [
     {
       title: '数据集名称',
       dataIndex: 'name',
       key: 'name',
       render: (value, record) => (
-        <Button type="link" size="small" style={{ padding: 0 }} onClick={() => navigate(`/inference/${record.id}`)}>
-          {value}
-        </Button>
+        <TaskMetadataEditor
+          name={value}
+          description={record.description}
+          editable={canRunTaskLifecycleAction(record.progress, 'edit')}
+          onNameClick={() => navigate(`/inference/${record.id}`)}
+          onSave={metadata => dataServiceApi.updateInferenceResultMeta(record.id, metadata)}
+        />
       ),
     },
     {
@@ -307,14 +280,10 @@ const InferenceResult: React.FC = () => {
             type="link"
             size="small"
             disabled={!canRunTaskLifecycleAction(record.progress, 'start') && !canRunTaskLifecycleAction(record.progress, 'resubmit')}
-            onClick={() => {
-              setRows(previous =>
-                previous.map(item =>
-                  item.id === record.id
-                    ? { ...item, progress: canRunTaskLifecycleAction(item.progress, 'start') ? '启动中' : '已创建' }
-                    : item,
-                ),
-              )
+            onClick={async () => {
+              if (canRunTaskLifecycleAction(record.progress, 'start')) {
+                await dataServiceApi.startInferenceResult(record.id)
+              }
               message.success('任务状态已更新')
             }}
           >
@@ -332,8 +301,8 @@ const InferenceResult: React.FC = () => {
             size="small"
             danger
             disabled={!canRunTaskLifecycleAction(record.progress, 'delete')}
-            onClick={() => {
-              setRows(previous => previous.filter(item => item.id !== record.id))
+            onClick={async () => {
+              await dataServiceApi.deleteInferenceResult(record.id)
               message.success('删除成功')
             }}
           >
@@ -365,9 +334,7 @@ const InferenceResult: React.FC = () => {
                     message.warning(STARTING_TERMINATE_BLOCKED_MESSAGE)
                     return
                   }
-                  setRows(previous =>
-                    previous.map(item => (item.id === record.id ? { ...item, progress: '已终止' } : item)),
-                  )
+                  void dataServiceApi.terminateInferenceResult(record.id)
                 }
               },
             }}
@@ -405,24 +372,18 @@ const InferenceResult: React.FC = () => {
   const submit = async () => {
     try {
       const values = await form.validateFields()
-      setRows(previous => [
-        {
-          id: `inf-${Date.now()}`,
-          name: values.name,
-          progress: '已创建',
-          dataUsage: values.inferenceMode === '导入推理结果集'
-            ? getBaseDataUsage(values.importDataUsage)
-            : (selectedPendingDataset?.dataUsage === '图像理解' ? '图像理解' : '文本生成') as DataUsage,
-          inferenceMode: values.inferenceMode,
-          importFile: normalizeUploadFileName(values.importFile),
-          pendingData: values.inferenceMode === '导入推理结果集' ? '外部导入' : values.pendingData,
-          pendingModel: values.inferenceMode === '导入推理结果集' ? values.importModelName : normalizeModelLabel(values.pendingModel),
-          dataVolume: values.inferenceMode === '导入推理结果集' ? '-' : selectedPendingDataset?.sampleCount ?? '-',
-          createdAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
-          description: values.description ?? '',
-        },
-        ...previous,
-      ])
+      await dataServiceApi.createInferenceResult({
+        name: values.name,
+        description: values.description ?? '',
+        dataUsage: values.inferenceMode === '导入推理结果集'
+          ? getBaseDataUsage(values.importDataUsage)
+          : (selectedPendingDataset?.dataUsage === '图像理解' ? '图像理解' : '文本生成') as DataUsage,
+        inferenceMode: values.inferenceMode,
+        importFile: normalizeUploadFileName(values.importFile),
+        pendingData: values.inferenceMode === '导入推理结果集' ? '外部导入' : values.pendingData,
+        pendingModel: values.inferenceMode === '导入推理结果集' ? values.importModelName : normalizeModelLabel(values.pendingModel),
+        dataVolume: values.inferenceMode === '导入推理结果集' ? '-' : selectedPendingDataset?.sampleCount ?? '-',
+      })
       message.success('推理结果集已创建')
       closeCreate()
     } catch {
@@ -544,7 +505,7 @@ const InferenceResult: React.FC = () => {
                     <ResumableUpload
                       accept=".jsonl,.json,.csv"
                       title="点击或拖拽文件到此区域上传"
-                      hint="支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB；失败或取消后可继续上传"
+                      hint="支持 .jsonl/.json/.csv 格式，文件大小不设前端限制；失败或取消后可继续上传"
                     />
                   </Form.Item>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 28, marginBottom: 20 }}>
@@ -705,17 +666,15 @@ const InferenceResult: React.FC = () => {
                   message.warning(STARTING_TERMINATE_BLOCKED_MESSAGE)
                   return
                 }
-                setRows(previous =>
-                  previous.map(item => (item.id === selectedRecord.id ? { ...item, progress: '已终止' } : item)),
-                )
+                void dataServiceApi.terminateInferenceResult(selectedRecord.id)
               }}
             >
               终止
             </Button>
             <Button
               danger
-              onClick={() => {
-                setRows(previous => previous.filter(item => item.id !== selectedRecord.id))
+              onClick={async () => {
+                await dataServiceApi.deleteInferenceResult(selectedRecord.id)
                 navigate('/inference')
               }}
             >
@@ -752,6 +711,16 @@ const InferenceResult: React.FC = () => {
               { title: '输入数据', dataIndex: 'input', key: 'input' },
               { title: '推理结果', dataIndex: 'output', key: 'output' },
               { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
+              {
+                title: '操作',
+                key: 'action',
+                width: 96,
+                render: (_value, row) => (
+                  <Button type="link" size="small" danger onClick={() => handleDeleteInferenceDetailRow(selectedRecord, row)}>
+                    删除
+                  </Button>
+                ),
+              },
             ]}
             dataSource={buildInferenceDetailRows(selectedRecord)}
           />

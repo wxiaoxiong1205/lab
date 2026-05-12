@@ -93,7 +93,12 @@ const seedState = {
     makeDataset({ id: 'test-3', name: '333333333', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'lab1', createdAt: '2026/03/01 11:00:00', sampleCount: 10, status: '处理失败' }),
     makeDataset({ id: 'test-4', name: '属性回归测试-22-333-444', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/04/09 10:00:00', sampleCount: 5 }),
   ],
-  inferenceResults: [],
+  inferenceResults: [
+    { id: 'inf-1', name: '推理结果集_2026_03_26_09_34_47', description: '', progress: '已完成', dataUsage: '文本生成', inferenceMode: '离线推理', pendingData: '验证数据集/验证-示例-1-json>V6', pendingModel: '123123', dataVolume: 20, createdAt: '2026/03/26 09:36:42' },
+    { id: 'inf-2', name: '测试111', description: '', progress: '已创建', dataUsage: '文本生成', inferenceMode: '离线推理', pendingData: '验证集/多轮---1>V1', pendingModel: '123123', dataVolume: 6, createdAt: '2026/03/24 18:55:23' },
+    { id: 'inf-3', name: '导入-文本生成-PROMPT_RESPONSE格式-推理结果集', description: '', progress: '已完成', dataUsage: '文本生成', inferenceMode: '导入推理结果集', importFile: 'PROMPT_RESPONSE_导入样例.csv', pendingData: '外部导入', pendingModel: '手输模型', dataVolume: 273, createdAt: '2026/03/24 11:06:59' },
+    { id: 'inf-4', name: '推理结果集_2026_03_18_16_46_47', description: '', progress: '已完成', dataUsage: '图像理解', inferenceMode: '在线推理', pendingData: '外部导入', pendingModel: '手输模型', dataVolume: 18, createdAt: '2026/03/18 16:47:08' },
+  ],
   annotationTasks: [
     { id: 'ann-1', name: '财税问答-人工标注-未开始', dataVolume: 12, progress: 0, status: '未开始', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '训练数据集/多轮指令精调-SFT-财税问答-V3', postDataset: '-', creator: 'deepexilab', createdAt: '2026-04-29 09:10:21' },
     { id: 'ann-2', name: '客服意图识别-在线标注中', dataVolume: 36, progress: 45, status: '标注中', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '训练数据集/训练测试-1-V8', postDataset: '-', creator: 'lab1', createdAt: '2026-04-28 16:38:22' },
@@ -104,7 +109,11 @@ const seedState = {
     { id: 'ann-7', name: '电商图片偏好-失败', dataVolume: 8, progress: null, status: '失败', collaborationMode: 'multi', reviewerCount: 2, reviewMode: '全量复核', datasetType: 'image-understanding', preDataset: '训练数据集/图文偏好排序-DPO-电商审核-V2', postDataset: '-', creator: 'lab1', createdAt: '2026-04-23 19:41:30' },
     { id: 'ann-8', name: '文本生成-标注服务失败', dataVolume: 10, progress: null, status: '失败', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '测试数据集/偏好对测试集-DPO-A-V1', postDataset: '-', creator: 'lab1', createdAt: '2026-04-22 13:09:18' },
   ],
-  cleaningTasks: [],
+  cleaningTasks: [
+    { id: 'clean-1', name: '多人标注任务清洗', description: '', status: '已完成', preDataset: '训练数据集/roleBased-V4', postDataset: '训练数据集/roleBased-V5', creator: 'deepexilab', createdAt: '2026/03/24 11:53:50' },
+    { id: 'clean-2', name: '多人-1', description: '', status: '启动中', preDataset: '训练数据集/训练测试-1-V8', postDataset: '-', creator: 'lab1', createdAt: '2026/03/20 09:45:19' },
+    { id: 'clean-3', name: '异常-2', description: '', status: '已完成', preDataset: '测试数据集/多文件-10-V1', postDataset: '测试数据集/多文件-10-V2', creator: 'lab1', createdAt: '2026/03/13 15:18:51' },
+  ],
 }
 
 const documentKnowledgeBase = JSON.parse(readFileSync(documentKnowledgeBasePath, 'utf8'))
@@ -193,6 +202,22 @@ async function readDb() {
       Object.assign(existing, clone(item))
     } else {
       state.annotationTasks.push(clone(item))
+    }
+  }
+
+  state.inferenceResults = state.inferenceResults || []
+  const existingInferenceIds = new Set(state.inferenceResults.map(item => item.id))
+  for (const item of seedState.inferenceResults) {
+    if (!existingInferenceIds.has(item.id)) {
+      state.inferenceResults.push(clone(item))
+    }
+  }
+
+  state.cleaningTasks = state.cleaningTasks || []
+  const existingCleaningIds = new Set(state.cleaningTasks.map(item => item.id))
+  for (const item of seedState.cleaningTasks) {
+    if (!existingCleaningIds.has(item.id)) {
+      state.cleaningTasks.push(clone(item))
     }
   }
 
@@ -301,7 +326,7 @@ function json(req, res, statusCode, payload) {
     'Access-Control-Allow-Origin': getAllowedOrigin(req),
     'Vary': 'Origin',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
     'X-Content-Type-Options': 'nosniff',
   })
   res.end(JSON.stringify(payload))
@@ -704,11 +729,14 @@ const server = createServer(async (req, res) => {
     state.inferenceResults.unshift({
       id: `inf-${Date.now()}`,
       name: body.name,
+      description: body.description || '',
       progress: '已创建',
       dataUsage: body.dataUsage,
+      inferenceMode: body.inferenceMode,
+      importFile: body.importFile,
       pendingData: body.pendingData,
       pendingModel: body.pendingModel,
-      dataVolume: Math.max(1, Math.floor(Math.random() * 20) + 1),
+      dataVolume: body.dataVolume ?? Math.max(1, Math.floor(Math.random() * 20) + 1),
       createdAt: nowText(),
     })
     await writeDb(state)
@@ -721,6 +749,20 @@ const server = createServer(async (req, res) => {
   }
 
   const deleteInferenceMatch = pathname.match(/^\/api\/data-service\/inference-results\/([^/]+)$/)
+  if (req.method === 'PATCH' && deleteInferenceMatch) {
+    const targetId = decodeURIComponent(deleteInferenceMatch[1])
+    const body = await readBody(req)
+    const state = await readDb()
+    const target = state.inferenceResults.find(item => item.id === targetId)
+    if (!target) {
+      return notFound(req, res)
+    }
+    target.name = String(body.name || '').trim() || target.name
+    target.description = String(body.description || '').trim()
+    await writeDb(state)
+    return json(req, res, 200, state)
+  }
+
   if (req.method === 'DELETE' && deleteInferenceMatch) {
     const targetId = decodeURIComponent(deleteInferenceMatch[1])
     const state = await readDb()
@@ -802,9 +844,11 @@ const server = createServer(async (req, res) => {
     state.cleaningTasks.unshift({
       id: `clean-${Date.now()}`,
       name: body.name,
+      description: body.description || '',
       status: '启动中',
       preDataset: body.preDataset,
-      postDataset: '-',
+      postDataset: body.postDataset || '-',
+      operatorValues: body.operatorValues || [],
       creator: 'deepexilab',
       createdAt: nowText(),
     })
@@ -818,6 +862,20 @@ const server = createServer(async (req, res) => {
   }
 
   const deleteCleaningMatch = pathname.match(/^\/api\/data-service\/cleaning-tasks\/([^/]+)$/)
+  if (req.method === 'PATCH' && deleteCleaningMatch) {
+    const targetId = decodeURIComponent(deleteCleaningMatch[1])
+    const body = await readBody(req)
+    const state = await readDb()
+    const target = state.cleaningTasks.find(item => item.id === targetId)
+    if (!target) {
+      return notFound(req, res)
+    }
+    target.name = String(body.name || '').trim() || target.name
+    target.description = String(body.description || '').trim()
+    await writeDb(state)
+    return json(req, res, 200, state)
+  }
+
   if (req.method === 'DELETE' && deleteCleaningMatch) {
     const targetId = decodeURIComponent(deleteCleaningMatch[1])
     const state = await readDb()

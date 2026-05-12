@@ -528,6 +528,27 @@ const TrainingDataset: React.FC = () => {
   const detailRows = selectedRecord
     ? buildDatasetDetailRows(selectedRecord, activeVersion ?? selectedRecord.versions[0])
     : []
+  const datasetKind = datasetTab === 'validation' ? 'validation' : 'training'
+
+  const handleDeleteDetailRow = (row: DatasetDetailRow) => {
+    if (!selectedRecord || !activeVersion) return
+
+    Modal.confirm({
+      title: '确认删除该条数据？',
+      content: '删除后不可恢复，请确认是否继续。',
+      okText: '确认删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await dataServiceApi.deleteDatasetDetailRow(datasetKind, selectedRecord.id, {
+          versionId: activeVersion.id,
+          rowKey: row.key,
+          currentRows: detailRows,
+        })
+        message.success('数据已删除')
+      },
+    })
+  }
 
   const versionColumns: ColumnsType<DatasetVersionRow> = [
     { title: '版本', dataIndex: 'version', key: 'version', width: 72, render: (v: string) => <Text strong style={{ color: '#4f46e5' }}>{v}</Text> },
@@ -831,7 +852,7 @@ const TrainingDataset: React.FC = () => {
         <ResumableUpload
           accept=".jsonl,.json,.csv"
           title="点击或拖拽文件到此区域上传"
-          hint="支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB"
+          hint="支持 .jsonl/.json/.csv 格式，文件大小不设前端限制"
         />
       </Form.Item>
 
@@ -870,6 +891,18 @@ const TrainingDataset: React.FC = () => {
     </>
   )
 
+  const detailDeleteColumn: ColumnsType<DatasetDetailRow>[number] = {
+    title: '操作',
+    key: 'action',
+    width: 96,
+    fixed: 'right',
+    render: (_, row) => (
+      <Button type="link" size="small" danger onClick={() => handleDeleteDetailRow(row)}>
+        删除
+      </Button>
+    ),
+  }
+
   const detailTableColumns: ColumnsType<DatasetDetailRow> =
     selectedRecord && isDpoUsage(selectedRecord.dataUsage)
       ? [
@@ -884,6 +917,7 @@ const TrainingDataset: React.FC = () => {
               { title: 'Rejected', dataIndex: 'rejected', key: 'rejected', width: 280 },
             ],
           },
+          detailDeleteColumn,
         ]
       : selectedRecord?.dataFormat === 'role-based'
       ? [
@@ -891,12 +925,14 @@ const TrainingDataset: React.FC = () => {
           { title: 'System', dataIndex: 'system', key: 'system' },
           { title: 'User', dataIndex: 'user', key: 'user' },
           { title: 'Assistant', dataIndex: 'assistant', key: 'assistant' },
+          detailDeleteColumn,
         ]
       : [
           { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => (detailPage - 1) * detailPageSize + index + 1 },
           { title: 'System', dataIndex: 'system', key: 'system' },
           { title: 'Prompt', dataIndex: 'prompt', key: 'prompt' },
           { title: 'Response', dataIndex: 'response', key: 'response' },
+          detailDeleteColumn,
         ]
 
   const downloadItems = [
@@ -1298,7 +1334,7 @@ const TrainingDataset: React.FC = () => {
                 <ResumableUpload
                   accept=".jsonl,.json,.csv"
                   title="点击或拖拽文件到此区域上传"
-                  hint="支持 .jsonl/.json/.csv 格式，单个文件不超过 100MB"
+                  hint="支持 .jsonl/.json/.csv 格式，文件大小不设前端限制"
                   value={addVersionFile}
                   onChange={setAddVersionFile}
                 />

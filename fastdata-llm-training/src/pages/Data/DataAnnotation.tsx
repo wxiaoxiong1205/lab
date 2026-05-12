@@ -8,7 +8,6 @@ import {
   message,
   Modal,
   Pagination,
-  Popconfirm,
   Progress,
   Radio,
   Select,
@@ -693,6 +692,39 @@ const DataAnnotation: React.FC = () => {
     message.success('审核已提交，结果已锁定')
   }
 
+  const handleDeleteAnnotationSample = (record: AnnotationSample, locked = submitted || reviewSubmitted) => {
+    if (locked) {
+      Modal.warning({
+        title: '已提交数据不允许删除',
+        content: '当前标注或审核结果已提交，数据已锁定，不能再删除单条数据。',
+      })
+      return
+    }
+
+    Modal.confirm({
+      title: '确认删除该条数据？',
+      content: '删除后不可恢复，请确认是否继续。',
+      okText: '确认删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        setAnnotationSamples(previous => {
+          const nextSamples = previous.filter(item => item.id !== record.id).map((item, index) => ({
+            ...item,
+            index: index + 1,
+          }))
+          setSamplePage(current => Math.min(current, Math.max(nextSamples.length, 1)))
+          return nextSamples
+        })
+        setReviewDecisions(previous => {
+          const { [record.id]: _removed, ...rest } = previous
+          return rest
+        })
+        message.success('删除成功')
+      },
+    })
+  }
+
   const handleSaveConfig = async () => {
     try {
       const values = await configForm.validateFields()
@@ -799,17 +831,6 @@ const DataAnnotation: React.FC = () => {
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/data-annotation/${record.id}`)}>
             查看详情
           </Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={async () => {
-              await dataServiceApi.deleteAnnotationTask(record.id)
-            }}
-          >
-            删除
-          </Button>
         </Space>
       ),
     },
@@ -858,21 +879,6 @@ const DataAnnotation: React.FC = () => {
           <Button type="link" size="small" icon={<TeamOutlined />} onClick={() => setMemberModalTask(record)}>
             任务成员
           </Button>
-          <Popconfirm
-            title="确认删除该多人标注任务？"
-            description="删除后任务总览、标注任务和审核任务中都会同步移除。"
-            okText="删除"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
-            onConfirm={async () => {
-              await dataServiceApi.deleteAnnotationTask(record.id)
-              message.success('删除成功')
-            }}
-          >
-            <Button type="link" size="small" icon={<DeleteOutlined />} danger>
-              删除
-            </Button>
-          </Popconfirm>
         </Space>
       ),
     },
@@ -965,16 +971,21 @@ const DataAnnotation: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 112,
+      width: 180,
       render: (_, record) => (
-        <Button
-          type="link"
-          size="small"
-          disabled={submitted || record.status === '已标注'}
-          onClick={() => handleCompleteSample(record.id)}
-        >
-          完成标注
-        </Button>
+        <Space size={0}>
+          <Button
+            type="link"
+            size="small"
+            disabled={submitted || record.status === '已标注'}
+            onClick={() => handleCompleteSample(record.id)}
+          >
+            完成标注
+          </Button>
+          <Button type="link" size="small" danger disabled={submitted} onClick={() => handleDeleteAnnotationSample(record)}>
+            删除
+          </Button>
+        </Space>
       ),
     },
   ]
@@ -1064,16 +1075,21 @@ const DataAnnotation: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 112,
+      width: 180,
       render: (_, record) => (
-        <Button
-          type="link"
-          size="small"
-          disabled={submitted || record.status === '已标注'}
-          onClick={() => handleCompleteSample(record.id)}
-        >
-          完成标注
-        </Button>
+        <Space size={0}>
+          <Button
+            type="link"
+            size="small"
+            disabled={submitted || record.status === '已标注'}
+            onClick={() => handleCompleteSample(record.id)}
+          >
+            完成标注
+          </Button>
+          <Button type="link" size="small" danger disabled={submitted} onClick={() => handleDeleteAnnotationSample(record)}>
+            删除
+          </Button>
+        </Space>
       ),
     },
   ]
@@ -1523,16 +1539,21 @@ const DataAnnotation: React.FC = () => {
       {
         title: '操作',
         key: 'action',
-        width: 112,
+        width: 180,
         render: (_, record) => (
-          <Button
-            type="link"
-            size="small"
-            disabled={submitted || record.status === '已标注'}
-            onClick={() => handleCompleteSample(record.id)}
-          >
-            完成标注
-          </Button>
+          <Space size={0}>
+            <Button
+              type="link"
+              size="small"
+              disabled={submitted || record.status === '已标注'}
+              onClick={() => handleCompleteSample(record.id)}
+            >
+              完成标注
+            </Button>
+            <Button type="link" size="small" danger disabled={submitted || readonlyDetail} onClick={() => handleDeleteAnnotationSample(record, submitted || readonlyDetail)}>
+              删除
+            </Button>
+          </Space>
         ),
       },
     ]
@@ -1614,18 +1635,23 @@ const DataAnnotation: React.FC = () => {
       {
         title: '操作',
         key: 'action',
-        width: 120,
+        width: 190,
         render: (_, record) => {
           const decision = reviewDecisions[record.id]
           return (
-            <Button
-              type="link"
-              size="small"
-              disabled={reviewSubmitted || decision?.status === '已审核'}
-              onClick={() => handleCompleteReview(record.id)}
-            >
-              完成审核
-            </Button>
+            <Space size={0}>
+              <Button
+                type="link"
+                size="small"
+                disabled={reviewSubmitted || decision?.status === '已审核'}
+                onClick={() => handleCompleteReview(record.id)}
+              >
+                完成审核
+              </Button>
+              <Button type="link" size="small" danger disabled={reviewSubmitted || readonlyDetail} onClick={() => handleDeleteAnnotationSample(record, reviewSubmitted || readonlyDetail)}>
+                删除
+              </Button>
+            </Space>
           )
         },
       },

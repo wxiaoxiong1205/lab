@@ -37,12 +37,13 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { mockTasks } from '../../data/mockData'
 import {
   TRAINING_METHOD_LABELS,
   TRAINING_RUN_STATUS_TAG,
   type MetricPoint,
 } from '../../types/training'
+import { useTrainingTasks } from '../../services/trainingTaskStore'
+import { createTaskNotification } from '../../services/notificationStore'
 import {
   getVersionActionFlags,
   TERMINATE_BLOCKED_MESSAGE,
@@ -156,8 +157,9 @@ const VersionDetail: React.FC = () => {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('dataset')
   const [activeParamTab, setActiveParamTab] = useState('basic')
+  const tasks = useTrainingTasks()
 
-  const task = mockTasks.find(t => t.id === id)
+  const task = tasks.find(t => t.id === id)
   const version = task?.versions.find(v => v.id === versionId)
 
   const handleBack = () => navigate(`/training/detail/${id}`)
@@ -196,7 +198,20 @@ const VersionDetail: React.FC = () => {
       title: '确认终止该版本训练？',
       okText: '确认',
       cancelText: '取消',
-      onOk: () => message.success('已提交终止'),
+      onOk: () => {
+        createTaskNotification({
+          type: 'training',
+          status: 'terminated',
+          severity: 'warning',
+          taskId: id ?? version.id,
+          taskName: task.name,
+          taskModule: '大模型训练',
+          title: '训练版本已终止',
+          content: `${task.name} ${version.version} 已提交终止。`,
+          targetPath: `/training/detail/${id}/version/${versionId}`,
+        })
+        message.success('已提交终止')
+      },
     })
   }
 

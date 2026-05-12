@@ -23,7 +23,6 @@ import {
   RedoOutlined,
 } from '@ant-design/icons'
 import { useParams, useNavigate } from 'react-router-dom'
-import { mockTasks } from '../../data/mockData'
 import {
   TRAINING_METHOD_LABELS,
   TRAINING_RUN_STATUS_TAG,
@@ -31,6 +30,8 @@ import {
   type RunStatus,
   type FineTuneType,
 } from '../../types/training'
+import { useTrainingTasks } from '../../services/trainingTaskStore'
+import { createTaskNotification } from '../../services/notificationStore'
 import {
   getVersionActionFlags,
   TERMINATE_BLOCKED_MESSAGE,
@@ -48,15 +49,16 @@ const FINE_TUNE_TYPE_LABELS: Record<FineTuneType, string> = {
 const TrainingDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const tasks = useTrainingTasks()
 
-  const task = mockTasks.find(t => t.id === id)
+  const task = tasks.find(t => t.id === id)
 
   const [versions, setVersions] = useState<TrainingVersion[]>(() => task?.versions ?? [])
 
   useEffect(() => {
-    const t = mockTasks.find(x => x.id === id)
+    const t = tasks.find(x => x.id === id)
     setVersions(t?.versions ?? [])
-  }, [id])
+  }, [id, tasks])
 
   const goVersionDetail = (v: TrainingVersion) => {
     navigate(`/training/detail/${id}/version/${v.id}`)
@@ -66,6 +68,17 @@ const TrainingDetail: React.FC = () => {
     setVersions(prev =>
       prev.map(v => (v.id === record.id ? { ...v, status: 'starting' as RunStatus } : v)),
     )
+    createTaskNotification({
+      type: 'training',
+      status: 'started',
+      severity: 'info',
+      taskId: id ?? record.id,
+      taskName: task?.name ?? record.description,
+      taskModule: '大模型训练',
+      title: '训练版本已启动',
+      content: `${task?.name ?? '训练任务'} ${record.version} 已提交启动。`,
+      targetPath: `/training/detail/${id}`,
+    })
     message.success('已提交启动')
   }
 
@@ -78,6 +91,17 @@ const TrainingDetail: React.FC = () => {
         setVersions(prev =>
           prev.map(v => (v.id === record.id ? { ...v, status: 'terminated' as RunStatus } : v)),
         )
+        createTaskNotification({
+          type: 'training',
+          status: 'terminated',
+          severity: 'warning',
+          taskId: id ?? record.id,
+          taskName: task?.name ?? record.description,
+          taskModule: '大模型训练',
+          title: '训练版本已终止',
+          content: `${task?.name ?? '训练任务'} ${record.version} 已提交终止。`,
+          targetPath: `/training/detail/${id}`,
+        })
         message.success('已提交终止')
       },
     })
@@ -468,6 +492,10 @@ const TrainingDetail: React.FC = () => {
             <div>
               <Text type="secondary" style={{ fontSize: 12, marginBottom: 4, display: 'block' }}>任务名称</Text>
               <Text strong style={{ color: '#0f172a', fontSize: 14 }}>{task.name}</Text>
+            </div>
+            <div style={{ maxWidth: 360 }}>
+              <Text type="secondary" style={{ fontSize: 12, marginBottom: 4, display: 'block' }}>任务描述</Text>
+              <Text style={{ color: '#475569', fontSize: 13 }}>{task.description || '--'}</Text>
             </div>
             <div>
               <Text type="secondary" style={{ fontSize: 12, marginBottom: 4, display: 'block' }}>训练类型</Text>

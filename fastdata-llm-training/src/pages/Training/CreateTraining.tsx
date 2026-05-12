@@ -38,8 +38,10 @@ import {
   ArrowLeftOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
-import { trainedModels, mockTasks } from '../../data/mockData'
+import { trainedModels } from '../../data/mockData'
 import { getTrainingTypeFromModel, isQwenProvider, loadBaseModelCatalog } from '../../data/modelCatalog'
+import { useTrainingTasks } from '../../services/trainingTaskStore'
+import { createTaskNotification } from '../../services/notificationStore'
 import { resolveDatasetVersionRow } from '../../data/datasetPickerCatalog'
 import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
 import RewardRulesConfig from '../../components/RewardRulesConfig'
@@ -647,6 +649,7 @@ const CreateTraining: React.FC = () => {
   const [form] = Form.useForm()
   const [activeTab, setActiveTab] = useState('basic')
   const [baseModelCatalog] = useState(() => loadBaseModelCatalog())
+  const trainingTasks = useTrainingTasks()
 
   // 同一页面路由在「仅 taskId」与「taskId + editVersion」之间切换时组件不卸载，Ant Design Form 的 initialValues 只生效一次；
   // 用完整查询串作为 key，保证从「新增版本 V9」切到「编辑某版本」时表单整表重建并正确回显。
@@ -654,7 +657,7 @@ const CreateTraining: React.FC = () => {
 
   // ── URL 参数解析 ────────────────────────────────────────────────────────
   const taskId = searchParams.get('taskId')
-  const parentTask = taskId ? mockTasks.find(t => t.id === taskId) : undefined
+  const parentTask = taskId ? trainingTasks.find(t => t.id === taskId) : undefined
   const editVersionId = searchParams.get('editVersion')
   const resubmitFromId = searchParams.get('resubmitFrom')
 
@@ -796,9 +799,32 @@ const CreateTraining: React.FC = () => {
         message.success('保存成功')
         navigate(`/training/detail/${taskId}`)
       } else if (mode === 'resubmitFrom') {
+        createTaskNotification({
+          type: 'training',
+          status: 'started',
+          severity: 'info',
+          taskId: taskId ?? `training-${Date.now()}`,
+          taskName: form.getFieldValue('taskName') || parentTask?.name || '训练任务',
+          taskModule: '大模型训练',
+          title: '训练任务已重新提交',
+          content: `${form.getFieldValue('taskName') || parentTask?.name || '训练任务'} 已重新提交，等待启动。`,
+          targetPath: taskId ? `/training/detail/${taskId}` : '/training',
+        })
         message.success('重新提交成功')
         navigate(`/training/detail/${taskId}`)
       } else {
+        const taskName = form.getFieldValue('taskName') || '未命名训练任务'
+        createTaskNotification({
+          type: 'training',
+          status: 'created',
+          severity: 'info',
+          taskId: taskId ?? `training-${Date.now()}`,
+          taskName,
+          taskModule: '大模型训练',
+          title: '训练任务已创建',
+          content: `${taskName} 已创建，等待启动训练。`,
+          targetPath: taskId ? `/training/detail/${taskId}` : '/training',
+        })
         message.success('创建成功')
         navigate('/training')
       }

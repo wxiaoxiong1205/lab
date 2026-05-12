@@ -60,6 +60,7 @@ import {
 } from '../../services/taskLifecycle'
 import { dataServiceApi } from '../../services/dataServiceApi'
 import type { InferenceResultRecord as DataServiceInferenceResultRecord } from '../../services/dataServiceStore'
+import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 
 const { Text, Title } = Typography
 
@@ -89,6 +90,7 @@ type EvaluationTask = {
   manualGuide?: string
   manualStatus?: '评估中' | '未评估' | '已完成'
   judgeModel?: string
+  autoEvaluationType?: 'single' | 'comparison'
   detailMetrics?: Array<{ label: string; value: string }>
   detailHighlights?: string[]
 }
@@ -278,7 +280,13 @@ function mergeInferenceResultOptions(
   remoteRecords
     .filter(item => item.progress === '已完成')
     .map(normalizeInferenceResultOption)
-    .forEach(item => map.set(item.value, item))
+    .forEach(item => {
+      const existing = Array.from(map.values()).find(option => option.targetModel === item.targetModel && option.createdAt === item.createdAt)
+      if (existing) {
+        map.delete(existing.value)
+      }
+      map.set(item.value, item)
+    })
   return Array.from(map.values())
 }
 
@@ -492,6 +500,153 @@ function makeManualTask(params: {
 }
 
 const seedTasks: EvaluationTask[] = [
+  {
+    id: 'eval-auto-success-1',
+    name: '自动评估-客服问答-单个评估',
+    status: '已完成',
+    runtime: '1 分钟 18 秒',
+    progress: 100,
+    inferenceResult: '推理结果集_2026_03_19_14_09_32',
+    targetModel: 'Qwen2.5-0.5B-Instruct-GPTQ-Int8',
+    methods: ['裁判员评估', '基础指标评估'],
+    creator: 'lab1',
+    createdAt: '2026-04-12 09:18:30',
+    mode: 'auto',
+    datasetType: 'text-generation',
+    description: '客服问答场景单模型自动评估，覆盖答案相关性、忠实度和上下文精确度。',
+    sourceType: 'existing',
+    judgeModel: 'Qwen3-Next-80B-A3B-Instruct',
+    autoEvaluationType: 'single',
+    detailMetrics: [
+      { label: '答案相关性', value: '88.40' },
+      { label: '忠实度', value: '84.72' },
+      { label: '上下文精确度', value: '81.36' },
+    ],
+    detailHighlights: ['模型回复与用户问题保持高相关。', '少量样本仍需加强引用上下文约束。'],
+  },
+  {
+    id: 'eval-auto-success-2',
+    name: '自动评估-金融摘要-单个评估',
+    status: '已完成',
+    runtime: '1 分钟 06 秒',
+    progress: 100,
+    inferenceResult: '推理结果集_定时测试11_20260318160141',
+    targetModel: 'Qwen3-Next-80B-A3B-Instruct',
+    methods: ['裁判员评估'],
+    creator: 'deepexilab',
+    createdAt: '2026-04-12 10:05:14',
+    mode: 'auto',
+    datasetType: 'text-generation',
+    description: '金融摘要任务单模型裁判员评估，重点观察事实一致性和摘要完整度。',
+    sourceType: 'existing',
+    judgeModel: 'deepseek-v3.2',
+    autoEvaluationType: 'single',
+    detailMetrics: [
+      { label: '答案相关性', value: '91.18' },
+      { label: '忠实度', value: '89.64' },
+      { label: '上下文精确度', value: '86.27' },
+    ],
+    detailHighlights: ['摘要主旨稳定，事实偏差低。', '长上下文样本的关键信息覆盖率表现较好。'],
+  },
+  {
+    id: 'eval-auto-success-3',
+    name: '自动评估-知识库问答-单个评估',
+    status: '已完成',
+    runtime: '58 秒',
+    progress: 100,
+    inferenceResult: '推理结果集_2026_03_26_09_34_47',
+    targetModel: '123123',
+    methods: ['基础指标评估'],
+    creator: 'zhangsan',
+    createdAt: '2026-04-12 10:42:09',
+    mode: 'auto',
+    datasetType: 'text-generation',
+    description: '知识库问答单模型基础指标评估，用于查看自动评估成功态列表与报告展示。',
+    sourceType: 'existing',
+    judgeModel: 'Qwen3-Next-80B-A3B-Instruct',
+    autoEvaluationType: 'single',
+    detailMetrics: [
+      { label: '答案相关性', value: '82.73' },
+      { label: '忠实度', value: '79.45' },
+      { label: '上下文精确度', value: '76.88' },
+    ],
+    detailHighlights: ['基础指标已完成聚合。', '检索上下文命中率仍有优化空间。'],
+  },
+  {
+    id: 'eval-auto-compare-success-1',
+    name: '自动评估-客服问答-对比评估',
+    status: '已完成',
+    runtime: '2 分钟 24 秒',
+    progress: 100,
+    inferenceResult: '推理结果集_2026_03_19_14_09_32',
+    targetModel: 'Qwen2.5-0.5B-Instruct-GPTQ-Int8 / Qwen3-Next-80B-A3B-Instruct',
+    methods: ['裁判员评估', '基础指标评估'],
+    creator: 'lab1',
+    createdAt: '2026-04-12 11:16:27',
+    mode: 'auto',
+    datasetType: 'text-generation',
+    description: '客服问答场景对比评估，用于观察两个模型在答案质量上的差异。',
+    sourceType: 'existing',
+    judgeModel: 'deepseek-v3.2',
+    autoEvaluationType: 'comparison',
+    compareFields: ['答案相关性', '忠实度', '上下文精确度'],
+    detailMetrics: [
+      { label: '答案相关性', value: '90.32' },
+      { label: '忠实度', value: '87.96' },
+      { label: '上下文精确度', value: '84.58' },
+    ],
+    detailHighlights: ['对比模型在复杂意图理解上差距明显。', '新模型在上下文利用方面更稳定。'],
+  },
+  {
+    id: 'eval-auto-compare-success-2',
+    name: '自动评估-安全拒答-对比评估',
+    status: '已完成',
+    runtime: '2 分钟 03 秒',
+    progress: 100,
+    inferenceResult: '推理结果集_定时测试11_20260318160141',
+    targetModel: 'Qwen3-Next-80B-A3B-Instruct / deepseek-v3.2',
+    methods: ['裁判员评估'],
+    creator: 'deepexilab',
+    createdAt: '2026-04-12 11:45:36',
+    mode: 'auto',
+    datasetType: 'text-generation',
+    description: '安全拒答场景对比评估，覆盖不安全请求识别与拒答一致性。',
+    sourceType: 'existing',
+    judgeModel: 'Qwen3-Next-80B-A3B-Instruct',
+    autoEvaluationType: 'comparison',
+    compareFields: ['安全性', '拒答准确率', '解释完整性'],
+    detailMetrics: [
+      { label: '安全性', value: '94.12' },
+      { label: '拒答准确率', value: '91.70' },
+      { label: '解释完整性', value: '88.24' },
+    ],
+    detailHighlights: ['高风险样本均触发拒答策略。', '部分边界样本解释仍可更精炼。'],
+  },
+  {
+    id: 'eval-auto-compare-success-3',
+    name: '自动评估-长文本总结-对比评估',
+    status: '已完成',
+    runtime: '2 分钟 41 秒',
+    progress: 100,
+    inferenceResult: '推理结果集_2026_03_26_09_34_47',
+    targetModel: '123123 / Qwen2.5-0.5B-Instruct-GPTQ-Int8',
+    methods: ['基础指标评估'],
+    creator: 'zhangsan',
+    createdAt: '2026-04-12 12:08:51',
+    mode: 'auto',
+    datasetType: 'text-generation',
+    description: '长文本总结对比评估，用于展示多条成功态对比任务。',
+    sourceType: 'existing',
+    judgeModel: 'deepseek-v3.2',
+    autoEvaluationType: 'comparison',
+    compareFields: ['覆盖完整性', '事实一致性', '表达简洁度'],
+    detailMetrics: [
+      { label: '覆盖完整性', value: '86.35' },
+      { label: '事实一致性', value: '83.91' },
+      { label: '表达简洁度', value: '80.46' },
+    ],
+    detailHighlights: ['长文本关键点覆盖稳定。', '对比模型在表达压缩率上存在可见差异。'],
+  },
   {
     id: 'eval-1',
     name: 'test0001',
@@ -1489,6 +1644,24 @@ const EffectEvaluation: React.FC = () => {
     setTasks(previous => previous.map(task => (task.id === id ? updater(task) : task)))
   }
 
+  const updateEvaluationTaskMeta = (id: string, value: { name: string; description?: string }) => {
+    mutateTask(id, task => ({ ...task, name: value.name, description: value.description ?? '' }))
+  }
+
+  useEffect(() => {
+    setTasks(previous =>
+      previous.map(task => {
+        const stillExists = inferenceResultOptions.some(option => option.label === task.inferenceResult)
+        if (stillExists) {
+          return task
+        }
+
+        const replacement = inferenceResultOptions.find(option => option.targetModel === task.targetModel)
+        return replacement ? { ...task, inferenceResult: replacement.label } : task
+      }),
+    )
+  }, [inferenceResultOptions])
+
   const runAction = (record: EvaluationTask, action: 'start' | 'terminate' | 'resubmit' | 'delete') => {
     if (action === 'start') {
       mutateTask(record.id, task => ({ ...task, status: '启动中', runtime: '-', progress: 0 }))
@@ -1517,7 +1690,20 @@ const EffectEvaluation: React.FC = () => {
   }
 
   const columns: ColumnsType<EvaluationTask> = [
-    { title: '任务名称', dataIndex: 'name', key: 'name', width: 180 },
+    {
+      title: '任务名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 240,
+      render: (_value, record) => (
+        <TaskMetadataEditor
+          name={record.name}
+          description={record.description}
+          editable={canRunTaskLifecycleAction(record.status, 'edit')}
+          onSave={value => updateEvaluationTaskMeta(record.id, value)}
+        />
+      ),
+    },
     {
       title: '任务状态',
       dataIndex: 'status',
@@ -1597,7 +1783,20 @@ const EffectEvaluation: React.FC = () => {
   ]
 
   const manualColumns: ColumnsType<EvaluationTask> = [
-    { title: '任务名称', dataIndex: 'name', key: 'name', width: 180 },
+    {
+      title: '任务名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 240,
+      render: (_value, record) => (
+        <TaskMetadataEditor
+          name={record.name}
+          description={record.description}
+          editable={canRunTaskLifecycleAction(record.status, 'edit')}
+          onSave={value => updateEvaluationTaskMeta(record.id, value)}
+        />
+      ),
+    },
     {
       title: '任务状态',
       dataIndex: 'manualStatus',
@@ -2268,7 +2467,9 @@ const EffectEvaluation: React.FC = () => {
                 >
                   <div>
                     <div><Text type="secondary">任务名称：</Text>{reportRecord.name}</div>
-                    {reportRecord.mode === 'auto' && <div><Text type="secondary">评估类型：</Text>单个评估</div>}
+                    {reportRecord.mode === 'auto' && (
+                      <div><Text type="secondary">评估类型：</Text>{reportRecord.autoEvaluationType === 'comparison' ? '对比评估' : '单个评估'}</div>
+                    )}
                     {reportRecord.mode === 'auto' && (
                       <div><Text type="secondary">裁判员模型/服务：</Text>{reportRecord.judgeModel || '-'}</div>
                     )}
