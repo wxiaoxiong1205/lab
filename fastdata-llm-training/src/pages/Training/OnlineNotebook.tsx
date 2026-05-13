@@ -47,6 +47,7 @@ import {
 import { getCurrentUser, usePermissionStore } from '../../services/permissionStore'
 import { useOnlineInferenceServices } from '../../services/onlineInferenceServiceStore'
 import { createTaskNotification } from '../../services/notificationStore'
+import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import { PUBLISH_CASE_NOTICE } from '../notebookCaseNotice'
 
 const { Text, Title, Paragraph } = Typography
@@ -1163,7 +1164,37 @@ const OnlineNotebook: React.FC = () => {
   }
 
   const notebookColumns: ColumnsType<MyNotebookRecord> = [
-    { title: 'Notebook名称', dataIndex: 'name', key: 'name', width: 240, ellipsis: true },
+    {
+      title: 'Notebook名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 240,
+      render: (_value, record) => (
+        <TaskMetadataEditor
+          value={record.name}
+          required
+          maxLength={80}
+          strong
+          placeholder="请输入 Notebook 名称"
+          onSave={name => setRows(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))}
+        />
+      ),
+    },
+    {
+      title: '描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          emptyText="暂无描述"
+          placeholder="请输入描述"
+          type="secondary"
+          onSave={description => setRows(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))}
+        />
+      ),
+    },
     {
       title: '镜像',
       dataIndex: 'image',

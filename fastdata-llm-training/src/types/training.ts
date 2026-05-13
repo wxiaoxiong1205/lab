@@ -247,6 +247,9 @@ export interface TrainingConfig {
   // 监控配置
   loggingSteps?: number
 
+  // DeepSpeed 训练加速配置
+  deepspeedStage?: 'off' | 'z0' | 'z2' | 'z3'
+
   // LoRA配置（仅 SFT/DPO/RFT + lora 场景）
   loraAlpha?: number
   loraDropout?: number

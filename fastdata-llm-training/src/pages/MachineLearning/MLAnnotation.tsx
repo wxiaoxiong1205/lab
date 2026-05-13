@@ -27,26 +27,38 @@ import dayjs from 'dayjs'
 import {
   ArrowLeftOutlined,
   AuditOutlined,
+  BorderOutlined,
   CheckCircleOutlined,
   DatabaseOutlined,
   DeleteOutlined,
   DeploymentUnitOutlined,
+  DragOutlined,
+  EditOutlined,
   FormOutlined,
+  FullscreenOutlined,
   EyeOutlined,
+  LeftOutlined,
+  MinusOutlined,
   PlusOutlined,
   ReloadOutlined,
+  RightOutlined,
   SendOutlined,
+  SettingOutlined,
+  StopOutlined,
   TagsOutlined,
   TeamOutlined,
+  ZoomInOutlined,
 } from '@ant-design/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { getCurrentProjectMember, getCurrentUser, usePermissionStore } from '../../services/permissionStore'
+import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 
 const { Title, Text } = Typography
 
 type MLAnnotationRecord = {
   id: string
   name: string
+  description?: string
   dataType: '文本' | '图片'
   annotationType: string
   count: number
@@ -61,6 +73,7 @@ type MLAnnotationRecord = {
 type MultiAnnotationRecord = {
   id: string
   name: string
+  description?: string
   annotationType: string
   count: number
   status: '未发布' | '已完成'
@@ -94,6 +107,14 @@ type MemberDraft = {
   member: string
   amount: number
   deadline: string
+}
+
+type WorkbenchSample = {
+  id: string
+  title: string
+  content: string
+  label: string
+  status: '待处理' | '进行中' | '已完成'
 }
 
 const onlineRecords: MLAnnotationRecord[] = [
@@ -455,7 +476,7 @@ const reviewAssignments: AssignmentRecord[] = [
   },
 ]
 
-const workbenchSamples = [
+const workbenchSamples: WorkbenchSample[] = [
   { id: 'sample-1', title: '样本 001', content: '客户反馈：图片中商品外观完整，主体清晰，可用于单图多标签分类。', label: '商品图', status: '待处理' },
   { id: 'sample-2', title: '样本 002', content: '文本内容：售后问题集中在发货时效和包装破损，需要标记为物流相关。', label: '物流问题', status: '进行中' },
   { id: 'sample-3', title: '样本 003', content: '图片主体存在遮挡，建议审核时重点检查标注边界和标签一致性。', label: '待复核', status: '已完成' },
@@ -466,6 +487,8 @@ type WorkbenchKind = 'text-classification' | 'entity' | 'image-classification' |
 type DetectionBox = { id: string; label: string; x: number; y: number; width: number; height: number }
 
 type SegmentationRegion = { id: string; label: string; points: string; color: string }
+
+type LabelItem = { name: string; color: string; classId?: string }
 
 const datasetOptions = [
   { value: 'image-multi-v2', label: '图像分类/Phoena-图像分类-单图多标签-有标注-V2', dataType: '图片', annotationType: '图像分类', count: 13, output: '图像分类/Phoena-图像分类-单图多标签-有标注-V3' },
@@ -523,10 +546,44 @@ const tableContainerStyle: React.CSSProperties = {
   WebkitOverflowScrolling: 'touch',
 }
 
-const labelOptions = ['食品', '人物', '物体', '动物', '文字', '车辆', '正向', '负向', '中性']
-const entityLabels = ['LOC', '企业', '学校', '人名', '产品', '药物']
-const detectionLabelOptions = ['商品', '价签', '货架', '人物', '缺陷']
-const segmentationLabelOptions = ['道路', '建筑', '车辆', '天空', '植被']
+const palette = ['#bf6a2a', '#2dd4a3', '#d63ae0', '#84cc16', '#2f7fd8', '#e2435f', '#1fc547']
+const textClassificationLabels: LabelItem[] = [
+  { name: '科技', color: '#bf6a2a' },
+  { name: '财经', color: '#2dd4a3' },
+  { name: '体育', color: '#d63ae0' },
+  { name: '健康', color: '#84cc16' },
+  { name: '娱乐', color: '#2f7fd8' },
+  { name: '环保', color: '#e2435f' },
+]
+const entityLabelItems: LabelItem[] = [
+  { name: 'LOC', color: '#bf6a2a' },
+  { name: '企业', color: '#2dd4a3' },
+  { name: '学校', color: '#d63ae0' },
+  { name: '人名', color: '#84cc16' },
+  { name: '产品', color: '#2f7fd8' },
+  { name: '药物', color: '#e2435f' },
+  { name: '业务', color: '#1fc547' },
+]
+const imageClassificationLabels: LabelItem[] = [
+  { name: 'Build_Your_Dream', color: '#bf6a2a' },
+  { name: 'Lamborghini', color: '#2dd4a3' },
+  { name: 'Audi', color: '#d63ae0' },
+  { name: 'Bmw', color: '#84cc16' },
+  { name: 'M_Power', color: '#2f7fd8' },
+  { name: 'RS', color: '#e2435f' },
+  { name: 'SUV', color: '#64748b' },
+]
+const detectionLabelItems: LabelItem[] = [
+  { name: '食品', color: '#2dd4a3', classId: 'class_id=1' },
+  { name: '人物', color: '#d63ae0', classId: 'class_id=2' },
+  { name: '物体', color: '#84cc16', classId: 'class_id=3' },
+  { name: '动物', color: '#e2435f', classId: 'class_id=4' },
+  { name: '文字', color: '#6d28d9', classId: 'class_id=5' },
+]
+const segmentationLabelItems: LabelItem[] = [
+  { name: 'road_sign', color: '#84cc16', classId: 'class_id=3' },
+  { name: 'background', color: '#2f7fd8', classId: 'class_id=4' },
+]
 
 function getAnnotationWorkbenchKind(record: { annotationType: string; name?: string; taskName?: string }): WorkbenchKind {
   if (record.annotationType === '实体识别') return 'entity'
@@ -538,6 +595,58 @@ function getAnnotationWorkbenchKind(record: { annotationType: string; name?: str
 
 function isMultiLabelTask(name: string) {
   return name.includes('多标签') || name.includes('多')
+}
+
+function buildWorkbenchSamples(kind: WorkbenchKind, total: number, progress = 0, seed = '标注任务'): WorkbenchSample[] {
+  const safeTotal = Math.max(1, total)
+  const completedCount = Math.min(safeTotal, Math.floor((safeTotal * Math.max(0, progress)) / 100))
+  const contentByKind: Record<WorkbenchKind, string[]> = {
+    'text-classification': [
+      '苹果公司发布了新款 iPhone，搭载更强大的芯片，相关供应链股价应声上涨。',
+      '受强降雨影响，城市部分道路出现拥堵，交通部门已启动应急疏导。',
+      '本周末将进行足球联赛半决赛，主队核心球员已恢复合练。',
+    ],
+    entity: [
+      '四川省江油市华丰中学选用豆奶和复合营养素后，试验组男生的贫血率下降13个百分点。',
+      '杭州某科技公司发布新一代智能终端，产品将首先在华东区域试点。',
+      '张三在北京大学附属医院完成药物临床随访，治疗方案保持稳定。',
+    ],
+    'image-classification': [
+      '车辆正面清晰，包含品牌标识和车身颜色，可用于单图分类。',
+      '设备表面存在轻微划痕和污渍，可用于缺陷多标签分类。',
+      '商品包装完整且主体居中，适合图像分类训练。',
+    ],
+    'object-detection': [
+      '货架商品与价格标签需要分别框选，要求边界贴合主体。',
+      '画面中存在人物和手持物体，需要区分不同目标类别。',
+      '动物主体位于画面中央，需框选头部和躯干整体。',
+    ],
+    'image-segmentation': [
+      '道路场景需要区分 road_sign 与 background，并保留实例边界。',
+      '建筑与路面交界较清晰，适合多边形区域标注。',
+      '天空、道路和标识牌需要分别形成分割区域。',
+    ],
+  }
+  const labelByKind: Record<WorkbenchKind, string[]> = {
+    'text-classification': ['科技', '社会', '体育'],
+    entity: ['LOC', '企业', '人名'],
+    'image-classification': ['Build_Your_Dream', 'SUV', 'Audi'],
+    'object-detection': ['食品', '人物', '动物'],
+    'image-segmentation': ['road_sign', 'background', 'road_sign'],
+  }
+
+  return Array.from({ length: safeTotal }, (_, index) => {
+    const status: WorkbenchSample['status'] = index < completedCount ? '已完成' : index === completedCount ? '进行中' : '待处理'
+    const contents = contentByKind[kind]
+    const labels = labelByKind[kind]
+    return {
+      id: `${kind}-${seed}-${index + 1}`,
+      title: `样本 ${String(index + 1).padStart(3, '0')}`,
+      content: contents[index % contents.length],
+      label: labels[index % labels.length],
+      status,
+    }
+  })
 }
 
 function renderMockImage(title: string, height = 280) {
@@ -592,11 +701,14 @@ const MLAnnotation: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'online' | 'multi'>(searchParams.get('tab') === 'multi' || isCreateRoute ? 'multi' : 'online')
   const [multiSubTab, setMultiSubTab] = useState<'overview' | 'annotation' | 'review'>(canManageMultiAnnotation ? 'overview' : 'annotation')
   const [onlineCreateOpen, setOnlineCreateOpen] = useState(false)
+  const [onlineRows, setOnlineRows] = useState<MLAnnotationRecord[]>(onlineRecords)
+  const [multiRows, setMultiRows] = useState<MultiAnnotationRecord[]>(multiRecords)
   const [onlineDatasetType, setOnlineDatasetType] = useState<'文本' | '图片'>('图片')
   const [onlineDatasetPickerOpen, setOnlineDatasetPickerOpen] = useState(false)
   const [onlineSelectedDatasetValue, setOnlineSelectedDatasetValue] = useState<string>()
   const [detailRecord, setDetailRecord] = useState<MLAnnotationRecord | MultiAnnotationRecord | null>(null)
   const [memberRecord, setMemberRecord] = useState<MultiAnnotationRecord | null>(null)
+  const [configModalOpen, setConfigModalOpen] = useState(false)
   const [annotatorDrafts, setAnnotatorDrafts] = useState<MemberDraft[]>([])
   const [reviewerDrafts, setReviewerDrafts] = useState<MemberDraft[]>([])
   const [selectedDataset, setSelectedDataset] = useState(datasetOptions[0])
@@ -609,11 +721,19 @@ const MLAnnotation: React.FC = () => {
     { id: 'box-1', label: '商品', x: 16, y: 18, width: 38, height: 34 },
     { id: 'box-2', label: '价签', x: 58, y: 54, width: 24, height: 18 },
   ])
+  const [activeDetectionBoxId, setActiveDetectionBoxId] = useState('box-1')
   const [segmentationRegions, setSegmentationRegions] = useState<SegmentationRegion[]>([
     { id: 'seg-1', label: '道路', points: '12,68 92,62 98,96 8,98', color: 'rgba(59, 130, 246, 0.42)' },
     { id: 'seg-2', label: '建筑', points: '18,16 56,10 62,48 22,54', color: 'rgba(245, 158, 11, 0.46)' },
   ])
-  const currentOnlineTask = onlineTaskId ? onlineRecords.find(item => item.id === onlineTaskId) : undefined
+  const [activeSegmentationRegionId, setActiveSegmentationRegionId] = useState('seg-1')
+  const [customLabels, setCustomLabels] = useState<Partial<Record<WorkbenchKind, LabelItem[]>>>({})
+  const [selectedLabelName, setSelectedLabelName] = useState<string>('科技')
+  const [labelSearchValue, setLabelSearchValue] = useState('')
+  const [labelModalOpen, setLabelModalOpen] = useState(false)
+  const [editingLabel, setEditingLabel] = useState<LabelItem | null>(null)
+  const [labelDraftName, setLabelDraftName] = useState('')
+  const currentOnlineTask = onlineTaskId ? onlineRows.find(item => item.id === onlineTaskId) : undefined
   const visibleAnnotationAssignments = canManageMultiAnnotation
     ? annotationAssignments
     : annotationAssignments.filter(item => item.member === currentUser.account)
@@ -626,6 +746,7 @@ const MLAnnotation: React.FC = () => {
       ? visibleReviewAssignments.find(item => item.id === workbenchId)
       : undefined
   const activeSample = workbenchSampleRows.find(item => item.id === activeSampleId) ?? workbenchSampleRows[0]
+  const activeSampleIndex = Math.max(0, workbenchSampleRows.findIndex(item => item.id === activeSample?.id))
   const multiTabItems = [
     ...(canManageMultiAnnotation ? [{ key: 'overview', label: '任务总览' }] : []),
     { key: 'annotation', label: '标注任务' },
@@ -646,22 +767,60 @@ const MLAnnotation: React.FC = () => {
 
   useEffect(() => {
     if (workbenchMode || onlineTaskId) {
-      setWorkbenchSampleRows(workbenchSamples)
-      setActiveSampleId(workbenchSamples[0].id)
+      const targetTask = currentOnlineTask ?? currentWorkbenchAssignment
+      const kind = targetTask ? getAnnotationWorkbenchKind(targetTask) : 'text-classification'
+      const progress = currentOnlineTask?.progress ?? (currentWorkbenchAssignment ? Math.round((currentWorkbenchAssignment.completed / currentWorkbenchAssignment.amount) * 100) : 0)
+      const total = currentOnlineTask?.count ?? currentWorkbenchAssignment?.amount ?? workbenchSamples.length
+      const nextSamples = buildWorkbenchSamples(kind, total, progress ?? 0, targetTask ? ('name' in targetTask ? targetTask.name : targetTask.taskName) : '标注任务')
+      setWorkbenchSampleRows(nextSamples)
+      setActiveSampleId(nextSamples[0]?.id ?? '')
       setWorkbenchSubmitted(false)
       setDetectionBoxes([
         { id: 'box-1', label: '商品', x: 16, y: 18, width: 38, height: 34 },
         { id: 'box-2', label: '价签', x: 58, y: 54, width: 24, height: 18 },
       ])
+      setActiveDetectionBoxId('box-1')
       setSegmentationRegions([
         { id: 'seg-1', label: '道路', points: '12,68 92,62 98,96 8,98', color: 'rgba(59, 130, 246, 0.42)' },
         { id: 'seg-2', label: '建筑', points: '18,16 56,10 62,48 22,54', color: 'rgba(245, 158, 11, 0.46)' },
       ])
+      setActiveSegmentationRegionId('seg-1')
+      setSelectedLabelName(getDefaultLabels(kind)[0]?.name ?? '')
     }
-  }, [onlineTaskId, workbenchId, workbenchMode])
+  }, [currentOnlineTask, currentWorkbenchAssignment, onlineTaskId, workbenchId, workbenchMode])
 
   const onlineColumns: ColumnsType<MLAnnotationRecord> = [
-    { title: '任务名称', dataIndex: 'name', key: 'name', width: 260, ellipsis: true },
+    {
+      title: '任务名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 260,
+      render: (_value, record) => (
+        <TaskMetadataEditor
+          value={record.name}
+          required
+          maxLength={80}
+          strong
+          placeholder="请输入任务名称"
+          onSave={name => setOnlineRows(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))}
+        />
+      ),
+    },
+    {
+      title: '任务描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          emptyText="暂无描述"
+          placeholder="请输入任务描述"
+          type="secondary"
+          onSave={description => setOnlineRows(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))}
+        />
+      ),
+    },
     { title: '数据类型', dataIndex: 'dataType', key: 'dataType', width: 96 },
     { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 120 },
     { title: '数据量', dataIndex: 'count', key: 'count', width: 90 },
@@ -685,7 +844,37 @@ const MLAnnotation: React.FC = () => {
   ]
 
   const multiColumns: ColumnsType<MultiAnnotationRecord> = [
-    { title: '标注任务', dataIndex: 'name', key: 'name', width: 240, ellipsis: true },
+    {
+      title: '标注任务',
+      dataIndex: 'name',
+      key: 'name',
+      width: 240,
+      render: (_value, record) => (
+        <TaskMetadataEditor
+          value={record.name}
+          required
+          maxLength={80}
+          strong
+          placeholder="请输入标注任务名称"
+          onSave={name => setMultiRows(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))}
+        />
+      ),
+    },
+    {
+      title: '任务描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          emptyText="暂无描述"
+          placeholder="请输入任务描述"
+          type="secondary"
+          onSave={description => setMultiRows(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))}
+        />
+      ),
+    },
     { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 120 },
     { title: '数据量', dataIndex: 'count', key: 'count', width: 90 },
     { title: '状态', dataIndex: 'status', key: 'status', width: 90, render: statusTag },
@@ -965,6 +1154,110 @@ const MLAnnotation: React.FC = () => {
     )
   }
 
+  function getDefaultLabels(kind: WorkbenchKind): LabelItem[] {
+    if (kind === 'entity') return entityLabelItems
+    if (kind === 'image-classification') return imageClassificationLabels
+    if (kind === 'object-detection') return detectionLabelItems
+    if (kind === 'image-segmentation') return segmentationLabelItems
+    return textClassificationLabels
+  }
+
+  function getCurrentLabels(kind: WorkbenchKind) {
+    return customLabels[kind] ?? getDefaultLabels(kind)
+  }
+
+  function openLabelEditor(label?: LabelItem) {
+    setEditingLabel(label ?? null)
+    setLabelDraftName(label?.name ?? '')
+    setLabelModalOpen(true)
+  }
+
+  function saveLabel(kind: WorkbenchKind) {
+    const name = labelDraftName.trim()
+    if (!name) {
+      message.warning('请输入标签名称')
+      return
+    }
+    setCustomLabels(previous => {
+      const labels = previous[kind] ?? getDefaultLabels(kind)
+      const nextLabels = editingLabel
+        ? labels.map(label => label.name === editingLabel.name ? { ...label, name } : label)
+        : [...labels, { name, color: palette[labels.length % palette.length], classId: kind === 'object-detection' || kind === 'image-segmentation' ? `class_id=${labels.length + 1}` : undefined }]
+      return { ...previous, [kind]: nextLabels }
+    })
+    setSelectedLabelName(name)
+    setLabelModalOpen(false)
+  }
+
+  function deleteLabel(kind: WorkbenchKind, labelName: string) {
+    Modal.confirm({
+      title: '确认删除标签？',
+      content: `删除标签“${labelName}”后，当前工作台不再展示该标签。`,
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        setCustomLabels(previous => {
+          const labels = previous[kind] ?? getDefaultLabels(kind)
+          const nextLabels = labels.filter(label => label.name !== labelName)
+          return { ...previous, [kind]: nextLabels }
+        })
+        if (selectedLabelName === labelName) {
+          setSelectedLabelName(getCurrentLabels(kind).find(label => label.name !== labelName)?.name ?? '')
+        }
+      },
+    })
+  }
+
+  function renderLabelRail(kind: WorkbenchKind, locked: boolean) {
+    const labels = getCurrentLabels(kind)
+    const visibleLabels = labels.filter(label => label.name.toLowerCase().includes(labelSearchValue.toLowerCase()))
+    return (
+      <aside style={{ width: 240, borderRight: '1px solid #e5e7eb', background: '#fff', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 14px 16px 14px' }}>
+          <Title level={4} style={{ margin: 0 }}>标签栏</Title>
+          <Button type="primary" shape="round" icon={<PlusOutlined />} disabled={locked} onClick={() => openLabelEditor()} style={{ width: 44, height: 44 }} />
+        </div>
+        <div style={{ padding: '0 14px 12px 14px' }}>
+          <Input value={labelSearchValue} onChange={event => setLabelSearchValue(event.target.value)} placeholder="搜索标签" style={{ height: 42, borderRadius: 8 }} />
+        </div>
+        <div style={{ padding: '0 14px 14px 14px', overflowY: 'auto', flex: 1 }}>
+          <Space direction="vertical" size={10} style={{ width: '100%' }}>
+            {visibleLabels.map(label => (
+              <div
+                key={label.name}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedLabelName(label.name)}
+                style={{
+                  minHeight: 52,
+                  borderRadius: 10,
+                  border: `1px solid ${selectedLabelName === label.name ? '#60a5fa' : '#e5e7eb'}`,
+                  padding: '12px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: selectedLabelName === label.name ? '#eff6ff' : '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                <Space>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: label.color, display: 'inline-block' }} />
+                  <Text ellipsis style={{ maxWidth: 112 }}>{label.name}</Text>
+                </Space>
+                <Space size={8}>
+                  <Button type="text" size="small" icon={<EditOutlined />} disabled={locked} onClick={event => { event.stopPropagation(); openLabelEditor(label) }} />
+                  <Button type="text" size="small" danger icon={<DeleteOutlined />} disabled={locked} onClick={event => { event.stopPropagation(); deleteLabel(kind, label.name) }} />
+                </Space>
+              </div>
+            ))}
+            {!visibleLabels.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无标签" />}
+          </Space>
+        </div>
+      </aside>
+    )
+  }
+
   function completeCurrentSample(feedback: string) {
     if (!activeSample) return
     const currentIndex = workbenchSampleRows.findIndex(sample => sample.id === activeSample.id)
@@ -976,6 +1269,72 @@ const MLAnnotation: React.FC = () => {
       setActiveSampleId(nextSample.id)
     }
     message.success(feedback)
+  }
+
+  function goToSample(offset: number) {
+    const currentIndex = workbenchSampleRows.findIndex(sample => sample.id === activeSampleId)
+    const nextSample = workbenchSampleRows[currentIndex + offset]
+    if (nextSample) {
+      setActiveSampleId(nextSample.id)
+    }
+  }
+
+  function submitAllAnnotations(locked: boolean) {
+    if (locked) return
+    const unfinished = workbenchSampleRows.some(sample => sample.status !== '已完成')
+    if (unfinished) {
+      message.warning('请先完成当前任务中的全部数据标注')
+      return
+    }
+    setWorkbenchSubmitted(true)
+    message.success('提交标注成功，当前任务已锁定')
+  }
+
+  function addDetectionBox() {
+    const index = detectionBoxes.length + 1
+    const next: DetectionBox = {
+      id: `box-${Date.now()}`,
+      label: selectedLabelName || '物体',
+      x: 12 + (index % 4) * 12,
+      y: 16 + (index % 3) * 10,
+      width: 24,
+      height: 20,
+    }
+    setDetectionBoxes(previous => [...previous, next])
+    setActiveDetectionBoxId(next.id)
+    message.success('已新增矩形框')
+  }
+
+  function deleteActiveDetectionBox() {
+    if (!activeDetectionBoxId) return
+    setDetectionBoxes(previous => {
+      const next = previous.filter(box => box.id !== activeDetectionBoxId)
+      setActiveDetectionBoxId(next[0]?.id ?? '')
+      return next
+    })
+    message.success('已删除当前矩形框')
+  }
+
+  function addSegmentationRegion() {
+    const next: SegmentationRegion = {
+      id: `seg-${Date.now()}`,
+      label: selectedLabelName || 'background',
+      points: '22,58 42,50 62,56 70,82 30,86',
+      color: 'rgba(132, 204, 22, 0.38)',
+    }
+    setSegmentationRegions(previous => [...previous, next])
+    setActiveSegmentationRegionId(next.id)
+    message.success('已新增分割区域')
+  }
+
+  function deleteActiveSegmentationRegion() {
+    if (!activeSegmentationRegionId) return
+    setSegmentationRegions(previous => {
+      const next = previous.filter(region => region.id !== activeSegmentationRegionId)
+      setActiveSegmentationRegionId(next[0]?.id ?? '')
+      return next
+    })
+    message.success('已删除当前分割区域')
   }
 
   function renderSampleList() {
@@ -1039,211 +1398,369 @@ const MLAnnotation: React.FC = () => {
     )
   }
 
-  function renderTextClassificationWorkbench(record: MLAnnotationRecord, locked: boolean) {
-    const multi = isMultiLabelTask(record.name)
+  function renderTopActions(locked: boolean) {
+    const kind = currentOnlineTask ? getAnnotationWorkbenchKind(currentOnlineTask) : currentWorkbenchAssignment ? getAnnotationWorkbenchKind(currentWorkbenchAssignment) : 'text-classification'
+    const labels = getCurrentLabels(kind)
     return (
-      <Card
-        title={multi ? '文本多标签标注' : '文本单标签标注'}
-        style={cardStyle}
-        styles={{ body: { padding: 0 } }}
-      >
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+      <Space size={12}>
+        <Button type="primary" size="large" icon={<SettingOutlined />} disabled={locked} onClick={() => setConfigModalOpen(true)}>标注配置</Button>
+        <Button
+          size="large"
+          icon={<FormOutlined />}
+          disabled={locked || !activeSample}
+          onClick={() => {
+            setSelectedLabelName(labels[0]?.name ?? '')
+            message.success('AI 自动标注已生成建议结果')
           }}
         >
-          <div style={{ padding: 20, borderRight: '1px solid #edf0f5', background: '#fbfdff' }}>
-            <Title level={5} style={{ marginTop: 0, marginBottom: 18 }}>数据列表</Title>
-            {renderSampleListPanel()}
-          </div>
-
-          <div style={{ padding: 20, borderRight: '1px solid #edf0f5', minWidth: 0 }}>
-            <Title level={5} style={{ marginTop: 0, marginBottom: 18 }}>文本内容</Title>
-            {activeSample ? (
-              <div style={{ minHeight: 320, padding: 24, borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff', lineHeight: '28px' }}>
-                <Text style={{ fontSize: 15 }}>{activeSample.content}</Text>
-              </div>
-            ) : <Empty description="暂无数据" />}
-          </div>
-
-          <div style={{ padding: 20, minWidth: 0 }}>
-            <Title level={5} style={{ marginTop: 0, marginBottom: 18 }}>{multi ? '标签选择' : '标签选择'}</Title>
-            <Space direction="vertical" size={16} style={{ width: '100%' }}>
-              {multi ? (
-                <Checkbox.Group disabled={locked || !activeSample} defaultValue={[activeSample?.label].filter(Boolean) as string[]} options={labelOptions.slice(5)} />
-              ) : (
-                <Radio.Group disabled={locked || !activeSample} defaultValue={activeSample?.label}>
-                  <Space direction="vertical">
-                    {labelOptions.slice(5).map(label => <Radio key={label} value={label}>{label}</Radio>)}
-                  </Space>
-                </Radio.Group>
-              )}
-              <Input.TextArea rows={6} disabled={locked || !activeSample} placeholder="请输入标注备注" />
-              {renderFooterActions(locked, '完成标注')}
-            </Space>
-          </div>
-        </div>
-      </Card>
+          AI自动标注
+        </Button>
+        <Button type="primary" size="large" icon={<FormOutlined />} disabled={locked || !activeSample} onClick={() => completeCurrentSample('完成标注')}>完成标注</Button>
+      </Space>
     )
   }
 
-  function renderEntityWorkbench(locked: boolean) {
-    const entityText = '2026年4月，DeepExi Lab 在广州发布智能数据标注产品，支持 Qwen 多模态模型辅助识别商品、学校和药物实体。'
+  function renderBottomPagination(locked: boolean) {
+    const total = workbenchSampleRows.length
+    const currentIndex = Math.max(0, workbenchSampleRows.findIndex(sample => sample.id === activeSampleId))
+    const pageNumbers = Array.from({ length: Math.min(total, 5) }, (_, index) => index + 1)
+    const selectPage = (page: number) => {
+      const target = workbenchSampleRows[page - 1]
+      if (target) {
+        setActiveSampleId(target.id)
+      }
+    }
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: '220px minmax(0, 1fr) 300px', gap: 16 }}>
-        <Card title="标签栏" style={cardStyle}>
-          <Input.Search placeholder="搜索标签" style={{ marginBottom: 12 }} />
-          <Space direction="vertical" style={{ width: '100%' }}>
-            {entityLabels.map((label, index) => (
-              <Card key={label} size="small" style={{ borderColor: index === 0 ? '#1677ff' : '#edf0f5' }}>
-                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                  <Tag color={['blue', 'green', 'orange', 'purple', 'cyan', 'red'][index]}>{label}</Tag>
-                  <Text type="secondary">替换</Text>
-                </Space>
-              </Card>
-            ))}
-            <Button block icon={<PlusOutlined />} disabled={locked}>新增标签</Button>
-          </Space>
-        </Card>
-        <Card
-          title="文本实体识别"
-          extra={<Space><Button disabled={locked}>标注配置</Button><Button disabled={locked}>AI自动标注</Button><Button type="primary" disabled={locked} onClick={() => completeCurrentSample('完成标注')}>完成标注</Button></Space>}
-          style={cardStyle}
-        >
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
-            {renderSampleList()}
-            <div style={{ padding: 24, minHeight: 220, borderRadius: 8, background: '#fbfdff', border: '1px solid #e5e7eb', lineHeight: '32px', fontSize: 15 }}>
-              {entityText.split(' ').map((part, index) => index === 2 ? <Tag key={part} color="blue">DeepExi Lab / 企业</Tag> : `${part} `)}
-              <Tag color="purple">广州 / LOC</Tag>
-              <Tag color="cyan">Qwen / 产品</Tag>
-            </div>
-            <Card size="small" title="当前选择" style={{ background: '#fafafa' }}>
-              <Text type="secondary">选择文本片段后，可从右侧标签中完成实体标注。</Text>
-            </Card>
-            {renderFooterActions(locked, '完成标注')}
-          </Space>
-        </Card>
-        <Card title="实体结果" style={cardStyle}>
-          <Space direction="vertical" size={14} style={{ width: '100%' }}>
-            <div>
-              <Text type="secondary">可用标签</Text>
-              <div style={{ marginTop: 8 }}>{renderTagGroup(entityLabels)}</div>
-            </div>
-            <div>
-              <Text type="secondary">已标注实体</Text>
-              <Space direction="vertical" style={{ width: '100%', marginTop: 8 }}>
-                {['DeepExi Lab / 企业', '广州 / LOC', 'Qwen / 产品'].map(item => (
-                  <Card key={item} size="small">{item}</Card>
-                ))}
-              </Space>
-            </div>
-          </Space>
-        </Card>
+      <div style={{ height: 64, borderTop: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px 0 18px' }}>
+        <Space size={18}>
+          <Text style={{ fontSize: 16 }}>显示第 {total ? currentIndex + 1 : 0}-{total ? currentIndex + 1 : 0} 条，共 {total} 条</Text>
+          <Button type="text" icon={<LeftOutlined />} disabled={currentIndex <= 0} onClick={() => goToSample(-1)} />
+          {pageNumbers.map(page => (
+            <Button key={page} type={page === currentIndex + 1 ? 'primary' : 'text'} ghost={page === currentIndex + 1} onClick={() => selectPage(page)} style={{ minWidth: 36 }}>{page}</Button>
+          ))}
+          {total > 5 && <Text type="secondary">...</Text>}
+          {total > 5 && <Button type={total === currentIndex + 1 ? 'primary' : 'text'} ghost={total === currentIndex + 1} onClick={() => selectPage(total)}>{total}</Button>}
+          <Button type="text" icon={<RightOutlined />} disabled={currentIndex >= total - 1} onClick={() => goToSample(1)} />
+        </Space>
+        <Button type="primary" size="large" disabled={locked || !workbenchSampleRows.length || workbenchSampleRows.some(sample => sample.status !== '已完成')} onClick={() => submitAllAnnotations(locked)}>
+          提交标注
+        </Button>
       </div>
     )
+  }
+
+  function renderAnnotationFrame(kind: WorkbenchKind, locked: boolean, content: React.ReactNode) {
+    const labels = getCurrentLabels(kind)
+    const finished = workbenchSampleRows.filter(sample => sample.status === '已完成').length
+    return (
+      <div style={{ height: '100vh', minHeight: 680, background: '#fff', overflow: 'hidden', display: 'grid', gridTemplateRows: '64px minmax(0, 1fr) 64px' }}>
+        <div style={{ borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px' }}>
+          <Button type="text" size="large" icon={<ArrowLeftOutlined />} onClick={() => navigate('/machine-annotation')}>返回</Button>
+          <Space size={24}>
+            <Text type="secondary">当前进度：{finished}/{workbenchSampleRows.length}</Text>
+            {renderTopActions(locked)}
+          </Space>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '240px minmax(0, 1fr)', minHeight: 0 }}>
+          {renderLabelRail(kind, locked)}
+          {content}
+        </div>
+        {renderBottomPagination(locked)}
+        <Modal
+          title={editingLabel ? '编辑标签' : '新增标签'}
+          open={labelModalOpen}
+          onOk={() => saveLabel(kind)}
+          onCancel={() => setLabelModalOpen(false)}
+          okText="确定"
+          cancelText="取消"
+          destroyOnClose
+        >
+          <Input value={labelDraftName} onChange={event => setLabelDraftName(event.target.value)} placeholder="请输入标签名称" />
+        </Modal>
+        <Modal
+          title="标注配置"
+          open={configModalOpen}
+          onCancel={() => setConfigModalOpen(false)}
+          onOk={() => {
+            setConfigModalOpen(false)
+            message.success('标注配置已保存')
+          }}
+          okText="保存"
+          cancelText="取消"
+        >
+          <Descriptions column={1} size="small" bordered>
+            <Descriptions.Item label="标注类型">{currentOnlineTask?.annotationType ?? currentWorkbenchAssignment?.annotationType ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label="标签数量">{labels.length}</Descriptions.Item>
+            <Descriptions.Item label="当前标签">{selectedLabelName || '-'}</Descriptions.Item>
+            <Descriptions.Item label="交互方式">一页一条数据，完成后自动跳转下一条；未提交前可删除当前数据。</Descriptions.Item>
+          </Descriptions>
+        </Modal>
+      </div>
+    )
+  }
+
+  function renderImageToolbar(mode: 'rect' | 'polygon') {
+    return (
+      <div style={{ height: 44, border: '1px solid #e5e7eb', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14, padding: '0 12px', background: '#fff' }}>
+        <Button type="text" icon={<TagsOutlined />} />
+        <Button type="text" icon={<MinusOutlined />} />
+        <Button type="text" icon={<DeploymentUnitOutlined />} />
+        <Button type={mode === 'rect' ? 'primary' : 'text'} ghost={mode === 'rect'} icon={<BorderOutlined />} />
+        <Button type={mode === 'polygon' ? 'primary' : 'text'} ghost={mode === 'polygon'} icon={<EditOutlined />} />
+        <Button type="text" icon={<StopOutlined />} />
+        <span style={{ height: 24, borderLeft: '1px solid #e5e7eb' }} />
+        <Button type="text" icon={<LeftOutlined />} />
+        <Button type="text" icon={<RightOutlined />} />
+        <Button type="text" icon={<DeleteOutlined />} />
+        <span style={{ height: 24, borderLeft: '1px solid #e5e7eb' }} />
+        <Button type="text" icon={<MinusOutlined />} />
+        <Text>100%</Text>
+        <Button type="text" icon={<ZoomInOutlined />} />
+        <Button type="text" icon={<DragOutlined />}>拖拽平移，滚轮缩放</Button>
+        <Button type="text" icon={<FullscreenOutlined />} />
+      </div>
+    )
+  }
+
+  function renderTextClassificationWorkbench(record: MLAnnotationRecord, locked: boolean) {
+    const multi = isMultiLabelTask(record.name)
+    const labels = getCurrentLabels('text-classification')
+    const resultValue = selectedLabelName || labels[0]?.name
+    const content = (
+      <main style={{ padding: 14, overflow: 'auto' }}>
+        <div style={{ borderRadius: 8, background: '#f3f4f6', minHeight: 40, display: 'grid', gridTemplateColumns: '96px minmax(0, 1fr) 360px', alignItems: 'center', padding: '0 28px', fontSize: 16 }}>
+          <span>序号</span>
+          <span>文本</span>
+          <span>标注结果</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '96px minmax(0, 1fr) 360px', minHeight: 300, padding: '6px 28px 0', borderBottom: '1px solid #e5e7eb' }}>
+          <div><Tag color="blue" style={{ borderRadius: '50%', width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{activeSampleIndex + 1}</Tag></div>
+          <div style={{ padding: '34px 26px', textAlign: 'center', color: '#1f2937', fontSize: 15, lineHeight: '28px' }}>
+            {activeSample?.content || '苹果公司发布了新款iPhone，搭载了更强大的A17芯片，股价应声上涨'}
+          </div>
+          <div style={{ padding: '22px 0' }}>
+            <Select
+              mode={multi ? 'multiple' : undefined}
+              value={multi ? [resultValue || activeSample?.label].filter(Boolean) : resultValue || activeSample?.label}
+              disabled={locked}
+              options={labels.map(label => ({ label: label.name, value: label.name }))}
+              style={{ width: '100%' }}
+              onChange={value => setSelectedLabelName(Array.isArray(value) ? value[0] : value)}
+            />
+          </div>
+        </div>
+      </main>
+    )
+    return renderAnnotationFrame('text-classification', locked, content)
+  }
+
+  function renderEntityWorkbench(locked: boolean) {
+    const labels = getCurrentLabels('entity')
+    const markedEntities = [
+      { text: '四川', label: 'LOC', range: '[0, 2]', color: '#bf6a2a' },
+      { text: '江油市华丰中', label: '企业', range: '[3, 9]', color: '#2dd4a3' },
+      { text: '奶和复合营养素', label: 'LOC', range: '[13, 20]', color: '#bf6a2a' },
+    ]
+    const content = (
+      <main style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 14, padding: 14, overflow: 'auto' }}>
+        <section style={{ borderRadius: 10, background: '#fff', boxShadow: '0 8px 24px rgba(15,23,42,0.08)', padding: 24 }}>
+          <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 20 }}>
+            <div>
+              <Title level={4} style={{ margin: 0 }}>文本实体识别</Title>
+              <Text type="secondary">先选中文本，再点击右侧标签完成标注</Text>
+            </div>
+            <Button danger size="large" icon={<DeleteOutlined />} disabled={locked} onClick={() => message.success('已删除当前选中实体')}>删除实体</Button>
+          </Space>
+          <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, background: '#fbfdff', padding: 26, minHeight: 120, fontSize: 17, lineHeight: '42px' }}>
+            <span style={{ textDecoration: 'underline', textDecorationColor: '#bf6a2a', textDecorationThickness: 2 }}>四川</span><Tag color="orange">LOC</Tag>
+            <span> 省</span><span style={{ borderBottom: '2px solid #2dd4a3' }}>江油市华丰中</span><Tag color="green">企业</Tag>
+            <span> 学选用豆</span><span style={{ background: '#e5edf7', borderBottom: '2px solid #bf6a2a' }}>奶和复合营养素</span><Tag color="orange">LOC</Tag>
+            <span> 后，试验组男生的贫血率下降13个百分点，而对照组只降低0.44个百分点。</span>
+          </div>
+          <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, marginTop: 18, padding: 18, minHeight: 120 }}>
+            <Title level={5}>当前选择</Title>
+            <Text>文本：奶和复合营养素</Text><br />
+            <Text>标签：LOC</Text><br />
+            <Text>范围：[13, 20]</Text>
+          </div>
+        </section>
+        <aside style={{ borderRadius: 10, background: '#fff', boxShadow: '0 8px 24px rgba(15,23,42,0.08)', padding: 22 }}>
+          <Title level={4}>可用标签</Title>
+          <Space wrap size={[8, 8]} style={{ marginBottom: 24 }}>
+            {labels.map(label => <Button key={label.name} shape="round" onClick={() => setSelectedLabelName(label.name)}><span style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block', background: label.color, marginRight: 6 }} />{label.name}</Button>)}
+          </Space>
+          <Title level={4}>已标注实体</Title>
+          <Space direction="vertical" style={{ width: '100%' }}>
+            {markedEntities.map(entity => (
+              <div key={`${entity.text}-${entity.range}`} style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 14, background: entity.text.includes('奶') ? '#eff6ff' : '#fff' }}>
+                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                  <div><Text strong>{entity.text}</Text><br /><Text type="secondary">{entity.range}</Text></div>
+                  <Tag color={entity.color}>{entity.label}</Tag>
+                </Space>
+              </div>
+            ))}
+          </Space>
+        </aside>
+      </main>
+    )
+    return renderAnnotationFrame('entity', locked, content)
   }
 
   function renderImageClassificationWorkbench(record: MLAnnotationRecord, locked: boolean) {
     const multi = isMultiLabelTask(record.name)
-    return (
-      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 320px', gap: 16 }}>
-        {renderSampleList()}
-        <Card title="图片预览" style={cardStyle}>{activeSample ? renderMockImage(activeSample.title) : <Empty description="暂无数据" />}</Card>
-        <Card title={multi ? '单图多标签' : '单图单标签'} style={cardStyle}>
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
-            {multi ? (
-              <Checkbox.Group disabled={locked || !activeSample} defaultValue={['商品图']} options={labelOptions.slice(0, 6)} />
-            ) : (
-              <Radio.Group disabled={locked || !activeSample} defaultValue="商品图">
-                <Space direction="vertical">{labelOptions.slice(0, 6).map(label => <Radio key={label} value={label}>{label}</Radio>)}</Space>
-              </Radio.Group>
-            )}
-            {renderFooterActions(locked, '完成标注')}
-          </Space>
-        </Card>
-      </div>
+    const labels = getCurrentLabels('image-classification')
+    const content = (
+      <main style={{ padding: 14, overflow: 'auto' }}>
+        <div style={{ borderRadius: 8, background: '#f3f4f6', minHeight: 40, display: 'grid', gridTemplateColumns: '96px minmax(0, 1fr) 360px', alignItems: 'center', padding: '0 28px', fontSize: 16 }}>
+          <span>序号</span>
+          <span>图像</span>
+          <span>标注结果</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '96px minmax(0, 1fr) 360px', minHeight: 500, padding: '6px 28px 18px', borderBottom: '1px solid #e5e7eb' }}>
+          <div><Tag color="blue" style={{ borderRadius: '50%', width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{activeSampleIndex + 1}</Tag></div>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <div style={{ width: '72%', minWidth: 420, height: 360, border: '1px solid #dbe2ea', borderRadius: 8, overflow: 'hidden', background: '#eef2f7', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+              <div style={{ width: 360, height: 150, borderRadius: '50% 46% 18% 18%', background: 'linear-gradient(135deg, #111827 0%, #475569 46%, #94a3b8 100%)', position: 'relative', boxShadow: '0 28px 55px rgba(15,23,42,0.28)' }}>
+                <span style={{ position: 'absolute', left: 62, top: 96, width: 58, height: 58, borderRadius: '50%', background: '#0f172a', border: '8px solid #cbd5e1' }} />
+                <span style={{ position: 'absolute', right: 58, top: 96, width: 58, height: 58, borderRadius: '50%', background: '#0f172a', border: '8px solid #cbd5e1' }} />
+                <span style={{ position: 'absolute', left: 124, top: 20, width: 118, height: 54, borderRadius: '52px 52px 10px 10px', background: 'rgba(219,234,254,0.86)' }} />
+              </div>
+              <Text type="secondary" style={{ position: 'absolute', bottom: 18 }}>{activeSample?.content}</Text>
+            </div>
+          </div>
+          <div style={{ padding: '22px 0' }}>
+            <Select
+              mode={multi ? 'multiple' : undefined}
+              value={multi ? [selectedLabelName || activeSample?.label || labels[0]?.name, 'SUV'].filter(Boolean) : selectedLabelName || activeSample?.label || labels[0]?.name}
+              disabled={locked}
+              options={labels.map(label => ({ label: label.name, value: label.name }))}
+              style={{ width: '100%' }}
+              onChange={value => setSelectedLabelName(Array.isArray(value) ? value[0] : value)}
+            />
+          </div>
+        </div>
+      </main>
     )
+    return renderAnnotationFrame('image-classification', locked, content)
   }
 
   function renderObjectDetectionWorkbench(locked: boolean) {
-    return (
-      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 340px', gap: 16 }}>
-        {renderSampleList()}
-        <Card title="矩形框标注画布" style={cardStyle}>
-          <div style={{ position: 'relative' }}>
-            {renderMockImage(activeSample?.title ?? '图片样本', 360)}
-            {detectionBoxes.map(box => (
-              <div key={box.id} style={{ position: 'absolute', left: `${box.x}%`, top: `${box.y}%`, width: `${box.width}%`, height: `${box.height}%`, border: '2px solid #f97316', borderRadius: 4 }}>
-                <Tag color="orange" style={{ position: 'absolute', left: 0, top: -28 }}>{box.label}</Tag>
-              </div>
-            ))}
+    const labels = getCurrentLabels('object-detection')
+    const content = (
+      <main style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 14, padding: 14, overflow: 'auto' }}>
+        <section style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 14 }}>
+          {renderImageToolbar('rect')}
+          <div style={{ position: 'relative', minHeight: 420, marginTop: 12, borderRadius: 10, background: '#eaf2fb', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+            <div style={{ width: '72%', height: 360, background: 'linear-gradient(135deg, #cbd5e1 0%, #b45309 45%, #78350f 70%, #fda4af 100%)', position: 'relative' }}>
+              {detectionBoxes.map(box => (
+                <div
+                  key={box.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setActiveDetectionBoxId(box.id)}
+                  style={{
+                    position: 'absolute',
+                    left: `${box.x}%`,
+                    top: `${box.y}%`,
+                    width: `${box.width}%`,
+                    height: `${box.height}%`,
+                    border: `2px solid ${activeDetectionBoxId === box.id ? '#2563eb' : '#e23b63'}`,
+                    background: activeDetectionBoxId === box.id ? 'rgba(37, 99, 235, 0.18)' : 'rgba(225, 29, 72, 0.16)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ position: 'absolute', width: 10, height: 10, borderRadius: '50%', background: '#fff', border: '1px solid #94a3b8', left: -6, top: -6 }} />
+                </div>
+              ))}
+            </div>
           </div>
-        </Card>
-        <Card title="检测框列表" style={cardStyle}>
-          <Space direction="vertical" size={12} style={{ width: '100%' }}>
-            <Select disabled={locked} defaultValue="商品" options={detectionLabelOptions.map(label => ({ value: label, label }))} style={{ width: '100%' }} />
-            <Button
-              block
-              disabled={locked || !activeSample}
-              icon={<PlusOutlined />}
-              onClick={() => setDetectionBoxes(items => [...items, { id: `box-${Date.now()}`, label: detectionLabelOptions[items.length % detectionLabelOptions.length], x: 20 + items.length * 6, y: 20 + items.length * 4, width: 26, height: 24 }])}
-            >
-              新增矩形框
-            </Button>
-            {detectionBoxes.map(box => (
-              <Card key={box.id} size="small">
-                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                  <span>{box.label} {box.width}x{box.height}</span>
-                  <Button type="link" danger disabled={locked} onClick={() => setDetectionBoxes(items => items.filter(item => item.id !== box.id))}>删除</Button>
-                </Space>
-              </Card>
-            ))}
-            {renderFooterActions(locked, '完成标注')}
-          </Space>
-        </Card>
-      </div>
+        </section>
+        <aside>
+          <Card title="区域信息" style={{ ...cardStyle, marginBottom: 14 }}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Select value={selectedLabelName || '动物'} disabled={locked} options={labels.map(label => ({ value: label.name, label: label.name }))} onChange={setSelectedLabelName} style={{ width: '100%' }} />
+              <Space>
+                <Button type="primary" disabled={locked} onClick={addDetectionBox}>新增框</Button>
+                <Button danger disabled={locked || !activeDetectionBoxId} onClick={deleteActiveDetectionBox}>删除框</Button>
+              </Space>
+              <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12 }}>
+                <Text type="secondary">区域 ID: {activeDetectionBoxId || '-'}</Text><br />
+                <Text type="secondary">矩形: x=118.4, y=22.6, w=353.2, h=400.5</Text><br />
+                <Text type="secondary">类别: {selectedLabelName || '动物'}</Text>
+              </div>
+            </Space>
+          </Card>
+          <Card title="标签图例" style={cardStyle}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {labels.map(label => (
+                <div key={label.name} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Space><span style={{ width: 10, height: 10, borderRadius: '50%', background: label.color }} />{label.name}</Space>
+                  <Tag color="blue">{label.classId}</Tag>
+                </div>
+              ))}
+            </Space>
+          </Card>
+        </aside>
+      </main>
     )
+    return renderAnnotationFrame('object-detection', locked, content)
   }
 
   function renderImageSegmentationWorkbench(locked: boolean) {
-    return (
-      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 340px', gap: 16 }}>
-        {renderSampleList()}
-        <Card title="图像分割画布" style={cardStyle}>
-          <div style={{ position: 'relative' }}>
-            {renderMockImage(activeSample?.title ?? '图片样本', 360)}
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
-              {segmentationRegions.map(region => (
-                <polygon key={region.id} points={region.points} fill={region.color} stroke="#0f172a" strokeWidth="0.6" />
-              ))}
-            </svg>
+    const labels = getCurrentLabels('image-segmentation')
+    const content = (
+      <main style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 14, padding: 14, overflow: 'auto' }}>
+        <section style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 14 }}>
+          {renderImageToolbar('polygon')}
+          <div style={{ position: 'relative', minHeight: 420, marginTop: 12, borderRadius: 10, background: '#eaf2fb', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+            <div style={{ width: '78%', height: 360, background: 'linear-gradient(180deg, #cbd5e1 0%, #94a3b8 26%, #64748b 52%, #334155 100%)', position: 'relative' }}>
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                <polygon points="0,48 16,42 32,36 52,32 70,36 100,48 100,100 0,100" fill="rgba(47, 127, 216, 0.28)" stroke="#2f7fd8" strokeWidth="0.8" />
+                <polyline points="0,48 16,42 32,36 52,32 70,36 100,48" fill="none" stroke="#2f7fd8" strokeWidth="1.2" />
+                {segmentationRegions.map(region => (
+                  <polygon
+                    key={region.id}
+                    points={region.points}
+                    fill={region.color}
+                    stroke={activeSegmentationRegionId === region.id ? '#2563eb' : '#d63ae0'}
+                    strokeWidth={activeSegmentationRegionId === region.id ? '1.2' : '0.8'}
+                    onClick={() => setActiveSegmentationRegionId(region.id)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                ))}
+              </svg>
+            </div>
           </div>
-        </Card>
-        <Card title="分割区域" style={cardStyle}>
-          <Space direction="vertical" size={12} style={{ width: '100%' }}>
-            <Select disabled={locked} defaultValue="道路" options={segmentationLabelOptions.map(label => ({ value: label, label }))} style={{ width: '100%' }} />
-            <Button
-              block
-              disabled={locked || !activeSample}
-              icon={<PlusOutlined />}
-              onClick={() => setSegmentationRegions(items => [...items, { id: `seg-${Date.now()}`, label: segmentationLabelOptions[items.length % segmentationLabelOptions.length], points: '35,20 84,28 76,72 28,68', color: 'rgba(34, 197, 94, 0.42)' }])}
-            >
-              新增分割区域
-            </Button>
-            {segmentationRegions.map(region => (
-              <Card key={region.id} size="small">
-                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                  <Tag color="green">{region.label}</Tag>
-                  <Button type="link" danger disabled={locked} onClick={() => setSegmentationRegions(items => items.filter(item => item.id !== region.id))}>删除</Button>
-                </Space>
-              </Card>
-            ))}
-            {renderFooterActions(locked, '完成标注')}
-          </Space>
-        </Card>
-      </div>
+        </section>
+        <aside>
+          <Card title="区域信息" style={{ ...cardStyle, marginBottom: 14 }}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Select value={selectedLabelName || 'background'} disabled={locked} options={labels.map(label => ({ value: label.name, label: label.name }))} onChange={setSelectedLabelName} style={{ width: '100%' }} />
+              <Space>
+                <Button type="primary" disabled={locked} onClick={addSegmentationRegion}>新增区域</Button>
+                <Button danger disabled={locked || !activeSegmentationRegionId} onClick={deleteActiveSegmentationRegion}>删除区域</Button>
+              </Space>
+              <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12 }}>
+                <Text type="secondary">区域 ID: {activeSegmentationRegionId || '-'}</Text><br />
+                <Text type="secondary">点数量: 18</Text><br />
+                <Text type="secondary">类别: {selectedLabelName || 'background'}</Text>
+              </div>
+            </Space>
+          </Card>
+          <Card title="标签图例" style={cardStyle}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {labels.map(label => (
+                <div key={label.name} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Space><span style={{ width: 10, height: 10, borderRadius: '50%', background: label.color }} />{label.name}</Space>
+                  <Tag color="blue">{label.classId}</Tag>
+                </div>
+              ))}
+            </Space>
+          </Card>
+        </aside>
+      </main>
     )
+    return renderAnnotationFrame('image-segmentation', locked, content)
   }
 
   function renderOnlineTaskSummary(record: MLAnnotationRecord, locked: boolean) {
@@ -1302,23 +1819,18 @@ const MLAnnotation: React.FC = () => {
 
     const locked = workbenchSubmitted || currentOnlineTask.status === '已完成'
     const workbenchKind = getAnnotationWorkbenchKind(currentOnlineTask)
+    const workbench = workbenchKind === 'text-classification'
+      ? renderTextClassificationWorkbench(currentOnlineTask, locked)
+      : workbenchKind === 'entity'
+        ? renderEntityWorkbench(locked)
+        : workbenchKind === 'image-classification'
+          ? renderImageClassificationWorkbench(currentOnlineTask, locked)
+          : workbenchKind === 'object-detection'
+            ? renderObjectDetectionWorkbench(locked)
+            : renderImageSegmentationWorkbench(locked)
     return (
-      <div style={{ padding: '24px 32px', minHeight: '100%', background: '#f7f8fa' }}>
-        <Space direction="vertical" size={16} style={{ width: '100%' }}>
-          <Card
-            style={cardStyle}
-            title="在线标注详情"
-            extra={<Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/machine-annotation')}>返回列表</Button>}
-          >
-            {renderOnlineTaskSummary(currentOnlineTask, locked)}
-          </Card>
-
-          {workbenchKind === 'text-classification' && renderTextClassificationWorkbench(currentOnlineTask, locked)}
-          {workbenchKind === 'entity' && renderEntityWorkbench(locked)}
-          {workbenchKind === 'image-classification' && renderImageClassificationWorkbench(currentOnlineTask, locked)}
-          {workbenchKind === 'object-detection' && renderObjectDetectionWorkbench(locked)}
-          {workbenchKind === 'image-segmentation' && renderImageSegmentationWorkbench(locked)}
-        </Space>
+      <div style={{ padding: 0, minHeight: '100%', background: '#f7f8fa' }}>
+        {workbench}
       </div>
     )
   }
@@ -1605,9 +2117,9 @@ const MLAnnotation: React.FC = () => {
                 <Table
                   rowKey="id"
                   columns={onlineColumns}
-                  dataSource={onlineRecords}
+                  dataSource={onlineRows}
                   pagination={{ pageSize: 10, total: 68, showTotal: total => `共 ${total} 条记录` }}
-                  scroll={{ x: 1650 }}
+                  scroll={{ x: 1870 }}
                 />
               </div>
             </>
@@ -1632,9 +2144,9 @@ const MLAnnotation: React.FC = () => {
                   <Table
                     rowKey="id"
                     columns={multiColumns}
-                    dataSource={multiRecords}
+                    dataSource={multiRows}
                     pagination={{ pageSize: 10, showTotal: total => `共 ${total} 条记录` }}
-                    scroll={{ x: 1320 }}
+                    scroll={{ x: 1540 }}
                   />
                 </div>
               )}

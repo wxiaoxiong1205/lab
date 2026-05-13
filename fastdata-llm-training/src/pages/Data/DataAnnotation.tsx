@@ -43,12 +43,14 @@ import {
   selectAnnotationTasks,
   useDataServiceSnapshot,
 } from '../../services/dataServiceApi'
+import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 
 const { Text, Title } = Typography
 
 type AnnotationTask = {
   id: string
   name: string
+  description?: string
   dataVolume: number
   progress: number | null
   status?: '未开始' | '标注中' | '待审核' | '已完成' | '已提交' | '失败'
@@ -798,8 +800,54 @@ const DataAnnotation: React.FC = () => {
     </Space>
   )
 
+  const updateAnnotationTaskMeta = async (record: AnnotationTask, value: { name?: string; description?: string }) => {
+    const nextRecord = {
+      ...record,
+      name: value.name ?? record.name,
+      description: value.description ?? record.description ?? '',
+    }
+    await dataServiceApi.updateAnnotationTaskMeta(record.id, {
+      name: nextRecord.name,
+      description: nextRecord.description,
+    })
+    setListResult(previous => ({
+      ...previous,
+      items: previous.items.map(item => (item.id === record.id ? nextRecord : item)),
+    }))
+  }
+
   const columns: ColumnsType<AnnotationTask> = [
-    { title: '任务名称', dataIndex: 'name', key: 'name' },
+    {
+      title: '任务名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 220,
+      render: (_value, record) => (
+        <TaskMetadataEditor
+          value={record.name}
+          required
+          maxLength={80}
+          strong
+          placeholder="请输入任务名称"
+          onSave={name => updateAnnotationTaskMeta(record, { name })}
+        />
+      ),
+    },
+    {
+      title: '任务描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          emptyText="暂无描述"
+          placeholder="请输入任务描述"
+          type="secondary"
+          onSave={description => updateAnnotationTaskMeta(record, { description })}
+        />
+      ),
+    },
     {
       title: '任务状态',
       dataIndex: 'status',

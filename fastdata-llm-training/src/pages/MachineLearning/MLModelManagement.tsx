@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { formatResourceLockMessage, getModelReferenceLocks } from '../../services/resourceReferenceGuard'
 import ResumableUpload from '../../components/ResumableUpload'
+import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 
 const { Title, Text } = Typography
 
@@ -124,7 +125,37 @@ const MLModelManagement: React.FC = () => {
   }
 
   const columns: ColumnsType<MLModelRecord> = [
-    { title: '模型名称', dataIndex: 'name', key: 'name', ellipsis: true },
+    {
+      title: '模型名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 240,
+      render: (_value, record) => (
+        <TaskMetadataEditor
+          value={record.name}
+          required
+          maxLength={80}
+          strong
+          placeholder="请输入模型名称"
+          onSave={name => setModels(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))}
+        />
+      ),
+    },
+    {
+      title: '模型描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          emptyText="暂无描述"
+          placeholder="请输入模型描述"
+          type="secondary"
+          onSave={description => setModels(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))}
+        />
+      ),
+    },
     { title: '版本数量', dataIndex: 'versionCount', key: 'versionCount', width: 160 },
     {
       title: '操作',

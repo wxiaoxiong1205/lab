@@ -23,6 +23,7 @@ import {
 } from '../../services/onlineInferenceServiceStore'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { formatResourceLockMessage, getOnlineInferenceServiceReferenceLocks } from '../../services/resourceReferenceGuard'
+import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 
 const { Title, Text } = Typography
 
@@ -75,7 +76,17 @@ const OnlineInferenceService: React.FC = () => {
       title: '服务名称',
       dataIndex: 'name',
       key: 'name',
-      render: value => <Button type="link" size="small" style={{ padding: 0 }}>{value}</Button>,
+      width: 220,
+      render: (_value, record) => (
+        <TaskMetadataEditor
+          value={record.name}
+          required
+          maxLength={80}
+          strong
+          placeholder="请输入服务名称"
+          onSave={name => onlineInferenceServiceActions.updateService(record.id, item => ({ ...item, name }))}
+        />
+      ),
     },
     {
       title: '连接状态',
@@ -84,7 +95,21 @@ const OnlineInferenceService: React.FC = () => {
       width: 120,
       render: (value: OnlineServiceConnectionStatus) => <Tag color={statusColorMap[value]}>{value}</Tag>,
     },
-    { title: '描述', dataIndex: 'description', key: 'description', width: 160 },
+    {
+      title: '描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          emptyText="暂无描述"
+          placeholder="请输入描述"
+          type="secondary"
+          onSave={description => onlineInferenceServiceActions.updateService(record.id, item => ({ ...item, description }))}
+        />
+      ),
+    },
     { title: '模型类型', dataIndex: 'modelType', key: 'modelType', width: 150 },
     { title: '创建人', dataIndex: 'creator', key: 'creator', width: 120 },
     { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 180 },

@@ -23,12 +23,14 @@ import {
   type TaskLifecycleStatus,
 } from '../../services/taskLifecycle'
 import { formatResourceLockMessage, getModelReferenceLocks } from '../../services/resourceReferenceGuard'
+import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 
 const { Text, Title } = Typography
 
 type ModelRecord = {
   id: string
   name: string
+  description?: string
   modelType: string
   baseModel: string
   versionCount: number
@@ -38,10 +40,10 @@ type ModelRecord = {
 }
 
 const modelList: ModelRecord[] = [
-  { id: 'm-1', name: '123123', modelType: '文本生成', baseModel: 'Qwen2.5-0.5B', versionCount: 2, status: '已完成', creator: 'admin', createdAt: '2026/03/20 10:00:00' },
-  { id: 'm-2', name: 'demo-basion-1', modelType: '文本生成', baseModel: 'Qwen2.5-0.5B', versionCount: 3, status: '已创建', creator: 'lab1', createdAt: '2026/03/18 14:30:00' },
-  { id: 'm-3', name: 'Qwen-test001', modelType: '文本生成', baseModel: 'Qwen2.5-0.5B-Instruct', versionCount: 3, status: '失败', creator: 'admin', createdAt: '2026/03/25 09:00:00' },
-  { id: 'm-4', name: 'Lora模型', modelType: '文本生成', baseModel: 'Qwen3-1.7B', versionCount: 1, status: '已终止', creator: 'lab1', createdAt: '2026/03/22 11:12:00' },
+  { id: 'm-1', name: '123123', description: '文本生成模型训练产物', modelType: '文本生成', baseModel: 'Qwen2.5-0.5B', versionCount: 2, status: '已完成', creator: 'admin', createdAt: '2026/03/20 10:00:00' },
+  { id: 'm-2', name: 'demo-basion-1', description: '业务演示模型', modelType: '文本生成', baseModel: 'Qwen2.5-0.5B', versionCount: 3, status: '已创建', creator: 'lab1', createdAt: '2026/03/18 14:30:00' },
+  { id: 'm-3', name: 'Qwen-test001', description: 'Qwen 基座测试模型', modelType: '文本生成', baseModel: 'Qwen2.5-0.5B-Instruct', versionCount: 3, status: '失败', creator: 'admin', createdAt: '2026/03/25 09:00:00' },
+  { id: 'm-4', name: 'Lora模型', description: 'LoRA 微调模型', modelType: '文本生成', baseModel: 'Qwen3-1.7B', versionCount: 1, status: '已终止', creator: 'lab1', createdAt: '2026/03/22 11:12:00' },
 ]
 
 function statusTag(status: ModelRecord['status']): React.ReactNode {
@@ -64,7 +66,37 @@ const ModelManagement: React.FC = () => {
   )
 
   const columns: ColumnsType<ModelRecord> = [
-    { title: '模型名称', dataIndex: 'name', key: 'name' },
+    {
+      title: '模型名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 220,
+      render: (_value, record) => (
+        <TaskMetadataEditor
+          value={record.name}
+          required
+          maxLength={80}
+          strong
+          placeholder="请输入模型名称"
+          onSave={name => setRows(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))}
+        />
+      ),
+    },
+    {
+      title: '模型描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          emptyText="暂无描述"
+          placeholder="请输入模型描述"
+          type="secondary"
+          onSave={description => setRows(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))}
+        />
+      ),
+    },
     { title: '模型类型', dataIndex: 'modelType', key: 'modelType' },
     { title: '基础模型', dataIndex: 'baseModel', key: 'baseModel' },
     { title: '版本数量', dataIndex: 'versionCount', key: 'versionCount', width: 120 },

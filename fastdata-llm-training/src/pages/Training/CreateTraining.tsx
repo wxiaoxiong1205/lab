@@ -63,6 +63,45 @@ dayjs.extend(customParseFormat)
 
 const { Title, Text, Paragraph } = Typography
 
+type DeepSpeedStage = 'off' | 'z0' | 'z2' | 'z3'
+
+const deepspeedStageOptions: Array<{
+  value: DeepSpeedStage
+  label: string
+  file: string
+  description: string
+  tooltip: string
+}> = [
+  {
+    value: 'off',
+    label: '不开启',
+    file: '不使用 DeepSpeed',
+    description: '使用框架默认训练策略，适合 LoRA 或单卡显存充足的场景。',
+    tooltip: '不开启 DeepSpeed 训练加速，不加载 ZeRO 配置。适合模型本身能放下、希望保持配置简单，或 LoRA 微调显存压力不大的场景。',
+  },
+  {
+    value: 'z0',
+    label: 'ZeRO-0',
+    file: 'examples/deepspeed/ds_z0_config.json',
+    description: '普通 DDP 基线，不切分参数、梯度和优化器状态，通常速度最快。',
+    tooltip: 'ZeRO-0 不做显存状态切分，等价于普通数据并行基线。显存节省最低、通信开销低，适合显存足够时做性能和稳定性基线。',
+  },
+  {
+    value: 'z2',
+    label: 'ZeRO-2',
+    file: 'examples/deepspeed/ds_z2_config.json',
+    description: '切分优化器状态和梯度，在显存占用与训练速度之间取得平衡。',
+    tooltip: 'ZeRO-2 切分 optimizer states 和 gradients。显存节省中等，通信开销仍相对可控，是多卡训练中最常见的折中方案。',
+  },
+  {
+    value: 'z3',
+    label: 'ZeRO-3',
+    file: 'examples/deepspeed/ds_z3_config.json',
+    description: '切分优化器状态、梯度和参数，最大化降低单卡显存占用。',
+    tooltip: 'ZeRO-3 同时切分 optimizer states、gradients 和 parameters。显存节省最高，但通信开销最大、单步通常更慢，适合模型很大或 ZeRO-2 仍放不下时使用。',
+  },
+]
+
 type TrainingBaseModelOption = {
   id: string
   name: string
@@ -346,6 +385,7 @@ const FULL_FINETUNE_DEFAULTS = {
   saveStrategy: 'STEPS',
   saveTotalLimit: 3,
   loggingSteps: 5,
+  deepspeedStage: 'off' as DeepSpeedStage,
 } as const
 
 /** LoRA 微调：仅 LoRA 配置 Tab 的默认值（说明仅 tooltip 展示） */
@@ -629,6 +669,7 @@ function mapVersionToFormValues(
     saveStrategy: c.saveStrategy,
     saveTotalLimit: c.saveTotalLimit,
     loggingSteps: c.loggingSteps,
+    deepspeedStage: c.deepspeedStage ?? 'off',
     loraRank: c.loraRank,
     loraTargetModules: c.loraTarget === 'all' ? ['all'] : (c.loraTarget ? [c.loraTarget] : ['all']),
     loraAlpha: c.loraAlpha,
@@ -1104,6 +1145,49 @@ const CreateTraining: React.FC = () => {
             <InputNumber style={{ width: '100%' }} min={1} placeholder="如: 5" />
           </Form.Item>
         </div>
+      ),
+    },
+    {
+      key: 'accelerate',
+      label: (
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ThunderboltOutlined />
+          训练加速配置
+        </span>
+      ),
+      children: (
+        <Form.Item
+          label="DeepSpeed ZeRO 策略"
+          name="deepspeedStage"
+          tooltip="DeepSpeed 是大模型训练优化框架；当前仅暴露 ZeRO 显存优化策略，用于在多卡训练中降低模型参数、梯度和优化器状态的显存冗余。"
+        >
+          <Radio.Group style={{ width: '100%' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
+              {deepspeedStageOptions.map(option => (
+                <Tooltip key={option.value} title={option.tooltip} placement="top">
+                  <Radio.Button
+                    value={option.value}
+                    style={{
+                      width: '100%',
+                      height: 'auto',
+                      minHeight: 128,
+                      padding: 12,
+                      borderRadius: 8,
+                      lineHeight: 1.5,
+                      whiteSpace: 'normal',
+                    }}
+                  >
+                    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                      <Text strong>{option.label}</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>{option.description}</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>{option.file}</Text>
+                    </Space>
+                  </Radio.Button>
+                </Tooltip>
+              ))}
+            </div>
+          </Radio.Group>
+        </Form.Item>
       ),
     },
   ]

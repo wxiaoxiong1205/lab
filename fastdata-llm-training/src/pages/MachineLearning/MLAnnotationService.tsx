@@ -3,12 +3,14 @@ import { Button, Card, Empty, message, Modal, Space, Table, Tag, Typography } fr
 import type { ColumnsType } from 'antd/es/table'
 import { AppstoreOutlined, PlusOutlined } from '@ant-design/icons'
 import { formatResourceLockMessage, getOnlineAnnotationServiceReferenceLocks } from '../../services/resourceReferenceGuard'
+import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 
 const { Title, Text } = Typography
 
 type AnnotationServiceRecord = {
   id: string
   name: string
+  description?: string
   tool: string
   targetDataset: string
   status: '运行中' | '已停止'
@@ -20,6 +22,7 @@ const seedServices: AnnotationServiceRecord[] = [
   {
     id: 'svc-1',
     name: '图像分类在线标注服务',
+    description: '用于图像分类任务的在线标注辅助服务',
     tool: '内置标注工具',
     targetDataset: '图像分类/图像分类-多-1-V3',
     status: '运行中',
@@ -68,7 +71,37 @@ const MLAnnotationService: React.FC = () => {
   }
 
   const columns: ColumnsType<AnnotationServiceRecord> = [
-    { title: '服务名称', dataIndex: 'name', key: 'name' },
+    {
+      title: '服务名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 220,
+      render: (_value, record) => (
+        <TaskMetadataEditor
+          value={record.name}
+          required
+          maxLength={80}
+          strong
+          placeholder="请输入服务名称"
+          onSave={name => setServices(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))}
+        />
+      ),
+    },
+    {
+      title: '描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          emptyText="暂无描述"
+          placeholder="请输入描述"
+          type="secondary"
+          onSave={description => setServices(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))}
+        />
+      ),
+    },
     { title: '标注工具', dataIndex: 'tool', key: 'tool' },
     { title: '目标数据集', dataIndex: 'targetDataset', key: 'targetDataset' },
     {

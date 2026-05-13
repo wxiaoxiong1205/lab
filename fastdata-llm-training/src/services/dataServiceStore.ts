@@ -72,6 +72,7 @@ export interface InferenceResultRecord {
 export interface AnnotationTaskRecord {
   id: string
   name: string
+  description?: string
   dataVolume: number
   progress: number | null
   status?: '未开始' | '标注中' | '待审核' | '已完成' | '已提交' | '失败'
@@ -660,6 +661,7 @@ export const dataServiceActions = {
       draft.annotationTasks.unshift({
         id: `ann-${Date.now()}`,
         name: params.name,
+        description: '',
         dataVolume: params.dataVolume,
         progress: 0,
         status: '未开始',
@@ -679,6 +681,15 @@ export const dataServiceActions = {
   deleteAnnotationTask(id: string) {
     update(draft => {
       draft.annotationTasks = draft.annotationTasks.filter(item => item.id !== id)
+    })
+  },
+
+  updateAnnotationTaskMeta(id: string, value: { name: string; description?: string }) {
+    update(draft => {
+      const target = draft.annotationTasks.find(item => item.id === id)
+      if (!target) return
+      target.name = value.name
+      target.description = value.description ?? ''
     })
   },
 

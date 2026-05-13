@@ -162,6 +162,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const isWorkspaceRoute = location.pathname === '/workspace'
   const isAdminRoute = location.pathname.startsWith('/admin')
   const isOpenPlatformRoute = location.pathname.startsWith('/open-platform')
+  const isAnnotationWorkbenchRoute = /^\/machine-annotation\/(online|annotate|review)\//.test(location.pathname)
   const isStandaloneUtilityRoute = isDocsRoute || isOpenPlatformRoute
   const [docPanelOpen, setDocPanelOpen] = useState(() => {
     if (typeof window === 'undefined') {
@@ -205,7 +206,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       .filter(Boolean) as MenuItemList
 
   const activeTopTab = isAdminRoute ? 'system' : 'workspace'
-  const showProjectMenus = !isDocsRoute && !isWorkspaceRoute && !isAdminRoute && !isOpenPlatformRoute && Boolean(currentProject)
+  const showProjectMenus = !isAnnotationWorkbenchRoute && !isDocsRoute && !isWorkspaceRoute && !isAdminRoute && !isOpenPlatformRoute && Boolean(currentProject)
   const projectTopNavItems = showProjectMenus
     ? (currentProjectMode === 'ml' ? mlTopNavItems : llmTopNavItems)
     : []
@@ -270,7 +271,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     return filterMenuItems(flattenedChildren)
   }, [activeProjectTopKey, isAdminRoute, permissionState, showProjectMenus])
 
-  const showSystemMenus = !isDocsRoute && isAdminRoute
+  const showSystemMenus = !isAnnotationWorkbenchRoute && !isDocsRoute && isAdminRoute
   const showMainSider = showProjectMenus || showSystemMenus
 
   const getSelectedKeys = () => {
@@ -376,10 +377,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       : 'minmax(220px, 1fr) minmax(0, 760px) minmax(280px, 1fr)'
 
   const contentNode = routeAccess.allowed ? (
-    <div className={`app-shell ${docPanelOpen && !isDocsRoute ? 'app-shell--doc-open' : ''}`}>
+    <div className={`app-shell ${docPanelOpen && !isDocsRoute && !isAnnotationWorkbenchRoute ? 'app-shell--doc-open' : ''}`}>
       <div className="app-shell__main">{children}</div>
 
-      {!isDocsRoute && (
+      {!isDocsRoute && !isAnnotationWorkbenchRoute && (
         <div className={`app-shell__doc-rail ${docPanelOpen ? 'app-shell__doc-rail--open' : ''}`}>
           <DesignDocPanel doc={currentDoc} open={docPanelOpen} onClose={() => setDocPanelOpen(false)} />
         </div>
@@ -406,24 +407,25 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 100,
-          height: 72,
-          background: 'linear-gradient(90deg, #ffffff 0%, #eef4ff 52%, #f1fbf7 100%)',
-          borderBottom: '1px solid rgba(148, 163, 184, 0.18)',
-          display: 'grid',
-          gridTemplateColumns: headerGridColumns,
-          alignItems: 'center',
-          columnGap: headerGap,
-          padding: `0 ${headerPaddingX}px`,
-          boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
-        }}
-      >
+      {!isAnnotationWorkbenchRoute && (
+        <Header
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 100,
+            height: 72,
+            background: 'linear-gradient(90deg, #ffffff 0%, #eef4ff 52%, #f1fbf7 100%)',
+            borderBottom: '1px solid rgba(148, 163, 184, 0.18)',
+            display: 'grid',
+            gridTemplateColumns: headerGridColumns,
+            alignItems: 'center',
+            columnGap: headerGap,
+            padding: `0 ${headerPaddingX}px`,
+            boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
+          }}
+        >
         <div style={{ display: 'flex', alignItems: 'center', gap: headerGap, minWidth: 0, justifySelf: 'start' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: compactHeader ? 10 : 12, minWidth: 0 }}>
             <div
@@ -646,9 +648,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             </div>
           </Dropdown>
         </div>
-      </Header>
+        </Header>
+      )}
 
-      <Layout style={{ marginTop: 72 }}>
+      <Layout style={{ marginTop: isAnnotationWorkbenchRoute ? 0 : 72 }}>
         {showMainSider && (
           <Sider
             width={248}
@@ -727,14 +730,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             width: showMainSider ? 'calc(100% - 248px)' : '100%',
             maxWidth: showMainSider ? 'calc(100% - 248px)' : '100%',
             background: 'linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)',
-            minHeight: 'calc(100vh - 72px)',
+            minHeight: isAnnotationWorkbenchRoute ? '100vh' : 'calc(100vh - 72px)',
             overflow: 'auto',
             transition: 'margin-left 0.2s ease',
           }}
         >
           {contentNode}
 
-          {!isDocsRoute && (
+          {!isDocsRoute && !isAnnotationWorkbenchRoute && (
             <DesignDocFab
               open={docPanelOpen}
               onToggle={toggleDocPanel}

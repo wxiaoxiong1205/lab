@@ -571,6 +571,20 @@ export const dataServiceApi = {
     dataServiceActions.deleteAnnotationTask(id)
   },
 
+  async updateAnnotationTaskMeta(id: string, params: UpdateTaskMetaParams): Promise<void> {
+    const snapshot = await requestSnapshot(`${API_ROOT}/annotation-tasks/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(params),
+    })
+
+    if (syncSnapshot(snapshot)) {
+      return
+    }
+
+    await delay()
+    dataServiceActions.updateAnnotationTaskMeta(id, params)
+  },
+
   async createCleaningTask(params: CreateCleaningTaskParams): Promise<void> {
     const snapshot = await requestSnapshot(`${API_ROOT}/cleaning-tasks`, {
       method: 'POST',
