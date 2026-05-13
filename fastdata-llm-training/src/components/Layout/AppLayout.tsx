@@ -16,7 +16,6 @@ import {
   FileTextOutlined,
   FolderOpenOutlined,
   ApartmentOutlined,
-  ApiOutlined,
 } from '@ant-design/icons'
 import DesignDocFab from '../DesignDoc/DesignDocFab'
 import DesignDocPanel from '../DesignDoc/DesignDocPanel'
@@ -163,6 +162,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const isWorkspaceRoute = location.pathname === '/workspace'
   const isAdminRoute = location.pathname.startsWith('/admin')
   const isOpenPlatformRoute = location.pathname.startsWith('/open-platform')
+  const isStandaloneUtilityRoute = isDocsRoute || isOpenPlatformRoute
   const [docPanelOpen, setDocPanelOpen] = useState(() => {
     if (typeof window === 'undefined') {
       return false
@@ -348,6 +348,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     navigate(notice.targetPath)
   }
 
+  const openStandaloneWindow = (path: string) => {
+    if (typeof window === 'undefined') {
+      navigate(path)
+      return
+    }
+
+    window.open(path, '_blank', 'noopener,noreferrer')
+  }
+
   const compactHeader = viewportWidth < 1280
   const compressedHeader = viewportWidth < 1180
   const ultraCompactHeader = viewportWidth < 1080
@@ -456,7 +465,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             justifySelf: 'center',
           }}
         >
-          {showProjectMenus ? (
+          {isStandaloneUtilityRoute ? null : showProjectMenus ? (
             projectTopNavItems.map(item => (
               <Button
                 key={item.key}
@@ -516,7 +525,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             <Button
               type="text"
               icon={<FileTextOutlined />}
-              onClick={() => navigate('/docs')}
+              onClick={() => openStandaloneWindow('/docs')}
               style={{
                 color: isDocsRoute ? '#1d4ed8' : '#475569',
                 fontSize: 18,
@@ -575,13 +584,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           <Dropdown
             menu={{
               items: [
-                { key: 'open-platform-api', icon: <ApiOutlined />, label: 'API访问密钥' },
+                { key: 'open-platform-api', label: 'API访问密钥' },
                 { key: 'profile', label: '个人中心' },
                 { key: 'settings', label: '设置' },
               ],
               onClick: ({ key }) => {
                 if (key === 'open-platform-api') {
-                  navigate('/open-platform/api-keys')
+                  openStandaloneWindow('/open-platform/api-keys')
                 }
               },
             }}

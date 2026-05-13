@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Input, Menu } from 'antd'
+import { Input, Menu } from 'antd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeftOutlined, ApiOutlined, BookOutlined, SearchOutlined, FileTextOutlined } from '@ant-design/icons'
+import { ApiOutlined, BookOutlined, SearchOutlined, FileTextOutlined } from '@ant-design/icons'
 import type { MenuProps } from 'antd'
-import { getCurrentProject, usePermissionStore } from '../../services/permissionStore'
 import { useActiveDocumentAgent } from '../../services/documentAgentService'
 import { productManual } from '../../docs/productManual'
 import { developerGuide } from '../../docs/developerGuide'
@@ -34,11 +33,18 @@ function getDocumentByPath(pathname: string): DocumentEntry {
   return documents.find(item => pathname === item.route) ?? documents[0]
 }
 
+function isDocumentTitleHeading(doc: DocumentEntry, title: string) {
+  return title.trim() === doc.title.trim()
+}
+
 function getParentKeys(doc: DocumentEntry, headingId: string): string[] {
-  const keys = ['doc-root', doc.key]
+  const keys = [doc.key]
   let currentLevelOneId = ''
 
   for (const heading of doc.headings) {
+    if (isDocumentTitleHeading(doc, heading.title)) {
+      continue
+    }
     if (heading.level === 1) {
       currentLevelOneId = heading.id
     }
@@ -57,25 +63,27 @@ const DocumentCenterLayout: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const contentRef = useRef<HTMLDivElement>(null)
-  const permissionState = usePermissionStore()
-  const currentProject = getCurrentProject(permissionState)
   const { activeService, loading: agentLoading } = useActiveDocumentAgent()
   const [search, setSearch] = useState('')
   const [activeHeadingId, setActiveHeadingId] = useState(() => decodeURIComponent(location.hash.replace(/^#/, '')))
-  const [openKeys, setOpenKeys] = useState<string[]>(['doc-root', 'product-manual'])
+  const [openKeys, setOpenKeys] = useState<string[]>(['product-manual'])
   const activeDoc = useMemo(() => getDocumentByPath(location.pathname), [location.pathname])
+  const activeDocMenuHeadings = useMemo(
+    () => activeDoc.headings.filter(item => !isDocumentTitleHeading(activeDoc, item.title)),
+    [activeDoc],
+  )
 
   const visibleHeadings = useMemo(() => {
     const keyword = search.trim().toLowerCase()
     if (!keyword) {
-      return activeDoc.headings
+      return activeDocMenuHeadings
     }
 
-    return activeDoc.headings.filter(item => item.title.toLowerCase().includes(keyword))
-  }, [activeDoc, search])
+    return activeDocMenuHeadings.filter(item => item.title.toLowerCase().includes(keyword))
+  }, [activeDocMenuHeadings, search])
 
   useEffect(() => {
-    setOpenKeys(previous => Array.from(new Set([...previous, 'doc-root', activeDoc.key])))
+    setOpenKeys(previous => Array.from(new Set([...previous, activeDoc.key])))
   }, [activeDoc])
 
   useEffect(() => {
@@ -95,7 +103,10 @@ const DocumentCenterLayout: React.FC = () => {
     }
 
     const updateActiveHeading = () => {
-      const headings = Array.from(container.querySelectorAll<HTMLElement>('.manual-heading[id]'))
+      const menuHeadingIds = new Set(activeDocMenuHeadings.map(item => item.id))
+      const headings = Array.from(container.querySelectorAll<HTMLElement>('.manual-heading[id]')).filter(item =>
+        menuHeadingIds.has(item.id),
+      )
       if (!headings.length) {
         return
       }
@@ -118,14 +129,14 @@ const DocumentCenterLayout: React.FC = () => {
     updateActiveHeading()
     container.addEventListener('scroll', updateActiveHeading, { passive: true })
     return () => container.removeEventListener('scroll', updateActiveHeading)
-  }, [activeDoc, activeHeadingId, location.pathname])
+  }, [activeDoc, activeDocMenuHeadings, activeHeadingId, location.pathname])
 
   const selectedKeys = useMemo(() => {
-    if (activeHeadingId) {
+    if (activeHeadingId && activeDocMenuHeadings.some(item => item.id === activeHeadingId)) {
       return [`heading:${activeDoc.key}:${activeHeadingId}`]
     }
     return [activeDoc.key]
-  }, [activeDoc, activeHeadingId])
+  }, [activeDoc, activeDocMenuHeadings, activeHeadingId])
 
   const getMenuLabel = (title: string, level: number) => (
     <span
@@ -153,7 +164,7 @@ const DocumentCenterLayout: React.FC = () => {
     const groups: NonNullable<MenuProps['items']> = []
     let currentGroup: NonNullable<MenuProps['items']>[number] | null = null
 
-    activeDoc.headings.forEach(item => {
+    activeDocMenuHeadings.forEach(item => {
       if (item.level === 1) {
         const children: NonNullable<MenuProps['items']> = []
         currentGroup = {
@@ -178,7 +189,7 @@ const DocumentCenterLayout: React.FC = () => {
     })
 
     return groups
-  }, [activeDoc, search, visibleHeadings])
+  }, [activeDoc, activeDocMenuHeadings, search, visibleHeadings])
 
   const documentMenuItems = documents.map(doc => ({
     key: doc.key,
@@ -187,14 +198,7 @@ const DocumentCenterLayout: React.FC = () => {
     children: activeDoc.key === doc.key ? groupedHeadings : undefined,
   }))
 
-  const menuItems: MenuProps['items'] = [
-    {
-      key: 'doc-root',
-      icon: <FileTextOutlined />,
-      label: '文档中心',
-      children: documentMenuItems,
-    },
-  ]
+  const menuItems: MenuProps['items'] = documentMenuItems
 
   const onMenuClick: MenuProps['onClick'] = ({ key }) => {
     const targetDoc = documents.find(item => item.key === key)
@@ -220,10 +224,6 @@ const DocumentCenterLayout: React.FC = () => {
     }
   }
 
-  const handleBackToApp = () => {
-    navigate(currentProject ? '/home' : '/workspace')
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'row', height: 'calc(100vh - 60px)', background: '#fff', overflow: 'hidden' }}>
       <div
@@ -237,23 +237,20 @@ const DocumentCenterLayout: React.FC = () => {
           flexDirection: 'column',
         }}
       >
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0' }}>
-          <Button
-            type="default"
-            icon={<ArrowLeftOutlined />}
-            onClick={handleBackToApp}
+        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid #e2e8f0' }}>
+          <div
             style={{
-              width: '100%',
-              borderRadius: 8,
-              height: 36,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'flex-start',
-              fontWeight: 500,
+              gap: 10,
+              color: '#0f172a',
+              fontSize: 16,
+              fontWeight: 700,
             }}
           >
-            返回{currentProject ? '项目概览' : '项目空间'}
-          </Button>
+            <FileTextOutlined style={{ color: '#2563eb' }} />
+            文档中心
+          </div>
         </div>
         <div style={{ padding: '16px 16px 12px' }}>
           <Input

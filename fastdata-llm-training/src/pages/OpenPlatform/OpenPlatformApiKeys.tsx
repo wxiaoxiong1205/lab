@@ -9,7 +9,6 @@ import {
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useNavigate } from 'react-router-dom'
 import {
   ApiOutlined,
   CopyOutlined,
@@ -58,7 +57,6 @@ async function copyText(value: string) {
 }
 
 const OpenPlatformApiKeys: React.FC = () => {
-  const navigate = useNavigate()
   const permissionState = usePermissionStore()
   const currentUser = getCurrentUser(permissionState)
   const records = useOpenPlatformAccessKeys(currentUser.account)
@@ -189,7 +187,7 @@ const OpenPlatformApiKeys: React.FC = () => {
             </Paragraph>
           </div>
           <Space size={10} wrap>
-            <Button icon={<FileTextOutlined />} onClick={() => navigate('/docs/developer-guide')}>
+            <Button icon={<FileTextOutlined />} onClick={() => window.open('/docs/developer-guide', '_blank', 'noopener,noreferrer')}>
               开放平台文档
             </Button>
             <Button type="primary" icon={<PlusOutlined />} disabled={hasAccessKey} onClick={createRecord}>

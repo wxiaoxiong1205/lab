@@ -55,7 +55,7 @@ type MLAnnotationRecord = {
   postDataset: string
   creator: string
   createdAt: string
-  status: '草稿' | '已完成'
+  status: '未发布' | '已完成'
 }
 
 type MultiAnnotationRecord = {
@@ -63,7 +63,7 @@ type MultiAnnotationRecord = {
   name: string
   annotationType: string
   count: number
-  status: '草稿' | '已发布'
+  status: '未发布' | '已完成'
   annotationProgress: number
   reviewProgress: number
   creator: string
@@ -108,7 +108,7 @@ const onlineRecords: MLAnnotationRecord[] = [
     postDataset: '-',
     creator: 'lab1',
     createdAt: '2026-04-20 14:55:10',
-    status: '草稿',
+    status: '未发布',
   },
   {
     id: '2',
@@ -121,7 +121,7 @@ const onlineRecords: MLAnnotationRecord[] = [
     postDataset: '-',
     creator: 'lab1',
     createdAt: '2026-04-17 16:18:44',
-    status: '草稿',
+    status: '未发布',
   },
   {
     id: '3',
@@ -147,7 +147,7 @@ const onlineRecords: MLAnnotationRecord[] = [
     postDataset: '-',
     creator: 'lab1',
     createdAt: '2026-04-14 14:25:09',
-    status: '草稿',
+    status: '未发布',
   },
   {
     id: '5',
@@ -160,7 +160,7 @@ const onlineRecords: MLAnnotationRecord[] = [
     postDataset: '-',
     creator: 'lab2',
     createdAt: '2026-04-13 11:05:22',
-    status: '草稿',
+    status: '未发布',
   },
   {
     id: '6',
@@ -173,7 +173,7 @@ const onlineRecords: MLAnnotationRecord[] = [
     postDataset: '-',
     creator: 'admin',
     createdAt: '2026-04-12 10:18:31',
-    status: '草稿',
+    status: '未发布',
   },
   {
     id: '7',
@@ -199,7 +199,7 @@ const onlineRecords: MLAnnotationRecord[] = [
     postDataset: '-',
     creator: 'deepexilab',
     createdAt: '2026-04-10 09:24:18',
-    status: '草稿',
+    status: '未发布',
   },
   {
     id: '9',
@@ -212,7 +212,7 @@ const onlineRecords: MLAnnotationRecord[] = [
     postDataset: '-',
     creator: 'lab1',
     createdAt: '2026-04-09 10:08:12',
-    status: '草稿',
+    status: '未发布',
   },
 ]
 
@@ -222,7 +222,7 @@ const multiRecords: MultiAnnotationRecord[] = [
     name: '标签测试0025',
     annotationType: '图像分类',
     count: 13,
-    status: '草稿',
+    status: '未发布',
     annotationProgress: 85,
     reviewProgress: 100,
     creator: 'lab1',
@@ -237,7 +237,7 @@ const multiRecords: MultiAnnotationRecord[] = [
     name: '有有有有有有有有有有有有',
     annotationType: '文本分类',
     count: 10,
-    status: '草稿',
+    status: '未发布',
     annotationProgress: 100,
     reviewProgress: 90,
     creator: 'lab1',
@@ -252,7 +252,7 @@ const multiRecords: MultiAnnotationRecord[] = [
     name: '标注数据集测试001',
     annotationType: '文本分类',
     count: 10,
-    status: '草稿',
+    status: '未发布',
     annotationProgress: 100,
     reviewProgress: 100,
     creator: 'lab1',
@@ -267,7 +267,7 @@ const multiRecords: MultiAnnotationRecord[] = [
     name: '标注测试00000000',
     annotationType: '实体识别',
     count: 10,
-    status: '已发布',
+    status: '已完成',
     annotationProgress: 100,
     reviewProgress: 100,
     creator: 'lab5',
@@ -282,7 +282,7 @@ const multiRecords: MultiAnnotationRecord[] = [
     name: '货架商品检测多人标注',
     annotationType: '物体检测',
     count: 48,
-    status: '草稿',
+    status: '未发布',
     annotationProgress: 46,
     reviewProgress: 18,
     creator: 'admin',
@@ -297,7 +297,7 @@ const multiRecords: MultiAnnotationRecord[] = [
     name: '客服意图分类多人标注',
     annotationType: '文本分类',
     count: 36,
-    status: '已发布',
+    status: '已完成',
     annotationProgress: 100,
     reviewProgress: 72,
     creator: 'lab2',
@@ -500,8 +500,7 @@ const stepCards = [
 
 function statusTag(status: MultiAnnotationRecord['status'] | MLAnnotationRecord['status'] | AssignmentRecord['status']) {
   const colorMap: Record<string, string> = {
-    草稿: 'default',
-    已发布: 'processing',
+    未发布: 'default',
     已完成: 'success',
     待处理: 'default',
     进行中: 'processing',
@@ -700,10 +699,10 @@ const MLAnnotation: React.FC = () => {
       width: 280,
       render: (_, record) => (
         <Space size={0}>
-          <Button type="link" size="small" icon={<SendOutlined />} disabled={record.status !== '草稿'}>发布</Button>
+          <Button type="link" size="small" icon={<SendOutlined />} disabled={record.status !== '未发布'}>发布</Button>
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setDetailRecord(record)}>详情</Button>
           <Button type="link" size="small" icon={<TeamOutlined />} onClick={() => setMemberRecord(record)}>任务成员</Button>
-          <Button type="link" size="small" icon={<DeleteOutlined />} disabled={record.status === '已发布'} danger>删除</Button>
+          <Button type="link" size="small" icon={<DeleteOutlined />} disabled={record.status === '已完成'} danger>删除</Button>
         </Space>
       ),
     },
@@ -982,24 +981,39 @@ const MLAnnotation: React.FC = () => {
   function renderSampleList() {
     return (
       <Card title="数据列表" style={cardStyle}>
-        <Space direction="vertical" size={8} style={{ width: '100%' }}>
-          {workbenchSampleRows.map(sample => (
-            <Button
-              key={sample.id}
-              block
-              type={sample.id === activeSampleId ? 'primary' : 'default'}
-              onClick={() => setActiveSampleId(sample.id)}
-              style={{ height: 'auto', padding: '10px 12px', textAlign: 'left' }}
-            >
-              <Space direction="vertical" size={2} style={{ width: '100%' }}>
-                <Text strong>{sample.title}</Text>
-                <Text type="secondary" style={{ fontSize: 12 }}>{sample.status}</Text>
-              </Space>
-            </Button>
-          ))}
-          {!workbenchSampleRows.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" />}
-        </Space>
+        {renderSampleListPanel()}
       </Card>
+    )
+  }
+
+  function renderSampleListPanel() {
+    return (
+      <Space direction="vertical" size={10} style={{ width: '100%' }}>
+        {workbenchSampleRows.map(sample => {
+          const active = sample.id === activeSampleId
+          return (
+            <button
+              key={sample.id}
+              type="button"
+              onClick={() => setActiveSampleId(sample.id)}
+              style={{
+                width: '100%',
+                border: `1px solid ${active ? '#2563eb' : '#e5e7eb'}`,
+                borderRadius: 10,
+                padding: '12px 14px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                background: active ? 'linear-gradient(135deg, #2563eb 0%, #60a5fa 100%)' : '#fff',
+                boxShadow: active ? '0 12px 24px rgba(37, 99, 235, 0.2)' : 'none',
+              }}
+            >
+              <div style={{ fontWeight: 700, color: active ? '#fff' : '#0f172a', fontSize: 15 }}>{sample.title}</div>
+              <div style={{ color: active ? 'rgba(255,255,255,0.8)' : '#64748b', fontSize: 12, marginTop: 4 }}>{sample.status}</div>
+            </button>
+          )
+        })}
+        {!workbenchSampleRows.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" />}
+      </Space>
     )
   }
 
@@ -1028,31 +1042,49 @@ const MLAnnotation: React.FC = () => {
   function renderTextClassificationWorkbench(record: MLAnnotationRecord, locked: boolean) {
     const multi = isMultiLabelTask(record.name)
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 320px', gap: 16 }}>
-        {renderSampleList()}
-        <Card title="文本内容" style={cardStyle}>
-          {activeSample ? (
-            <div style={{ minHeight: 280, padding: 24, borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff' }}>
-              <Text style={{ fontSize: 15, lineHeight: '28px' }}>{activeSample.content}</Text>
-            </div>
-          ) : <Empty description="暂无数据" />}
-        </Card>
-        <Card title={multi ? '文本多标签标注' : '文本单标签标注'} style={cardStyle}>
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
-            {multi ? (
-              <Checkbox.Group disabled={locked || !activeSample} defaultValue={[activeSample?.label].filter(Boolean) as string[]} options={labelOptions.slice(5)} />
-            ) : (
-              <Radio.Group disabled={locked || !activeSample} defaultValue={activeSample?.label}>
-                <Space direction="vertical">
-                  {labelOptions.slice(5).map(label => <Radio key={label} value={label}>{label}</Radio>)}
-                </Space>
-              </Radio.Group>
-            )}
-            <Input.TextArea rows={5} disabled={locked || !activeSample} placeholder="请输入标注备注" />
-            {renderFooterActions(locked, '完成标注')}
-          </Space>
-        </Card>
-      </div>
+      <Card
+        title={multi ? '文本多标签标注' : '文本单标签标注'}
+        style={cardStyle}
+        styles={{ body: { padding: 0 } }}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          }}
+        >
+          <div style={{ padding: 20, borderRight: '1px solid #edf0f5', background: '#fbfdff' }}>
+            <Title level={5} style={{ marginTop: 0, marginBottom: 18 }}>数据列表</Title>
+            {renderSampleListPanel()}
+          </div>
+
+          <div style={{ padding: 20, borderRight: '1px solid #edf0f5', minWidth: 0 }}>
+            <Title level={5} style={{ marginTop: 0, marginBottom: 18 }}>文本内容</Title>
+            {activeSample ? (
+              <div style={{ minHeight: 320, padding: 24, borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff', lineHeight: '28px' }}>
+                <Text style={{ fontSize: 15 }}>{activeSample.content}</Text>
+              </div>
+            ) : <Empty description="暂无数据" />}
+          </div>
+
+          <div style={{ padding: 20, minWidth: 0 }}>
+            <Title level={5} style={{ marginTop: 0, marginBottom: 18 }}>{multi ? '标签选择' : '标签选择'}</Title>
+            <Space direction="vertical" size={16} style={{ width: '100%' }}>
+              {multi ? (
+                <Checkbox.Group disabled={locked || !activeSample} defaultValue={[activeSample?.label].filter(Boolean) as string[]} options={labelOptions.slice(5)} />
+              ) : (
+                <Radio.Group disabled={locked || !activeSample} defaultValue={activeSample?.label}>
+                  <Space direction="vertical">
+                    {labelOptions.slice(5).map(label => <Radio key={label} value={label}>{label}</Radio>)}
+                  </Space>
+                </Radio.Group>
+              )}
+              <Input.TextArea rows={6} disabled={locked || !activeSample} placeholder="请输入标注备注" />
+              {renderFooterActions(locked, '完成标注')}
+            </Space>
+          </div>
+        </div>
+      </Card>
     )
   }
 
@@ -1214,6 +1246,44 @@ const MLAnnotation: React.FC = () => {
     )
   }
 
+  function renderOnlineTaskSummary(record: MLAnnotationRecord, locked: boolean) {
+    const fields: Array<{ label: string; value: React.ReactNode; wide?: boolean }> = [
+      { label: '任务名称', value: record.name, wide: true },
+      { label: '数据类型', value: record.dataType },
+      { label: '标注类型', value: record.annotationType },
+      { label: '数据量', value: workbenchSampleRows.length },
+      { label: '标注进度', value: progressCell(record.progress) },
+      { label: '状态', value: statusTag(locked ? '已完成' : record.status) },
+      { label: '标注前数据集', value: record.preDataset, wide: true },
+      { label: '标注后数据集', value: record.postDataset, wide: true },
+      { label: '创建人', value: record.creator },
+      { label: '创建时间', value: record.createdAt, wide: true },
+    ]
+
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+        {fields.map(field => (
+          <div
+            key={field.label}
+            style={{
+              gridColumn: field.wide ? 'span 2' : undefined,
+              minWidth: 0,
+              padding: '12px 14px',
+              borderRadius: 10,
+              border: '1px solid #e5e7eb',
+              background: '#fbfdff',
+            }}
+          >
+            <div style={{ color: '#64748b', fontSize: 12, marginBottom: 6 }}>{field.label}</div>
+            <div style={{ color: '#0f172a', fontSize: 14, lineHeight: 1.6, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {field.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   function renderOnlineWorkbench() {
     if (!currentOnlineTask) {
       return (
@@ -1240,18 +1310,7 @@ const MLAnnotation: React.FC = () => {
             title="在线标注详情"
             extra={<Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/machine-annotation')}>返回列表</Button>}
           >
-            <Descriptions column={4} size="small" bordered>
-              <Descriptions.Item label="任务名称" span={2}>{currentOnlineTask.name}</Descriptions.Item>
-              <Descriptions.Item label="数据类型">{currentOnlineTask.dataType}</Descriptions.Item>
-              <Descriptions.Item label="标注类型">{currentOnlineTask.annotationType}</Descriptions.Item>
-              <Descriptions.Item label="数据量">{workbenchSampleRows.length}</Descriptions.Item>
-              <Descriptions.Item label="标注进度" span={2}>{progressCell(currentOnlineTask.progress)}</Descriptions.Item>
-              <Descriptions.Item label="状态">{statusTag(locked ? '已完成' : currentOnlineTask.status)}</Descriptions.Item>
-              <Descriptions.Item label="标注前数据集" span={2}>{currentOnlineTask.preDataset}</Descriptions.Item>
-              <Descriptions.Item label="标注后数据集" span={2}>{currentOnlineTask.postDataset}</Descriptions.Item>
-              <Descriptions.Item label="创建人">{currentOnlineTask.creator}</Descriptions.Item>
-              <Descriptions.Item label="创建时间">{currentOnlineTask.createdAt}</Descriptions.Item>
-            </Descriptions>
+            {renderOnlineTaskSummary(currentOnlineTask, locked)}
           </Card>
 
           {workbenchKind === 'text-classification' && renderTextClassificationWorkbench(currentOnlineTask, locked)}
