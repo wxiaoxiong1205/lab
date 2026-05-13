@@ -4,7 +4,6 @@ import {
   Breadcrumb,
   Button,
   Card,
-  Checkbox,
   DatePicker,
   Descriptions,
   Empty,
@@ -115,6 +114,12 @@ type WorkbenchSample = {
   content: string
   label: string
   status: '待处理' | '进行中' | '已完成'
+}
+
+type ReviewResult = {
+  decision: 'pass' | 'reject'
+  reason: string
+  saved: boolean
 }
 
 const onlineRecords: MLAnnotationRecord[] = [
@@ -490,6 +495,8 @@ type SegmentationRegion = { id: string; label: string; points: string; color: st
 
 type LabelItem = { name: string; color: string; classId?: string }
 
+type EntityMark = { id: string; text: string; label: string; range: string; color: string }
+
 const datasetOptions = [
   { value: 'image-multi-v2', label: '图像分类/Phoena-图像分类-单图多标签-有标注-V2', dataType: '图片', annotationType: '图像分类', count: 13, output: '图像分类/Phoena-图像分类-单图多标签-有标注-V3' },
   { value: 'image-single-v1', label: '图像分类/Phoena-图像分类-单图单标签-无标注-V1', dataType: '图片', annotationType: '图像分类', count: 21, output: '图像分类/Phoena-图像分类-单图单标签-有标注-V2' },
@@ -593,6 +600,14 @@ function getAnnotationWorkbenchKind(record: { annotationType: string; name?: str
   return 'text-classification'
 }
 
+function getDefaultWorkbenchLabels(kind: WorkbenchKind): LabelItem[] {
+  if (kind === 'entity') return entityLabelItems
+  if (kind === 'image-classification') return imageClassificationLabels
+  if (kind === 'object-detection') return detectionLabelItems
+  if (kind === 'image-segmentation') return segmentationLabelItems
+  return textClassificationLabels
+}
+
 function isMultiLabelTask(name: string) {
   return name.includes('多标签') || name.includes('多')
 }
@@ -628,7 +643,7 @@ function buildWorkbenchSamples(kind: WorkbenchKind, total: number, progress = 0,
     ],
   }
   const labelByKind: Record<WorkbenchKind, string[]> = {
-    'text-classification': ['科技', '社会', '体育'],
+    'text-classification': ['科技', '财经', '体育'],
     entity: ['LOC', '企业', '人名'],
     'image-classification': ['Build_Your_Dream', 'SUV', 'Audi'],
     'object-detection': ['食品', '人物', '动物'],
@@ -649,28 +664,11 @@ function buildWorkbenchSamples(kind: WorkbenchKind, total: number, progress = 0,
   })
 }
 
-function renderMockImage(title: string, height = 280) {
-  return (
-    <div
-      style={{
-        position: 'relative',
-        height,
-        borderRadius: 10,
-        overflow: 'hidden',
-        background: 'linear-gradient(135deg, #1d4ed8 0%, #38bdf8 42%, #fef3c7 100%)',
-        border: '1px solid #dbeafe',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: 700,
-      }}
-    >
-      {title}
-    </div>
-  )
-}
+const defaultEntityMarks: EntityMark[] = [
+  { id: 'entity-1', text: '四川', label: 'LOC', range: '[0, 2]', color: '#bf6a2a' },
+  { id: 'entity-2', text: '江油市华丰中', label: '企业', range: '[3, 9]', color: '#2dd4a3' },
+  { id: 'entity-3', text: '奶和复合营养素', label: 'LOC', range: '[13, 20]', color: '#bf6a2a' },
+]
 
 function renderTagGroup(labels: string[]) {
   return (
@@ -716,6 +714,8 @@ const MLAnnotation: React.FC = () => {
   const onlineSelectedDataset = datasetOptions.find(item => item.value === onlineSelectedDatasetValue)
   const [workbenchSampleRows, setWorkbenchSampleRows] = useState(workbenchSamples)
   const [activeSampleId, setActiveSampleId] = useState(workbenchSamples[0].id)
+  const [sampleLabelResults, setSampleLabelResults] = useState<Record<string, string[]>>({})
+  const [reviewResults, setReviewResults] = useState<Record<string, ReviewResult>>({})
   const [workbenchSubmitted, setWorkbenchSubmitted] = useState(false)
   const [detectionBoxes, setDetectionBoxes] = useState<DetectionBox[]>([
     { id: 'box-1', label: '商品', x: 16, y: 18, width: 38, height: 34 },
@@ -727,6 +727,8 @@ const MLAnnotation: React.FC = () => {
     { id: 'seg-2', label: '建筑', points: '18,16 56,10 62,48 22,54', color: 'rgba(245, 158, 11, 0.46)' },
   ])
   const [activeSegmentationRegionId, setActiveSegmentationRegionId] = useState('seg-1')
+  const [entityMarks, setEntityMarks] = useState<EntityMark[]>(defaultEntityMarks)
+  const [activeEntityId, setActiveEntityId] = useState(defaultEntityMarks[2].id)
   const [customLabels, setCustomLabels] = useState<Partial<Record<WorkbenchKind, LabelItem[]>>>({})
   const [selectedLabelName, setSelectedLabelName] = useState<string>('科技')
   const [labelSearchValue, setLabelSearchValue] = useState('')
@@ -747,6 +749,7 @@ const MLAnnotation: React.FC = () => {
       : undefined
   const activeSample = workbenchSampleRows.find(item => item.id === activeSampleId) ?? workbenchSampleRows[0]
   const activeSampleIndex = Math.max(0, workbenchSampleRows.findIndex(item => item.id === activeSample?.id))
+  const activeReviewResult = activeSample ? reviewResults[activeSample.id] ?? { decision: 'pass', reason: '', saved: false } : { decision: 'pass', reason: '', saved: false }
   const multiTabItems = [
     ...(canManageMultiAnnotation ? [{ key: 'overview', label: '任务总览' }] : []),
     { key: 'annotation', label: '标注任务' },
@@ -769,11 +772,22 @@ const MLAnnotation: React.FC = () => {
     if (workbenchMode || onlineTaskId) {
       const targetTask = currentOnlineTask ?? currentWorkbenchAssignment
       const kind = targetTask ? getAnnotationWorkbenchKind(targetTask) : 'text-classification'
-      const progress = currentOnlineTask?.progress ?? (currentWorkbenchAssignment ? Math.round((currentWorkbenchAssignment.completed / currentWorkbenchAssignment.amount) * 100) : 0)
+      const targetStatus = targetTask?.status
+      const progress = targetStatus === '已完成'
+        ? 100
+        : currentWorkbenchAssignment
+          ? Math.round((currentWorkbenchAssignment.completed / Math.max(1, currentWorkbenchAssignment.amount)) * 100)
+          : 0
       const total = currentOnlineTask?.count ?? currentWorkbenchAssignment?.amount ?? workbenchSamples.length
       const nextSamples = buildWorkbenchSamples(kind, total, progress ?? 0, targetTask ? ('name' in targetTask ? targetTask.name : targetTask.taskName) : '标注任务')
       setWorkbenchSampleRows(nextSamples)
-      setActiveSampleId(nextSamples[0]?.id ?? '')
+      setActiveSampleId(nextSamples.find(sample => sample.status !== '已完成')?.id ?? nextSamples[0]?.id ?? '')
+      setSampleLabelResults(Object.fromEntries(nextSamples
+        .filter(sample => sample.status === '已完成')
+        .map(sample => [sample.id, sample.label ? [sample.label] : []])))
+      setReviewResults(Object.fromEntries(nextSamples
+        .filter(sample => sample.status === '已完成')
+        .map(sample => [sample.id, { decision: 'pass', reason: '', saved: true } satisfies ReviewResult])))
       setWorkbenchSubmitted(false)
       setDetectionBoxes([
         { id: 'box-1', label: '商品', x: 16, y: 18, width: 38, height: 34 },
@@ -785,7 +799,9 @@ const MLAnnotation: React.FC = () => {
         { id: 'seg-2', label: '建筑', points: '18,16 56,10 62,48 22,54', color: 'rgba(245, 158, 11, 0.46)' },
       ])
       setActiveSegmentationRegionId('seg-1')
-      setSelectedLabelName(getDefaultLabels(kind)[0]?.name ?? '')
+      setEntityMarks(defaultEntityMarks)
+      setActiveEntityId(defaultEntityMarks[2].id)
+      setSelectedLabelName(getDefaultWorkbenchLabels(kind)[0]?.name ?? '')
     }
   }, [currentOnlineTask, currentWorkbenchAssignment, onlineTaskId, workbenchId, workbenchMode])
 
@@ -1068,17 +1084,196 @@ const MLAnnotation: React.FC = () => {
       cancelText: '取消',
       okButtonProps: { danger: true },
       onOk: () => {
+        const deletingId = activeSample.id
         setWorkbenchSampleRows(previous => {
-          const nextRows = previous.filter(item => item.id !== activeSample.id)
-          const nextActive = nextRows.find(item => item.id !== activeSample.id) ?? nextRows[0]
+          const nextRows = previous.filter(item => item.id !== deletingId)
+          const nextActive = nextRows[Math.min(activeSampleIndex, Math.max(0, nextRows.length - 1))]
           if (nextActive) {
             setActiveSampleId(nextActive.id)
           }
           return nextRows
         })
+        setSampleLabelResults(previous => {
+          const next = { ...previous }
+          delete next[deletingId]
+          return next
+        })
+        setReviewResults(previous => {
+          const next = { ...previous }
+          delete next[deletingId]
+          return next
+        })
         message.success('删除成功')
       },
     })
+  }
+
+  function markActiveSampleInProgress() {
+    if (!activeSample) return
+    setWorkbenchSampleRows(previous => previous.map(sample => (
+      sample.id === activeSample.id && sample.status === '待处理' ? { ...sample, status: '进行中' } : sample
+    )))
+  }
+
+  function getCurrentWorkbenchKind() {
+    return currentOnlineTask
+      ? getAnnotationWorkbenchKind(currentOnlineTask)
+      : currentWorkbenchAssignment
+        ? getAnnotationWorkbenchKind(currentWorkbenchAssignment)
+        : 'text-classification'
+  }
+
+  function getActiveSampleLabels(fallback?: string, includeFallback = false) {
+    const values = activeSample ? sampleLabelResults[activeSample.id] : undefined
+    return values?.length || !includeFallback ? (values ?? []) : [fallback ?? activeSample?.label ?? selectedLabelName].filter(Boolean)
+  }
+
+  function updateActiveSampleLabels(nextValue: string | string[]) {
+    if (!activeSample) return
+    const nextLabels = (Array.isArray(nextValue) ? nextValue : [nextValue]).filter(Boolean)
+    setSampleLabelResults(previous => ({ ...previous, [activeSample.id]: nextLabels }))
+    setSelectedLabelName(nextLabels[0] ?? '')
+    markActiveSampleInProgress()
+  }
+
+  function saveCurrentAnnotation() {
+    if (!activeSample) return
+    const kind = getCurrentWorkbenchKind()
+    if (kind === 'entity') {
+      const labels = entityMarks.map(entity => entity.label).filter(Boolean)
+      if (!labels.length) {
+        message.warning('请先完成实体标注')
+        return
+      }
+      setSampleLabelResults(previous => ({ ...previous, [activeSample.id]: Array.from(new Set(labels)) }))
+    } else if (kind === 'object-detection') {
+      const labels = detectionBoxes.map(box => box.label).filter(Boolean)
+      if (!labels.length) {
+        message.warning('请先新增或选择检测框')
+        return
+      }
+      setSampleLabelResults(previous => ({ ...previous, [activeSample.id]: Array.from(new Set(labels)) }))
+    } else if (kind === 'image-segmentation') {
+      const labels = segmentationRegions.map(region => region.label).filter(Boolean)
+      if (!labels.length) {
+        message.warning('请先新增或选择分割区域')
+        return
+      }
+      setSampleLabelResults(previous => ({ ...previous, [activeSample.id]: Array.from(new Set(labels)) }))
+    } else if (!(sampleLabelResults[activeSample.id] ?? []).length) {
+      message.warning('请先选择标注结果')
+      return
+    }
+    markActiveSampleInProgress()
+    message.success('标注结果已保存')
+  }
+
+  function updateActiveDetectionLabel(label: string) {
+    setSelectedLabelName(label)
+    setDetectionBoxes(previous => previous.map(box => (
+      box.id === activeDetectionBoxId ? { ...box, label } : box
+    )))
+    updateActiveSampleLabels(label)
+  }
+
+  function updateActiveSegmentationLabel(label: string) {
+    setSelectedLabelName(label)
+    setSegmentationRegions(previous => previous.map(region => (
+      region.id === activeSegmentationRegionId ? { ...region, label } : region
+    )))
+    updateActiveSampleLabels(label)
+  }
+
+  function updateActiveEntityLabel(label: LabelItem) {
+    setSelectedLabelName(label.name)
+    setEntityMarks(previous => previous.map(entity => (
+      entity.id === activeEntityId ? { ...entity, label: label.name, color: label.color } : entity
+    )))
+    updateActiveSampleLabels(label.name)
+  }
+
+  function deleteActiveEntity() {
+    if (!activeEntityId) return
+    setEntityMarks(previous => {
+      const next = previous.filter(entity => entity.id !== activeEntityId)
+      setActiveEntityId(next[0]?.id ?? '')
+      return next
+    })
+    markActiveSampleInProgress()
+    message.success('已删除当前选中实体')
+  }
+
+  function updateReviewResult(patch: Partial<ReviewResult>) {
+    if (!activeSample) return
+    setReviewResults(previous => ({
+      ...previous,
+      [activeSample.id]: {
+        decision: previous[activeSample.id]?.decision ?? 'pass',
+        reason: previous[activeSample.id]?.reason ?? '',
+        saved: false,
+        ...patch,
+      },
+    }))
+    setWorkbenchSampleRows(previous => previous.map(sample => (
+      sample.id === activeSample.id && sample.status === '待处理' ? { ...sample, status: '进行中' } : sample
+    )))
+  }
+
+  function saveCurrentReview() {
+    if (!activeSample) return
+    const result = reviewResults[activeSample.id] ?? activeReviewResult
+    if (result.decision === 'reject' && !result.reason.trim()) {
+      message.warning('审核不通过时请填写原因')
+      return
+    }
+    setReviewResults(previous => ({
+      ...previous,
+      [activeSample.id]: { ...result, saved: true },
+    }))
+    message.success('审核结果已保存')
+  }
+
+  function completeCurrentReview() {
+    if (!activeSample) return
+    const result = reviewResults[activeSample.id] ?? activeReviewResult
+    if (result.decision === 'reject' && !result.reason.trim()) {
+      message.warning('审核不通过时请填写原因')
+      return
+    }
+    const currentId = activeSample.id
+    const currentIndex = workbenchSampleRows.findIndex(sample => sample.id === currentId)
+    setReviewResults(previous => ({
+      ...previous,
+      [currentId]: { ...result, saved: true },
+    }))
+    setWorkbenchSampleRows(previous => previous.map(sample => (
+      sample.id === currentId ? { ...sample, status: '已完成' } : sample
+    )))
+    const nextSample = workbenchSampleRows.slice(currentIndex + 1).find(sample => sample.status !== '已完成')
+      ?? workbenchSampleRows.find(sample => sample.id !== currentId && sample.status !== '已完成')
+      ?? workbenchSampleRows[currentIndex + 1]
+      ?? workbenchSampleRows.find(sample => sample.id !== currentId)
+    if (nextSample) {
+      setActiveSampleId(nextSample.id)
+    }
+    message.success('完成审核')
+  }
+
+  function selectWorkbenchLabel(kind: WorkbenchKind, label: LabelItem) {
+    setSelectedLabelName(label.name)
+    if (kind === 'object-detection' && activeDetectionBoxId) {
+      updateActiveDetectionLabel(label.name)
+      return
+    }
+    if (kind === 'image-segmentation' && activeSegmentationRegionId) {
+      updateActiveSegmentationLabel(label.name)
+      return
+    }
+    if (kind === 'entity' && activeEntityId) {
+      updateActiveEntityLabel(label)
+      return
+    }
+    updateActiveSampleLabels(label.name)
   }
 
   function openOnlineCreate() {
@@ -1155,11 +1350,7 @@ const MLAnnotation: React.FC = () => {
   }
 
   function getDefaultLabels(kind: WorkbenchKind): LabelItem[] {
-    if (kind === 'entity') return entityLabelItems
-    if (kind === 'image-classification') return imageClassificationLabels
-    if (kind === 'object-detection') return detectionLabelItems
-    if (kind === 'image-segmentation') return segmentationLabelItems
-    return textClassificationLabels
+    return getDefaultWorkbenchLabels(kind)
   }
 
   function getCurrentLabels(kind: WorkbenchKind) {
@@ -1228,7 +1419,11 @@ const MLAnnotation: React.FC = () => {
                 key={label.name}
                 role="button"
                 tabIndex={0}
-                onClick={() => setSelectedLabelName(label.name)}
+                onClick={() => {
+                  if (!locked) {
+                    selectWorkbenchLabel(kind, label)
+                  }
+                }}
                 style={{
                   minHeight: 52,
                   borderRadius: 10,
@@ -1238,7 +1433,8 @@ const MLAnnotation: React.FC = () => {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   background: selectedLabelName === label.name ? '#eff6ff' : '#fff',
-                  cursor: 'pointer',
+                  cursor: locked ? 'not-allowed' : 'pointer',
+                  opacity: locked ? 0.65 : 1,
                 }}
               >
                 <Space>
@@ -1260,11 +1456,30 @@ const MLAnnotation: React.FC = () => {
 
   function completeCurrentSample(feedback: string) {
     if (!activeSample) return
-    const currentIndex = workbenchSampleRows.findIndex(sample => sample.id === activeSample.id)
+    const kind = getCurrentWorkbenchKind()
+    const labelsByKind =
+      kind === 'entity'
+        ? entityMarks.map(entity => entity.label).filter(Boolean)
+        : kind === 'object-detection'
+          ? detectionBoxes.map(box => box.label).filter(Boolean)
+          : kind === 'image-segmentation'
+            ? segmentationRegions.map(region => region.label).filter(Boolean)
+            : (sampleLabelResults[activeSample.id] ?? [])
+    const nextLabels = Array.from(new Set(labelsByKind))
+    if (!nextLabels.length) {
+      message.warning('请先完成当前数据的标注结果')
+      return
+    }
+    const currentId = activeSample.id
+    const currentIndex = workbenchSampleRows.findIndex(sample => sample.id === currentId)
+    setSampleLabelResults(previous => ({ ...previous, [currentId]: nextLabels }))
     setWorkbenchSampleRows(previous => previous.map(sample => (
-      sample.id === activeSample.id ? { ...sample, status: '已完成' } : sample
+      sample.id === currentId ? { ...sample, status: '已完成' } : sample
     )))
-    const nextSample = workbenchSampleRows[currentIndex + 1] ?? workbenchSampleRows.find(sample => sample.id !== activeSample.id)
+    const nextSample = workbenchSampleRows.slice(currentIndex + 1).find(sample => sample.status !== '已完成')
+      ?? workbenchSampleRows.find(sample => sample.id !== currentId && sample.status !== '已完成')
+      ?? workbenchSampleRows[currentIndex + 1]
+      ?? workbenchSampleRows.find(sample => sample.id !== currentId)
     if (nextSample) {
       setActiveSampleId(nextSample.id)
     }
@@ -1287,6 +1502,11 @@ const MLAnnotation: React.FC = () => {
       return
     }
     setWorkbenchSubmitted(true)
+    if (currentOnlineTask) {
+      setOnlineRows(previous => previous.map(item => (
+        item.id === currentOnlineTask.id ? { ...item, progress: 100, status: '已完成' } : item
+      )))
+    }
     message.success('提交标注成功，当前任务已锁定')
   }
 
@@ -1302,16 +1522,20 @@ const MLAnnotation: React.FC = () => {
     }
     setDetectionBoxes(previous => [...previous, next])
     setActiveDetectionBoxId(next.id)
+    updateActiveSampleLabels(next.label)
     message.success('已新增矩形框')
   }
 
   function deleteActiveDetectionBox() {
     if (!activeDetectionBoxId) return
-    setDetectionBoxes(previous => {
-      const next = previous.filter(box => box.id !== activeDetectionBoxId)
-      setActiveDetectionBoxId(next[0]?.id ?? '')
-      return next
-    })
+    const nextBoxes = detectionBoxes.filter(box => box.id !== activeDetectionBoxId)
+    setDetectionBoxes(nextBoxes)
+    setActiveDetectionBoxId(nextBoxes[0]?.id ?? '')
+    if (nextBoxes[0]) {
+      updateActiveSampleLabels(nextBoxes[0].label)
+    } else if (activeSample) {
+      setSampleLabelResults(previous => ({ ...previous, [activeSample.id]: [] }))
+    }
     message.success('已删除当前矩形框')
   }
 
@@ -1324,25 +1548,21 @@ const MLAnnotation: React.FC = () => {
     }
     setSegmentationRegions(previous => [...previous, next])
     setActiveSegmentationRegionId(next.id)
+    updateActiveSampleLabels(next.label)
     message.success('已新增分割区域')
   }
 
   function deleteActiveSegmentationRegion() {
     if (!activeSegmentationRegionId) return
-    setSegmentationRegions(previous => {
-      const next = previous.filter(region => region.id !== activeSegmentationRegionId)
-      setActiveSegmentationRegionId(next[0]?.id ?? '')
-      return next
-    })
+    const nextRegions = segmentationRegions.filter(region => region.id !== activeSegmentationRegionId)
+    setSegmentationRegions(nextRegions)
+    setActiveSegmentationRegionId(nextRegions[0]?.id ?? '')
+    if (nextRegions[0]) {
+      updateActiveSampleLabels(nextRegions[0].label)
+    } else if (activeSample) {
+      setSampleLabelResults(previous => ({ ...previous, [activeSample.id]: [] }))
+    }
     message.success('已删除当前分割区域')
-  }
-
-  function renderSampleList() {
-    return (
-      <Card title="数据列表" style={cardStyle}>
-        {renderSampleListPanel()}
-      </Card>
-    )
   }
 
   function renderSampleListPanel() {
@@ -1376,28 +1596,6 @@ const MLAnnotation: React.FC = () => {
     )
   }
 
-  function renderFooterActions(locked: boolean, primaryText: string) {
-    return (
-      <Space wrap>
-        <Button disabled={!activeSample}>上一条</Button>
-        <Button disabled={locked || !activeSample} onClick={() => message.success('保存成功')}>保存</Button>
-        <Button danger disabled={locked || !activeSample} onClick={handleDeleteWorkbenchSample}>删除当前数据</Button>
-        <Button type="primary" disabled={locked || !activeSample} onClick={() => completeCurrentSample(`${primaryText}成功`)}>
-          {primaryText}
-        </Button>
-        <Button
-          disabled={locked || !activeSample}
-          onClick={() => {
-            setWorkbenchSubmitted(true)
-            message.success('标注任务已提交，数据已锁定')
-          }}
-        >
-          提交标注
-        </Button>
-      </Space>
-    )
-  }
-
   function renderTopActions(locked: boolean) {
     const kind = currentOnlineTask ? getAnnotationWorkbenchKind(currentOnlineTask) : currentWorkbenchAssignment ? getAnnotationWorkbenchKind(currentWorkbenchAssignment) : 'text-classification'
     const labels = getCurrentLabels(kind)
@@ -1409,7 +1607,10 @@ const MLAnnotation: React.FC = () => {
           icon={<FormOutlined />}
           disabled={locked || !activeSample}
           onClick={() => {
-            setSelectedLabelName(labels[0]?.name ?? '')
+            const suggestedLabel = labels[0]?.name ?? ''
+            if (suggestedLabel) {
+              updateActiveSampleLabels(suggestedLabel)
+            }
             message.success('AI 自动标注已生成建议结果')
           }}
         >
@@ -1522,10 +1723,11 @@ const MLAnnotation: React.FC = () => {
     )
   }
 
-  function renderTextClassificationWorkbench(record: MLAnnotationRecord, locked: boolean) {
-    const multi = isMultiLabelTask(record.name)
+  function renderTextClassificationWorkbench(record: MLAnnotationRecord | AssignmentRecord, locked: boolean) {
+    const recordName = 'name' in record ? record.name : record.taskName
+    const multi = isMultiLabelTask(recordName)
     const labels = getCurrentLabels('text-classification')
-    const resultValue = selectedLabelName || labels[0]?.name
+    const resultValues = getActiveSampleLabels(labels[0]?.name)
     const content = (
       <main style={{ padding: 14, overflow: 'auto' }}>
         <div style={{ borderRadius: 8, background: '#f3f4f6', minHeight: 40, display: 'grid', gridTemplateColumns: '96px minmax(0, 1fr) 360px', alignItems: 'center', padding: '0 28px', fontSize: 16 }}>
@@ -1541,12 +1743,17 @@ const MLAnnotation: React.FC = () => {
           <div style={{ padding: '22px 0' }}>
             <Select
               mode={multi ? 'multiple' : undefined}
-              value={multi ? [resultValue || activeSample?.label].filter(Boolean) : resultValue || activeSample?.label}
+              value={multi ? resultValues : resultValues[0]}
               disabled={locked}
+              placeholder="请选择标注结果"
               options={labels.map(label => ({ label: label.name, value: label.name }))}
               style={{ width: '100%' }}
-              onChange={value => setSelectedLabelName(Array.isArray(value) ? value[0] : value)}
+              onChange={updateActiveSampleLabels}
             />
+            <div style={{ marginTop: 10 }}>{renderTagGroup(resultValues)}</div>
+            <Button size="small" style={{ marginTop: 12 }} disabled={locked || !activeSample} onClick={saveCurrentAnnotation}>
+              保存当前标注
+            </Button>
           </div>
         </div>
       </main>
@@ -1556,11 +1763,7 @@ const MLAnnotation: React.FC = () => {
 
   function renderEntityWorkbench(locked: boolean) {
     const labels = getCurrentLabels('entity')
-    const markedEntities = [
-      { text: '四川', label: 'LOC', range: '[0, 2]', color: '#bf6a2a' },
-      { text: '江油市华丰中', label: '企业', range: '[3, 9]', color: '#2dd4a3' },
-      { text: '奶和复合营养素', label: 'LOC', range: '[13, 20]', color: '#bf6a2a' },
-    ]
+    const activeEntity = entityMarks.find(entity => entity.id === activeEntityId) ?? entityMarks[0]
     const content = (
       <main style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 14, padding: 14, overflow: 'auto' }}>
         <section style={{ borderRadius: 10, background: '#fff', boxShadow: '0 8px 24px rgba(15,23,42,0.08)', padding: 24 }}>
@@ -1569,30 +1772,61 @@ const MLAnnotation: React.FC = () => {
               <Title level={4} style={{ margin: 0 }}>文本实体识别</Title>
               <Text type="secondary">先选中文本，再点击右侧标签完成标注</Text>
             </div>
-            <Button danger size="large" icon={<DeleteOutlined />} disabled={locked} onClick={() => message.success('已删除当前选中实体')}>删除实体</Button>
+            <Button danger size="large" icon={<DeleteOutlined />} disabled={locked || !activeEntity} onClick={deleteActiveEntity}>删除实体</Button>
           </Space>
           <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, background: '#fbfdff', padding: 26, minHeight: 120, fontSize: 17, lineHeight: '42px' }}>
-            <span style={{ textDecoration: 'underline', textDecorationColor: '#bf6a2a', textDecorationThickness: 2 }}>四川</span><Tag color="orange">LOC</Tag>
-            <span> 省</span><span style={{ borderBottom: '2px solid #2dd4a3' }}>江油市华丰中</span><Tag color="green">企业</Tag>
-            <span> 学选用豆</span><span style={{ background: '#e5edf7', borderBottom: '2px solid #bf6a2a' }}>奶和复合营养素</span><Tag color="orange">LOC</Tag>
-            <span> 后，试验组男生的贫血率下降13个百分点，而对照组只降低0.44个百分点。</span>
+            <Text>{activeSample?.content ?? '四川省江油市华丰中学选用豆奶和复合营养素后，试验组男生的贫血率下降13个百分点。'}</Text>
+            <div style={{ marginTop: 22 }}>
+              <Space wrap size={[10, 10]}>
+                {entityMarks.map(entity => (
+                  <button
+                    key={entity.id}
+                    type="button"
+                    disabled={locked}
+                    onClick={() => setActiveEntityId(entity.id)}
+                    style={{
+                      border: `1px solid ${activeEntityId === entity.id ? '#2563eb' : '#d9e2ef'}`,
+                      borderRadius: 999,
+                      background: activeEntityId === entity.id ? '#eff6ff' : '#fff',
+                      padding: '6px 10px',
+                      cursor: locked ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <span style={{ borderBottom: `2px solid ${entity.color}`, marginRight: 6 }}>{entity.text}</span>
+                    <Tag color={entity.color} style={{ marginInlineEnd: 0 }}>{entity.label}</Tag>
+                  </button>
+                ))}
+              </Space>
+            </div>
           </div>
           <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, marginTop: 18, padding: 18, minHeight: 120 }}>
             <Title level={5}>当前选择</Title>
-            <Text>文本：奶和复合营养素</Text><br />
-            <Text>标签：LOC</Text><br />
-            <Text>范围：[13, 20]</Text>
+            <Text>文本：{activeEntity?.text ?? '-'}</Text><br />
+            <Text>标签：{activeEntity?.label ?? '-'}</Text><br />
+            <Text>范围：{activeEntity?.range ?? '-'}</Text>
           </div>
         </section>
         <aside style={{ borderRadius: 10, background: '#fff', boxShadow: '0 8px 24px rgba(15,23,42,0.08)', padding: 22 }}>
           <Title level={4}>可用标签</Title>
           <Space wrap size={[8, 8]} style={{ marginBottom: 24 }}>
-            {labels.map(label => <Button key={label.name} shape="round" onClick={() => setSelectedLabelName(label.name)}><span style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block', background: label.color, marginRight: 6 }} />{label.name}</Button>)}
+            {labels.map(label => <Button key={label.name} shape="round" disabled={locked || !activeEntity} onClick={() => updateActiveEntityLabel(label)}><span style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block', background: label.color, marginRight: 6 }} />{label.name}</Button>)}
           </Space>
           <Title level={4}>已标注实体</Title>
           <Space direction="vertical" style={{ width: '100%' }}>
-            {markedEntities.map(entity => (
-              <div key={`${entity.text}-${entity.range}`} style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 14, background: entity.text.includes('奶') ? '#eff6ff' : '#fff' }}>
+            {entityMarks.map(entity => (
+              <div
+                key={`${entity.text}-${entity.range}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => setActiveEntityId(entity.id)}
+                style={{
+                  border: `1px solid ${activeEntityId === entity.id ? '#60a5fa' : '#e5e7eb'}`,
+                  borderRadius: 10,
+                  padding: 14,
+                  background: activeEntityId === entity.id ? '#eff6ff' : '#fff',
+                  cursor: 'pointer',
+                }}
+              >
                 <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                   <div><Text strong>{entity.text}</Text><br /><Text type="secondary">{entity.range}</Text></div>
                   <Tag color={entity.color}>{entity.label}</Tag>
@@ -1606,9 +1840,11 @@ const MLAnnotation: React.FC = () => {
     return renderAnnotationFrame('entity', locked, content)
   }
 
-  function renderImageClassificationWorkbench(record: MLAnnotationRecord, locked: boolean) {
-    const multi = isMultiLabelTask(record.name)
+  function renderImageClassificationWorkbench(record: MLAnnotationRecord | AssignmentRecord, locked: boolean) {
+    const recordName = 'name' in record ? record.name : record.taskName
+    const multi = isMultiLabelTask(recordName)
     const labels = getCurrentLabels('image-classification')
+    const resultValues = getActiveSampleLabels(labels[0]?.name)
     const content = (
       <main style={{ padding: 14, overflow: 'auto' }}>
         <div style={{ borderRadius: 8, background: '#f3f4f6', minHeight: 40, display: 'grid', gridTemplateColumns: '96px minmax(0, 1fr) 360px', alignItems: 'center', padding: '0 28px', fontSize: 16 }}>
@@ -1631,12 +1867,17 @@ const MLAnnotation: React.FC = () => {
           <div style={{ padding: '22px 0' }}>
             <Select
               mode={multi ? 'multiple' : undefined}
-              value={multi ? [selectedLabelName || activeSample?.label || labels[0]?.name, 'SUV'].filter(Boolean) : selectedLabelName || activeSample?.label || labels[0]?.name}
+              value={multi ? resultValues : resultValues[0]}
               disabled={locked}
+              placeholder="请选择标注结果"
               options={labels.map(label => ({ label: label.name, value: label.name }))}
               style={{ width: '100%' }}
-              onChange={value => setSelectedLabelName(Array.isArray(value) ? value[0] : value)}
+              onChange={updateActiveSampleLabels}
             />
+            <div style={{ marginTop: 10 }}>{renderTagGroup(resultValues)}</div>
+            <Button size="small" style={{ marginTop: 12 }} disabled={locked || !activeSample} onClick={saveCurrentAnnotation}>
+              保存当前标注
+            </Button>
           </div>
         </div>
       </main>
@@ -1646,6 +1887,7 @@ const MLAnnotation: React.FC = () => {
 
   function renderObjectDetectionWorkbench(locked: boolean) {
     const labels = getCurrentLabels('object-detection')
+    const activeBox = detectionBoxes.find(box => box.id === activeDetectionBoxId) ?? detectionBoxes[0]
     const content = (
       <main style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 14, padding: 14, overflow: 'auto' }}>
         <section style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 14 }}>
@@ -1657,7 +1899,10 @@ const MLAnnotation: React.FC = () => {
                   key={box.id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => setActiveDetectionBoxId(box.id)}
+                  onClick={() => {
+                    setActiveDetectionBoxId(box.id)
+                    updateActiveSampleLabels(box.label)
+                  }}
                   style={{
                     position: 'absolute',
                     left: `${box.x}%`,
@@ -1678,15 +1923,15 @@ const MLAnnotation: React.FC = () => {
         <aside>
           <Card title="区域信息" style={{ ...cardStyle, marginBottom: 14 }}>
             <Space direction="vertical" style={{ width: '100%' }}>
-              <Select value={selectedLabelName || '动物'} disabled={locked} options={labels.map(label => ({ value: label.name, label: label.name }))} onChange={setSelectedLabelName} style={{ width: '100%' }} />
+              <Select value={activeBox?.label ?? selectedLabelName ?? '动物'} disabled={locked || !activeBox} options={labels.map(label => ({ value: label.name, label: label.name }))} onChange={updateActiveDetectionLabel} style={{ width: '100%' }} />
               <Space>
                 <Button type="primary" disabled={locked} onClick={addDetectionBox}>新增框</Button>
                 <Button danger disabled={locked || !activeDetectionBoxId} onClick={deleteActiveDetectionBox}>删除框</Button>
               </Space>
               <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12 }}>
-                <Text type="secondary">区域 ID: {activeDetectionBoxId || '-'}</Text><br />
-                <Text type="secondary">矩形: x=118.4, y=22.6, w=353.2, h=400.5</Text><br />
-                <Text type="secondary">类别: {selectedLabelName || '动物'}</Text>
+                <Text type="secondary">区域 ID: {activeBox?.id ?? '-'}</Text><br />
+                <Text type="secondary">矩形: x={activeBox?.x ?? '-'}, y={activeBox?.y ?? '-'}, w={activeBox?.width ?? '-'}, h={activeBox?.height ?? '-'}</Text><br />
+                <Text type="secondary">类别: {activeBox?.label ?? '-'}</Text>
               </div>
             </Space>
           </Card>
@@ -1708,6 +1953,7 @@ const MLAnnotation: React.FC = () => {
 
   function renderImageSegmentationWorkbench(locked: boolean) {
     const labels = getCurrentLabels('image-segmentation')
+    const activeRegion = segmentationRegions.find(region => region.id === activeSegmentationRegionId) ?? segmentationRegions[0]
     const content = (
       <main style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 14, padding: 14, overflow: 'auto' }}>
         <section style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 14 }}>
@@ -1724,7 +1970,10 @@ const MLAnnotation: React.FC = () => {
                     fill={region.color}
                     stroke={activeSegmentationRegionId === region.id ? '#2563eb' : '#d63ae0'}
                     strokeWidth={activeSegmentationRegionId === region.id ? '1.2' : '0.8'}
-                    onClick={() => setActiveSegmentationRegionId(region.id)}
+                    onClick={() => {
+                      setActiveSegmentationRegionId(region.id)
+                      updateActiveSampleLabels(region.label)
+                    }}
                     style={{ cursor: 'pointer' }}
                   />
                 ))}
@@ -1735,15 +1984,15 @@ const MLAnnotation: React.FC = () => {
         <aside>
           <Card title="区域信息" style={{ ...cardStyle, marginBottom: 14 }}>
             <Space direction="vertical" style={{ width: '100%' }}>
-              <Select value={selectedLabelName || 'background'} disabled={locked} options={labels.map(label => ({ value: label.name, label: label.name }))} onChange={setSelectedLabelName} style={{ width: '100%' }} />
+              <Select value={activeRegion?.label ?? selectedLabelName ?? 'background'} disabled={locked || !activeRegion} options={labels.map(label => ({ value: label.name, label: label.name }))} onChange={updateActiveSegmentationLabel} style={{ width: '100%' }} />
               <Space>
                 <Button type="primary" disabled={locked} onClick={addSegmentationRegion}>新增区域</Button>
                 <Button danger disabled={locked || !activeSegmentationRegionId} onClick={deleteActiveSegmentationRegion}>删除区域</Button>
               </Space>
               <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12 }}>
-                <Text type="secondary">区域 ID: {activeSegmentationRegionId || '-'}</Text><br />
-                <Text type="secondary">点数量: 18</Text><br />
-                <Text type="secondary">类别: {selectedLabelName || 'background'}</Text>
+                <Text type="secondary">区域 ID: {activeRegion?.id ?? '-'}</Text><br />
+                <Text type="secondary">点数量: {activeRegion?.points.split(' ').length ?? 0}</Text><br />
+                <Text type="secondary">类别: {activeRegion?.label ?? '-'}</Text>
               </div>
             </Space>
           </Card>
@@ -1761,44 +2010,6 @@ const MLAnnotation: React.FC = () => {
       </main>
     )
     return renderAnnotationFrame('image-segmentation', locked, content)
-  }
-
-  function renderOnlineTaskSummary(record: MLAnnotationRecord, locked: boolean) {
-    const fields: Array<{ label: string; value: React.ReactNode; wide?: boolean }> = [
-      { label: '任务名称', value: record.name, wide: true },
-      { label: '数据类型', value: record.dataType },
-      { label: '标注类型', value: record.annotationType },
-      { label: '数据量', value: workbenchSampleRows.length },
-      { label: '标注进度', value: progressCell(record.progress) },
-      { label: '状态', value: statusTag(locked ? '已完成' : record.status) },
-      { label: '标注前数据集', value: record.preDataset, wide: true },
-      { label: '标注后数据集', value: record.postDataset, wide: true },
-      { label: '创建人', value: record.creator },
-      { label: '创建时间', value: record.createdAt, wide: true },
-    ]
-
-    return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-        {fields.map(field => (
-          <div
-            key={field.label}
-            style={{
-              gridColumn: field.wide ? 'span 2' : undefined,
-              minWidth: 0,
-              padding: '12px 14px',
-              borderRadius: 10,
-              border: '1px solid #e5e7eb',
-              background: '#fbfdff',
-            }}
-          >
-            <div style={{ color: '#64748b', fontSize: 12, marginBottom: 6 }}>{field.label}</div>
-            <div style={{ color: '#0f172a', fontSize: 14, lineHeight: 1.6, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {field.value}
-            </div>
-          </div>
-        ))}
-      </div>
-    )
   }
 
   function renderOnlineWorkbench() {
@@ -1852,6 +2063,22 @@ const MLAnnotation: React.FC = () => {
         </div>
       )
     }
+
+    if (!isReview) {
+      const locked = workbenchSubmitted || currentWorkbenchAssignment.status === '已完成'
+      const workbenchKind = getAnnotationWorkbenchKind(currentWorkbenchAssignment)
+      return workbenchKind === 'text-classification'
+        ? renderTextClassificationWorkbench(currentWorkbenchAssignment, locked)
+        : workbenchKind === 'entity'
+          ? renderEntityWorkbench(locked)
+          : workbenchKind === 'image-classification'
+            ? renderImageClassificationWorkbench(currentWorkbenchAssignment, locked)
+            : workbenchKind === 'object-detection'
+              ? renderObjectDetectionWorkbench(locked)
+              : renderImageSegmentationWorkbench(locked)
+    }
+
+    const locked = workbenchSubmitted || currentWorkbenchAssignment.status === '已完成'
 
     return (
       <div style={{ padding: '24px 32px', minHeight: '100%', background: '#f7f8fa' }}>
@@ -1921,13 +2148,23 @@ const MLAnnotation: React.FC = () => {
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
                 {isReview ? (
                   <>
-                    <Radio.Group defaultValue="pass">
+                    <Radio.Group
+                      value={activeReviewResult.decision}
+                      disabled={locked || !activeSample}
+                      onChange={event => updateReviewResult({ decision: event.target.value })}
+                    >
                       <Space direction="vertical">
                         <Radio value="pass">审核通过</Radio>
                         <Radio value="reject">驳回重新标注</Radio>
                       </Space>
                     </Radio.Group>
-                    <Input.TextArea rows={5} placeholder="请输入审核意见" />
+                    <Input.TextArea
+                      rows={5}
+                      value={activeReviewResult.reason}
+                      disabled={locked || !activeSample}
+                      placeholder={activeReviewResult.decision === 'reject' ? '审核不通过时必须填写原因' : '请输入审核意见'}
+                      onChange={event => updateReviewResult({ reason: event.target.value })}
+                    />
                   </>
                 ) : (
                   <>
@@ -1947,20 +2184,26 @@ const MLAnnotation: React.FC = () => {
                   </>
                 )}
                 <Space wrap>
-                  <Button>上一条</Button>
-                  <Button onClick={() => message.success(isReview ? '审核结果已保存' : '标注结果已保存')}>保存</Button>
+                  <Button disabled={activeSampleIndex <= 0} onClick={() => goToSample(-1)}>上一条</Button>
+                  <Button disabled={locked || !activeSample} onClick={saveCurrentReview}>保存</Button>
                   <Button danger disabled={!activeSample || workbenchSubmitted || currentWorkbenchAssignment.status === '已完成'} onClick={handleDeleteWorkbenchSample}>
                     删除当前数据
                   </Button>
                   <Button
                     type="primary"
-                    disabled={!activeSample || workbenchSubmitted}
+                    disabled={!activeSample || locked}
+                    onClick={completeCurrentReview}
+                  >
+                    完成审核
+                  </Button>
+                  <Button
+                    disabled={locked || !workbenchSampleRows.length || workbenchSampleRows.some(sample => sample.status !== '已完成')}
                     onClick={() => {
                       setWorkbenchSubmitted(true)
-                      message.success(isReview ? '审核任务已提交' : '标注任务已提交')
+                      message.success('审核任务已提交，数据已锁定')
                     }}
                   >
-                    {isReview ? '完成审核' : '完成标注'}
+                    提交审核
                   </Button>
                 </Space>
               </Space>

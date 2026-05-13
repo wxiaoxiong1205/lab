@@ -36,6 +36,7 @@ import {
   CheckOutlined,
   ExperimentOutlined,
   ArrowLeftOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { trainedModels } from '../../data/mockData'
@@ -68,35 +69,35 @@ type DeepSpeedStage = 'off' | 'z0' | 'z2' | 'z3'
 const deepspeedStageOptions: Array<{
   value: DeepSpeedStage
   label: string
-  file: string
+  summary: string
   description: string
   tooltip: string
 }> = [
   {
     value: 'off',
     label: '不开启',
-    file: '不使用 DeepSpeed',
+    summary: '默认训练',
     description: '使用框架默认训练策略，适合 LoRA 或单卡显存充足的场景。',
     tooltip: '不开启 DeepSpeed 训练加速，不加载 ZeRO 配置。适合模型本身能放下、希望保持配置简单，或 LoRA 微调显存压力不大的场景。',
   },
   {
     value: 'z0',
     label: 'ZeRO-0',
-    file: 'examples/deepspeed/ds_z0_config.json',
+    summary: '普通 DDP',
     description: '普通 DDP 基线，不切分参数、梯度和优化器状态，通常速度最快。',
     tooltip: 'ZeRO-0 不做显存状态切分，等价于普通数据并行基线。显存节省最低、通信开销低，适合显存足够时做性能和稳定性基线。',
   },
   {
     value: 'z2',
     label: 'ZeRO-2',
-    file: 'examples/deepspeed/ds_z2_config.json',
+    summary: '均衡策略',
     description: '切分优化器状态和梯度，在显存占用与训练速度之间取得平衡。',
     tooltip: 'ZeRO-2 切分 optimizer states 和 gradients。显存节省中等，通信开销仍相对可控，是多卡训练中最常见的折中方案。',
   },
   {
     value: 'z3',
     label: 'ZeRO-3',
-    file: 'examples/deepspeed/ds_z3_config.json',
+    summary: '最大节省',
     description: '切分优化器状态、梯度和参数，最大化降低单卡显存占用。',
     tooltip: 'ZeRO-3 同时切分 optimizer states、gradients 和 parameters。显存节省最高，但通信开销最大、单步通常更慢，适合模型很大或 ZeRO-2 仍放不下时使用。',
   },
@@ -426,6 +427,69 @@ const LoraTargetModulesSelect: React.FC<{
     <Select.Option value="down_proj">down_proj (下投影)</Select.Option>
   </Select>
 )
+
+const DeepSpeedStageField: React.FC = () => {
+  const form = Form.useFormInstance()
+  const selectedStage = (Form.useWatch('deepspeedStage', form) ?? 'off') as DeepSpeedStage
+  const enabled = selectedStage !== 'off'
+  const zeroOptions = deepspeedStageOptions.filter(option => option.value !== 'off')
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <Form.Item name="deepspeedStage" hidden>
+        <Input />
+      </Form.Item>
+
+      <Form.Item
+        label="训练加速配置"
+        tooltip="DeepSpeed 用于提升大模型训练效率，并优化显存占用。"
+        style={{ marginBottom: 0 }}
+      >
+        <Space direction="vertical" size={10} style={{ width: '100%' }}>
+          <Space align="center" size={12}>
+            <Switch
+              checked={enabled}
+              checkedChildren="开启"
+              unCheckedChildren="关闭"
+              onChange={checked => form.setFieldValue('deepspeedStage', checked ? 'z0' : 'off')}
+            />
+          </Space>
+
+          {enabled && (
+            <Radio.Group
+              value={selectedStage}
+              onChange={event => form.setFieldValue('deepspeedStage', event.target.value)}
+            >
+              <Space size={[12, 8]} wrap>
+                {zeroOptions.map(option => (
+                  <Radio
+                    key={option.value}
+                    value={option.value}
+                    style={{
+                      marginInlineEnd: 0,
+                      padding: '6px 10px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 6,
+                      background: '#fff',
+                    }}
+                  >
+                    <Space size={6}>
+                      <Text strong>{option.label}</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>{option.summary}</Text>
+                      <Tooltip title={option.tooltip} placement="top">
+                        <QuestionCircleOutlined style={{ color: '#94a3b8', fontSize: 13 }} />
+                      </Tooltip>
+                    </Space>
+                  </Radio>
+                ))}
+              </Space>
+            </Radio.Group>
+          )}
+        </Space>
+      </Form.Item>
+    </div>
+  )
+}
 
 type TrainingDatasetRow = {
   key: string
@@ -1147,49 +1211,6 @@ const CreateTraining: React.FC = () => {
         </div>
       ),
     },
-    {
-      key: 'accelerate',
-      label: (
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ThunderboltOutlined />
-          训练加速配置
-        </span>
-      ),
-      children: (
-        <Form.Item
-          label="DeepSpeed ZeRO 策略"
-          name="deepspeedStage"
-          tooltip="DeepSpeed 是大模型训练优化框架；当前仅暴露 ZeRO 显存优化策略，用于在多卡训练中降低模型参数、梯度和优化器状态的显存冗余。"
-        >
-          <Radio.Group style={{ width: '100%' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-              {deepspeedStageOptions.map(option => (
-                <Tooltip key={option.value} title={option.tooltip} placement="top">
-                  <Radio.Button
-                    value={option.value}
-                    style={{
-                      width: '100%',
-                      height: 'auto',
-                      minHeight: 128,
-                      padding: 12,
-                      borderRadius: 8,
-                      lineHeight: 1.5,
-                      whiteSpace: 'normal',
-                    }}
-                  >
-                    <Space direction="vertical" size={6} style={{ width: '100%' }}>
-                      <Text strong>{option.label}</Text>
-                      <Text type="secondary" style={{ fontSize: 12 }}>{option.description}</Text>
-                      <Text type="secondary" style={{ fontSize: 12 }}>{option.file}</Text>
-                    </Space>
-                  </Radio.Button>
-                </Tooltip>
-              ))}
-            </div>
-          </Radio.Group>
-        </Form.Item>
-      ),
-    },
   ]
 
   // LoRA 配置标签页（仅选择 LoRA 微调时显示）
@@ -1488,7 +1509,9 @@ const CreateTraining: React.FC = () => {
 
           <Divider style={{ margin: '20px 0 16px' }} />
 
-          {/* 微调类型：仅 SFT / DPO / RFT 显示 */}
+          <DeepSpeedStageField />
+
+          {/* 微调类型：仅 SFT / DPO / RFT 显示，参数 Tabs 紧跟其后 */}
           {(trainingMethod === 'SFT' || trainingMethod === 'DPO' || trainingMethod === 'RFT') && (
             <Form.Item
               label="微调类型"
