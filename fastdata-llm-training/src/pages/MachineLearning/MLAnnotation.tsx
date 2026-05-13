@@ -1136,38 +1136,6 @@ const MLAnnotation: React.FC = () => {
     markActiveSampleInProgress()
   }
 
-  function saveCurrentAnnotation() {
-    if (!activeSample) return
-    const kind = getCurrentWorkbenchKind()
-    if (kind === 'entity') {
-      const labels = entityMarks.map(entity => entity.label).filter(Boolean)
-      if (!labels.length) {
-        message.warning('请先完成实体标注')
-        return
-      }
-      setSampleLabelResults(previous => ({ ...previous, [activeSample.id]: Array.from(new Set(labels)) }))
-    } else if (kind === 'object-detection') {
-      const labels = detectionBoxes.map(box => box.label).filter(Boolean)
-      if (!labels.length) {
-        message.warning('请先新增或选择检测框')
-        return
-      }
-      setSampleLabelResults(previous => ({ ...previous, [activeSample.id]: Array.from(new Set(labels)) }))
-    } else if (kind === 'image-segmentation') {
-      const labels = segmentationRegions.map(region => region.label).filter(Boolean)
-      if (!labels.length) {
-        message.warning('请先新增或选择分割区域')
-        return
-      }
-      setSampleLabelResults(previous => ({ ...previous, [activeSample.id]: Array.from(new Set(labels)) }))
-    } else if (!(sampleLabelResults[activeSample.id] ?? []).length) {
-      message.warning('请先选择标注结果')
-      return
-    }
-    markActiveSampleInProgress()
-    message.success('标注结果已保存')
-  }
-
   function updateActiveDetectionLabel(label: string) {
     setSelectedLabelName(label)
     setDetectionBoxes(previous => previous.map(box => (
@@ -1565,37 +1533,6 @@ const MLAnnotation: React.FC = () => {
     message.success('已删除当前分割区域')
   }
 
-  function renderSampleListPanel() {
-    return (
-      <Space direction="vertical" size={10} style={{ width: '100%' }}>
-        {workbenchSampleRows.map(sample => {
-          const active = sample.id === activeSampleId
-          return (
-            <button
-              key={sample.id}
-              type="button"
-              onClick={() => setActiveSampleId(sample.id)}
-              style={{
-                width: '100%',
-                border: `1px solid ${active ? '#2563eb' : '#e5e7eb'}`,
-                borderRadius: 10,
-                padding: '12px 14px',
-                textAlign: 'left',
-                cursor: 'pointer',
-                background: active ? 'linear-gradient(135deg, #2563eb 0%, #60a5fa 100%)' : '#fff',
-                boxShadow: active ? '0 12px 24px rgba(37, 99, 235, 0.2)' : 'none',
-              }}
-            >
-              <div style={{ fontWeight: 700, color: active ? '#fff' : '#0f172a', fontSize: 15 }}>{sample.title}</div>
-              <div style={{ color: active ? 'rgba(255,255,255,0.8)' : '#64748b', fontSize: 12, marginTop: 4 }}>{sample.status}</div>
-            </button>
-          )
-        })}
-        {!workbenchSampleRows.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" />}
-      </Space>
-    )
-  }
-
   function renderTopActions(locked: boolean) {
     const kind = currentOnlineTask ? getAnnotationWorkbenchKind(currentOnlineTask) : currentWorkbenchAssignment ? getAnnotationWorkbenchKind(currentWorkbenchAssignment) : 'text-classification'
     const labels = getCurrentLabels(kind)
@@ -1751,9 +1688,6 @@ const MLAnnotation: React.FC = () => {
               onChange={updateActiveSampleLabels}
             />
             <div style={{ marginTop: 10 }}>{renderTagGroup(resultValues)}</div>
-            <Button size="small" style={{ marginTop: 12 }} disabled={locked || !activeSample} onClick={saveCurrentAnnotation}>
-              保存当前标注
-            </Button>
           </div>
         </div>
       </main>
@@ -1875,9 +1809,6 @@ const MLAnnotation: React.FC = () => {
               onChange={updateActiveSampleLabels}
             />
             <div style={{ marginTop: 10 }}>{renderTagGroup(resultValues)}</div>
-            <Button size="small" style={{ marginTop: 12 }} disabled={locked || !activeSample} onClick={saveCurrentAnnotation}>
-              保存当前标注
-            </Button>
           </div>
         </div>
       </main>
