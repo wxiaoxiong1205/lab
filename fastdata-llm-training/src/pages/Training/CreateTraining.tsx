@@ -1162,7 +1162,7 @@ const CreateTraining: React.FC = () => {
           tooltip="DeepSpeed 是大模型训练优化框架；当前仅暴露 ZeRO 显存优化策略，用于在多卡训练中降低模型参数、梯度和优化器状态的显存冗余。"
         >
           <Radio.Group style={{ width: '100%' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
               {deepspeedStageOptions.map(option => (
                 <Tooltip key={option.value} title={option.tooltip} placement="top">
                   <Radio.Button
