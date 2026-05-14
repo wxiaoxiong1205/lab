@@ -4,6 +4,7 @@ import {
   CopyOutlined,
   DeleteOutlined,
   EyeOutlined,
+  FilterOutlined,
   LinkOutlined,
   MoreOutlined,
   PauseCircleOutlined,
@@ -48,6 +49,7 @@ import { getCurrentUser, usePermissionStore } from '../../services/permissionSto
 import { useOnlineInferenceServices } from '../../services/onlineInferenceServiceStore'
 import { createTaskNotification } from '../../services/notificationStore'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
+import TableColumnFilterDropdown, { type TableColumnFilterOption } from '../../components/TableColumnFilterDropdown'
 import { PUBLISH_CASE_NOTICE } from '../notebookCaseNotice'
 
 const { Text, Title, Paragraph } = Typography
@@ -67,6 +69,14 @@ type SSHConfigRecord = {
   sshKey: string
   sshCommand: string
 }
+
+const PROJECT_SSH_CONFIG: SSHConfigRecord = {
+  username: 'lab',
+  sshKey: 'SHA256:PO9za4v8KR0nQZHMIjPYXmnU8a3mA1uEBCexONB4yyYA',
+  sshCommand: 'ssh -p 31088 lab@ssh-zGVlcGV4aWxhYI9rZXIfc3NoOojc5QDUzMA==@deepexilab-test.deepexi.com',
+}
+
+const PROJECT_SSH_SUPPORTED = Boolean(PROJECT_SSH_CONFIG)
 
 type MLNotebookRecord = {
   id: string
@@ -344,7 +354,7 @@ const myNotebooksSeed: MLNotebookRecord[] = [
     name: 'hzj_单图多标签-ml-dev',
     description: 'ML 部署在线开发：hzj_单图多标签',
     image: 'lab-cn-guangzhou.cr.volces.com/fs/jupyter/ml/deepexi-notebook:pytorch_2.5-cuda_12.1-py311-ubuntu22.04',
-    sshSupported: true,
+    sshSupported: PROJECT_SSH_SUPPORTED,
     status: '运行中',
     spec: '1x GPU\nCPU: 4 Core / 内存: 16 GB',
     runtimeLimit: '-',
@@ -368,18 +378,14 @@ const myNotebooksSeed: MLNotebookRecord[] = [
       { id: 'ml-port-1', protocol: 'TCP', port: 8000, purpose: 'Web UI' },
       { id: 'ml-port-2', protocol: 'TCP', port: 7860, purpose: 'Gradio UI' },
     ],
-    sshConfig: {
-      username: 'lab',
-      sshKey: 'SHA256:PO9za4v8KR0nQZHMIjPYXmnU8a3mA1uEBCexONB4yyYA',
-      sshCommand: 'ssh -p 31088 lab@ssh-zGVlcGV4aWxhYI9rZXIfc3NoOojc5QDUzMA==@deepexilab-test.deepexi.com',
-    },
+    sshConfig: PROJECT_SSH_CONFIG,
   },
   {
     id: 'ml-nb-2',
     name: 'basion-ml-dev',
     description: 'ML 部署在线开发：basion',
     image: 'lab-cn-guangzhou.cr.volces.com/fs/jupyter/ml/deepexi-notebook:datascience-cpu-python312-ubuntu24.04',
-    sshSupported: false,
+    sshSupported: PROJECT_SSH_SUPPORTED,
     status: '已终止',
     spec: 'CPU Only\nCPU: 2 Core / 内存: 8 GB',
     runtimeLimit: '2小时30分钟',
@@ -400,6 +406,7 @@ const myNotebooksSeed: MLNotebookRecord[] = [
     runtimeHours: 2,
     runtimeMinutes: 30,
     openPorts: [{ id: 'ml-port-3', protocol: 'TCP', port: 8888, purpose: 'Jupyter Lab' }],
+    sshConfig: PROJECT_SSH_CONFIG,
   },
 ]
 
@@ -519,6 +526,7 @@ const codeBlockStyle: React.CSSProperties = {
 
 const CASE_PUBLISH_READY_DELAY = 4800
 const CASE_HIGHLIGHT_DURATION = 5000
+const NOTEBOOK_STATUS_FILTERS = Object.keys(TASK_LIFECYCLE_TAG) as NotebookStatus[]
 
 function statusTag(status: NotebookStatus): React.ReactNode {
   const config = TASK_LIFECYCLE_TAG[status]
@@ -688,6 +696,7 @@ const MLNotebook: React.FC = () => {
   const [customMirrorForm] = Form.useForm<CustomMirrorFormValues>()
   const [mirrorTagForm] = Form.useForm<CustomMirrorTagFormValues>()
   const [searchValue, setSearchValue] = useState('')
+  const [notebookTableResetKey, setNotebookTableResetKey] = useState(0)
   const [activeTab, setActiveTab] = useState<'mine' | 'square'>('mine')
   const [rows, setRows] = useState(myNotebooksSeed)
   const [squareRows, setSquareRows] = useState(squareNotebooks)
@@ -851,13 +860,59 @@ const MLNotebook: React.FC = () => {
   }, [squareRows])
 
   const notebookList = useMemo(
-    () => rows.filter(item => item.name.toLowerCase().includes(searchValue.toLowerCase())),
+    () => {
+      const keyword = searchValue.trim().toLowerCase()
+      return rows.filter(item => !keyword || item.name.toLowerCase().includes(keyword))
+    },
     [rows, searchValue],
   )
 
   const squareList = useMemo(
-    () => squareRows.filter(item => item.name.toLowerCase().includes(searchValue.toLowerCase())),
+    () => {
+      const keyword = searchValue.trim().toLowerCase()
+      return squareRows.filter(item => !keyword || item.name.toLowerCase().includes(keyword))
+    },
     [searchValue, squareRows],
+  )
+  const notebookStatusOptions = useMemo<TableColumnFilterOption[]>(
+    () =>
+      NOTEBOOK_STATUS_FILTERS.map(status => ({
+        value: status,
+        label: <Tag color={TASK_LIFECYCLE_TAG[status].color}>{TASK_LIFECYCLE_TAG[status].label}</Tag>,
+        searchText: TASK_LIFECYCLE_TAG[status].label,
+        count: rows.filter(item => item.status === status).length,
+      })),
+    [rows],
+  )
+  const notebookAccessScopeOptions = useMemo<TableColumnFilterOption[]>(
+    () => [
+      {
+        value: 'private',
+        label: <Tag color="orange">私有</Tag>,
+        searchText: '私有 private',
+        count: rows.filter(item => item.accessScope === 'private').length,
+      },
+      {
+        value: 'public',
+        label: <Tag color="blue">公开</Tag>,
+        searchText: '公开 public',
+        count: rows.filter(item => item.accessScope === 'public').length,
+      },
+    ],
+    [rows],
+  )
+  const notebookCreatorOptions = useMemo<TableColumnFilterOption[]>(
+    () =>
+      Array.from(new Set(rows.map(item => item.creator).filter(Boolean))).map(creator => ({
+        value: creator,
+        label: creator,
+        searchText: creator,
+        count: rows.filter(item => item.creator === creator).length,
+      })),
+    [rows],
+  )
+  const renderNotebookFilterIcon = (filtered: boolean) => (
+    <FilterOutlined style={{ color: filtered ? '#1677ff' : '#94a3b8' }} />
   )
   const processingCaseCount = squareRows.filter(item => item.publishStatus === 'processing').length
   const mirrorNamespace = Form.useWatch('namespace', customMirrorForm)
@@ -1221,13 +1276,18 @@ const MLNotebook: React.FC = () => {
       dataIndex: 'sshSupported',
       key: 'sshSupported',
       width: 120,
-      render: value => (value ? <Text style={{ color: '#059669' }}>已支持</Text> : <Text type="secondary">未支持</Text>),
+      render: () => (PROJECT_SSH_SUPPORTED ? <Text style={{ color: '#059669' }}>已支持</Text> : <Text type="secondary">未支持</Text>),
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
       width: 110,
+      filterIcon: renderNotebookFilterIcon,
+      filterDropdown: props => (
+        <TableColumnFilterDropdown title="筛选状态" options={notebookStatusOptions} {...props} />
+      ),
+      onFilter: (value, record) => record.status === String(value),
       render: value => statusTag(value),
     },
     {
@@ -1235,6 +1295,11 @@ const MLNotebook: React.FC = () => {
       dataIndex: 'accessScope',
       key: 'accessScope',
       width: 110,
+      filterIcon: renderNotebookFilterIcon,
+      filterDropdown: props => (
+        <TableColumnFilterDropdown title="筛选访问权限" options={notebookAccessScopeOptions} {...props} />
+      ),
+      onFilter: (value, record) => record.accessScope === value,
       render: value => accessScopeTag(value),
     },
     {
@@ -1245,8 +1310,18 @@ const MLNotebook: React.FC = () => {
       render: value => <div style={{ whiteSpace: 'pre-line' }}>{value}</div>,
     },
     { title: '最大运行时长', dataIndex: 'runtimeLimit', key: 'runtimeLimit', width: 140 },
+    {
+      title: '创建人',
+      dataIndex: 'creator',
+      key: 'creator',
+      width: 120,
+      filterIcon: renderNotebookFilterIcon,
+      filterDropdown: props => (
+        <TableColumnFilterDropdown title="筛选创建人" options={notebookCreatorOptions} {...props} />
+      ),
+      onFilter: (value, record) => record.creator === String(value),
+    },
     { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 170 },
-    { title: '创建人', dataIndex: 'creator', key: 'creator', width: 120 },
     {
       title: '操作',
       key: 'action',
@@ -1342,6 +1417,12 @@ const MLNotebook: React.FC = () => {
   const handleTabChange = (key: string) => {
     setActiveTab(key as 'mine' | 'square')
     setSearchValue('')
+    setNotebookTableResetKey(previous => previous + 1)
+  }
+
+  const resetNotebookFilters = () => {
+    setSearchValue('')
+    setNotebookTableResetKey(previous => previous + 1)
   }
 
   const openCreate = () => {
@@ -1420,7 +1501,7 @@ const MLNotebook: React.FC = () => {
         name: values.name || '未命名Notebook',
         description: values.description?.trim() || '',
         image: values.image || imageOptions[0].value,
-        sshSupported: false,
+        sshSupported: PROJECT_SSH_SUPPORTED,
         status: '已创建',
         spec: buildSpecSummary(values),
         runtimeLimit: buildRuntimeLimit(values),
@@ -1443,7 +1524,7 @@ const MLNotebook: React.FC = () => {
         runtimeHours: values.runtimeEnabled ? values.runtimeHours : undefined,
         runtimeMinutes: values.runtimeEnabled ? values.runtimeMinutes : undefined,
         openPorts: toPortRecords(values.openPorts),
-        sshConfig: undefined,
+        sshConfig: PROJECT_SSH_CONFIG,
       }
 
       setRows(previous => [newRecord, ...previous])
@@ -2623,22 +2704,12 @@ const MLNotebook: React.FC = () => {
                 onChange={e => setSearchValue(e.target.value)}
                 style={{ width: 230 }}
               />
-              {activeTab === 'mine' && (
-                <Select
-                  allowClear
-                  placeholder="状态"
-                  style={{ width: 150 }}
-                  options={[
-                    { value: '运行中', label: '运行中' },
-                    { value: '已终止', label: '已终止' },
-                    { value: '已创建', label: '已创建' },
-                  ]}
-                />
-              )}
               {activeTab === 'mine' ? (
                 <>
-                  <Button type="primary">搜索</Button>
-                  <Button onClick={() => setSearchValue('')}>重置</Button>
+                  <Button type="primary" onClick={() => message.success('筛选已应用')}>
+                    搜索
+                  </Button>
+                  <Button onClick={resetNotebookFilters}>重置</Button>
                 </>
               ) : (
                 <Button icon={<SearchOutlined />} />
@@ -2664,6 +2735,7 @@ const MLNotebook: React.FC = () => {
 
           {activeTab === 'mine' ? (
             <Table
+              key={notebookTableResetKey}
               rowKey="id"
               columns={notebookColumns}
               dataSource={notebookList}
