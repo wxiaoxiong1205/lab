@@ -27,6 +27,7 @@
 - 阅读 `AGENTS.md`
 - 阅读和本轮需求直接相关的代码
 - 阅读 `docs/ai/production-review-template.md`
+- 复杂迭代、历史返工模块或跨页面状态联动需求，先阅读 `docs/ai/phase2-experience-lessons.md`
 - 如果涉及页面，阅读或更新 `pageDocs.ts` 对应文档
 
 ### 3.2 需求理解

@@ -61,6 +61,33 @@ const GPU_MODEL_LABELS: Record<string, string> = {
   H100: 'NVIDIA H100',
 }
 
+const DEEPSPEED_STAGE_LABELS: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  off: {
+    label: '未开启',
+    color: '#475569',
+    bg: 'rgba(100,116,139,0.1)',
+    border: 'rgba(100,116,139,0.18)',
+  },
+  z0: {
+    label: 'ZeRO-0',
+    color: '#2563eb',
+    bg: 'rgba(37,99,235,0.1)',
+    border: 'rgba(37,99,235,0.18)',
+  },
+  z2: {
+    label: 'ZeRO-2',
+    color: '#0891b2',
+    bg: 'rgba(8,145,178,0.1)',
+    border: 'rgba(8,145,178,0.18)',
+  },
+  z3: {
+    label: 'ZeRO-3',
+    color: '#7c3aed',
+    bg: 'rgba(124,58,237,0.1)',
+    border: 'rgba(124,58,237,0.18)',
+  },
+}
+
 function formatMetricTableValue(v: number): string {
   const a = Math.abs(v)
   if (Number.isNaN(v)) return '--'
@@ -80,6 +107,10 @@ function formatCardCount(value?: number): string {
 
 function formatResourceValue(value?: number, unit?: string): string {
   return value ? `${value}${unit ? ` ${unit}` : ''}` : '--'
+}
+
+function getDeepSpeedStageConfig(value?: string) {
+  return DEEPSPEED_STAGE_LABELS[value ?? 'off'] ?? DEEPSPEED_STAGE_LABELS.off
 }
 
 /** 训练曲线展示顺序（与参考页一致：loss / eval_loss / epoch / learning_rate 等） */
@@ -238,6 +269,7 @@ const VersionDetail: React.FC = () => {
   // ── 参数配置子Tab内容 ──────────────────────────────────────────────────
 
   const cfg = version.config
+  const deepSpeedStageCfg = getDeepSpeedStageConfig(cfg?.deepspeedStage)
   const basicRows = [
     { name: 'learning_rate',           label: '学习率',            value: cfg?.learningRate },
     { name: 'num_train_epochs',        label: '训练轮次',          value: cfg?.numEpochs },
@@ -935,6 +967,21 @@ const VersionDetail: React.FC = () => {
             }}>
               {version.fineTuneType === 'lora' ? 'Lora微调' : '全参微调'}
             </span>
+          </Descriptions.Item>
+          <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '12px 16px', display: 'block' }}>训练加速配置</span>}>
+            <Tag
+              style={{
+                margin: 0,
+                background: deepSpeedStageCfg.bg,
+                border: `1px solid ${deepSpeedStageCfg.border}`,
+                color: deepSpeedStageCfg.color,
+                borderRadius: 6,
+                fontWeight: 600,
+                fontSize: 12,
+              }}
+            >
+              {deepSpeedStageCfg.label}
+            </Tag>
           </Descriptions.Item>
           <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '12px 16px', display: 'block' }}>模型来源</span>}>
             <Space orientation="vertical" size={6} style={{ width: '100%' }}>

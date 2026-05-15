@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  Alert,
   Modal,
   Button,
   Input,
@@ -25,6 +26,7 @@ import {
 const { Text } = Typography
 
 export type SelectedDatasetVersionRow = DatasetPickerResolvedRow
+export type DetailedDataUsage = '文本生成 / SFT' | '文本生成 / DPO' | '文本生成 / RFT-PPO' | '文本生成 / RFT-GRPO' | '图像理解'
 
 export interface DatasetSelectModalProps {
   open: boolean
@@ -37,8 +39,26 @@ export interface DatasetSelectModalProps {
   fixedDataType?: DatasetPickerDataType
   /** 不固定数据类型时，首次打开默认选中的数据类型 */
   defaultDataType?: DatasetPickerDataType
+  /** 不固定数据类型时，仅允许展示的数据类型 */
+  allowedDataTypes?: DatasetPickerDataType[]
   /** 推理结果集选择数据时，数据用途需要细分到 SFT / DPO / RFT-PPO / RFT-GRPO */
   detailedDataUsage?: boolean
+  /** 数据用途细分后的白名单，适用于推理结果集等只允许 SFT 的场景 */
+  allowedDetailedUsages?: DetailedDataUsage[]
+  /** 按数据类型设置数据用途白名单，适用于“测试数据保留，训练/验证只允许 SFT”的场景 */
+  allowedDetailedUsagesByDataType?: Partial<Record<DatasetPickerDataType, DetailedDataUsage[]>>
+  /** 按数据类型排除数据格式，适用于训练/验证中排除 DPO/RFT 格式但保留基础用途筛选的场景 */
+  excludedFormatsByDataType?: Partial<Record<DatasetPickerDataType, string[]>>
+  /** 隐藏当前范围内数量为 0 的细分用途选项 */
+  hideEmptyDetailedUsageOptions?: boolean
+  /** 隐藏细分用途选项，仅保留“全部” */
+  hideDetailedUsageOptions?: boolean
+  /** 首次打开时默认选中的数据用途 */
+  defaultDataUsage?: string
+  /** 弹窗顶部的业务约束提示 */
+  dataScopeHint?: React.ReactNode
+  emptyText?: string
+  emptyDescription?: string
   defaultSelectedKeys?: string[]
   excludeKeys?: string[]
   onCancel: () => void
@@ -85,7 +105,17 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
   trainingMethod,
   fixedDataType,
   defaultDataType,
+  allowedDataTypes,
   detailedDataUsage = false,
+  allowedDetailedUsages,
+  allowedDetailedUsagesByDataType,
+  excludedFormatsByDataType,
+  hideEmptyDetailedUsageOptions = false,
+  hideDetailedUsageOptions = false,
+  defaultDataUsage,
+  dataScopeHint,
+  emptyText = '暂无数据集',
+  emptyDescription,
   defaultSelectedKeys = [],
   excludeKeys = [],
   onCancel,
@@ -97,7 +127,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
   const pageSize = 10
 
   const [dataType, setDataType] = useState<string>(fixedDataType ?? defaultDataType ?? '')
-  const [dataUsage, setDataUsage] = useState(() => (detailedDataUsage ? '' : getDefaultDataUsage(trainingType)))
+  const [dataUsage, setDataUsage] = useState(() => defaultDataUsage ?? (detailedDataUsage ? '' : getDefaultDataUsage(trainingType)))
   const [dataFormat, setDataFormat] = useState('')
 
   // 选中状态
@@ -121,7 +151,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
       setPage(1)
       setExpandedIds(new Set())
       setDataType(fixedDataType ?? defaultDataType ?? '')
-      setDataUsage(detailedDataUsage ? '' : getDefaultDataUsage(trainingType))
+      setDataUsage(defaultDataUsage ?? (detailedDataUsage ? '' : getDefaultDataUsage(trainingType)))
       setDataFormat('')
       if (mode === 'multiple') {
         setMultiSelected(new Set(defaultSelectedKeys.filter(k => !excludeKeys.includes(k))))
@@ -132,21 +162,66 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
       }
     }
     prevOpenRef.current = true
-  }, [open, fixedDataType, defaultDataType, mode, trainingType, trainingMethod, detailedDataUsage, defaultSelectedKeys, excludeKeys])
+  }, [open, fixedDataType, defaultDataType, mode, trainingType, trainingMethod, detailedDataUsage, defaultDataUsage, defaultSelectedKeys, excludeKeys])
 
   // ─── 派生数据：数据类型选项 & 数量 ───
   const DATA_TYPES = useMemo(
-    () => ['测试数据集', '训练数据集', '验证数据集'] as const,
+    () => ['训练数据集', '验证数据集', '测试数据集'] as const,
     [],
   )
+  const selectableDataTypes = useMemo(
+    () => allowedDataTypes?.length
+      ? DATA_TYPES.filter(t => allowedDataTypes.includes(t))
+      : DATA_TYPES,
+    [DATA_TYPES, allowedDataTypes],
+  )
+  const allowedDetailedUsageSet = useMemo(
+    () => allowedDetailedUsages?.length ? new Set<string>(allowedDetailedUsages) : null,
+    [allowedDetailedUsages],
+  )
+  const allowedDetailedUsageByTypeSets = useMemo(() => {
+    if (!allowedDetailedUsagesByDataType) return null
+    return Object.fromEntries(
+      Object.entries(allowedDetailedUsagesByDataType).map(([type, usages]) => [type, new Set(usages)]),
+    ) as Partial<Record<DatasetPickerDataType, Set<DetailedDataUsage>>>
+  }, [allowedDetailedUsagesByDataType])
+  const excludedFormatByTypeSets = useMemo(() => {
+    if (!excludedFormatsByDataType) return null
+    return Object.fromEntries(
+      Object.entries(excludedFormatsByDataType).map(([type, formats]) => [type, new Set(formats)]),
+    ) as Partial<Record<DatasetPickerDataType, Set<string>>>
+  }, [excludedFormatsByDataType])
+  const baseCatalog = useMemo(() => {
+    let list = DATASET_PICKER_CATALOG
+    if (allowedDataTypes?.length) {
+      list = list.filter(d => allowedDataTypes.includes(d.dataType))
+    }
+    if (allowedDetailedUsageSet) {
+      list = list.filter(d => allowedDetailedUsageSet.has(getDetailedUsage(d)))
+    }
+    if (allowedDetailedUsageByTypeSets) {
+      list = list.filter(d => {
+        const scopedSet = allowedDetailedUsageByTypeSets[d.dataType]
+        return !scopedSet || scopedSet.has(getDetailedUsage(d) as DetailedDataUsage)
+      })
+    }
+    if (excludedFormatByTypeSets) {
+      list = list.filter(d => {
+        const scopedSet = excludedFormatByTypeSets[d.dataType]
+        return !scopedSet || !scopedSet.has(d.dataFormat)
+      })
+    }
+    return list
+  }, [allowedDataTypes, allowedDetailedUsageByTypeSets, allowedDetailedUsageSet, excludedFormatByTypeSets])
+
   const typeCounts = useMemo(() => {
     const m: Record<string, number> = {}
     for (const t of DATA_TYPES) m[t] = 0
-    for (const d of DATASET_PICKER_CATALOG) {
+    for (const d of baseCatalog) {
       m[d.dataType] = (m[d.dataType] ?? 0) + 1
     }
     return m
-  }, [DATA_TYPES])
+  }, [DATA_TYPES, baseCatalog])
 
   // ─── 筛选逻辑 ───
   const allowedFormats = useMemo(
@@ -155,7 +230,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
   )
 
   const filteredCatalog = useMemo(() => {
-    let list = DATASET_PICKER_CATALOG
+    let list = baseCatalog
     if (fixedDataType) list = list.filter(d => d.dataType === fixedDataType)
     else if (dataType) list = list.filter(d => d.dataType === dataType)
     if (dataUsage) {
@@ -168,17 +243,17 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
       list = list.filter(d => d.name.toLowerCase().includes(q))
     }
     return list
-  }, [fixedDataType, dataType, dataUsage, dataFormat, search, allowedFormats, detailedDataUsage])
+  }, [baseCatalog, fixedDataType, dataType, dataUsage, dataFormat, search, allowedFormats, detailedDataUsage])
 
   const usageScope = useMemo(() => {
-    let list = DATASET_PICKER_CATALOG
+    let list = baseCatalog
     if (fixedDataType) list = list.filter(d => d.dataType === fixedDataType)
     else if (dataType) list = list.filter(d => d.dataType === dataType)
     return list
-  }, [fixedDataType, dataType])
+  }, [baseCatalog, fixedDataType, dataType])
 
   const formatScope = useMemo(() => {
-    let list = DATASET_PICKER_CATALOG
+    let list = baseCatalog
     if (fixedDataType) list = list.filter(d => d.dataType === fixedDataType)
     else if (dataType) list = list.filter(d => d.dataType === dataType)
     if (dataUsage) {
@@ -186,18 +261,22 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
     }
     if (allowedFormats) list = list.filter(d => allowedFormats.has(d.dataFormat))
     return list
-  }, [fixedDataType, dataType, dataUsage, allowedFormats, detailedDataUsage])
+  }, [baseCatalog, fixedDataType, dataType, dataUsage, allowedFormats, detailedDataUsage])
 
   const usageOptions = useMemo(() => {
     if (detailedDataUsage) {
-      const values = ['文本生成 / SFT', '文本生成 / DPO', '文本生成 / RFT-PPO', '文本生成 / RFT-GRPO', '图像理解']
+      const values: DetailedDataUsage[] = ['文本生成 / SFT', '文本生成 / DPO', '文本生成 / RFT-PPO', '文本生成 / RFT-GRPO', '图像理解']
+      const scopedValues = allowedDetailedUsages?.length ? values.filter(value => allowedDetailedUsages.includes(value)) : values
+      const visibleValues = hideEmptyDetailedUsageOptions
+        ? scopedValues.filter(value => usageScope.some(item => getDetailedUsage(item) === value))
+        : scopedValues
       return [
         { value: '', label: '全部', count: usageScope.length },
-        ...values.map(value => ({
+        ...(hideDetailedUsageOptions ? [] : visibleValues.map(value => ({
           value,
           label: value,
           count: usageScope.filter(item => getDetailedUsage(item) === value).length,
-        })),
+        }))),
       ]
     }
     const text = usageScope.filter(d => d.dataUsage === '文本生成').length
@@ -207,7 +286,15 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
       { value: '文本生成', label: '文本生成', count: text },
       { value: '图像理解', label: '图像理解', count: vision },
     ]
-  }, [detailedDataUsage, usageScope])
+  }, [allowedDetailedUsages, detailedDataUsage, hideDetailedUsageOptions, hideEmptyDetailedUsageOptions, usageScope])
+
+  useEffect(() => {
+    if (!dataUsage) return
+    const allowed = new Set(usageOptions.map(option => option.value))
+    if (!allowed.has(dataUsage)) {
+      setDataUsage('')
+    }
+  }, [dataUsage, usageOptions])
 
   // dataFormat 超出范围时自动清除（单向监听 formatScope，避免无限循环）
   useEffect(() => {
@@ -231,6 +318,15 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
     () => filteredCatalog.slice((page - 1) * pageSize, page * pageSize),
     [filteredCatalog, page],
   )
+  const selectableKeys = useMemo(() => {
+    const keys = new Set<string>()
+    for (const item of baseCatalog) {
+      for (const version of item.versions) {
+        keys.add(makeDatasetRowKey(item.id, version.id))
+      }
+    }
+    return keys
+  }, [baseCatalog])
 
   // ─── 操作 ───
   const toggleMulti = useCallback(
@@ -249,15 +345,16 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
   const handleConfirm = useCallback(() => {
     if (mode === 'multiple') {
       const rows = Array.from(multiSelected)
+        .filter(k => selectableKeys.has(k))
         .map(k => resolveDatasetVersionRow(k))
         .filter(Boolean) as SelectedDatasetVersionRow[]
       onConfirm(rows)
     } else {
-      if (!singleSelected) { onConfirm([]); return }
+      if (!singleSelected || !selectableKeys.has(singleSelected)) { onConfirm([]); return }
       const row = resolveDatasetVersionRow(singleSelected)
       onConfirm(row ? [row] : [])
     }
-  }, [mode, multiSelected, singleSelected, onConfirm])
+  }, [mode, multiSelected, onConfirm, selectableKeys, singleSelected])
 
   const totalCount = filteredCatalog.length
   const rangeStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1
@@ -349,7 +446,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
               style={{ padding: 0, height: 'auto' }}
               onClick={() => {
                 setDataType(fixedDataType ?? defaultDataType ?? '')
-                setDataUsage(detailedDataUsage ? '' : getDefaultDataUsage(trainingType))
+                setDataUsage(defaultDataUsage ?? (detailedDataUsage ? '' : getDefaultDataUsage(trainingType)))
                 setDataFormat('')
                 setSearch('')
                 setPage(1)
@@ -376,9 +473,9 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
               >
                 <Space orientation="vertical" size={6} style={{ width: '100%' }}>
                   <Radio value="">
-                    全部（{DATASET_PICKER_CATALOG.length}）
+                    全部（{baseCatalog.length}）
                   </Radio>
-                  {DATA_TYPES.map(t => (
+                  {selectableDataTypes.map(t => (
                     <Radio key={t} value={t}>
                       {t}（{typeCounts[t] ?? 0}）
                     </Radio>
@@ -403,9 +500,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
               <Space orientation="vertical" size={6} style={{ width: '100%' }}>
                 {usageOptions.map(opt => (
                   <Radio key={opt.value || 'all'} value={opt.value}>
-                    {opt.value
-                      ? `${opt.label}（${opt.count}）`
-                      : `全部（${opt.count}）`}
+                    {opt.label}（{opt.count}）
                   </Radio>
                 ))}
               </Space>
@@ -440,6 +535,15 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
 
         {/* ── 右侧数据集列表 ── */}
         <div>
+          {dataScopeHint ? (
+            <Alert
+              type="info"
+              showIcon
+              message={dataScopeHint}
+              style={{ borderRadius: 10, marginBottom: 12 }}
+            />
+          ) : null}
+
           <div
             style={{
               display: 'flex',
@@ -473,7 +577,18 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
             columns={columns}
             dataSource={pagedList}
             pagination={false}
-            locale={{ emptyText: '暂无数据集' }}
+            locale={{
+              emptyText: (
+                <div style={{ padding: '18px 0' }}>
+                  <Text type="secondary">{emptyText}</Text>
+                  {emptyDescription ? (
+                    <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 12 }}>
+                      {emptyDescription}
+                    </Text>
+                  ) : null}
+                </div>
+              ),
+            }}
             onRow={record => ({
               style: { cursor: 'pointer' },
               onClick: () => {

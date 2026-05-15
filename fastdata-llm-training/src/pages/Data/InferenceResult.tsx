@@ -578,7 +578,12 @@ const InferenceResult: React.FC = () => {
                     </Card>
                   ) : null}
 
-                  <Form.Item label="待推理数据" name="pendingData" rules={[{ required: true, message: '请选择待推理数据' }]}>
+                  <Form.Item
+                    label="待推理数据"
+                    name="pendingData"
+                    rules={[{ required: true, message: '请选择待推理数据' }]}
+                    extra={<Text type="secondary">当前推理结果集可选择数据集；训练/验证数据集中仅支持 SFT 类型，DPO/RFT 数据不会出现在选择列表中。</Text>}
+                  >
                     <Input
                       readOnly
                       placeholder="请选择数据集分类、数据集和版本"
@@ -642,7 +647,14 @@ const InferenceResult: React.FC = () => {
           mode="single"
           trainingType="text"
           defaultDataType="验证数据集"
-          detailedDataUsage
+          defaultDataUsage=""
+          excludedFormatsByDataType={{
+            训练数据集: ['Chosen_Rejected', 'Completion_Reward'],
+            验证数据集: ['Chosen_Rejected', 'Completion_Reward'],
+          }}
+          dataScopeHint="可选择数据集；训练/验证数据集中仅展示 SFT 版本。DPO/RFT 偏好或奖励数据不支持创建推理结果集。"
+          emptyText="暂无可用于推理结果集的数据集版本"
+          emptyDescription="请先创建测试数据集，或发布 SFT 类型的训练/验证数据集。"
           defaultSelectedKeys={selectedPendingDataset ? [selectedPendingDataset.key] : []}
           onCancel={() => setDatasetPickerOpen(false)}
           onConfirm={selectedRows => {
