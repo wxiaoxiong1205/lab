@@ -493,10 +493,6 @@ const TrainingDetail: React.FC = () => {
               <Text type="secondary" style={{ fontSize: 12, marginBottom: 4, display: 'block' }}>任务名称</Text>
               <Text strong style={{ color: '#0f172a', fontSize: 14 }}>{task.name}</Text>
             </div>
-            <div style={{ maxWidth: 360 }}>
-              <Text type="secondary" style={{ fontSize: 12, marginBottom: 4, display: 'block' }}>任务描述</Text>
-              <Text style={{ color: '#475569', fontSize: 13 }}>{task.description || '--'}</Text>
-            </div>
             <div>
               <Text type="secondary" style={{ fontSize: 12, marginBottom: 4, display: 'block' }}>训练类型</Text>
               <span style={{

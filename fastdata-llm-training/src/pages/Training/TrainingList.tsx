@@ -82,21 +82,6 @@ const TrainingList: React.FC = () => {
       ),
     },
     {
-      title: '任务描述',
-      dataIndex: 'description',
-      key: 'description',
-      width: 220,
-      render: (value, record) => (
-        <TaskMetadataEditor
-          value={value}
-          emptyText="暂无描述"
-          placeholder="请输入任务描述"
-          type="secondary"
-          onSave={description => trainingTaskActions.updateTrainingTaskMeta(record.id, { name: record.name, description })}
-        />
-      ),
-    },
-    {
       title: '训练类型',
       dataIndex: 'trainingType',
       key: 'trainingType',
