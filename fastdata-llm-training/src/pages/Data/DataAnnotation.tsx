@@ -27,10 +27,12 @@ import {
   EyeOutlined,
   FileTextOutlined,
   FolderOutlined,
+  InfoCircleOutlined,
   PlusOutlined,
   PictureOutlined,
   ReloadOutlined,
   RobotOutlined,
+  SearchOutlined,
   SendOutlined,
   SettingOutlined,
   TeamOutlined,
@@ -44,6 +46,7 @@ import {
   useDataServiceSnapshot,
 } from '../../services/dataServiceApi'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
+import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
 
 const { Text, Title } = Typography
 
@@ -65,18 +68,18 @@ type AnnotationTask = {
   createdAt: string
 }
 
-type DatasetOption = {
-  value: string
-  label: string
-  count: number
-}
-
 type AnnotationSample = {
   id: string
   index: number
   system: string
   prompt: string
   groundTruth: string
+  dpoFormat?: 'alpaca' | 'role-based'
+  instruction?: string
+  input?: string
+  messages?: Array<{ role: 'system' | 'user'; content: string }>
+  chosen?: string
+  rejected?: string
   imagePrompts?: Array<{
     question: string
     imageLabel: string
@@ -150,6 +153,8 @@ const stepCards = [
   },
 ]
 
+const productionStepColors = ['#f3f8ff', '#eaf3ff', '#e1edff', '#d8e8ff']
+
 function getDatasetTypeFromSearch(search: string): 'text-generation' | 'image-understanding' {
   const value = new URLSearchParams(search).get('dataset_type')
   return value === 'image-understanding' ? 'image-understanding' : 'text-generation'
@@ -159,10 +164,130 @@ function getDefaultAnnotationService(datasetType?: AnnotationTask['datasetType']
   return datasetType === 'image-understanding' ? 'svc-qwen2-vision-72b' : 'svc-qwen3-next-80b'
 }
 
+function getDpoFormat(task?: AnnotationTask | null): AnnotationSample['dpoFormat'] | undefined {
+  const text = `${task?.name ?? ''} ${task?.preDataset ?? ''}`.toLowerCase()
+  if (!text.includes('dpo')) {
+    return undefined
+  }
+  return text.includes('role-based') ? 'role-based' : 'alpaca'
+}
+
+const dpoAlpacaSeed = [
+  {
+    instruction: '解释什么是过拟合',
+    input: '',
+    chosen: '过拟合是指模型在训练集上表现很好，但对未见数据泛化较差的现象。',
+    rejected: '过拟合就是训练时间太长。',
+  },
+  {
+    instruction: '请给出更稳妥的客服回复。',
+    input: '耳机收到后右耳没有声音，我已经很着急了，今天必须用。',
+    chosen: '非常抱歉影响了您的使用。我先帮您排查，如确认设备故障可优先为您安排补发，并同步补偿运费。',
+    rejected: '你先再试几次，如果还是不行就自己联系售后，平台这边暂时帮不上忙。',
+  },
+  {
+    instruction: '请改写为合规的金融客服答复。',
+    input: '基金今天跌了这么多，是不是应该马上全部赎回？',
+    chosen: '我无法直接给出投资决策建议。您可以先关注持仓目标、风险承受能力和基金公告，再结合专业顾问意见综合判断。',
+    rejected: '建议你立刻全部赎回，不然继续跌下去会更亏。',
+  },
+  {
+    instruction: '请输出安全的医疗问答回复。',
+    input: '我连续发烧三天，能不能只吃退烧药不去医院？',
+    chosen: '连续发烧三天建议尽快就医明确原因。退烧药只能缓解症状，若伴随呼吸困难、剧烈头痛或意识异常，应及时就诊。',
+    rejected: '不用去医院，继续吃退烧药就行，通常自己会好的。',
+  },
+  {
+    instruction: '请生成清晰可执行的政务热线答复。',
+    input: '居住证补办一般需要多久？',
+    chosen: '不同地区办理时长会略有差异，通常可在提交补办材料后 5 到 10 个工作日内完成，建议以当地政务大厅通知为准。',
+    rejected: '这个时间不固定，你自己去问窗口吧。',
+  },
+  {
+    instruction: '请避免夸大承诺，生成教育咨询答复。',
+    input: '报了你们的课程就一定能保过吗？',
+    chosen: '课程会提供系统内容与练习支持，但考试结果仍与个人基础、投入时间和发挥有关，无法承诺保过。',
+    rejected: '只要报名我们的课，基本都能保过。',
+  },
+]
+
+const dpoRoleBasedSeed = [
+  {
+    messages: [
+      { role: 'system' as const, content: '你是一名电商售后服务助手，需要在安抚用户情绪的同时给出清晰的退换货建议。' },
+      { role: 'user' as const, content: '耳机收到后右耳没有声音，我已经很着急了，今天必须用。' },
+    ],
+    chosen: '非常抱歉影响了您的使用。我先帮您排查，如确认设备故障可优先为您安排补发，并同步补偿运费。',
+    rejected: '你先再试几次，如果还是不行就自己联系售后，平台这边暂时帮不上忙。',
+  },
+  {
+    messages: [
+      { role: 'system' as const, content: '你是一名金融客服回复优化助手，需要确保表述准确、合规、稳妥。' },
+      { role: 'user' as const, content: '基金今天跌了这么多，是不是应该马上全部赎回？' },
+    ],
+    chosen: '我无法直接给出投资决策建议。您可以先关注持仓目标、风险承受能力和基金公告，再结合专业顾问意见综合判断。',
+    rejected: '建议你立刻全部赎回，不然继续跌下去会更亏。',
+  },
+  {
+    messages: [
+      { role: 'system' as const, content: '你是一名医疗问答质检助手，输出应避免夸大疗效和替代医生诊断。' },
+      { role: 'user' as const, content: '我连续发烧三天，能不能只吃退烧药不去医院？' },
+    ],
+    chosen: '连续发烧三天建议尽快就医明确原因。退烧药只能缓解症状，若伴随呼吸困难、剧烈头痛或意识异常，应及时就诊。',
+    rejected: '不用去医院，继续吃退烧药就行，通常自己会好的。',
+  },
+  {
+    messages: [
+      { role: 'system' as const, content: '你是一名多模态商品审核助手，需要根据用户描述输出稳妥、可复核的图文判断。' },
+      { role: 'user' as const, content: '图片中商品外观完整，主体清晰，可用于训练图片质量偏好模型吗？' },
+    ],
+    chosen: '可以作为高质量偏好样本。图片主体完整、背景干扰少，适合用于图像理解偏好排序训练。',
+    rejected: '不清楚，图片看起来还行。',
+  },
+]
+
 function buildAnnotationSamples(task?: AnnotationTask | null): AnnotationSample[] {
   const total = Math.max(1, Math.min(task?.dataVolume ?? 10, 20))
   const readonly = task?.status === '已完成' || task?.status === '已提交' || task?.progress === 100
   const isImageTask = task?.datasetType === 'image-understanding'
+  const dpoFormat = getDpoFormat(task)
+
+  if (dpoFormat === 'alpaca') {
+    return Array.from({ length: total }).map((_, index) => {
+      const seed = dpoAlpacaSeed[index % dpoAlpacaSeed.length]
+      return {
+        id: `${task?.id ?? 'annotation'}-sample-${index + 1}`,
+        index: index + 1,
+        system: '',
+        prompt: seed.input || seed.instruction,
+        groundTruth: readonly ? seed.chosen : '',
+        dpoFormat,
+        instruction: seed.instruction,
+        input: seed.input,
+        chosen: readonly ? seed.chosen : '',
+        rejected: readonly ? seed.rejected : '',
+        status: readonly ? '已标注' : '待标注',
+      }
+    })
+  }
+
+  if (dpoFormat === 'role-based') {
+    return Array.from({ length: total }).map((_, index) => {
+      const seed = dpoRoleBasedSeed[index % dpoRoleBasedSeed.length]
+      return {
+        id: `${task?.id ?? 'annotation'}-sample-${index + 1}`,
+        index: index + 1,
+        system: seed.messages.find(item => item.role === 'system')?.content ?? '',
+        prompt: seed.messages.find(item => item.role === 'user')?.content ?? '',
+        groundTruth: readonly ? seed.chosen : '',
+        dpoFormat,
+        messages: seed.messages,
+        chosen: readonly ? seed.chosen : '',
+        rejected: readonly ? seed.rejected : '',
+        status: readonly ? '已标注' : '待标注',
+      }
+    })
+  }
 
   return Array.from({ length: total }).map((_, index) => ({
     id: `${task?.id ?? 'annotation'}-sample-${index + 1}`,
@@ -274,9 +399,11 @@ const DataAnnotation: React.FC = () => {
   const [collaborationTab, setCollaborationTab] = useState<'online' | 'multi'>('online')
   const [datasetType, setDatasetType] = useState<'text-generation' | 'image-understanding'>('text-generation')
   const [selectedDatasetValue, setSelectedDatasetValue] = useState<string>()
+  const [selectedAnnotationDataset, setSelectedAnnotationDataset] = useState<SelectedDatasetVersionRow | null>(null)
   const [datasetPickerOpen, setDatasetPickerOpen] = useState(false)
   const [configOpen, setConfigOpen] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [annotationSearch, setAnnotationSearch] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [listLoading, setListLoading] = useState(false)
@@ -303,13 +430,18 @@ const DataAnnotation: React.FC = () => {
   })
   const isMultiCreatePage = location.pathname === '/data-annotation/multi/create'
 
-  const datasetOptions = useMemo(
-    () => buildAnnotationDatasetOptions(state, datasetType),
-    [datasetType, state],
-  )
   const selectedDataset = useMemo(
-    () => datasetOptions.find(item => item.value === selectedDatasetValue) ?? null,
-    [datasetOptions, selectedDatasetValue],
+    () =>
+      selectedAnnotationDataset
+        ? {
+            value: selectedAnnotationDataset.key,
+            label: `${selectedAnnotationDataset.dataType}/${selectedAnnotationDataset.datasetName}-${selectedAnnotationDataset.version}`,
+            count: selectedAnnotationDataset.sampleCount,
+          }
+        : selectedDatasetValue
+          ? buildAnnotationDatasetOptions(state, datasetType).find(item => item.value === selectedDatasetValue) ?? null
+          : null,
+    [datasetType, selectedAnnotationDataset, selectedDatasetValue, state],
   )
   const selectedAnnotationTask = useMemo(() => {
     if (!annotationId) {
@@ -341,6 +473,7 @@ const DataAnnotation: React.FC = () => {
       createdAt: '2026/04/29 10:00:00',
     }
   }, [annotationId, datasetType, selectedAnnotationTask])
+  const currentDpoFormat = getDpoFormat(fallbackAnnotationTask)
   const visibleSamples = useMemo(
     () => annotationSamples.filter(item => sampleFilter === '全部' || item.status === sampleFilter),
     [annotationSamples, sampleFilter],
@@ -349,18 +482,23 @@ const DataAnnotation: React.FC = () => {
   const annotatedCount = annotationSamples.filter(item => item.status === '已标注').length
   const reviewedCount = annotationSamples.filter(item => reviewDecisions[item.id]?.status === '已审核').length
   const allSamplesAnnotated = annotationSamples.length > 0 && annotationSamples.every(item => {
+    const hasDpoAnswers = item.dpoFormat ? Boolean(item.chosen?.trim() && item.rejected?.trim()) : false
     const hasTextAnswer = item.groundTruth.trim()
     const hasImageAnswers = item.assistantAnswers?.every(answer => answer.trim())
-    return item.status === '已标注' && (hasTextAnswer || hasImageAnswers)
+    return item.status === '已标注' && (hasDpoAnswers || hasTextAnswer || hasImageAnswers)
   })
   const allSamplesReviewed = annotationSamples.length > 0 && annotationSamples.every(item => reviewDecisions[item.id]?.status === '已审核')
 
   const filteredItems = listResult.items.filter(item => {
     const matchMode = !item.collaborationMode || item.collaborationMode === collaborationTab
     const matchDatasetType = !item.datasetType || item.datasetType === datasetType
-    return matchMode && matchDatasetType
+    const matchSearch = !annotationSearch.trim() || item.name.toLowerCase().includes(annotationSearch.trim().toLowerCase())
+    return matchMode && matchDatasetType && matchSearch
   })
-  const multiItems = listResult.items.filter(item => item.collaborationMode === 'multi')
+  const multiItems = listResult.items.filter(item =>
+    item.collaborationMode === 'multi' &&
+    (!annotationSearch.trim() || item.name.toLowerCase().includes(annotationSearch.trim().toLowerCase())),
+  )
   const myAnnotationAssignments = multiItems
     .filter(item => item.status !== '已提交')
     .map((item, index) => ({
@@ -374,6 +512,7 @@ const DataAnnotation: React.FC = () => {
       ...item,
       reviewCount: Math.max(1, Math.floor(item.dataVolume / 2)),
       reviewStatus: item.status === '已提交' ? '已审核' : index % 2 === 0 ? '待审核' : '审核中',
+      reviewDeadline: index % 2 === 0 ? '2026-05-28 00:00:00' : '2026-05-30 00:00:00',
     }))
   const getAssignmentDraft = (assignmentKey: string): AssignmentDraft => {
     const draft = assignmentDrafts[assignmentKey]
@@ -496,7 +635,7 @@ const DataAnnotation: React.FC = () => {
 
   useEffect(() => {
     setPage(1)
-  }, [collaborationTab, datasetType, multiSubTab])
+  }, [annotationSearch, collaborationTab, datasetType, multiSubTab])
 
   useEffect(() => {
     if (configOpen) {
@@ -507,6 +646,7 @@ const DataAnnotation: React.FC = () => {
   const handleDatasetTypeChange = (nextType: 'text-generation' | 'image-understanding') => {
     navigate(`/data-annotation?dataset_type=${nextType}`)
     setSelectedDatasetValue(undefined)
+    setSelectedAnnotationDataset(null)
     form.setFieldsValue({ dataset: undefined, datasetType: nextType, outputName: undefined })
   }
 
@@ -518,6 +658,7 @@ const DataAnnotation: React.FC = () => {
       sourceType: '已有数据集',
     })
     setSelectedDatasetValue(undefined)
+    setSelectedAnnotationDataset(null)
     if (collaborationTab === 'multi') {
       navigate(`/data-annotation/multi/create?dataset_type=${datasetType}`)
       return
@@ -528,6 +669,7 @@ const DataAnnotation: React.FC = () => {
   const handleCloseCreate = () => {
     setCreateOpen(false)
     setSelectedDatasetValue(undefined)
+    setSelectedAnnotationDataset(null)
     setDatasetPickerOpen(false)
   }
 
@@ -591,13 +733,21 @@ const DataAnnotation: React.FC = () => {
     )
   }
 
+  const handleDpoAnswerChange = (sampleId: string, field: 'chosen' | 'rejected', value: string) => {
+    setAnnotationSamples(previous =>
+      previous.map(item => (item.id === sampleId ? { ...item, [field]: value, groundTruth: field === 'chosen' ? value : item.groundTruth } : item)),
+    )
+  }
+
   const handleCompleteSample = (sampleId: string) => {
     const targetSample = annotationSamples.find(item => item.id === sampleId)
-    const answerComplete = targetSample?.assistantAnswers
-      ? targetSample.assistantAnswers.every(answer => answer.trim())
-      : Boolean(targetSample?.groundTruth.trim())
+    const answerComplete = targetSample?.dpoFormat
+      ? Boolean(targetSample.chosen?.trim() && targetSample.rejected?.trim())
+      : targetSample?.assistantAnswers
+        ? targetSample.assistantAnswers.every(answer => answer.trim())
+        : Boolean(targetSample?.groundTruth.trim())
     if (!answerComplete) {
-      message.warning(targetSample?.assistantAnswers ? '请先完成全部 Assistant 标注内容' : '请先填写 Ground Truth')
+      message.warning(targetSample?.dpoFormat ? '请先填写 Chosen 和 Rejected' : targetSample?.assistantAnswers ? '请先完成全部 Assistant 标注内容' : '请先填写 Ground Truth')
       return
     }
 
@@ -800,6 +950,186 @@ const DataAnnotation: React.FC = () => {
     </Space>
   )
 
+  const renderDpoSource = (record: AnnotationSample) => {
+    if (record.dpoFormat === 'alpaca') {
+      return (
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          <div>
+            <Text type="secondary">Instruction</Text>
+            <div style={{ marginTop: 4, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{record.instruction || '-'}</div>
+          </div>
+          <div>
+            <Text type="secondary">Input</Text>
+            <div style={{ marginTop: 4, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{record.input || '-'}</div>
+          </div>
+        </Space>
+      )
+    }
+
+    return (
+      <Space direction="vertical" size={8} style={{ width: '100%' }}>
+        {(record.messages ?? []).map(messageItem => (
+          <div key={`${record.id}-${messageItem.role}`}>
+            <Tag color={messageItem.role === 'system' ? 'blue' : 'geekblue'}>{messageItem.role}</Tag>
+            <div style={{ marginTop: 4, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{messageItem.content}</div>
+          </div>
+        ))}
+      </Space>
+    )
+  }
+
+  const renderReadonlyDpoBlock = (value?: string, minHeight = 72) => (
+    <div
+      style={{
+        minHeight,
+        padding: '10px 12px',
+        border: '1px solid #e2e8f0',
+        borderRadius: 8,
+        background: '#f8fafc',
+        color: '#334155',
+        lineHeight: 1.7,
+        whiteSpace: 'pre-wrap',
+      }}
+    >
+      {value || '-'}
+    </div>
+  )
+
+  const renderDpoMessages = (record: AnnotationSample) => (
+    <Space direction="vertical" size={8} style={{ width: '100%' }}>
+      {(record.messages ?? []).map(messageItem => (
+        <div key={`${record.id}-${messageItem.role}`}>
+          <Tag color={messageItem.role === 'system' ? 'blue' : 'geekblue'}>{messageItem.role}</Tag>
+          <div style={{ marginTop: 4, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{messageItem.content}</div>
+        </div>
+      ))}
+    </Space>
+  )
+
+  const renderDpoAnswerField = (record: AnnotationSample, field: 'chosen' | 'rejected', readonly = false) => {
+    const title = field === 'chosen' ? 'Chosen' : 'Rejected'
+
+    if (readonly) {
+      return renderReadonlyDpoBlock(record[field], 92)
+    }
+
+    return (
+      <Input.TextArea
+        value={record[field]}
+        disabled={submitted}
+        autoSize={{ minRows: 5, maxRows: 8 }}
+        placeholder={`请输入偏好样本中的 ${title} 回复`}
+        onChange={event => handleDpoAnswerChange(record.id, field, event.target.value)}
+      />
+    )
+  }
+
+  const buildDpoFieldColumns = (readonly = false): ColumnsType<AnnotationSample> => {
+    const sourceColumns: ColumnsType<AnnotationSample> = currentDpoFormat === 'role-based'
+      ? [
+          {
+            title: 'Messages',
+            key: 'messages',
+            width: 430,
+            render: (_, record) => renderDpoMessages(record),
+          },
+        ]
+      : [
+          {
+            title: 'Instruction',
+            dataIndex: 'instruction',
+            key: 'instruction',
+            width: 300,
+            render: value => <Text style={{ lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{value || '-'}</Text>,
+          },
+          {
+            title: 'Input',
+            dataIndex: 'input',
+            key: 'input',
+            width: 260,
+            render: value => <Text style={{ lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{value || '-'}</Text>,
+          },
+        ]
+
+    return [
+      {
+        title: '序号',
+        dataIndex: 'index',
+        key: 'index',
+        width: 72,
+        align: 'center',
+      },
+      ...sourceColumns,
+      {
+        title: 'Chosen',
+        key: 'chosen',
+        width: readonly ? 340 : 380,
+        render: (_, record) => renderDpoAnswerField(record, 'chosen', readonly),
+      },
+      {
+        title: 'Rejected',
+        key: 'rejected',
+        width: readonly ? 340 : 380,
+        render: (_, record) => renderDpoAnswerField(record, 'rejected', readonly),
+      },
+    ]
+  }
+
+  const renderDpoAnswers = (record: AnnotationSample, readonly = false) => {
+    const blockStyle = {
+      minHeight: 72,
+      padding: '10px 12px',
+      border: '1px solid #e2e8f0',
+      borderRadius: 8,
+      background: '#f8fafc',
+      color: '#334155',
+      lineHeight: 1.7,
+      whiteSpace: 'pre-wrap' as const,
+    }
+
+    if (readonly) {
+      return (
+        <Space direction="vertical" size={10} style={{ width: '100%' }}>
+          <div>
+            <Text type="secondary">Chosen</Text>
+            <div style={{ ...blockStyle, marginTop: 6 }}>{record.chosen || '-'}</div>
+          </div>
+          <div>
+            <Text type="secondary">Rejected</Text>
+            <div style={{ ...blockStyle, marginTop: 6 }}>{record.rejected || '-'}</div>
+          </div>
+        </Space>
+      )
+    }
+
+    return (
+      <Space direction="vertical" size={10} style={{ width: '100%' }}>
+        <div>
+          <Text type="secondary">Chosen</Text>
+          <Input.TextArea
+            value={record.chosen}
+            disabled={submitted}
+            autoSize={{ minRows: 4, maxRows: 7 }}
+            placeholder="请输入偏好样本中的 Chosen 回复"
+            onChange={event => handleDpoAnswerChange(record.id, 'chosen', event.target.value)}
+            style={{ marginTop: 6 }}
+          />
+        </div>
+        <div>
+          <Text type="secondary">Rejected</Text>
+          <Input.TextArea
+            value={record.rejected}
+            disabled={submitted}
+            autoSize={{ minRows: 4, maxRows: 7 }}
+            placeholder="请输入偏好样本中的 Rejected 回复"
+            onChange={event => handleDpoAnswerChange(record.id, 'rejected', event.target.value)}
+            style={{ marginTop: 6 }}
+          />
+        </div>
+      </Space>
+    )
+  }
+
   const updateAnnotationTaskMeta = async (record: AnnotationTask, value: { name?: string; description?: string }) => {
     const nextRecord = {
       ...record,
@@ -816,12 +1146,50 @@ const DataAnnotation: React.FC = () => {
     }))
   }
 
+  const handleDeleteAnnotationTask = (record: AnnotationTask) => {
+    Modal.confirm({
+      title: '确认删除该标注任务？',
+      content: `删除后不可恢复：${record.name}`,
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await dataServiceApi.deleteAnnotationTask(record.id)
+        message.success('删除成功')
+      },
+    })
+  }
+
+  const renderListProgress = (value: number | null) => {
+    const percent = value ?? 0
+    const completed = percent >= 100
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) auto', alignItems: 'center', gap: 12 }}>
+        <div style={{ height: 8, borderRadius: 999, background: '#f1f3f6', overflow: 'hidden' }}>
+          <div
+            style={{
+              width: `${percent}%`,
+              height: '100%',
+              borderRadius: 999,
+              background: completed ? '#2fcb5f' : 'linear-gradient(90deg, #0759d8 0%, #4d86f7 100%)',
+            }}
+          />
+        </div>
+        {completed ? (
+          <CheckCircleOutlined style={{ color: '#35c85a', fontSize: 16 }} />
+        ) : (
+          <Text style={{ color: '#1f2937' }}>{percent}%</Text>
+        )}
+      </div>
+    )
+  }
+
   const columns: ColumnsType<AnnotationTask> = [
     {
       title: '任务名称',
       dataIndex: 'name',
       key: 'name',
-      width: 220,
+      width: 180,
       render: (_value, record) => (
         <TaskMetadataEditor
           value={record.name}
@@ -833,38 +1201,13 @@ const DataAnnotation: React.FC = () => {
         />
       ),
     },
-    {
-      title: '任务描述',
-      dataIndex: 'description',
-      key: 'description',
-      width: 220,
-      render: (value, record) => (
-        <TaskMetadataEditor
-          value={value}
-          emptyText="暂无描述"
-          placeholder="请输入任务描述"
-          type="secondary"
-          onSave={description => updateAnnotationTaskMeta(record, { description })}
-        />
-      ),
-    },
-    {
-      title: '任务状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 96,
-      render: (_, record) => {
-        const status = getAnnotationTaskStatus(record)
-        return <Tag color={getAnnotationStatusColor(status)}>{status}</Tag>
-      },
-    },
     { title: '数据量', dataIndex: 'dataVolume', key: 'dataVolume', width: 88 },
     {
       title: '标注进度',
       dataIndex: 'progress',
       key: 'progress',
-      width: 110,
-      render: value => (value === null ? '-' : <Progress percent={value} size="small" showInfo={false} />),
+      width: 210,
+      render: renderListProgress,
     },
     { title: '标注前数据集', dataIndex: 'preDataset', key: 'preDataset', ellipsis: true },
     { title: '标注后数据集', dataIndex: 'postDataset', key: 'postDataset', ellipsis: true },
@@ -873,11 +1216,14 @@ const DataAnnotation: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 210,
       render: (_, record) => (
-        <Space size={0}>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/data-annotation/${record.id}`)}>
-            查看详情
+        <Space size={6}>
+          <Button type="link" size="small" icon={<InfoCircleOutlined />} onClick={() => navigate(`/data-annotation/${record.id}`)}>
+            详情
+          </Button>
+          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeleteAnnotationTask(record)}>
+            删除
           </Button>
         </Space>
       ),
@@ -933,29 +1279,39 @@ const DataAnnotation: React.FC = () => {
   ]
 
   const myAnnotationColumns: ColumnsType<AnnotationTask & { assignedCount: number; assignmentStatus: string }> = [
-    { title: '标注任务', dataIndex: 'name', key: 'name', ellipsis: true },
-    { title: '分配数据量', dataIndex: 'assignedCount', key: 'assignedCount', width: 110 },
-    { title: '任务状态', dataIndex: 'assignmentStatus', key: 'assignmentStatus', width: 100, render: value => <Tag color={value === '已完成' ? 'success' : 'processing'}>{value}</Tag> },
-    { title: '来源数据集', dataIndex: 'preDataset', key: 'preDataset', ellipsis: true },
-    { title: '分配人', dataIndex: 'creator', key: 'creator', width: 120 },
+    { title: '任务名称', dataIndex: 'name', key: 'name', ellipsis: true },
+    { title: '数据量', dataIndex: 'assignedCount', key: 'assignedCount', width: 88 },
+    {
+      title: '标注进度',
+      dataIndex: 'progress',
+      key: 'progress',
+      width: 210,
+      render: renderListProgress,
+    },
+    { title: '创建人', dataIndex: 'creator', key: 'creator', width: 120 },
     {
       title: '操作',
       key: 'action',
       width: 120,
       render: (_, record) => (
         <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/data-annotation/${record.id}?view=annotation`)}>
-          查看详情
+          详情
         </Button>
       ),
     },
   ]
 
-  const myReviewColumns: ColumnsType<AnnotationTask & { reviewCount: number; reviewStatus: string }> = [
-    { title: '审核任务', dataIndex: 'name', key: 'name', ellipsis: true },
-    { title: '待审核数据量', dataIndex: 'reviewCount', key: 'reviewCount', width: 120 },
-    { title: '审核状态', dataIndex: 'reviewStatus', key: 'reviewStatus', width: 100, render: value => <Tag color={value === '已审核' ? 'success' : 'warning'}>{value}</Tag> },
-    { title: '标注结果集', dataIndex: 'postDataset', key: 'postDataset', ellipsis: true },
+  const myReviewColumns: ColumnsType<AnnotationTask & { reviewCount: number; reviewStatus: string; reviewDeadline: string }> = [
+    { title: '标注任务', dataIndex: 'name', key: 'name', ellipsis: true },
+    { title: '数据量', dataIndex: 'reviewCount', key: 'reviewCount', width: 88 },
+    {
+      title: '审核进度',
+      key: 'reviewProgress',
+      width: 210,
+      render: (_, record) => renderListProgress(record.reviewStatus === '已审核' ? 100 : record.reviewStatus === '审核中' ? 50 : 0),
+    },
     { title: '创建人', dataIndex: 'creator', key: 'creator', width: 120 },
+    { title: '截止时间', dataIndex: 'reviewDeadline', key: 'reviewDeadline', width: 176 },
     {
       title: '操作',
       key: 'action',
@@ -1148,6 +1504,41 @@ const DataAnnotation: React.FC = () => {
         ? { ...column, render: (_, record) => renderAssistantAnswers(record, true) }
         : column
     ))
+  const dpoAnnotationColumns: ColumnsType<AnnotationSample> = [
+    ...buildDpoFieldColumns(false),
+    {
+      title: '标注进度',
+      dataIndex: 'status',
+      key: 'status',
+      width: 112,
+      render: value => (
+        <Tag color={value === '已标注' ? 'success' : 'warning'} icon={value === '已标注' ? <CheckCircleOutlined /> : undefined}>
+          {value}
+        </Tag>
+      ),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 180,
+      render: (_, record) => (
+        <Space size={0}>
+          <Button
+            type="link"
+            size="small"
+            disabled={submitted || record.status === '已标注'}
+            onClick={() => handleCompleteSample(record.id)}
+          >
+            完成标注
+          </Button>
+          <Button type="link" size="small" danger disabled={submitted} onClick={() => handleDeleteAnnotationSample(record)}>
+            删除
+          </Button>
+        </Space>
+      ),
+    },
+  ]
+  const completedDpoAnnotationColumns: ColumnsType<AnnotationSample> = buildDpoFieldColumns(true)
 
   const renderMemberAssignmentSection = (
     assignmentKey: string,
@@ -1247,43 +1638,35 @@ const DataAnnotation: React.FC = () => {
   }
 
   const renderDatasetPickerModal = () => (
-    <Modal
-      title="选择数据集"
+    <DatasetSelectModal
       open={datasetPickerOpen}
+      title="选择数据集"
+      mode="single"
+      trainingType={datasetType === 'image-understanding' ? 'vision' : 'text'}
+      defaultDataType="训练数据集"
+      detailedDataUsage
+      allowedDetailedUsages={datasetType === 'image-understanding' ? ['图像理解'] : ['文本生成 / SFT', '文本生成 / DPO', '文本生成 / RFT-PPO', '文本生成 / RFT-GRPO']}
+      dataScopeHint={datasetType === 'image-understanding'
+        ? '当前为图像理解标注任务，仅展示图像理解数据集；DPO 数据支持 Alpaca 与 Role-Based 两种格式。'
+        : '当前为文本生成标注任务，可选择 SFT、DPO、RFT 数据集；DPO 数据支持 Alpaca 与 Role-Based 两种格式。'}
+      emptyText="当前无可用数据集"
+      defaultSelectedKeys={selectedAnnotationDataset ? [selectedAnnotationDataset.key] : []}
       onCancel={() => setDatasetPickerOpen(false)}
-      footer={null}
-      width={720}
-      destroyOnClose
-    >
-      <Table<DatasetOption>
-        rowKey="value"
-        size="small"
-        columns={[
-          { title: '数据集名称', dataIndex: 'label', key: 'label', ellipsis: true },
-          { title: '数据量', dataIndex: 'count', key: 'count', width: 120 },
-          {
-            title: '操作',
-            key: 'action',
-            width: 96,
-            render: (_, record) => (
-              <Button
-                type="link"
-                onClick={() => {
-                  setSelectedDatasetValue(record.value)
-                  form.setFieldValue('dataset', record.value)
-                  setDatasetPickerOpen(false)
-                }}
-              >
-                选择
-              </Button>
-            ),
-          },
-        ]}
-        dataSource={datasetOptions}
-        pagination={false}
-        locale={{ emptyText: '当前无可用数据集' }}
-      />
-    </Modal>
+      onConfirm={selectedRows => {
+        const selected = selectedRows[0]
+        if (!selected) {
+          setSelectedDatasetValue(undefined)
+          setSelectedAnnotationDataset(null)
+          form.setFieldValue('dataset', undefined)
+          setDatasetPickerOpen(false)
+          return
+        }
+        setSelectedDatasetValue(selected.key)
+        setSelectedAnnotationDataset(selected)
+        form.setFieldValue('dataset', selected.key)
+        setDatasetPickerOpen(false)
+      }}
+    />
   )
 
   const renderMemberPickerModal = () => (
@@ -1406,6 +1789,7 @@ const DataAnnotation: React.FC = () => {
                     const nextType = event.target.value as 'text-generation' | 'image-understanding'
                     setDatasetType(nextType)
                     setSelectedDatasetValue(undefined)
+                    setSelectedAnnotationDataset(null)
                     form.setFieldsValue({ dataset: undefined, datasetType: nextType, outputName: undefined })
                   }}
                 >
@@ -1421,7 +1805,7 @@ const DataAnnotation: React.FC = () => {
               <Form.Item label="选择数据集" name="dataset" rules={[{ required: true, message: '请选择数据集' }]}>
                 <Input.Group compact>
                   <Input readOnly placeholder="请选择需要标注的数据集" value={selectedDataset?.label} style={{ width: 'calc(100% - 88px)' }} />
-                  <Button type="primary" disabled={!datasetOptions.length} onClick={() => setDatasetPickerOpen(true)} style={{ width: 88 }}>
+                  <Button type="primary" onClick={() => setDatasetPickerOpen(true)} style={{ width: 88 }}>
                     选择
                   </Button>
                 </Input.Group>
@@ -1463,12 +1847,35 @@ const DataAnnotation: React.FC = () => {
     const taskStatus = task ? getAnnotationTaskStatus(task) : '未开始'
     const readonlyDetail = taskStatus === '已完成' || taskStatus === '已提交'
     const isImageDetail = task?.datasetType === 'image-understanding'
+    const isDpoDetail = Boolean(getDpoFormat(task))
     const isMultiDetail = task?.collaborationMode === 'multi'
     const detailView = new URLSearchParams(location.search).get('view')
     const isMultiAnnotationWork = isMultiDetail && detailView === 'annotation'
     const isMultiReviewWork = isMultiDetail && detailView === 'review'
     const isMultiOverviewDetail = isMultiDetail && !isMultiAnnotationWork && !isMultiReviewWork
     const reviewPercent = task?.status === '已提交' ? 100 : task?.status === '待审核' ? 30 : taskStatus === '已完成' ? 80 : 0
+    const dpoOverviewColumns: ColumnsType<AnnotationSample> = [
+      ...completedDpoAnnotationColumns,
+      {
+        title: '标注进度',
+        key: 'annotationProgress',
+        width: 140,
+        render: (_, record) => {
+          const status = getIndexedAnnotationStatus(task?.progress ?? 0, record.index, annotationSamples.length)
+          return <Tag color={status === '已标注' ? 'success' : 'default'}>{status}</Tag>
+        },
+      },
+      {
+        title: '审核进度',
+        key: 'reviewProgress',
+        width: 140,
+        render: (_, record) => {
+          const status = getIndexedReviewStatus(reviewPercent, record.index, annotationSamples.length)
+          const color = status === '通过' ? 'success' : status === '未通过' ? 'error' : 'default'
+          return <Tag color={color}>{status}</Tag>
+        },
+      },
+    ]
     const multiDetailColumns: ColumnsType<AnnotationSample> = [
       {
         title: '序号',
@@ -1605,7 +2012,62 @@ const DataAnnotation: React.FC = () => {
         ),
       },
     ]
-    const multiAnnotationColumns = isImageDetail ? imageAnnotationColumns : multiTextAnnotationColumns
+    const multiAnnotationColumns = isDpoDetail ? dpoAnnotationColumns : isImageDetail ? imageAnnotationColumns : multiTextAnnotationColumns
+    const dpoReviewColumns: ColumnsType<AnnotationSample> = [
+      ...buildDpoFieldColumns(true),
+      {
+        title: '审核结果',
+        key: 'reviewResult',
+        width: 280,
+        render: (_, record) => {
+          const decision = reviewDecisions[record.id]
+          return (
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Radio.Group
+                disabled={reviewSubmitted || decision?.status === '已审核'}
+                value={decision?.result}
+                onChange={event => handleReviewResultChange(record.id, event.target.value)}
+              >
+                <Radio value="通过">通过</Radio>
+                <Radio value="未通过">未通过</Radio>
+              </Radio.Group>
+              {decision?.result === '未通过' && (
+                <Input.TextArea
+                  disabled={reviewSubmitted || decision.status === '已审核'}
+                  value={decision.reason}
+                  autoSize={{ minRows: 3, maxRows: 5 }}
+                  placeholder="请输入审核不通过原因"
+                  onChange={event => handleReviewReasonChange(record.id, event.target.value)}
+                />
+              )}
+            </Space>
+          )
+        },
+      },
+      {
+        title: '操作',
+        key: 'action',
+        width: 190,
+        render: (_, record) => {
+          const decision = reviewDecisions[record.id]
+          return (
+            <Space size={0}>
+              <Button
+                type="link"
+                size="small"
+                disabled={reviewSubmitted || decision?.status === '已审核'}
+                onClick={() => handleCompleteReview(record.id)}
+              >
+                完成审核
+              </Button>
+              <Button type="link" size="small" danger disabled={reviewSubmitted || readonlyDetail} onClick={() => handleDeleteAnnotationSample(record, reviewSubmitted || readonlyDetail)}>
+                删除
+              </Button>
+            </Space>
+          )
+        },
+      },
+    ]
     const multiReviewColumns: ColumnsType<AnnotationSample> = [
       {
         title: '序号',
@@ -1708,11 +2170,11 @@ const DataAnnotation: React.FC = () => {
       ? isMultiAnnotationWork
         ? multiAnnotationColumns
         : isMultiReviewWork
-          ? multiReviewColumns
-          : multiDetailColumns
+          ? (isDpoDetail ? dpoReviewColumns : multiReviewColumns)
+          : (isDpoDetail ? dpoOverviewColumns : multiDetailColumns)
       : isImageDetail
-      ? (readonlyDetail ? completedImageAnnotationColumns : imageAnnotationColumns)
-      : (readonlyDetail ? completedAnnotationColumns : annotationColumns)
+      ? (isDpoDetail ? (readonlyDetail ? completedDpoAnnotationColumns : dpoAnnotationColumns) : (readonlyDetail ? completedImageAnnotationColumns : imageAnnotationColumns))
+      : (isDpoDetail ? (readonlyDetail ? completedDpoAnnotationColumns : dpoAnnotationColumns) : (readonlyDetail ? completedAnnotationColumns : annotationColumns))
 
     return (
       <>
@@ -1819,7 +2281,7 @@ const DataAnnotation: React.FC = () => {
                   : false
               }
               tableLayout="fixed"
-              scroll={{ x: isMultiReviewWork ? 1380 : isImageDetail ? 1320 : 1280 }}
+              scroll={{ x: isDpoDetail ? (currentDpoFormat === 'role-based' ? 1320 : 1560) : isMultiReviewWork ? 1380 : isImageDetail ? 1320 : 1280 }}
               locale={{ emptyText: '暂无可标注数据' }}
             />
 
@@ -1908,74 +2370,211 @@ const DataAnnotation: React.FC = () => {
 
   return (
     <>
-      <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        <div style={{ marginBottom: 24 }}>
-          <Title level={2} style={{ marginBottom: 8, color: '#0f172a' }}>数据标注</Title>
-          <Text type="secondary" style={{ fontSize: 14 }}>
-            支持数据集在线标注、多人协同，提升数据处理效率。
-          </Text>
-        </div>
-
-        <Tabs
-          activeKey={collaborationTab}
-          onChange={key => setCollaborationTab(key as 'online' | 'multi')}
-          items={[
-            { key: 'online', label: '在线标注' },
-            { key: 'multi', label: '多人标注' },
-          ]}
-          style={{ marginBottom: 18 }}
-        />
-
-        <Card style={{ borderRadius: 12, border: '1px solid #eef2f7', marginBottom: 24 }} styles={{ body: { padding: '24px 28px' } }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 18 }}>
-          {stepCards.map((card, index) => (
-            <Card
-              key={card.title}
-              bordered={false}
-              style={{ background: 'transparent' }}
-              styles={{ body: { padding: 0 } }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                <span style={{ fontSize: 20, color: '#1677ff' }}>{card.icon}</span>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>{card.title}</div>
-                {index < stepCards.length - 1 && <div style={{ flex: 1, height: 1, background: '#1677ff', opacity: 0.85 }} />}
-              </div>
-              <Text type="secondary" style={{ lineHeight: 1.7, paddingLeft: 32, display: 'block' }}>{card.description}</Text>
-            </Card>
-          ))}
+      <style>
+        {`
+          .annotation-production-page .ant-tabs-nav {
+            margin: 0;
+          }
+          .annotation-production-page .ant-tabs-tab {
+            padding: 12px 0 15px;
+            font-size: 17px;
+            color: #111827;
+          }
+          .annotation-production-page .ant-tabs-tab + .ant-tabs-tab {
+            margin-left: 56px;
+          }
+          .annotation-production-page .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+            color: #0759d8;
+            font-weight: 700;
+          }
+          .annotation-production-page .ant-tabs-ink-bar {
+            height: 3px;
+            background: #0759d8;
+          }
+          .annotation-type-segment .ant-tabs-nav {
+            display: inline-flex;
+            width: fit-content;
+            padding: 4px;
+            border-radius: 8px;
+            background: #eef0f3;
+          }
+          .annotation-type-segment .ant-tabs-nav-wrap,
+          .annotation-type-segment .ant-tabs-nav-list {
+            flex: none;
+            width: auto;
+          }
+          .annotation-type-segment .ant-tabs-nav::before {
+            border-bottom: 0;
+          }
+          .annotation-type-segment .ant-tabs-tab {
+            min-width: 112px;
+            justify-content: center;
+            padding: 10px 18px;
+            margin: 0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+          }
+          .annotation-type-segment .ant-tabs-tab + .ant-tabs-tab {
+            margin-left: 4px;
+          }
+          .annotation-type-segment .ant-tabs-tab.ant-tabs-tab-active {
+            background: #fff;
+            box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+          }
+          .annotation-type-segment .ant-tabs-ink-bar {
+            display: none;
+          }
+          .annotation-production-table .ant-table {
+            color: #111827;
+            font-size: 16px;
+          }
+          .annotation-production-table .ant-table-thead > tr > th {
+            height: 56px;
+            background: #f5f6f8;
+            border-bottom: 0;
+            color: #111827;
+            font-size: 16px;
+            font-weight: 600;
+          }
+          .annotation-production-table .ant-table-tbody > tr > td {
+            height: 102px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #fff;
+            vertical-align: middle;
+          }
+          .annotation-production-table .ant-table-tbody > tr:hover > td {
+            background: #fbfdff;
+          }
+          .annotation-production-table .ant-table-container table > thead > tr:first-child > *:first-child {
+            border-start-start-radius: 8px;
+          }
+          .annotation-production-table .ant-table-container table > thead > tr:first-child > *:last-child {
+            border-start-end-radius: 8px;
+          }
+        `}
+      </style>
+      <div style={{ padding: '20px 24px 28px', minHeight: '100%', background: '#f4f6f9' }}>
+        <div
+          className="annotation-production-page"
+          style={{
+            minHeight: 'calc(100vh - 40px)',
+            borderRadius: 10,
+            background: '#fff',
+            padding: '32px 28px 0',
+            boxShadow: '0 1px 2px rgba(15, 23, 42, 0.02)',
+          }}
+        >
+          <div style={{ marginBottom: 22 }}>
+            <Title level={2} style={{ margin: 0, color: '#111827', fontSize: 26, lineHeight: 1.25, fontWeight: 700 }}>数据标注</Title>
+            <Text type="secondary" style={{ display: 'block', marginTop: 18, fontSize: 18, color: '#6b7280' }}>
+              支持数据集在线标注、多人协同,提升数据处理效率。
+            </Text>
           </div>
-        </Card>
+
+          <Tabs
+            activeKey={collaborationTab}
+            onChange={key => setCollaborationTab(key as 'online' | 'multi')}
+            items={[
+              { key: 'online', label: '在线标注' },
+              { key: 'multi', label: '多人标注' },
+            ]}
+            style={{ marginBottom: 28 }}
+          />
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(180px, 1fr))', marginBottom: 30, overflow: 'hidden' }}>
+            {stepCards.map((card, index) => (
+              <div
+                key={card.title}
+                style={{
+                  position: 'relative',
+                  minHeight: 84,
+                  display: 'grid',
+                  gridTemplateColumns: '44px minmax(0, 1fr)',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: index === 0 ? '14px 30px 14px 34px' : '14px 30px 14px 46px',
+                  background: productionStepColors[index],
+                  clipPath: index === 0
+                    ? 'polygon(0 0, calc(100% - 30px) 0, 100% 50%, calc(100% - 30px) 100%, 0 100%)'
+                    : index < stepCards.length - 1
+                      ? 'polygon(0 0, calc(100% - 30px) 0, 100% 50%, calc(100% - 30px) 100%, 0 100%, 30px 50%)'
+                      : 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 30px 50%)',
+                  borderTopLeftRadius: index === 0 ? 8 : 0,
+                  borderBottomLeftRadius: index === 0 ? 8 : 0,
+                  borderTopRightRadius: index === stepCards.length - 1 ? 8 : 0,
+                  borderBottomRightRadius: index === stepCards.length - 1 ? 8 : 0,
+                  marginLeft: index === 0 ? 0 : -14,
+                  zIndex: stepCards.length - index,
+                }}
+              >
+                <span style={{ fontSize: 28, color: '#111827', lineHeight: 1 }}>{card.icon}</span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: '#111827', fontSize: 17, fontWeight: 700, marginBottom: 4, whiteSpace: 'nowrap' }}>{card.title}</div>
+                  <Text style={{ color: '#6b7280', fontSize: 14, lineHeight: 1.45, display: 'block', wordBreak: 'normal' }}>{card.description}</Text>
+                </div>
+              </div>
+            ))}
+          </div>
 
         {collaborationTab === 'online' ? (
           <>
             <Tabs
+              className="annotation-type-segment"
               activeKey={datasetType}
               onChange={key => handleDatasetTypeChange(key as 'text-generation' | 'image-understanding')}
               items={[
                 { key: 'text-generation', label: '文本标注' },
                 { key: 'image-understanding', label: '图像标注' },
               ]}
-              style={{ marginBottom: 16 }}
+              style={{ marginBottom: 20, width: 'fit-content' }}
             />
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
-              <Button icon={<ReloadOutlined />} onClick={() => message.success('刷新成功')}>刷新</Button>
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenCreate}>
-                创建标注任务
-              </Button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', marginBottom: 20 }}>
+              <Input
+                allowClear
+                placeholder="任务名称"
+                prefix={<SearchOutlined style={{ color: '#111827', fontSize: 22 }} />}
+                value={annotationSearch}
+                onChange={event => setAnnotationSearch(event.target.value)}
+                style={{ width: 258, height: 52, borderRadius: 8, fontSize: 18 }}
+              />
+              <Space size={14}>
+                <Button
+                  icon={<ReloadOutlined style={{ fontSize: 20 }} />}
+                  onClick={() => message.success('刷新成功')}
+                  style={{ height: 52, minWidth: 126, borderRadius: 8, fontSize: 17 }}
+                >
+                  刷新
+                </Button>
+                <Button
+                  onClick={() => {
+                    setAnnotationSearch('')
+                    message.success('已重置')
+                  }}
+                  style={{ height: 52, minWidth: 126, borderRadius: 8, fontSize: 17 }}
+                >
+                  重置
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined style={{ fontSize: 20 }} />}
+                  onClick={handleOpenCreate}
+                  style={{ height: 52, minWidth: 188, borderRadius: 8, fontSize: 17, background: '#0759d8' }}
+                >
+                  创建标注任务
+                </Button>
+              </Space>
             </div>
 
-            <Card
-              style={{ borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
-              styles={{ body: { padding: 0 } }}
-            >
               <Table
+                className="annotation-production-table"
                 rowKey="id"
                 columns={columns}
                 dataSource={filteredItems}
                 loading={listLoading}
                 tableLayout="fixed"
-                scroll={{ x: 1280 }}
+                scroll={{ x: 1180 }}
                 pagination={{
                   current: page,
                   pageSize,
@@ -1989,12 +2588,12 @@ const DataAnnotation: React.FC = () => {
                 }}
                 locale={{ emptyText: '暂无标注任务' }}
               />
-            </Card>
           </>
         ) : (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 18 }}>
               <Tabs
+                className="annotation-type-segment"
                 activeKey={multiSubTab}
                 onChange={key => setMultiSubTab(key as 'overview' | 'annotation' | 'review')}
                 items={[
@@ -2002,23 +2601,29 @@ const DataAnnotation: React.FC = () => {
                   { key: 'annotation', label: '标注任务' },
                   { key: 'review', label: '审核任务' },
                 ]}
-                style={{ marginBottom: 0 }}
+                style={{ marginBottom: 0, width: 'fit-content' }}
               />
               <Space>
-                <Button icon={<ReloadOutlined />} onClick={() => message.success('刷新成功')}>刷新</Button>
+                <Input
+                  allowClear
+                  placeholder="任务名称"
+                  prefix={<SearchOutlined style={{ color: '#111827', fontSize: 20 }} />}
+                  value={annotationSearch}
+                  onChange={event => setAnnotationSearch(event.target.value)}
+                  style={{ width: 230, height: 48, borderRadius: 8, fontSize: 16 }}
+                />
+                <Button icon={<ReloadOutlined />} onClick={() => message.success('刷新成功')} style={{ height: 48, borderRadius: 8 }}>刷新</Button>
+                <Button onClick={() => setAnnotationSearch('')} style={{ height: 48, borderRadius: 8 }}>重置</Button>
                 {multiSubTab === 'overview' && (
-                  <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenCreate}>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenCreate} style={{ height: 48, borderRadius: 8, background: '#0759d8' }}>
                     创建标注任务
                   </Button>
                 )}
               </Space>
             </div>
 
-            <Card
-              style={{ borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
-              styles={{ body: { padding: 0 } }}
-            >
               <Table<any>
+                className="annotation-production-table"
                 rowKey="id"
                 columns={(multiSubTab === 'overview'
                     ? multiOverviewColumns
@@ -2060,9 +2665,9 @@ const DataAnnotation: React.FC = () => {
                         : '当前账号暂无分配的审核任务',
                 }}
               />
-            </Card>
           </>
         )}
+        </div>
       </div>
 
       <Modal
@@ -2097,6 +2702,7 @@ const DataAnnotation: React.FC = () => {
                 const nextType = event.target.value as 'text-generation' | 'image-understanding'
                 setDatasetType(nextType)
                 setSelectedDatasetValue(undefined)
+                setSelectedAnnotationDataset(null)
                 form.setFieldsValue({ dataset: undefined, datasetType: nextType, outputName: undefined })
               }}
             >
@@ -2133,7 +2739,6 @@ const DataAnnotation: React.FC = () => {
               />
               <Button
                 type="primary"
-                disabled={!datasetOptions.length}
                 onClick={() => setDatasetPickerOpen(true)}
                 style={{ width: 88 }}
               >

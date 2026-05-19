@@ -26,7 +26,7 @@ export interface DatasetOption {
 export interface CreateDatasetParams {
   name: string
   dataUsage: TrainingDatasetUsage | '文本生成' | '图像理解'
-  dataFormat: 'PROMPT_RESPONSE' | 'ROLE_BASED'
+  dataFormat: 'PROMPT_RESPONSE' | 'ROLE_BASED' | 'ALPACA'
 }
 
 export interface AddDatasetVersionParams {

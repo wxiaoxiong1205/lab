@@ -139,7 +139,7 @@ function getBaseDataUsage(value?: ImportDataUsage): DataUsage {
 }
 
 function getImportDataFormatOptions(value?: ImportDataUsage) {
-  if (value === '文本生成 / DPO') return ['Chosen_Rejected']
+  if (value === '文本生成 / DPO') return ['ALPACA', 'ROLE_BASED']
   if (value === '文本生成 / RFT-PPO' || value === '文本生成 / RFT-GRPO') return ['Completion_Reward']
   if (value === '图像理解') return ['image_text_pair']
   return ['PROMPT_RESPONSE', 'ROLE_BASED']
@@ -648,10 +648,7 @@ const InferenceResult: React.FC = () => {
           trainingType="text"
           defaultDataType="验证数据集"
           defaultDataUsage=""
-          excludedFormatsByDataType={{
-            训练数据集: ['Chosen_Rejected', 'Completion_Reward'],
-            验证数据集: ['Chosen_Rejected', 'Completion_Reward'],
-          }}
+          excludePreferenceOrRewardByDataType={['训练数据集', '验证数据集']}
           dataScopeHint="可选择数据集；训练/验证数据集中仅展示 SFT 版本。DPO/RFT 偏好或奖励数据不支持创建推理结果集。"
           emptyText="暂无可用于推理结果集的数据集版本"
           emptyDescription="请先创建测试数据集，或发布 SFT 类型的训练/验证数据集。"

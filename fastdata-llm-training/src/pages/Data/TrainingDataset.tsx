@@ -12,6 +12,7 @@ import {
   getDatasetUsagePath,
   resolveDatasetUsageFromPath,
 } from '../../services/datasetUsage'
+import { getDatasetFormatLabel, isDpoUsage, normalizeDatasetFormat } from '../../services/datasetFormats'
 import { formatResourceLockMessage, getCreatorDeletePermission, getDatasetReferenceLocks } from '../../services/resourceReferenceGuard'
 import ResumableUpload from '../../components/ResumableUpload'
 
@@ -64,8 +65,11 @@ type DatasetDetailRow = {
   system?: string
   user?: string
   assistant?: string
-  chosen?: string
-  rejected?: string
+  instruction?: string
+  input?: string
+  messages?: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  chosen?: string | { role: 'assistant'; content: string }
+  rejected?: string | { role: 'assistant'; content: string }
   prompt?: string
   response?: string
 }
@@ -97,36 +101,32 @@ const DATA_ATTRIBUTE_GROUPS = [
   },
 ] as const
 
-function isDpoUsage(value?: string): boolean {
-  return String(value ?? '').startsWith('DPO-')
-}
-
 function resolveFormatLabel(dataUsage?: string, dataFormat?: string): string {
-  if (isDpoUsage(dataUsage)) {
-    return 'CHOSEN_REJECTED'
-  }
-
-  return dataFormat === 'role-based' ? 'ROLE_BASED' : 'PROMPT_RESPONSE'
+  return getDatasetFormatLabel(dataUsage, dataFormat)
 }
 
 function buildJsonTemplateRows(dataUsage?: string, dataFormat?: string): Array<Record<string, unknown>> {
   if (isDpoUsage(dataUsage)) {
+    const normalizedFormat = normalizeDatasetFormat(dataFormat, dataUsage)
+    if (normalizedFormat === 'role-based') {
+      return [
+        {
+          messages: [
+            { role: 'system', content: '你是一个严谨的中文助手。' },
+            { role: 'user', content: '请解释什么是过拟合。' },
+          ],
+          chosen: { role: 'assistant', content: '过拟合是指模型过度记住训练集细节，导致泛化能力下降。' },
+          rejected: { role: 'assistant', content: '过拟合就是模型训练了很久。' },
+        },
+      ]
+    }
+
     return [
       {
-        system: '你是一名智能客服助手，需要输出更稳妥、安抚式的答复。',
-        user: '商品迟迟不发货，我现在很着急。',
-        assistant: {
-          chosen: '非常抱歉影响了您的安排，我先帮您核查订单进度，并优先催促仓库加急处理。',
-          rejected: '发货慢是正常的，你再等等吧。',
-        },
-      },
-      {
-        system: '你是一名金融合规问答助手。',
-        user: '基金跌了这么多，是不是现在必须全部卖掉？',
-        assistant: {
-          chosen: '我无法直接替您做投资决策，建议结合自身风险承受能力、持仓周期和基金公告综合判断。',
-          rejected: '建议你马上清仓，不然还会继续跌。',
-        },
+        instruction: '解释什么是过拟合',
+        input: '',
+        chosen: '过拟合是指模型在训练集上表现很好，但对未见数据泛化较差的现象。',
+        rejected: '过拟合就是训练时间太长。',
       },
     ]
   }
@@ -162,18 +162,19 @@ function buildJsonTemplateRows(dataUsage?: string, dataFormat?: string): Array<R
 
 function buildSheetTemplateRows(dataUsage?: string, dataFormat?: string): Array<Record<string, string>> {
   if (isDpoUsage(dataUsage)) {
+    const normalizedFormat = normalizeDatasetFormat(dataFormat, dataUsage)
+    if (normalizedFormat === 'role-based') {
+      return buildJsonTemplateRows(dataUsage, dataFormat).map(row =>
+        Object.fromEntries(Object.entries(row).map(([key, value]) => [key, typeof value === 'string' ? value : JSON.stringify(value)])),
+      )
+    }
+
     return [
       {
-        system: '你是一名智能客服助手，需要输出更稳妥、安抚式的答复。',
-        user: '商品迟迟不发货，我现在很着急。',
-        'assistant.chosen': '非常抱歉影响了您的安排，我先帮您核查订单进度，并优先催促仓库加急处理。',
-        'assistant.rejected': '发货慢是正常的，你再等等吧。',
-      },
-      {
-        system: '你是一名金融合规问答助手。',
-        user: '基金跌了这么多，是不是现在必须全部卖掉？',
-        'assistant.chosen': '我无法直接替您做投资决策，建议结合自身风险承受能力、持仓周期和基金公告综合判断。',
-        'assistant.rejected': '建议你马上清仓，不然还会继续跌。',
+        instruction: '解释什么是过拟合',
+        input: '',
+        chosen: '过拟合是指模型在训练集上表现很好，但对未见数据泛化较差的现象。',
+        rejected: '过拟合就是训练时间太长。',
       },
     ]
   }
@@ -189,7 +190,7 @@ function normalizeRowsForSheet(rows: DatasetDetailRow[]): Array<Record<string, s
   return rows.map(row => {
     const entries = Object.entries(row)
       .filter(([key, value]) => key !== 'key' && value !== undefined && value !== null)
-      .map(([key, value]) => [key, String(value)])
+      .map(([key, value]) => [key, typeof value === 'string' ? value : JSON.stringify(value)])
     return Object.fromEntries(entries)
   })
 }
@@ -209,6 +210,35 @@ function buildCsv(rows: Array<Record<string, unknown>>): string {
     ...rows.map(row => headers.map(header => escapeCsvValue(row[header])).join(',')),
   ]
   return lines.join('\n')
+}
+
+function renderJsonLike(value: unknown) {
+  if (Array.isArray(value)) {
+    return (
+      <Space direction="vertical" size={8} style={{ width: '100%' }}>
+        {value.map((item, index) => (
+          <div key={`${item.role}-${index}`} style={{ lineHeight: 1.7 }}>
+            <Tag color={item.role === 'system' ? 'purple' : item.role === 'user' ? 'blue' : 'green'} style={{ marginBottom: 4 }}>
+              {item.role}
+            </Tag>
+            <div style={{ whiteSpace: 'pre-wrap' }}>{item.content}</div>
+          </div>
+        ))}
+      </Space>
+    )
+  }
+
+  if (value && typeof value === 'object') {
+    const payload = value as { role?: string; content?: string }
+    return (
+      <div style={{ lineHeight: 1.7 }}>
+        {payload.role ? <Tag color="green" style={{ marginBottom: 4 }}>{payload.role}</Tag> : null}
+        <div style={{ whiteSpace: 'pre-wrap' }}>{payload.content ?? JSON.stringify(value)}</div>
+      </div>
+    )
+  }
+
+  return <Text style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{String(value ?? '-')}</Text>
 }
 
 function triggerDownload(blob: Blob, filename: string) {
@@ -347,48 +377,80 @@ function buildDatasetDetailRows(record: TrainingDatasetRecord, version: DatasetV
   }
 
   if (isDpoUsage(record.dataUsage)) {
+    if (normalizeDatasetFormat(record.dataFormat, record.dataUsage) === 'role-based') {
+      return [
+        {
+          key: `${version.id}-1`,
+          messages: [
+            { role: 'system', content: '你是一个严谨的中文助手。' },
+            { role: 'user', content: '请解释什么是过拟合。' },
+          ],
+          chosen: { role: 'assistant', content: '过拟合是指模型过度记住训练集细节，导致泛化能力下降。' },
+          rejected: { role: 'assistant', content: '过拟合就是模型训练了很久。' },
+        },
+        {
+          key: `${version.id}-2`,
+          messages: [
+            { role: 'system', content: '你是一名金融客服质检助手。' },
+            { role: 'user', content: '最近亏损很大，我是不是应该马上满仓补进去？' },
+          ],
+          chosen: { role: 'assistant', content: '我无法直接给出投资操作建议，您可以结合风险承受能力、持仓目标和市场波动情况综合判断。' },
+          rejected: { role: 'assistant', content: '现在就应该满仓补进去，越跌越要加。' },
+        },
+        {
+          key: `${version.id}-3`,
+          messages: [
+            { role: 'system', content: '你是一名医疗问答审核助手，需要避免替代医生诊断。' },
+            { role: 'user', content: '连续咳嗽一周，是不是一定得肺炎了？' },
+          ],
+          chosen: { role: 'assistant', content: '仅凭当前描述无法判断是否为肺炎，建议关注是否伴随发热、胸痛等症状，并尽快就医明确原因。' },
+          rejected: { role: 'assistant', content: '基本就是肺炎，先按肺炎去吃药就行。' },
+        },
+      ]
+    }
+
     return [
       {
         key: `${version.id}-1`,
-        system: '你是一名内容风控助手，需要输出礼貌、明确且可执行的建议。',
-        user: '商家一直不处理退款，我现在很生气。',
+        instruction: '解释什么是过拟合',
+        input: '',
+        chosen: '过拟合是指模型在训练集上表现很好，但对未见数据泛化较差的现象。',
+        rejected: '过拟合就是训练时间太长。',
+      },
+      {
+        key: `${version.id}-2`,
+        instruction: '请输出礼貌、明确且可执行的建议。',
+        input: '商家一直不处理退款，我现在很生气。',
         chosen: '非常抱歉影响了您的体验。我建议先确认退款节点，我也可以帮您整理关键信息，便于继续催办处理。',
         rejected: '你自己再等等吧，退款慢很正常。',
       },
       {
-        key: `${version.id}-2`,
-        system: '你是一名金融客服质检助手。',
-        user: '最近亏损很大，我是不是应该马上满仓补进去？',
+        key: `${version.id}-3`,
+        instruction: '请改写为合规的金融客服回复。',
+        input: '最近亏损很大，我是不是应该马上满仓补进去？',
         chosen: '我无法直接给出投资操作建议，您可以结合风险承受能力、持仓目标和市场波动情况综合判断。',
         rejected: '现在就应该满仓补进去，越跌越要加。',
       },
       {
-        key: `${version.id}-3`,
-        system: '你是一名医疗问答审核助手，需要避免替代医生诊断。',
-        user: '连续咳嗽一周，是不是一定得肺炎了？',
+        key: `${version.id}-4`,
+        instruction: '请避免替代医生诊断，输出安全答复。',
+        input: '连续咳嗽一周，是不是一定得肺炎了？',
         chosen: '仅凭当前描述无法判断是否为肺炎，建议关注是否伴随发热、胸痛等症状，并尽快就医明确原因。',
         rejected: '基本就是肺炎，先按肺炎去吃药就行。',
       },
       {
-        key: `${version.id}-4`,
-        system: '你是一名政务服务助手，需要回答清晰、礼貌。',
-        user: '社保卡丢了之后补办流程麻烦吗？',
+        key: `${version.id}-5`,
+        instruction: '请输出清晰、礼貌的政务服务答复。',
+        input: '社保卡丢了之后补办流程麻烦吗？',
         chosen: '通常需要先挂失，再携带身份证明到指定网点补办，具体材料和时限以当地社保部门通知为准。',
         rejected: '这个你自己去柜台问，不清楚。',
       },
       {
-        key: `${version.id}-5`,
-        system: '你是一名教育咨询助手，不能夸大承诺。',
-        user: '报名后一定能拿到证书吗？',
+        key: `${version.id}-6`,
+        instruction: '请生成不能夸大承诺的教育咨询答复。',
+        input: '报名后一定能拿到证书吗？',
         chosen: '课程会提供系统学习支持，但是否拿到证书仍取决于出勤、考试和审核结果，无法直接承诺。',
         rejected: '报名之后肯定都能拿证。',
-      },
-      {
-        key: `${version.id}-6`,
-        system: '你是一名企业 IT 服务台助手。',
-        user: '电脑蓝屏后文件会不会都没了？',
-        chosen: '蓝屏不一定导致文件丢失，建议先记录报错信息并检查最近是否有自动备份，再联系 IT 排查原因。',
-        rejected: '蓝屏了文件基本肯定都没了。',
       },
     ]
   }
@@ -798,7 +860,10 @@ const TrainingDataset: React.FC = () => {
       <Form.Item label="数据格式" name="dataFormat" rules={[{ required: true, message: '请选择数据格式' }]}>
         <Select placeholder="请选择数据格式">
           {isDpoUsage(selectedCreateUsage) ? (
-            <Select.Option value="PROMPT_RESPONSE">CHOSEN_REJECTED</Select.Option>
+            <>
+              <Select.Option value="ALPACA">Alpaca</Select.Option>
+              <Select.Option value="ROLE_BASED">Role-Based</Select.Option>
+            </>
           ) : (
             <>
               <Select.Option value="PROMPT_RESPONSE">PROMPT_RESPONSE</Select.Option>
@@ -875,7 +940,7 @@ const TrainingDataset: React.FC = () => {
           {(() => { const s = statusMap[selectedRecord.versionStatus] || { color: 'default', label: selectedRecord.versionStatus }; return <Tag color={s.color}>{s.label}</Tag> })()}
         </Descriptions.Item>
         <Descriptions.Item label="数据用途">{selectedRecord.dataUsage}</Descriptions.Item>
-        <Descriptions.Item label="数据格式">{selectedRecord.dataFormat}</Descriptions.Item>
+        <Descriptions.Item label="数据格式">{resolveFormatLabel(selectedRecord.dataUsage, selectedRecord.dataFormat)}</Descriptions.Item>
         <Descriptions.Item label="创建人">{selectedRecord.creator}</Descriptions.Item>
         <Descriptions.Item label="最近更新时间">{selectedRecord.createdAt}</Descriptions.Item>
       </Descriptions>
@@ -905,20 +970,22 @@ const TrainingDataset: React.FC = () => {
 
   const detailTableColumns: ColumnsType<DatasetDetailRow> =
     selectedRecord && isDpoUsage(selectedRecord.dataUsage)
-      ? [
-          { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => (detailPage - 1) * detailPageSize + index + 1 },
-          { title: 'System', dataIndex: 'system', key: 'system', width: 260 },
-          { title: 'User', dataIndex: 'user', key: 'user', width: 240 },
-          {
-            title: 'Assistant',
-            key: 'assistant',
-            children: [
-              { title: 'Chosen', dataIndex: 'chosen', key: 'chosen', width: 280 },
-              { title: 'Rejected', dataIndex: 'rejected', key: 'rejected', width: 280 },
-            ],
-          },
-          detailDeleteColumn,
-        ]
+      ? normalizeDatasetFormat(selectedRecord.dataFormat, selectedRecord.dataUsage) === 'role-based'
+        ? [
+            { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => (detailPage - 1) * detailPageSize + index + 1 },
+            { title: 'Messages', dataIndex: 'messages', key: 'messages', width: 360, render: renderJsonLike },
+            { title: 'Chosen', dataIndex: 'chosen', key: 'chosen', width: 320, render: renderJsonLike },
+            { title: 'Rejected', dataIndex: 'rejected', key: 'rejected', width: 320, render: renderJsonLike },
+            detailDeleteColumn,
+          ]
+        : [
+            { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => (detailPage - 1) * detailPageSize + index + 1 },
+            { title: 'Instruction', dataIndex: 'instruction', key: 'instruction', width: 260, render: renderJsonLike },
+            { title: 'Input', dataIndex: 'input', key: 'input', width: 220, render: renderJsonLike },
+            { title: 'Chosen', dataIndex: 'chosen', key: 'chosen', width: 300, render: renderJsonLike },
+            { title: 'Rejected', dataIndex: 'rejected', key: 'rejected', width: 300, render: renderJsonLike },
+            detailDeleteColumn,
+          ]
       : selectedRecord?.dataFormat === 'role-based'
       ? [
           { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => (detailPage - 1) * detailPageSize + index + 1 },
@@ -1028,7 +1095,10 @@ const TrainingDataset: React.FC = () => {
 
   useEffect(() => {
     if (isDpoUsage(selectedCreateUsage)) {
-      form.setFieldValue('dataFormat', 'PROMPT_RESPONSE')
+      const currentFormat = form.getFieldValue('dataFormat')
+      if (currentFormat !== 'ALPACA' && currentFormat !== 'ROLE_BASED') {
+        form.setFieldValue('dataFormat', 'ALPACA')
+      }
     }
   }, [form, selectedCreateUsage])
 
@@ -1511,7 +1581,7 @@ const TrainingDataset: React.FC = () => {
             <ResumableUpload
               accept=".jsonl,.json,.csv"
               title="上传新版本数据文件"
-              hint={`格式需与数据集一致：${addVersionTarget?.dataFormat ?? '-'}`}
+              hint={`格式需与数据集一致：${addVersionTarget ? resolveFormatLabel(addVersionTarget.dataUsage, addVersionTarget.dataFormat) : '-'}`}
               onFileChange={setAddVersionFile}
             />
           </Form.Item>

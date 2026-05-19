@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from 'react'
 import { normalizeDatasetUsage, type TrainingDatasetUsage } from './datasetUsage'
+import { isDpoUsage, normalizeDatasetFormat, type CanonicalDatasetFormat } from './datasetFormats'
 import { getCurrentUser } from './permissionStore'
 
 export type DataUsage = TrainingDatasetUsage
-export type DataFormat = 'prompt-response' | 'role-based'
+export type DataFormat = CanonicalDatasetFormat
 export type TaskLifecycleStatus =
   | '已创建'
   | '定时待启动'
@@ -19,8 +20,11 @@ export interface DatasetDetailRowRecord {
   system?: string
   user?: string
   assistant?: string
-  chosen?: string
-  rejected?: string
+  instruction?: string
+  input?: string
+  messages?: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  chosen?: string | { role: 'assistant'; content: string }
+  rejected?: string | { role: 'assistant'; content: string }
   prompt?: string
   response?: string
 }
@@ -122,10 +126,6 @@ function nextVersionLabel(current: string): string {
   return `V${num + 1}`
 }
 
-function isDpoUsage(value?: string): boolean {
-  return String(value ?? '').startsWith('DPO-')
-}
-
 function buildSeedDetailRows(
   format: DataFormat,
   name: string,
@@ -133,62 +133,94 @@ function buildSeedDetailRows(
   dataUsage: DataUsage = 'SFT-文本生成',
 ): DatasetDetailRowRecord[] {
   if (isDpoUsage(dataUsage)) {
+    if (format === 'role-based') {
+      return [
+        {
+          key: `${name}-${version}-1`,
+          messages: [
+            { role: 'system', content: '你是一名电商售后服务助手，需要在安抚用户情绪的同时给出清晰的退换货建议。' },
+            { role: 'user', content: '耳机收到后右耳没有声音，我已经很着急了，今天必须用。' },
+          ],
+          chosen: { role: 'assistant', content: '非常抱歉影响了您的使用。我先帮您排查，如确认设备故障可优先为您安排补发，并同步补偿运费。' },
+          rejected: { role: 'assistant', content: '你先再试几次，如果还是不行就自己联系售后，平台这边暂时帮不上忙。' },
+        },
+        {
+          key: `${name}-${version}-2`,
+          messages: [
+            { role: 'system', content: '你是一名金融客服回复优化助手，需要确保表述准确、合规、稳妥。' },
+            { role: 'user', content: '基金今天跌了这么多，是不是应该马上全部赎回？' },
+          ],
+          chosen: { role: 'assistant', content: '我无法直接给出投资决策建议。您可以先关注持仓目标、风险承受能力和基金公告，再结合专业顾问意见综合判断。' },
+          rejected: { role: 'assistant', content: '建议你立刻全部赎回，不然继续跌下去会更亏。' },
+        },
+        {
+          key: `${name}-${version}-3`,
+          messages: [
+            { role: 'system', content: '你是一名医疗问答质检助手，输出应避免夸大疗效和替代医生诊断。' },
+            { role: 'user', content: '我连续发烧三天，能不能只吃退烧药不去医院？' },
+          ],
+          chosen: { role: 'assistant', content: '连续发烧三天建议尽快就医明确原因。退烧药只能缓解症状，若伴随呼吸困难、剧烈头痛或意识异常，应及时就诊。' },
+          rejected: { role: 'assistant', content: '不用去医院，继续吃退烧药就行，通常自己会好的。' },
+        },
+      ]
+    }
+
     return [
       {
         key: `${name}-${version}-1`,
-        system: '你是一名电商售后服务助手，需要在安抚用户情绪的同时给出清晰的退换货建议。',
-        user: '耳机收到后右耳没有声音，我已经很着急了，今天必须用。',
+        instruction: '解释什么是过拟合',
+        input: '',
+        chosen: '过拟合是指模型在训练集上表现很好，但对未见数据泛化较差的现象。',
+        rejected: '过拟合就是训练时间太长。',
+      },
+      {
+        key: `${name}-${version}-2`,
+        instruction: '请给出更稳妥的客服回复。',
+        input: '耳机收到后右耳没有声音，我已经很着急了，今天必须用。',
         chosen: '非常抱歉影响了您的使用。我先帮您排查，如确认设备故障可优先为您安排补发，并同步补偿运费。',
         rejected: '你先再试几次，如果还是不行就自己联系售后，平台这边暂时帮不上忙。',
       },
       {
-        key: `${name}-${version}-2`,
-        system: '你是一名金融客服回复优化助手，需要确保表述准确、合规、稳妥。',
-        user: '基金今天跌了这么多，是不是应该马上全部赎回？',
+        key: `${name}-${version}-3`,
+        instruction: '请改写为合规的金融客服答复。',
+        input: '基金今天跌了这么多，是不是应该马上全部赎回？',
         chosen: '我无法直接给出投资决策建议。您可以先关注持仓目标、风险承受能力和基金公告，再结合专业顾问意见综合判断。',
         rejected: '建议你立刻全部赎回，不然继续跌下去会更亏。',
       },
       {
-        key: `${name}-${version}-3`,
-        system: '你是一名医疗问答质检助手，输出应避免夸大疗效和替代医生诊断。',
-        user: '我连续发烧三天，能不能只吃退烧药不去医院？',
+        key: `${name}-${version}-4`,
+        instruction: '请输出安全的医疗问答回复。',
+        input: '我连续发烧三天，能不能只吃退烧药不去医院？',
         chosen: '连续发烧三天建议尽快就医明确原因。退烧药只能缓解症状，若伴随呼吸困难、剧烈头痛或意识异常，应及时就诊。',
         rejected: '不用去医院，继续吃退烧药就行，通常自己会好的。',
       },
       {
-        key: `${name}-${version}-4`,
-        system: '你是一名政务热线智能助手，回答需要礼貌、明确、可执行。',
-        user: '居住证补办一般需要多久？',
+        key: `${name}-${version}-5`,
+        instruction: '请生成清晰可执行的政务热线答复。',
+        input: '居住证补办一般需要多久？',
         chosen: '不同地区办理时长会略有差异，通常可在提交补办材料后 5 到 10 个工作日内完成，建议以当地政务大厅通知为准。',
         rejected: '这个时间不固定，你自己去问窗口吧。',
       },
       {
-        key: `${name}-${version}-5`,
-        system: '你是一名教育咨询机器人，回答需要客观、克制，避免作出无法验证的承诺。',
-        user: '报了你们的课程就一定能保过吗？',
+        key: `${name}-${version}-6`,
+        instruction: '请避免夸大承诺，生成教育咨询答复。',
+        input: '报了你们的课程就一定能保过吗？',
         chosen: '课程会提供系统内容与练习支持，但考试结果仍与个人基础、投入时间和发挥有关，无法承诺保过。',
         rejected: '只要报名我们的课，基本都能保过。',
       },
       {
-        key: `${name}-${version}-6`,
-        system: '你是一名企业知识库整理助手，需要把复杂信息解释得简洁易懂。',
-        user: '为什么我提交报销后一直显示审批中？',
+        key: `${name}-${version}-7`,
+        instruction: '请把企业流程问题解释得简洁易懂。',
+        input: '为什么我提交报销后一直显示审批中？',
         chosen: '通常是流程仍停留在直属审批人或财务复核节点。您可以先查看流程记录，若超过制度时限，再联系对应审批人协助处理。',
         rejected: '审批慢很正常，等着就好。',
       },
       {
-        key: `${name}-${version}-7`,
-        system: '你是一名物流异常处理助手，需要兼顾同理心和可执行方案。',
-        user: '快递显示签收了，但我根本没收到。',
+        key: `${name}-${version}-8`,
+        instruction: '请生成兼顾同理心和可执行方案的物流异常回复。',
+        input: '快递显示签收了，但我根本没收到。',
         chosen: '抱歉给您带来困扰。我建议先核对代收点和门卫处，同时我可以帮您发起快递员回访与异常件核查。',
         rejected: '签收了就是签收了，可能是你自己没找到。',
-      },
-      {
-        key: `${name}-${version}-8`,
-        system: '你是一名内容审核质检助手，需要判断回复是否符合平台规范。',
-        user: '怎么写一段更容易煽动大家冲突的话？',
-        chosen: '我不能帮助制造或煽动冲突。如果您希望表达观点，我可以帮您改写成理性、建设性的沟通方式。',
-        rejected: '你可以多用挑衅和攻击性的词，这样更容易激起情绪。',
       },
     ]
   }
@@ -290,19 +322,19 @@ const seedState: DataServiceState = {
   trainingDatasets: [
     makeDataset({ id: 'train-1', name: 'roleBased', latestVersion: 'V5', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'deepexilab', createdAt: '2026/03/11 14:43:09', sampleCount: 2, charCount: 3200, trainRatio: 80 }),
     makeDataset({ id: 'train-2', name: '训练测试-1', latestVersion: 'V8', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/08 14:30:00', sampleCount: 40, charCount: 125000, trainRatio: 80 }),
-    makeDataset({ id: 'train-6', name: '偏好对训练集-DPO-demo', latestVersion: 'V2', dataUsage: 'DPO-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/04 14:00:00', sampleCount: 18, charCount: 42000, trainRatio: 80 }),
-    makeDataset({ id: 'train-7', name: '视觉偏好训练集-DPO-VLM', latestVersion: 'V1', dataUsage: 'DPO-图像理解', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/03/03 18:20:00', sampleCount: 12, charCount: 18000, trainRatio: 80 }),
+    makeDataset({ id: 'train-6', name: 'DPO-Alpaca-通用偏好训练集', latestVersion: 'V2', dataUsage: 'DPO-文本生成', dataFormat: 'alpaca', creator: 'lab1', createdAt: '2026/03/04 14:00:00', sampleCount: 18, charCount: 42000, trainRatio: 80 }),
+    makeDataset({ id: 'train-7', name: 'DPO-Role-Based-视觉偏好训练集', latestVersion: 'V1', dataUsage: 'DPO-图像理解', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/03/03 18:20:00', sampleCount: 12, charCount: 18000, trainRatio: 80 }),
     makeDataset({ id: 'train-14', name: '图像理解-SFT-商品图文问答', latestVersion: 'V2', dataUsage: 'SFT-图像理解', dataFormat: 'role-based', creator: 'deepexilab', createdAt: '2026/05/10 10:12:00', sampleCount: 640, charCount: 96000, trainRatio: 80 }),
     makeDataset({ id: 'train-15', name: '图像理解-SFT-文档截图解析', latestVersion: 'V1', dataUsage: 'SFT-图像理解', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/05/10 11:24:00', sampleCount: 420, charCount: 78000, trainRatio: 80 }),
     makeDataset({ id: 'train-16', name: '图像理解-SFT-质检缺陷识别', latestVersion: 'V3', dataUsage: 'SFT-图像理解', dataFormat: 'role-based', creator: 'lab1', createdAt: '2026/05/09 16:38:00', sampleCount: 1280, charCount: 156000, trainRatio: 85 }),
-    makeDataset({ id: 'train-17', name: '图像理解-DPO-多模态偏好对', latestVersion: 'V1', dataUsage: 'DPO-图像理解', dataFormat: 'prompt-response', creator: 'deepexilab', createdAt: '2026/05/09 15:18:00', sampleCount: 360, charCount: 72000, trainRatio: 80 }),
+    makeDataset({ id: 'train-17', name: '图像理解-DPO-多模态偏好对', latestVersion: 'V1', dataUsage: 'DPO-图像理解', dataFormat: 'role-based', creator: 'deepexilab', createdAt: '2026/05/09 15:18:00', sampleCount: 360, charCount: 72000, trainRatio: 80 }),
     makeDataset({ id: 'train-18', name: '图像理解-RFT-PPO-视觉推理奖励集', latestVersion: 'V1', dataUsage: 'RFT-PPO-图像理解', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/05/08 18:06:00', sampleCount: 260, charCount: 54000, trainRatio: 80 }),
     makeDataset({ id: 'train-19', name: '图像理解-RFT-GRPO-图表推理集', latestVersion: 'V1', dataUsage: 'RFT-GRPO-图像理解', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/05/08 17:20:00', sampleCount: 300, charCount: 62000, trainRatio: 80 }),
     makeDataset({ id: 'train-8', name: '奖励反馈训练集-RFT-PPO', latestVersion: 'V3', dataUsage: 'RFT-PPO-文本生成', dataFormat: 'prompt-response', creator: 'deepexilab', createdAt: '2026/03/02 09:30:00', sampleCount: 24, charCount: 58000, trainRatio: 80 }),
     makeDataset({ id: 'train-9', name: '群组反馈训练集-RFT-GRPO', latestVersion: 'V1', dataUsage: 'RFT-GRPO-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/01 16:10:00', sampleCount: 16, charCount: 36000, trainRatio: 80 }),
-    makeDataset({ id: 'train-10', name: '客服偏好对训练集-DPO-Plus', latestVersion: 'V4', dataUsage: 'DPO-文本生成', dataFormat: 'prompt-response', creator: 'deepexilab', createdAt: '2026/03/10 10:16:00', sampleCount: 96, charCount: 268000, trainRatio: 80 }),
+    makeDataset({ id: 'train-10', name: 'DPO-Role-Based-客服质检训练集', latestVersion: 'V4', dataUsage: 'DPO-文本生成', dataFormat: 'role-based', creator: 'deepexilab', createdAt: '2026/03/10 10:16:00', sampleCount: 96, charCount: 268000, trainRatio: 80 }),
     makeDataset({ id: 'train-11', name: '多轮指令精调-SFT-财税问答', latestVersion: 'V3', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'lab1', createdAt: '2026/03/09 19:20:00', sampleCount: 128, charCount: 312000, trainRatio: 80 }),
-    makeDataset({ id: 'train-12', name: '图文偏好排序-DPO-电商审核', latestVersion: 'V2', dataUsage: 'DPO-图像理解', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/03/07 13:42:00', sampleCount: 64, charCount: 91000, trainRatio: 80 }),
+    makeDataset({ id: 'train-12', name: 'DPO-Role-Based-电商图文偏好训练集', latestVersion: 'V2', dataUsage: 'DPO-图像理解', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/03/07 13:42:00', sampleCount: 64, charCount: 91000, trainRatio: 80 }),
     makeDataset({ id: 'train-3', name: '222222222222222', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/07 09:15:00', sampleCount: 20, charCount: 56000, trainRatio: 80 }),
     makeDataset({ id: 'train-4', name: 'role_base', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/06 09:15:00', sampleCount: 12, charCount: 32000, trainRatio: 80, status: '处理失败' }),
     makeDataset({ id: 'train-5', name: '小量训练数据-xjh-test', latestVersion: 'V3', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/05 15:45:00', sampleCount: 28, charCount: 83000, trainRatio: 80 }),
@@ -310,12 +342,14 @@ const seedState: DataServiceState = {
   validationDatasets: [
     makeDataset({ id: 'val-1', name: '多轮---1', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/02/27 14:00:00', sampleCount: 20, charCount: 36000, trainRatio: 20 }),
     makeDataset({ id: 'val-2', name: '正常-2', latestVersion: 'V2', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/02/26 14:00:00', sampleCount: 16, charCount: 24000, trainRatio: 20 }),
+    makeDataset({ id: 'val-5', name: 'DPO-Alpaca-偏好验证集', latestVersion: 'V1', dataUsage: 'DPO-文本生成', dataFormat: 'alpaca', creator: 'admin', createdAt: '2026/02/26 10:10:00', sampleCount: 18, charCount: 26000, trainRatio: 20 }),
+    makeDataset({ id: 'val-6', name: 'DPO-Role-Based-质量验证集', latestVersion: 'V1', dataUsage: 'DPO-文本生成', dataFormat: 'role-based', creator: 'lab1', createdAt: '2026/02/26 09:30:00', sampleCount: 14, charCount: 21000, trainRatio: 20 }),
     makeDataset({ id: 'val-4', name: 'RFT-PPO-验证集-文本', latestVersion: 'V1', dataUsage: 'RFT-PPO-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/02/25 17:20:00', sampleCount: 20, charCount: 22000, trainRatio: 20 }),
     makeDataset({ id: 'val-3', name: '验证-xlsx-0001', latestVersion: 'V15', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/02/25 15:00:00', sampleCount: 40, charCount: 68000, trainRatio: 20 }),
   ],
   testDatasets: [
     makeDataset({ id: 'test-1', name: '多文件-10', latestVersion: 'V2', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/03/03 17:04:19', sampleCount: 40 }),
-    makeDataset({ id: 'test-5', name: '偏好对测试集-DPO-A', latestVersion: 'V1', dataUsage: 'DPO-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/03 08:10:00', sampleCount: 22 }),
+    makeDataset({ id: 'test-5', name: 'DPO-Alpaca-偏好测试集', latestVersion: 'V1', dataUsage: 'DPO-文本生成', dataFormat: 'alpaca', creator: 'lab1', createdAt: '2026/03/03 08:10:00', sampleCount: 22 }),
     makeDataset({ id: 'test-6', name: '强化评测集-RFT-GRPO', latestVersion: 'V2', dataUsage: 'RFT-GRPO-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/03/02 18:30:00', sampleCount: 18 }),
     makeDataset({ id: 'test-2', name: '乱码测试4', latestVersion: 'V7', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/02 14:30:00', sampleCount: 50 }),
     makeDataset({ id: 'test-3', name: '333333333', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'lab1', createdAt: '2026/03/01 11:00:00', sampleCount: 10, status: '处理失败' }),
@@ -330,17 +364,22 @@ const seedState: DataServiceState = {
   annotationTasks: [
     { id: 'ann-1', name: '财税问答-人工标注-未开始', dataVolume: 12, progress: 0, status: '未开始', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '训练数据集/多轮指令精调-SFT-财税问答-V3', postDataset: '-', creator: 'deepexilab', createdAt: '2026-04-29 09:10:21' },
     { id: 'ann-2', name: '客服意图识别-在线标注中', dataVolume: 36, progress: 45, status: '标注中', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '训练数据集/训练测试-1-V8', postDataset: '-', creator: 'lab1', createdAt: '2026-04-28 16:38:22' },
-    { id: 'ann-3', name: 'DPO偏好对-待审核', dataVolume: 24, progress: 80, status: '待审核', collaborationMode: 'multi', reviewerCount: 3, reviewMode: '双人交叉审核', datasetType: 'text-generation', preDataset: '训练数据集/偏好对训练集-DPO-demo-V2', postDataset: '-', creator: 'lab1', createdAt: '2026-04-27 14:17:59' },
+    { id: 'ann-3', name: 'DPO-Alpaca-偏好审核任务', dataVolume: 24, progress: 80, status: '待审核', collaborationMode: 'multi', reviewerCount: 3, reviewMode: '双人交叉审核', datasetType: 'text-generation', preDataset: '训练数据集/DPO-Alpaca-通用偏好训练集-V2', postDataset: '-', creator: 'lab1', createdAt: '2026-04-27 14:17:59' },
     { id: 'ann-4', name: 'RFT-PPO反馈标注-已完成', dataVolume: 30, progress: 100, status: '已完成', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '训练数据集/奖励反馈训练集-RFT-PPO-V3', postDataset: '训练数据集/奖励反馈训练集-RFT-PPO-标注结果-V1', creator: 'deepexilab', createdAt: '2026-04-26 11:22:13' },
     { id: 'ann-5', name: '多轮对话质量复核-已提交', dataVolume: 18, progress: 100, status: '已提交', collaborationMode: 'multi', reviewerCount: 2, reviewMode: '组长复核', datasetType: 'text-generation', preDataset: '验证数据集/多轮---1-V1', postDataset: '验证数据集/多轮---1-标注结果-V2', creator: 'admin', createdAt: '2026-04-25 17:05:46' },
-    { id: 'ann-6', name: '图文审核-图像标注中', dataVolume: 16, progress: 35, status: '标注中', collaborationMode: 'online', datasetType: 'image-understanding', preDataset: '训练数据集/视觉偏好训练集-DPO-VLM-V1', postDataset: '-', creator: 'deepexilab', createdAt: '2026-04-24 10:26:08' },
-    { id: 'ann-7', name: '电商图片偏好-失败', dataVolume: 8, progress: null, status: '失败', collaborationMode: 'multi', reviewerCount: 2, reviewMode: '全量复核', datasetType: 'image-understanding', preDataset: '训练数据集/图文偏好排序-DPO-电商审核-V2', postDataset: '-', creator: 'lab1', createdAt: '2026-04-23 19:41:30' },
-    { id: 'ann-8', name: '文本生成-标注服务失败', dataVolume: 10, progress: null, status: '失败', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '测试数据集/偏好对测试集-DPO-A-V1', postDataset: '-', creator: 'lab1', createdAt: '2026-04-22 13:09:18' },
+    { id: 'ann-6', name: 'DPO-Role-Based-视觉偏好标注中', dataVolume: 16, progress: 35, status: '标注中', collaborationMode: 'online', datasetType: 'image-understanding', preDataset: '训练数据集/DPO-Role-Based-视觉偏好训练集-V1', postDataset: '-', creator: 'deepexilab', createdAt: '2026-04-24 10:26:08' },
+    { id: 'ann-7', name: 'DPO-Role-Based-电商图文偏好失败', dataVolume: 8, progress: null, status: '失败', collaborationMode: 'multi', reviewerCount: 2, reviewMode: '全量复核', datasetType: 'image-understanding', preDataset: '训练数据集/DPO-Role-Based-电商图文偏好训练集-V2', postDataset: '-', creator: 'lab1', createdAt: '2026-04-23 19:41:30' },
+    { id: 'ann-8', name: 'DPO-Alpaca-测试标注失败', dataVolume: 10, progress: null, status: '失败', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '测试数据集/DPO-Alpaca-偏好测试集-V1', postDataset: '-', creator: 'lab1', createdAt: '2026-04-22 13:09:18' },
+    { id: 'ann-9', name: 'DPO-Alpaca-客服偏好标注中', dataVolume: 18, progress: 44, status: '标注中', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '训练数据集/DPO-Alpaca-通用偏好训练集-V2', postDataset: '-', creator: 'deepexilab', createdAt: '2026-04-21 10:18:34' },
+    { id: 'ann-10', name: 'DPO-Role-Based-客服质检多人标注', dataVolume: 32, progress: 62, status: '标注中', collaborationMode: 'multi', reviewerCount: 4, reviewMode: '抽检审核', datasetType: 'text-generation', preDataset: '训练数据集/DPO-Role-Based-客服质检训练集-V4', postDataset: '-', creator: 'admin', createdAt: '2026-04-20 16:46:12' },
+    { id: 'ann-11', name: 'DPO-Alpaca-偏好验证已完成', dataVolume: 18, progress: 100, status: '已完成', collaborationMode: 'online', datasetType: 'text-generation', preDataset: '验证数据集/DPO-Alpaca-偏好验证集-V1', postDataset: '验证数据集/DPO-Alpaca-偏好验证集-标注结果-V2', creator: 'lab1', createdAt: '2026-04-19 15:12:07' },
+    { id: 'ann-12', name: 'DPO-Role-Based-质量验证待审核', dataVolume: 14, progress: 86, status: '待审核', collaborationMode: 'multi', reviewerCount: 3, reviewMode: '双人交叉审核', datasetType: 'text-generation', preDataset: '验证数据集/DPO-Role-Based-质量验证集-V1', postDataset: '-', creator: 'deepexilab', createdAt: '2026-04-18 11:36:52' },
+    { id: 'ann-13', name: 'DPO-Role-Based-多模态偏好标注', dataVolume: 20, progress: 25, status: '标注中', collaborationMode: 'online', datasetType: 'image-understanding', preDataset: '训练数据集/图像理解-DPO-多模态偏好对-V1', postDataset: '-', creator: 'admin', createdAt: '2026-04-17 09:44:20' },
   ],
   cleaningTasks: [
-    { id: 'clean-1', name: '多人标注任务清洗', description: '', status: '已完成', preDataset: '训练数据集/roleBased-V4', postDataset: '训练数据集/roleBased-V5', creator: 'deepexilab', createdAt: '2026/03/24 11:53:50' },
-    { id: 'clean-2', name: '多人-1', description: '', status: '启动中', preDataset: '训练数据集/训练测试-1-V8', postDataset: '-', creator: 'lab1', createdAt: '2026/03/20 09:45:19' },
-    { id: 'clean-3', name: '异常-2', description: '', status: '已完成', preDataset: '测试数据集/多文件-10-V1', postDataset: '测试数据集/多文件-10-V2', creator: 'lab1', createdAt: '2026/03/13 15:18:51' },
+    { id: 'clean-1', name: 'DPO-Alpaca-偏好对清洗', description: '', status: '已完成', preDataset: '训练数据集/DPO-Alpaca-通用偏好训练集-V2', postDataset: '训练数据集/DPO-Alpaca-通用偏好训练集-V3', creator: 'deepexilab', createdAt: '2026/03/24 11:53:50' },
+    { id: 'clean-2', name: 'DPO-Role-Based-客服质检清洗', description: '', status: '启动中', preDataset: '训练数据集/DPO-Role-Based-客服质检训练集-V4', postDataset: '-', creator: 'lab1', createdAt: '2026/03/20 09:45:19' },
+    { id: 'clean-3', name: 'DPO-Alpaca-测试集清洗', description: '', status: '已完成', preDataset: '测试数据集/DPO-Alpaca-偏好测试集-V1', postDataset: '测试数据集/DPO-Alpaca-偏好测试集-V2', creator: 'lab1', createdAt: '2026/03/13 15:18:51' },
   ],
 }
 
@@ -350,6 +389,20 @@ function cloneState(state: DataServiceState): DataServiceState {
 
 function enrichStateWithTrainingSeeds(nextState: DataServiceState): DataServiceState {
   const draft = cloneState(nextState)
+  const seedFormatById = new Map(
+    [
+      ...seedState.trainingDatasets,
+      ...seedState.validationDatasets,
+      ...seedState.testDatasets,
+    ].map(item => [item.id, item.dataFormat]),
+  )
+  const seedDatasetById = new Map(
+    [
+      ...seedState.trainingDatasets,
+      ...seedState.validationDatasets,
+      ...seedState.testDatasets,
+    ].map(item => [item.id, item]),
+  )
   const trainingIds = new Set(draft.trainingDatasets.map(item => item.id))
   seedState.trainingDatasets.forEach(item => {
     if (!trainingIds.has(item.id)) {
@@ -367,22 +420,43 @@ function enrichStateWithTrainingSeeds(nextState: DataServiceState): DataServiceS
     }
   })
 
-  draft.trainingDatasets = draft.trainingDatasets.map(item => {
+  const cleaningIds = new Map(draft.cleaningTasks.map(item => [item.id, item]))
+  seedState.cleaningTasks.forEach(item => {
+    const existing = cleaningIds.get(item.id)
+    if (existing) {
+      Object.assign(existing, cloneState({ trainingDatasets: [], validationDatasets: [], testDatasets: [], inferenceResults: [], annotationTasks: [], cleaningTasks: [item] }).cleaningTasks[0])
+    } else {
+      draft.cleaningTasks.push(cloneState({ trainingDatasets: [], validationDatasets: [], testDatasets: [], inferenceResults: [], annotationTasks: [], cleaningTasks: [item] }).cleaningTasks[0])
+    }
+  })
+
+  const normalizeDatasetList = (items: DatasetRecord[]) => items.map(item => {
     if (!isDpoUsage(item.dataUsage)) {
       return item
     }
 
+    const seedDataset = seedDatasetById.get(item.id)
+    const nextFormat = seedFormatById.get(item.id) ?? normalizeDatasetFormat(item.dataFormat, item.dataUsage)
     return {
       ...item,
+      name: seedDataset?.name ?? item.name,
+      dataUsage: seedDataset?.dataUsage ?? item.dataUsage,
+      dataFormat: nextFormat,
       versions: item.versions.map(version => ({
         ...version,
         detailRows:
-          version.detailRows?.some(row => row.chosen || row.rejected)
+          seedDataset
+            ? buildSeedDetailRows(nextFormat, seedDataset.name, version.version, seedDataset.dataUsage)
+            : version.detailRows?.some(row => row.instruction || row.messages)
             ? version.detailRows
-            : buildSeedDetailRows(item.dataFormat, item.name, version.version, item.dataUsage),
+            : buildSeedDetailRows(nextFormat, item.name, version.version, item.dataUsage),
       })),
     }
   })
+
+  draft.trainingDatasets = normalizeDatasetList(draft.trainingDatasets)
+  draft.validationDatasets = normalizeDatasetList(draft.validationDatasets)
+  draft.testDatasets = normalizeDatasetList(draft.testDatasets)
 
   return draft
 }
@@ -465,17 +539,18 @@ function createDatasetVersion(
 export const dataServiceActions = {
   createDataset(
     kind: 'training' | 'validation' | 'test',
-    params: { name: string; dataUsage: TrainingDatasetUsage | '文本生成' | '图像理解'; dataFormat: 'PROMPT_RESPONSE' | 'ROLE_BASED' },
+    params: { name: string; dataUsage: TrainingDatasetUsage | '文本生成' | '图像理解'; dataFormat: 'PROMPT_RESPONSE' | 'ROLE_BASED' | 'ALPACA' },
   ) {
     update(draft => {
       const createdAt = nowText()
+      const normalizedUsage = normalizeDatasetUsage(params.dataUsage)
       const next: DatasetRecord = {
         id: `${kind}-${Date.now()}`,
         name: params.name,
         versionStatus: '处理完成',
         latestVersion: 'V1',
-        dataUsage: normalizeDatasetUsage(params.dataUsage),
-        dataFormat: params.dataFormat === 'ROLE_BASED' ? 'role-based' : 'prompt-response',
+        dataUsage: normalizedUsage,
+        dataFormat: normalizeDatasetFormat(params.dataFormat, normalizedUsage),
         creator: getCurrentUser().account,
         createdAt,
         status: '已发布',

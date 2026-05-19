@@ -8,6 +8,7 @@ import { nextVersionLabel, parseVersionNum } from './TrainingDataset'
 import type { PaginatedResult } from '../../services/dataServiceApi'
 import { dataServiceApi, selectDatasets, useDataServiceSnapshot } from '../../services/dataServiceApi'
 import { formatResourceLockMessage, getCreatorDeletePermission, getDatasetReferenceLocks } from '../../services/resourceReferenceGuard'
+import { getDatasetFormatLabel, isDpoUsage, normalizeDatasetFormat } from '../../services/datasetFormats'
 import ResumableUpload from '../../components/ResumableUpload'
 
 const { Text } = Typography
@@ -58,12 +59,11 @@ type DatasetDetailRow = {
   response?: string
   user?: string
   assistant?: string
+  instruction?: string
+  input?: string
+  messages?: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
   chosen?: string
   rejected?: string
-}
-
-function isDpoUsage(value?: string): boolean {
-  return String(value ?? '').startsWith('DPO-')
 }
 
 function resolveTestUsageLabel(value?: string): '文本生成' | '图像理解' {
@@ -75,11 +75,23 @@ function resolveTestUsageColor(value?: string): string {
 }
 
 function resolveFormatLabel(dataUsage?: string, dataFormat?: string): string {
-  if (isDpoUsage(dataUsage)) {
-    return 'CHOSEN_REJECTED'
-  }
+  return getDatasetFormatLabel(dataUsage, dataFormat)
+}
 
-  return dataFormat === 'role-based' ? 'ROLE_BASED' : 'PROMPT_RESPONSE'
+function renderDetailValue(value: unknown) {
+  if (Array.isArray(value)) {
+    return (
+      <Space direction="vertical" size={6}>
+        {value.map((item, index) => (
+          <div key={`${item.role}-${index}`}>
+            <Tag color={item.role === 'system' ? 'purple' : 'blue'}>{item.role}</Tag>
+            <Text>{item.content}</Text>
+          </div>
+        ))}
+      </Space>
+    )
+  }
+  return <Text style={{ whiteSpace: 'pre-wrap' }}>{String(value ?? '-')}</Text>
 }
 
 function buildTestVersions(row: Omit<TestDatasetRecord, 'versions'>): TestVersionRow[] {
@@ -112,20 +124,27 @@ function buildDetailRows(record: TestDatasetRecord, version: TestVersionRow): Da
   }
 
   if (isDpoUsage(record.dataUsage)) {
+    if (normalizeDatasetFormat(record.dataFormat, record.dataUsage) === 'role-based') {
+      return [
+        {
+          key: `${version.id}-1`,
+          messages: [
+            { role: 'system', content: '你是一个严谨的中文助手。' },
+            { role: 'user', content: '请解释什么是过拟合。' },
+          ],
+          chosen: '过拟合是指模型过度记住训练集细节，导致泛化能力下降。',
+          rejected: '过拟合就是模型训练了很久。',
+        },
+      ]
+    }
+
     return [
       {
         key: `${version.id}-1`,
-        system: '你是一名电商售后服务助手，需要在安抚用户情绪的同时给出清晰的退换货建议。',
-        user: '耳机收到后右耳没有声音，我已经很着急了，今天必须用。',
-        chosen: '非常抱歉影响了您的使用。我先帮您排查，如确认设备故障可优先为您安排补发，并同步补偿运费。',
-        rejected: '你先再试几次，如果还是不行就自己联系售后，平台这边暂时帮不上忙。',
-      },
-      {
-        key: `${version.id}-2`,
-        system: '你是一名金融客服回复优化助手，需要确保表述准确、合规、稳妥。',
-        user: '基金今天跌了这么多，是不是应该马上全部赎回？',
-        chosen: '我无法直接给出投资决策建议。您可以先关注持仓目标、风险承受能力和基金公告，再结合专业顾问意见综合判断。',
-        rejected: '建议你立刻全部赎回，不然继续跌下去会更亏。',
+        instruction: '解释什么是过拟合',
+        input: '',
+        chosen: '过拟合是指模型在训练集上表现很好，但对未见数据泛化较差的现象。',
+        rejected: '过拟合就是训练时间太长。',
       },
     ]
   }
@@ -587,20 +606,22 @@ const TestDataset: React.FC = () => {
 
   const detailTableColumns: ColumnsType<DatasetDetailRow> =
     selectedRecord && isDpoUsage(selectedRecord.dataUsage)
-      ? [
-          { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
-          { title: 'System', dataIndex: 'system', key: 'system', width: 260 },
-          { title: 'User', dataIndex: 'user', key: 'user', width: 240 },
-          {
-            title: 'Assistant',
-            key: 'assistant',
-            children: [
-              { title: 'Chosen', dataIndex: 'chosen', key: 'chosen', width: 280 },
-              { title: 'Rejected', dataIndex: 'rejected', key: 'rejected', width: 280 },
-            ],
-          },
-          detailDeleteColumn,
-        ]
+      ? normalizeDatasetFormat(selectedRecord.dataFormat, selectedRecord.dataUsage) === 'role-based'
+        ? [
+            { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
+            { title: 'Messages', dataIndex: 'messages', key: 'messages', width: 360, render: renderDetailValue },
+            { title: 'Chosen', dataIndex: 'chosen', key: 'chosen', width: 280, render: renderDetailValue },
+            { title: 'Rejected', dataIndex: 'rejected', key: 'rejected', width: 280, render: renderDetailValue },
+            detailDeleteColumn,
+          ]
+        : [
+            { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
+            { title: 'Instruction', dataIndex: 'instruction', key: 'instruction', width: 260 },
+            { title: 'Input', dataIndex: 'input', key: 'input', width: 220 },
+            { title: 'Chosen', dataIndex: 'chosen', key: 'chosen', width: 280 },
+            { title: 'Rejected', dataIndex: 'rejected', key: 'rejected', width: 280 },
+            detailDeleteColumn,
+          ]
       : selectedRecord?.dataFormat === 'role-based'
       ? [
           { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },

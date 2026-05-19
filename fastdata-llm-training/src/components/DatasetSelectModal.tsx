@@ -22,6 +22,7 @@ import {
   resolveDatasetVersionRow,
   type DatasetPickerResolvedRow,
 } from '../data/datasetPickerCatalog'
+import { isPreferenceOrRewardFormat } from '../services/datasetFormats'
 
 const { Text } = Typography
 
@@ -49,6 +50,8 @@ export interface DatasetSelectModalProps {
   allowedDetailedUsagesByDataType?: Partial<Record<DatasetPickerDataType, DetailedDataUsage[]>>
   /** 按数据类型排除数据格式，适用于训练/验证中排除 DPO/RFT 格式但保留基础用途筛选的场景 */
   excludedFormatsByDataType?: Partial<Record<DatasetPickerDataType, string[]>>
+  /** 按数据类型排除 DPO/RFT 偏好或奖励数据，避免 ROLE_BASED 与 SFT 格式冲突时误伤 */
+  excludePreferenceOrRewardByDataType?: DatasetPickerDataType[]
   /** 隐藏当前范围内数量为 0 的细分用途选项 */
   hideEmptyDetailedUsageOptions?: boolean
   /** 隐藏细分用途选项，仅保留“全部” */
@@ -68,7 +71,7 @@ export interface DatasetSelectModalProps {
 /** 训练方法 → 允许的数据格式映射 */
 export const TRAINING_METHOD_FORMATS: Record<TrainingMethod, string[]> = {
   SFT: ['PROMPT_RESPONSE', 'ROLE_BASED'],
-  DPO: ['Chosen_Rejected'],
+  DPO: ['ALPACA', 'ROLE_BASED'],
   RFT: ['Completion_Reward'],
 }
 
@@ -89,11 +92,22 @@ interface FormatOption { value: string; label: string; count: number }
 
 function getDetailedUsage(item: DatasetPickerItem): string {
   if (item.dataUsage === '图像理解') return '图像理解'
-  if (item.dataFormat === 'Chosen_Rejected') return '文本生成 / DPO'
+  if (item.dataFormat === 'ALPACA' || (item.dataFormat === 'ROLE_BASED' && item.name.toUpperCase().includes('DPO'))) return '文本生成 / DPO'
   if (item.dataFormat === 'Completion_Reward') {
     return item.name.toUpperCase().includes('GRPO') ? '文本生成 / RFT-GRPO' : '文本生成 / RFT-PPO'
   }
   return '文本生成 / SFT'
+}
+
+function matchesTrainingMethod(item: DatasetPickerItem, trainingMethod?: TrainingMethod): boolean {
+  if (!trainingMethod) return true
+  if (trainingMethod === 'SFT') {
+    return !isPreferenceOrRewardFormat(item.dataFormat, item.name)
+  }
+  if (trainingMethod === 'DPO') {
+    return item.dataFormat === 'ALPACA' || (item.dataFormat === 'ROLE_BASED' && item.name.toUpperCase().includes('DPO'))
+  }
+  return item.dataFormat === 'Completion_Reward'
 }
 
 /** 训练/验证弹窗固定为训练/验证数据集类型 */
@@ -110,6 +124,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
   allowedDetailedUsages,
   allowedDetailedUsagesByDataType,
   excludedFormatsByDataType,
+  excludePreferenceOrRewardByDataType,
   hideEmptyDetailedUsageOptions = false,
   hideDetailedUsageOptions = false,
   defaultDataUsage,
@@ -191,6 +206,10 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
       Object.entries(excludedFormatsByDataType).map(([type, formats]) => [type, new Set(formats)]),
     ) as Partial<Record<DatasetPickerDataType, Set<string>>>
   }, [excludedFormatsByDataType])
+  const excludePreferenceOrRewardTypes = useMemo(
+    () => new Set(excludePreferenceOrRewardByDataType ?? []),
+    [excludePreferenceOrRewardByDataType],
+  )
   const baseCatalog = useMemo(() => {
     let list = DATASET_PICKER_CATALOG
     if (allowedDataTypes?.length) {
@@ -211,8 +230,11 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
         return !scopedSet || !scopedSet.has(d.dataFormat)
       })
     }
+    if (excludePreferenceOrRewardTypes.size) {
+      list = list.filter(d => !excludePreferenceOrRewardTypes.has(d.dataType) || !isPreferenceOrRewardFormat(d.dataFormat, d.name))
+    }
     return list
-  }, [allowedDataTypes, allowedDetailedUsageByTypeSets, allowedDetailedUsageSet, excludedFormatByTypeSets])
+  }, [allowedDataTypes, allowedDetailedUsageByTypeSets, allowedDetailedUsageSet, excludePreferenceOrRewardTypes, excludedFormatByTypeSets])
 
   const typeCounts = useMemo(() => {
     const m: Record<string, number> = {}
@@ -238,12 +260,13 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
     }
     if (dataFormat) list = list.filter(d => d.dataFormat === dataFormat)
     if (allowedFormats) list = list.filter(d => allowedFormats.has(d.dataFormat))
+    if (trainingMethod) list = list.filter(d => matchesTrainingMethod(d, trainingMethod))
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       list = list.filter(d => d.name.toLowerCase().includes(q))
     }
     return list
-  }, [baseCatalog, fixedDataType, dataType, dataUsage, dataFormat, search, allowedFormats, detailedDataUsage])
+  }, [baseCatalog, fixedDataType, dataType, dataUsage, dataFormat, search, allowedFormats, detailedDataUsage, trainingMethod])
 
   const usageScope = useMemo(() => {
     let list = baseCatalog
@@ -260,8 +283,9 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
       list = list.filter(d => (detailedDataUsage ? getDetailedUsage(d) === dataUsage : d.dataUsage === dataUsage))
     }
     if (allowedFormats) list = list.filter(d => allowedFormats.has(d.dataFormat))
+    if (trainingMethod) list = list.filter(d => matchesTrainingMethod(d, trainingMethod))
     return list
-  }, [baseCatalog, fixedDataType, dataType, dataUsage, allowedFormats, detailedDataUsage])
+  }, [baseCatalog, fixedDataType, dataType, dataUsage, allowedFormats, detailedDataUsage, trainingMethod])
 
   const usageOptions = useMemo(() => {
     if (detailedDataUsage) {

@@ -144,11 +144,15 @@ const cleaningFieldOptionsByFormat: Record<string, CleaningFieldOption[]> = {
     { value: 'user', label: 'User' },
     { value: 'assistant', label: 'Assistant' },
   ],
+  ALPACA: [
+    { value: 'instruction', label: 'Instruction' },
+    { value: 'input', label: 'Input' },
+    { value: 'chosen', label: 'Chosen' },
+    { value: 'rejected', label: 'Rejected' },
+  ],
   Chosen_Rejected: [
-    { value: 'system', label: 'System' },
-    { value: 'user', label: 'User' },
-    { value: 'assistant.chosen', label: 'Assistant Chosen' },
-    { value: 'assistant.rejected', label: 'Assistant Rejected' },
+    { value: 'chosen', label: 'Chosen' },
+    { value: 'rejected', label: 'Rejected' },
   ],
   Completion_Reward: [
     { value: 'completion', label: 'Completion' },
@@ -159,6 +163,13 @@ const cleaningFieldOptionsByFormat: Record<string, CleaningFieldOption[]> = {
 function getCleaningFieldOptions(dataset?: SelectedDatasetVersionRow | null): CleaningFieldOption[] {
   if (!dataset) {
     return []
+  }
+  if (dataset.dataFormat === 'ROLE_BASED' && dataset.datasetName.toUpperCase().includes('DPO')) {
+    return [
+      { value: 'messages', label: 'Messages' },
+      { value: 'chosen.content', label: 'Chosen Content' },
+      { value: 'rejected.content', label: 'Rejected Content' },
+    ]
   }
   return cleaningFieldOptionsByFormat[dataset.dataFormat] ?? [
     { value: 'content', label: 'Content' },
@@ -659,6 +670,7 @@ const DataCleaning: React.FC = () => {
           trainingType="text"
           defaultDataType="训练数据集"
           detailedDataUsage
+          dataScopeHint="可选择 SFT、DPO、RFT 以及测试数据集；DPO 支持 Alpaca 与 Role-Based 两种格式，清洗字段会随格式自动切换。"
           defaultSelectedKeys={selectedCleaningDataset ? [selectedCleaningDataset.key] : []}
           onCancel={() => setDatasetPickerOpen(false)}
           onConfirm={selectedRows => {
