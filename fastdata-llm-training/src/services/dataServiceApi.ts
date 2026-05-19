@@ -77,6 +77,10 @@ export interface UpdateTaskMetaParams {
   description?: string
 }
 
+export interface UpdateDatasetVersionParams {
+  description: string
+}
+
 export interface ListQueryParams {
   search?: string
   dataUsage?: string
@@ -412,6 +416,28 @@ export const dataServiceApi = {
 
     await delay()
     dataServiceActions.updateDatasetMeta(kind, id, params)
+  },
+
+  async updateDatasetVersionDescription(
+    kind: DatasetKind,
+    id: string,
+    versionId: string,
+    params: UpdateDatasetVersionParams,
+  ): Promise<void> {
+    const snapshot = await requestSnapshot(
+      `${API_ROOT}/datasets/${kind}/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(params),
+      },
+    )
+
+    if (syncSnapshot(snapshot)) {
+      return
+    }
+
+    await delay()
+    dataServiceActions.updateDatasetVersionDescription(kind, id, versionId, params.description)
   },
 
   async deleteDatasetDetailRow(kind: DatasetKind, id: string, params: DeleteDatasetDetailRowParams): Promise<void> {

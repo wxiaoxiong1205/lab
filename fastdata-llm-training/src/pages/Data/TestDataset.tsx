@@ -37,6 +37,7 @@ type TestVersionRow = {
   processStatus: string
   publishStatus: string
   sampleCount: number
+  description?: string
   createdAt: string
 }
 
@@ -110,6 +111,7 @@ function buildTestVersions(row: Omit<TestDatasetRecord, 'versions'>): TestVersio
       processStatus: '处理完成',
       publishStatus: isLatest ? row.status : '已归档',
       sampleCount: Math.max(10, Math.floor(500 * scale)),
+      description: isLatest ? row.description : '',
       createdAt: row.createdAt,
     })
   }
@@ -327,18 +329,21 @@ const TestDataset: React.FC = () => {
 
   const handleUpdateDatasetMeta = async (
     record: TestDatasetRecord,
-    value: { name?: string; description?: string },
+    value: { name?: string },
   ) => {
     const nextName = value.name ?? record.name
-    const nextDescription = value.description ?? record.description ?? ''
     await dataServiceApi.updateDatasetMeta('test', record.id, {
       name: nextName,
-      description: nextDescription,
+      description: record.description ?? '',
     })
 
     if (isDetailRoute && selectedRecord?.id === record.id && value.name && value.name !== record.name) {
       navigate(`/measurement/testing/${encodeURIComponent(nextName)}`, { replace: true })
     }
+  }
+
+  const handleUpdateDatasetVersionDescription = async (record: TestDatasetRecord, versionId: string, description: string) => {
+    await dataServiceApi.updateDatasetVersionDescription('test', record.id, versionId, { description })
   }
 
   const handleCancelAddVersion = () => {
@@ -387,21 +392,6 @@ const TestDataset: React.FC = () => {
           placeholder="请输入数据集名称"
           onTextClick={() => handleOpenDetail(record)}
           onSave={name => handleUpdateDatasetMeta(record, { name })}
-        />
-      ),
-    },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-      width: 220,
-      render: (value, record) => (
-        <TaskMetadataEditor
-          value={value}
-          emptyText="暂无描述"
-          placeholder="请输入描述"
-          type="secondary"
-          onSave={description => handleUpdateDatasetMeta(record, { description })}
         />
       ),
     },
@@ -839,12 +829,15 @@ const TestDataset: React.FC = () => {
                   <Text type="secondary">描述：</Text>
                   <div style={{ display: 'inline-flex', minWidth: 260, maxWidth: '100%', verticalAlign: 'middle' }}>
                     <TaskMetadataEditor
-                      value={selectedRecord.description}
+                      value={activeVersion?.description ?? selectedRecord.description}
                       emptyText="暂无描述"
                       placeholder="请输入描述"
                       type="secondary"
                       alwaysShowEdit
-                      onSave={description => handleUpdateDatasetMeta(selectedRecord, { description })}
+                      onSave={description => {
+                        if (!activeVersion) return
+                        return handleUpdateDatasetVersionDescription(selectedRecord, activeVersion.id, description)
+                      }}
                     />
                   </div>
                 </div>
@@ -1018,7 +1011,7 @@ const TestDataset: React.FC = () => {
             columns={columns}
             dataSource={listResult.items}
             loading={listLoading}
-            scroll={{ x: 1220 }}
+            scroll={{ x: 1000 }}
             tableLayout="fixed"
             pagination={{
               current: page,

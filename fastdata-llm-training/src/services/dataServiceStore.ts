@@ -570,7 +570,7 @@ export const dataServiceActions = {
           next.sampleCount,
           next.charCount,
           next.trainRatio,
-          undefined,
+          params.description,
           buildSeedDetailRows(next.dataFormat, next.name, next.latestVersion, next.dataUsage),
           next.creator,
         ),
@@ -648,6 +648,21 @@ export const dataServiceActions = {
       if (!target) return
       target.name = value.name
       target.description = value.description ?? ''
+    })
+  },
+
+  updateDatasetVersionDescription(kind: 'training' | 'validation' | 'test', id: string, versionId: string, description: string) {
+    update(draft => {
+      const list =
+        kind === 'training'
+          ? draft.trainingDatasets
+          : kind === 'validation'
+            ? draft.validationDatasets
+            : draft.testDatasets
+      const target = list.find(item => item.id === id)
+      const version = target?.versions.find(item => item.id === versionId)
+      if (!version) return
+      version.description = description
     })
   },
 

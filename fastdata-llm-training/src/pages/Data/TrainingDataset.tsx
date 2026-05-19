@@ -42,6 +42,7 @@ export type DatasetVersionRow = {
   trainRatio: number
   sampleCount: number
   charCount: number
+  description?: string
   createdAt: string
 }
 
@@ -340,6 +341,7 @@ function buildVersionsFromRow(row: Omit<TrainingDatasetRecord, 'versions'>): Dat
       trainRatio: row.trainRatio,
       sampleCount: Math.max(10, Math.floor(row.sampleCount * scale)),
       charCount: Math.max(1000, Math.floor(row.charCount * scale)),
+      description: isLatest ? row.description : '',
       createdAt: row.createdAt,
     })
   }
@@ -698,18 +700,26 @@ const TrainingDataset: React.FC = () => {
 
   const handleUpdateDatasetMeta = async (
     record: TrainingDatasetRecord,
-    value: { name?: string; description?: string },
+    value: { name?: string },
   ) => {
     const nextName = value.name ?? record.name
-    const nextDescription = value.description ?? record.description ?? ''
     await dataServiceApi.updateDatasetMeta(datasetTab === 'validation' ? 'validation' : 'training', record.id, {
       name: nextName,
-      description: nextDescription,
+      description: record.description ?? '',
     })
 
     if (isDetailRoute && selectedRecord?.id === record.id && value.name && value.name !== record.name) {
       navigate(`/datasets/training/${encodeURIComponent(nextName)}${datasetTab === 'validation' ? '?key=validation' : ''}`, { replace: true })
     }
+  }
+
+  const handleUpdateDatasetVersionDescription = async (record: TrainingDatasetRecord, versionId: string, description: string) => {
+    await dataServiceApi.updateDatasetVersionDescription(
+      datasetTab === 'validation' ? 'validation' : 'training',
+      record.id,
+      versionId,
+      { description },
+    )
   }
 
   /** 从详情弹窗进入增加版本：使用列表中的最新行数据，避免详情态与列表不同步 */
@@ -766,21 +776,6 @@ const TrainingDataset: React.FC = () => {
           placeholder="请输入数据集名称"
           onTextClick={() => handleOpenDetail(record)}
           onSave={name => handleUpdateDatasetMeta(record, { name })}
-        />
-      ),
-    },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-      width: 220,
-      render: (value, record) => (
-        <TaskMetadataEditor
-          value={value}
-          emptyText="暂无描述"
-          placeholder="请输入描述"
-          type="secondary"
-          onSave={description => handleUpdateDatasetMeta(record, { description })}
         />
       ),
     },
@@ -1359,12 +1354,15 @@ const TrainingDataset: React.FC = () => {
                   <Text type="secondary">描述：</Text>
                   <div style={{ display: 'inline-flex', minWidth: 260, maxWidth: '100%', verticalAlign: 'middle' }}>
                     <TaskMetadataEditor
-                      value={selectedRecord.description}
+                      value={activeVersion?.description ?? selectedRecord.description}
                       emptyText="暂无描述"
                       placeholder="请输入描述"
                       type="secondary"
                       alwaysShowEdit
-                      onSave={description => handleUpdateDatasetMeta(selectedRecord, { description })}
+                      onSave={description => {
+                        if (!activeVersion) return
+                        return handleUpdateDatasetVersionDescription(selectedRecord, activeVersion.id, description)
+                      }}
                     />
                   </div>
                 </div>
@@ -1572,7 +1570,7 @@ const TrainingDataset: React.FC = () => {
             columns={columns}
             dataSource={listResult.items}
             loading={listLoading}
-            scroll={{ x: 1320 }}
+            scroll={{ x: 1100 }}
             tableLayout="fixed"
             pagination={{
               current: page,
