@@ -678,17 +678,9 @@ const InferenceResult: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
             <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/inference')}>返回列表</Button>
             <div>
-              <div style={{ width: 500, maxWidth: 'min(500px, 46vw)' }}>
-                <TaskMetadataEditor
-                  value={selectedRecord.name}
-                  required
-                  maxLength={80}
-                  strong
-                  alwaysShowEdit
-                  placeholder="请输入数据集名称"
-                  onSave={name => dataServiceApi.updateInferenceResultMeta(selectedRecord.id, { name, description: selectedRecord.description })}
-                />
-              </div>
+              <Text strong style={{ display: 'block', fontSize: 22, color: '#0f172a', lineHeight: 1.25 }}>
+                {selectedRecord.name}
+              </Text>
               <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 14, lineHeight: 1.7 }}>
                 查看推理结果集的任务状态、来源模型和推理明细。
               </Text>

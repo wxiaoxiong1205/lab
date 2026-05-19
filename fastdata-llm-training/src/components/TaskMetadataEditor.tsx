@@ -111,10 +111,10 @@ const TaskMetadataEditor: React.FC<TaskMetadataEditorProps> = ({
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, width: '100%' }}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0, maxWidth: '100%', width: 'fit-content' }}
     >
       <Tooltip title={displayValue || emptyText}>
-        <div style={{ minWidth: 0, flex: 1 }}>{textNode}</div>
+        <div style={{ minWidth: 0, flex: '0 1 auto' }}>{textNode}</div>
       </Tooltip>
       <Tooltip title="编辑">
         <Button

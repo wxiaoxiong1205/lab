@@ -1185,17 +1185,9 @@ const TrainingDataset: React.FC = () => {
               返回列表
             </Button>
             <div>
-              <div style={{ width: 460, maxWidth: 'min(460px, 46vw)' }}>
-                <TaskMetadataEditor
-                  value={selectedRecord.name}
-                  required
-                  maxLength={64}
-                  strong
-                  alwaysShowEdit
-                  placeholder="请输入数据集名称"
-                  onSave={name => handleUpdateDatasetMeta(selectedRecord, { name })}
-                />
-              </div>
+              <Text strong style={{ display: 'block', fontSize: 22, color: '#0f172a', lineHeight: 1.25 }}>
+                {selectedRecord.name}
+              </Text>
               <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 14, lineHeight: 1.7 }}>
                 查看训练数据集版本、基本信息和样本详情。
               </Text>
