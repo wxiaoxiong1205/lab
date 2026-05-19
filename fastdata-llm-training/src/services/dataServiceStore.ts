@@ -46,6 +46,7 @@ export interface DatasetVersionRecord {
 export interface DatasetRecord {
   id: string
   name: string
+  description?: string
   versionStatus: string
   latestVersion: string
   dataUsage: DataUsage
@@ -290,6 +291,7 @@ function makeDataset(params: {
   return {
     id,
     name,
+    description,
     versionStatus: '处理完成',
     latestVersion,
     dataUsage,
@@ -539,7 +541,7 @@ function createDatasetVersion(
 export const dataServiceActions = {
   createDataset(
     kind: 'training' | 'validation' | 'test',
-    params: { name: string; dataUsage: TrainingDatasetUsage | '文本生成' | '图像理解'; dataFormat: 'PROMPT_RESPONSE' | 'ROLE_BASED' | 'ALPACA' },
+    params: { name: string; description?: string; dataUsage: TrainingDatasetUsage | '文本生成' | '图像理解'; dataFormat: 'PROMPT_RESPONSE' | 'ROLE_BASED' | 'ALPACA' },
   ) {
     update(draft => {
       const createdAt = nowText()
@@ -547,6 +549,7 @@ export const dataServiceActions = {
       const next: DatasetRecord = {
         id: `${kind}-${Date.now()}`,
         name: params.name,
+        description: params.description ?? '',
         versionStatus: '处理完成',
         latestVersion: 'V1',
         dataUsage: normalizedUsage,
@@ -630,6 +633,21 @@ export const dataServiceActions = {
       if (kind === 'training') draft.trainingDatasets = draft.trainingDatasets.filter(item => item.id !== id)
       else if (kind === 'validation') draft.validationDatasets = draft.validationDatasets.filter(item => item.id !== id)
       else draft.testDatasets = draft.testDatasets.filter(item => item.id !== id)
+    })
+  },
+
+  updateDatasetMeta(kind: 'training' | 'validation' | 'test', id: string, value: { name: string; description?: string }) {
+    update(draft => {
+      const list =
+        kind === 'training'
+          ? draft.trainingDatasets
+          : kind === 'validation'
+            ? draft.validationDatasets
+            : draft.testDatasets
+      const target = list.find(item => item.id === id)
+      if (!target) return
+      target.name = value.name
+      target.description = value.description ?? ''
     })
   },
 

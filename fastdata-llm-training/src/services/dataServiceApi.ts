@@ -25,6 +25,7 @@ export interface DatasetOption {
 
 export interface CreateDatasetParams {
   name: string
+  description?: string
   dataUsage: TrainingDatasetUsage | '文本生成' | '图像理解'
   dataFormat: 'PROMPT_RESPONSE' | 'ROLE_BASED' | 'ALPACA'
 }
@@ -397,6 +398,20 @@ export const dataServiceApi = {
 
     await delay()
     dataServiceActions.deleteDataset(kind, id)
+  },
+
+  async updateDatasetMeta(kind: DatasetKind, id: string, params: UpdateTaskMetaParams): Promise<void> {
+    const snapshot = await requestSnapshot(`${API_ROOT}/datasets/${kind}/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(params),
+    })
+
+    if (syncSnapshot(snapshot)) {
+      return
+    }
+
+    await delay()
+    dataServiceActions.updateDatasetMeta(kind, id, params)
   },
 
   async deleteDatasetDetailRow(kind: DatasetKind, id: string, params: DeleteDatasetDetailRowParams): Promise<void> {

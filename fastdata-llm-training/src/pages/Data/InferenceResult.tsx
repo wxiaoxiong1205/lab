@@ -678,7 +678,17 @@ const InferenceResult: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
             <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/inference')}>返回列表</Button>
             <div>
-              <Text strong style={{ display: 'block', fontSize: 26, color: '#0f172a', lineHeight: 1.15 }}>{selectedRecord.name}</Text>
+              <div style={{ width: 500, maxWidth: 'min(500px, 46vw)' }}>
+                <TaskMetadataEditor
+                  value={selectedRecord.name}
+                  required
+                  maxLength={80}
+                  strong
+                  alwaysShowEdit
+                  placeholder="请输入数据集名称"
+                  onSave={name => dataServiceApi.updateInferenceResultMeta(selectedRecord.id, { name, description: selectedRecord.description })}
+                />
+              </div>
               <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 14, lineHeight: 1.7 }}>
                 查看推理结果集的任务状态、来源模型和推理明细。
               </Text>
@@ -713,7 +723,17 @@ const InferenceResult: React.FC = () => {
 
         <Card title="基本信息" style={{ ...sectionCardStyle, marginBottom: 18 }}>
           <Descriptions column={2} bordered size="small">
-            <Descriptions.Item label="数据集名称" span={2}>{selectedRecord.name}</Descriptions.Item>
+            <Descriptions.Item label="数据集名称" span={2}>
+              <TaskMetadataEditor
+                value={selectedRecord.name}
+                required
+                maxLength={80}
+                strong
+                alwaysShowEdit
+                placeholder="请输入数据集名称"
+                onSave={name => dataServiceApi.updateInferenceResultMeta(selectedRecord.id, { name, description: selectedRecord.description })}
+              />
+            </Descriptions.Item>
             <Descriptions.Item label="推理进度">
               <Tag color={TASK_LIFECYCLE_TAG[selectedRecord.progress].color}>{TASK_LIFECYCLE_TAG[selectedRecord.progress].label}</Tag>
             </Descriptions.Item>
@@ -726,7 +746,16 @@ const InferenceResult: React.FC = () => {
             <Descriptions.Item label="导入文件">{selectedRecord.importFile || '-'}</Descriptions.Item>
             <Descriptions.Item label="数据量">{selectedRecord.dataVolume}</Descriptions.Item>
             <Descriptions.Item label="创建时间">{selectedRecord.createdAt}</Descriptions.Item>
-            <Descriptions.Item label="描述" span={2}>{selectedRecord.description || '-'}</Descriptions.Item>
+            <Descriptions.Item label="描述" span={2}>
+              <TaskMetadataEditor
+                value={selectedRecord.description}
+                emptyText="暂无描述"
+                placeholder="请输入描述"
+                type="secondary"
+                alwaysShowEdit
+                onSave={description => dataServiceApi.updateInferenceResultMeta(selectedRecord.id, { name: selectedRecord.name, description })}
+              />
+            </Descriptions.Item>
           </Descriptions>
         </Card>
 

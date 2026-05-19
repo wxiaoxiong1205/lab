@@ -739,6 +739,26 @@ const DataAnnotation: React.FC = () => {
     )
   }
 
+  const buildDpoAiAnswer = (record: AnnotationSample, field: 'chosen' | 'rejected') => {
+    const isRejected = field === 'rejected'
+    if (record.dpoFormat === 'alpaca') {
+      const context = record.input?.trim() ? `，并结合输入“${record.input.trim()}”` : ''
+      return isRejected
+        ? `这是一个较弱的回复：仅简单回应“${record.instruction || record.prompt}”，缺少必要解释、边界说明和可执行建议。`
+        : `针对“${record.instruction || record.prompt}”${context}，给出清晰、稳妥且可执行的回答，覆盖关键事实并避免夸大承诺。`
+    }
+
+    const userMessage = record.messages?.find(item => item.role === 'user')?.content ?? record.prompt
+    return isRejected
+      ? `这是一个不推荐的回复：对“${userMessage}”回应过于笼统，未充分处理用户诉求，也缺少必要的风险提示。`
+      : `我会先准确回应“${userMessage}”中的核心诉求，再补充必要背景、处理步骤和边界说明，使回复更完整、可信且可复核。`
+  }
+
+  const handleDpoAiAnnotate = (record: AnnotationSample, field: 'chosen' | 'rejected') => {
+    handleDpoAnswerChange(record.id, field, buildDpoAiAnswer(record, field))
+    message.success(`${field === 'chosen' ? 'Chosen' : 'Rejected'} 已由 AI 标注生成`)
+  }
+
   const handleCompleteSample = (sampleId: string) => {
     const targetSample = annotationSamples.find(item => item.id === sampleId)
     const answerComplete = targetSample?.dpoFormat
@@ -1014,13 +1034,26 @@ const DataAnnotation: React.FC = () => {
     }
 
     return (
-      <Input.TextArea
-        value={record[field]}
-        disabled={submitted}
-        autoSize={{ minRows: 5, maxRows: 8 }}
-        placeholder={`请输入偏好样本中的 ${title} 回复`}
-        onChange={event => handleDpoAnswerChange(record.id, field, event.target.value)}
-      />
+      <div className="dpo-ai-answer-field">
+        <Input.TextArea
+          value={record[field]}
+          disabled={submitted}
+          autoSize={{ minRows: 5, maxRows: 8 }}
+          placeholder={field === 'chosen' ? '期望的模型输出' : '不期望的模型输出'}
+          onChange={event => handleDpoAnswerChange(record.id, field, event.target.value)}
+          className="dpo-ai-answer-input"
+        />
+        {!submitted && (
+          <Button
+            type="primary"
+            icon={<RobotOutlined />}
+            className="dpo-ai-answer-button"
+            onClick={() => handleDpoAiAnnotate(record, field)}
+          >
+            AI标注
+          </Button>
+        )}
+      </div>
     )
   }
 
@@ -2178,6 +2211,41 @@ const DataAnnotation: React.FC = () => {
 
     return (
       <>
+        <style>
+          {`
+            .dpo-ai-answer-field {
+              position: relative;
+            }
+            .dpo-ai-answer-field .dpo-ai-answer-input {
+              transition: border-color 0.16s ease, box-shadow 0.16s ease;
+            }
+            .dpo-ai-answer-field:hover .dpo-ai-answer-input,
+            .dpo-ai-answer-field:focus-within .dpo-ai-answer-input {
+              border-color: #1677ff;
+              box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.12);
+            }
+            .dpo-ai-answer-button {
+              position: absolute;
+              right: 10px;
+              bottom: 10px;
+              height: 36px;
+              padding: 0 14px;
+              border-radius: 8px;
+              font-weight: 600;
+              opacity: 0;
+              pointer-events: none;
+              transform: translateY(4px);
+              transition: opacity 0.16s ease, transform 0.16s ease;
+              box-shadow: 0 6px 16px rgba(22, 119, 255, 0.22);
+            }
+            .dpo-ai-answer-field:hover .dpo-ai-answer-button,
+            .dpo-ai-answer-field:focus-within .dpo-ai-answer-button {
+              opacity: 1;
+              pointer-events: auto;
+              transform: translateY(0);
+            }
+          `}
+        </style>
         <div style={{ padding: '28px 32px', minHeight: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 22 }}>
             <div>

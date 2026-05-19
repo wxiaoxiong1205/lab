@@ -15,6 +15,7 @@ import {
 import { getDatasetFormatLabel, isDpoUsage, normalizeDatasetFormat } from '../../services/datasetFormats'
 import { formatResourceLockMessage, getCreatorDeletePermission, getDatasetReferenceLocks } from '../../services/resourceReferenceGuard'
 import ResumableUpload from '../../components/ResumableUpload'
+import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 
 const { Text } = Typography
 const { TextArea } = Input
@@ -47,6 +48,7 @@ export type DatasetVersionRow = {
 export type TrainingDatasetRecord = {
   id: string
   name: string
+  description?: string
   versionStatus: string
   latestVersion: string
   dataUsage: string
@@ -653,6 +655,7 @@ const TrainingDataset: React.FC = () => {
       const datasetUsage = resolveDatasetUsageFromPath(values.dataUsage) ?? 'SFT-文本生成'
       await dataServiceApi.createDataset(datasetTab === 'validation' ? 'validation' : 'training', {
         name: values.name,
+        description: values.description,
         dataUsage: datasetUsage,
         dataFormat: values.dataFormat,
       })
@@ -691,6 +694,22 @@ const TrainingDataset: React.FC = () => {
 
   const handleOpenAddVersion = (record: TrainingDatasetRecord) => {
     navigate(`/datasets/training/${encodeURIComponent(record.name)}/new-version${datasetTab === 'validation' ? '?key=validation' : ''}`)
+  }
+
+  const handleUpdateDatasetMeta = async (
+    record: TrainingDatasetRecord,
+    value: { name?: string; description?: string },
+  ) => {
+    const nextName = value.name ?? record.name
+    const nextDescription = value.description ?? record.description ?? ''
+    await dataServiceApi.updateDatasetMeta(datasetTab === 'validation' ? 'validation' : 'training', record.id, {
+      name: nextName,
+      description: nextDescription,
+    })
+
+    if (isDetailRoute && selectedRecord?.id === record.id && value.name && value.name !== record.name) {
+      navigate(`/datasets/training/${encodeURIComponent(nextName)}${datasetTab === 'validation' ? '?key=validation' : ''}`, { replace: true })
+    }
   }
 
   /** 从详情弹窗进入增加版本：使用列表中的最新行数据，避免详情态与列表不同步 */
@@ -733,7 +752,38 @@ const TrainingDataset: React.FC = () => {
   }
 
   const columns: ColumnsType<TrainingDatasetRecord> = [
-    { title: '数据集名称', dataIndex: 'name', key: 'name', width: 200, ellipsis: true },
+    {
+      title: '数据集名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 240,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          required
+          maxLength={64}
+          strong
+          placeholder="请输入数据集名称"
+          onTextClick={() => handleOpenDetail(record)}
+          onSave={name => handleUpdateDatasetMeta(record, { name })}
+        />
+      ),
+    },
+    {
+      title: '描述',
+      dataIndex: 'description',
+      key: 'description',
+      width: 220,
+      render: (value, record) => (
+        <TaskMetadataEditor
+          value={value}
+          emptyText="暂无描述"
+          placeholder="请输入描述"
+          type="secondary"
+          onSave={description => handleUpdateDatasetMeta(record, { description })}
+        />
+      ),
+    },
     {
       title: '最新版本状态',
       dataIndex: 'versionStatus',
@@ -1140,7 +1190,17 @@ const TrainingDataset: React.FC = () => {
               返回列表
             </Button>
             <div>
-              <Text strong style={{ display: 'block', fontSize: 26, color: '#0f172a', lineHeight: 1.15 }}>{selectedRecord.name}</Text>
+              <div style={{ width: 460, maxWidth: 'min(460px, 46vw)' }}>
+                <TaskMetadataEditor
+                  value={selectedRecord.name}
+                  required
+                  maxLength={64}
+                  strong
+                  alwaysShowEdit
+                  placeholder="请输入数据集名称"
+                  onSave={name => handleUpdateDatasetMeta(selectedRecord, { name })}
+                />
+              </div>
               <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 14, lineHeight: 1.7 }}>
                 查看训练数据集版本、基本信息和样本详情。
               </Text>
@@ -1276,13 +1336,38 @@ const TrainingDataset: React.FC = () => {
               style={{ borderRadius: 18 }}
             >
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', rowGap: 26, columnGap: 24 }}>
-                <div><Text type="secondary">数据集名称：</Text><Text strong>{selectedRecord.name}</Text></div>
+                <div>
+                  <Text type="secondary">数据集名称：</Text>
+                  <div style={{ display: 'inline-flex', minWidth: 260, maxWidth: '100%', verticalAlign: 'middle' }}>
+                    <TaskMetadataEditor
+                      value={selectedRecord.name}
+                      required
+                      maxLength={64}
+                      strong
+                      alwaysShowEdit
+                      placeholder="请输入数据集名称"
+                      onSave={name => handleUpdateDatasetMeta(selectedRecord, { name })}
+                    />
+                  </div>
+                </div>
                 <div><Text type="secondary">数据量：</Text><Text strong>{activeVersion?.sampleCount ?? selectedRecord.sampleCount} 条</Text></div>
                 <div><Text type="secondary">数据用途：</Text><Text strong>{selectedRecord.dataUsage}</Text></div>
                 <div><Text type="secondary">数据格式：</Text><Tag>{resolveFormatLabel(selectedRecord.dataUsage, selectedRecord.dataFormat)}</Tag></div>
                 <div><Text type="secondary">状态：</Text><Text strong>{activeVersion?.processStatus ?? selectedRecord.versionStatus}</Text></div>
                 <div><Text type="secondary">文件大小：</Text><Text strong>{formatFileSizeMB(activeVersion?.charCount ?? selectedRecord.charCount)}</Text></div>
-                <div><Text type="secondary">描述：</Text><Text strong>-</Text></div>
+                <div>
+                  <Text type="secondary">描述：</Text>
+                  <div style={{ display: 'inline-flex', minWidth: 260, maxWidth: '100%', verticalAlign: 'middle' }}>
+                    <TaskMetadataEditor
+                      value={selectedRecord.description}
+                      emptyText="暂无描述"
+                      placeholder="请输入描述"
+                      type="secondary"
+                      alwaysShowEdit
+                      onSave={description => handleUpdateDatasetMeta(selectedRecord, { description })}
+                    />
+                  </div>
+                </div>
                 <div><Text type="secondary">创建人：</Text><Text strong>{activeVersion?.creator ?? selectedRecord.creator}</Text></div>
                 <div><Text type="secondary">创建时间：</Text><Text strong>{activeVersion?.createdAt ?? selectedRecord.createdAt}</Text></div>
                 <div><Text type="secondary">数据属性：</Text><Text strong>-</Text></div>
@@ -1487,7 +1572,7 @@ const TrainingDataset: React.FC = () => {
             columns={columns}
             dataSource={listResult.items}
             loading={listLoading}
-            scroll={{ x: 1100 }}
+            scroll={{ x: 1320 }}
             tableLayout="fixed"
             pagination={{
               current: page,

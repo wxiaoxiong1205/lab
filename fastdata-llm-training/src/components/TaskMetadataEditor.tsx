@@ -12,6 +12,7 @@ type TaskMetadataEditorProps = {
   maxLength?: number
   strong?: boolean
   type?: 'default' | 'secondary'
+  alwaysShowEdit?: boolean
   onSave: (value: string) => void | Promise<void>
   onTextClick?: () => void
 }
@@ -24,6 +25,7 @@ const TaskMetadataEditor: React.FC<TaskMetadataEditorProps> = ({
   maxLength = 300,
   strong = false,
   type = 'default',
+  alwaysShowEdit = false,
   onSave,
   onTextClick,
 }) => {
@@ -78,8 +80,8 @@ const TaskMetadataEditor: React.FC<TaskMetadataEditorProps> = ({
           placeholder={placeholder}
           autoFocus
         />
-        <Button type="primary" size="small" icon={<CheckOutlined />} loading={saving} onClick={save} />
         <Button size="small" icon={<CloseOutlined />} disabled={saving} onClick={cancelEdit} />
+        <Button type="primary" size="small" icon={<CheckOutlined />} loading={saving} onClick={save} />
       </Space.Compact>
     )
   }
@@ -123,8 +125,8 @@ const TaskMetadataEditor: React.FC<TaskMetadataEditorProps> = ({
           style={{
             flex: '0 0 auto',
             color: '#1677ff',
-            opacity: hovered ? 1 : 0,
-            pointerEvents: hovered ? 'auto' : 'none',
+            opacity: hovered || alwaysShowEdit ? 1 : 0,
+            pointerEvents: hovered || alwaysShowEdit ? 'auto' : 'none',
             transition: 'opacity 0.16s ease',
           }}
         />
