@@ -40,6 +40,7 @@ import {
 import { type TaskLifecycleStatus } from '../../services/taskLifecycle'
 import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
+import { canAccessResourceData, getOperationDeniedMessage } from '../../services/permissionStore'
 
 const { Text, Title } = Typography
 
@@ -284,6 +285,22 @@ const DataCleaning: React.FC = () => {
     () => getCleaningFieldOptions(selectedCleaningDataset),
     [selectedCleaningDataset],
   )
+  const canOperateCleaningTask = (record?: Pick<CleaningTask, 'creator'> | null) =>
+    canAccessResourceData('llm', record?.creator).allowed
+  const warnNoCleaningDataAccess = (record?: Pick<CleaningTask, 'creator'> | null) => {
+    const permission = canAccessResourceData('llm', record?.creator)
+    if (permission.allowed) {
+      return true
+    }
+    message.warning(getOperationDeniedMessage(permission.reason))
+    return false
+  }
+  const updateCleaningTaskMeta = (record: CleaningTask, value: { name: string; description?: string }) => {
+    if (!warnNoCleaningDataAccess(record)) {
+      return
+    }
+    return dataServiceApi.updateCleaningTaskMeta(record.id, value)
+  }
 
   const filteredItems = useMemo(
     () =>
@@ -307,7 +324,8 @@ const DataCleaning: React.FC = () => {
           maxLength={80}
           strong
           placeholder="请输入任务名称"
-          onSave={name => dataServiceApi.updateCleaningTaskMeta(record.id, { name, description: record.description })}
+          disabled={!canOperateCleaningTask(record)}
+          onSave={name => updateCleaningTaskMeta(record, { name, description: record.description })}
         />
       ),
     },
@@ -322,7 +340,8 @@ const DataCleaning: React.FC = () => {
           emptyText="暂无描述"
           placeholder="请输入任务描述"
           type="secondary"
-          onSave={description => dataServiceApi.updateCleaningTaskMeta(record.id, { name: record.name, description })}
+          disabled={!canOperateCleaningTask(record)}
+          onSave={description => updateCleaningTaskMeta(record, { name: record.name, description })}
         />
       ),
     },
@@ -345,8 +364,20 @@ const DataCleaning: React.FC = () => {
           >
             启动
           </Button>
-          <Button type="link" size="small" onClick={() => setDetailTask(record)}>查看详情</Button>
-          <Button type="link" size="small" disabled={record.status !== '已终止'}>编辑</Button>
+          <Button type="link" size="small" onClick={() => {
+            if (!warnNoCleaningDataAccess(record)) {
+              return
+            }
+            setDetailTask(record)
+          }}>查看详情</Button>
+          <Button
+            type="link"
+            size="small"
+            disabled={record.status !== '已终止'}
+            onClick={() => warnNoCleaningDataAccess(record)}
+          >
+            编辑
+          </Button>
           {record.status === '启动中' && <Button type="link" size="small" disabled>终止</Button>}
           {record.status !== '启动中' && (
             <Popconfirm
@@ -354,13 +385,21 @@ const DataCleaning: React.FC = () => {
               okText="删除"
               cancelText="取消"
               onConfirm={async () => {
+                if (!warnNoCleaningDataAccess(record)) {
+                  return
+                }
                 await dataServiceApi.deleteCleaningTask(record.id)
               }}
             >
               <Button type="link" size="small" danger>删除</Button>
             </Popconfirm>
           )}
-          <Button type="link" size="small" icon={<EllipsisOutlined />} onClick={() => setDetailTask(record)} />
+          <Button type="link" size="small" icon={<EllipsisOutlined />} onClick={() => {
+            if (!warnNoCleaningDataAccess(record)) {
+              return
+            }
+            setDetailTask(record)
+          }} />
         </Space>
       ),
     },
@@ -833,7 +872,16 @@ const DataCleaning: React.FC = () => {
                       title="清洗结果"
                       style={{ borderRadius: 14 }}
                       extra={
-                        <Button icon={<DownloadOutlined />} disabled={detailTask.status !== '已完成'}>
+                        <Button
+                          icon={<DownloadOutlined />}
+                          disabled={detailTask.status !== '已完成'}
+                          onClick={() => {
+                            if (!warnNoCleaningDataAccess(detailTask)) {
+                              return
+                            }
+                            message.success('已开始下载清洗结果')
+                          }}
+                        >
                           下载数据
                         </Button>
                       }

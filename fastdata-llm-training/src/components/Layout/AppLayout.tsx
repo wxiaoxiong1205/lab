@@ -22,12 +22,14 @@ import DesignDocPanel from '../DesignDoc/DesignDocPanel'
 import { getPageDesignDoc } from '../../docs/pageDocs'
 import {
   canViewCurrentRoute,
+  getAccessibleProjects,
   getCurrentProject,
   getCurrentProjectMode,
   getCurrentUser,
   getOperationDeniedMessage,
   getUserRoleLabels,
   hasMenuPermission,
+  setCurrentProject,
   usePermissionStore,
 } from '../../services/permissionStore'
 import { resolveRouteAccess } from '../../services/permissionCatalog'
@@ -136,7 +138,6 @@ const systemMenuSource: MenuItemList = [
 ]
 
 const llmTopNavItems = [
-  { key: '/home', label: '首页', icon: <HomeOutlined />, route: '/home' },
   { key: 'data-services', label: '数据服务', icon: <DatabaseOutlined />, route: '/datasets' },
   { key: 'model-training', label: '模型训练', icon: <CloudServerOutlined />, route: '/finetune/notebooks' },
   { key: 'evaluation', label: '模型评估', icon: <BarChartOutlined />, route: '/effect-evaluation' },
@@ -160,6 +161,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const permissionState = usePermissionStore()
   const isDocsRoute = location.pathname.startsWith('/docs')
   const isWorkspaceRoute = location.pathname === '/workspace'
+  const isTaskOverviewRoute = location.pathname === '/task-overview'
   const isAdminRoute = location.pathname.startsWith('/admin')
   const isOpenPlatformRoute = location.pathname.startsWith('/open-platform')
   const isAnnotationWorkbenchRoute = /^\/machine-annotation\/(online|annotate|review)\//.test(location.pathname)
@@ -205,22 +207,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       })
       .filter(Boolean) as MenuItemList
 
-  const activeTopTab = isAdminRoute ? 'system' : 'workspace'
-  const showProjectMenus = !isAnnotationWorkbenchRoute && !isDocsRoute && !isWorkspaceRoute && !isAdminRoute && !isOpenPlatformRoute && Boolean(currentProject)
-  const projectTopNavItems = showProjectMenus
-    ? (currentProjectMode === 'ml' ? mlTopNavItems : llmTopNavItems)
+  const activeTopTab = isTaskOverviewRoute ? 'task-overview' : isAdminRoute ? 'system' : 'workspace'
+  const showProjectTopNav = !isAnnotationWorkbenchRoute && !isDocsRoute && !isWorkspaceRoute && !isAdminRoute && !isOpenPlatformRoute && Boolean(currentProject)
+  const showProjectMenus = showProjectTopNav && !isTaskOverviewRoute
+  const projectTopNavItems = showProjectTopNav
+    ? (isTaskOverviewRoute ? [...llmTopNavItems, ...mlTopNavItems] : currentProjectMode === 'ml' ? mlTopNavItems : llmTopNavItems)
     : []
 
   const activeProjectTopKey = useMemo(() => {
-    if (!showProjectMenus) {
+    if (!showProjectTopNav || isTaskOverviewRoute) {
       return null
     }
     const currentMenuKey = resolveRouteAccess(location.pathname)?.menuKey ?? location.pathname
     if (currentProjectMode === 'ml') {
       return 'machine-learning'
-    }
-    if (currentMenuKey === '/home') {
-      return '/home'
     }
     for (const item of projectMenuSource) {
       if (!item || !('key' in item) || !('children' in item) || !item.children) continue
@@ -239,14 +239,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         }
       }
     }
-    return '/home'
-  }, [currentProjectMode, location.pathname, showProjectMenus])
+    return 'data-services'
+  }, [currentProjectMode, isTaskOverviewRoute, location.pathname, showProjectTopNav])
 
   const activeMenuItems = useMemo(() => {
     if (isAdminRoute) {
       return filterMenuItems(systemMenuSource)
     }
-    if (!showProjectMenus || !activeProjectTopKey || activeProjectTopKey === '/home') {
+    if (!showProjectMenus || !activeProjectTopKey) {
       return []
     }
 
@@ -358,6 +358,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     window.open(path, '_blank', 'noopener,noreferrer')
   }
 
+  const openTaskOverview = () => {
+    if (!currentProject) {
+      const firstProject = getAccessibleProjects(permissionState)[0]
+      if (firstProject) {
+        setCurrentProject(firstProject.id, 'llm')
+      }
+    }
+    navigate('/task-overview')
+  }
+
   const compactHeader = viewportWidth < 1280
   const compressedHeader = viewportWidth < 1180
   const ultraCompactHeader = viewportWidth < 1080
@@ -467,27 +477,59 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             justifySelf: 'center',
           }}
         >
-          {isStandaloneUtilityRoute ? null : showProjectMenus ? (
-            projectTopNavItems.map(item => (
+          {isStandaloneUtilityRoute ? null : showProjectTopNav ? (
+            <>
               <Button
-                key={item.key}
-                type={activeProjectTopKey === item.key ? 'primary' : 'text'}
-                icon={item.icon}
-                onClick={() => navigate(item.route)}
+                type={isTaskOverviewRoute ? 'primary' : 'text'}
+                icon={<HomeOutlined />}
+                onClick={openTaskOverview}
                 style={{
                   height: navButtonHeight,
                   paddingInline: navButtonPadding,
                   borderRadius: 16,
                   fontWeight: 700,
                   flexShrink: 0,
-                  boxShadow: activeProjectTopKey === item.key ? '0 10px 24px rgba(37, 99, 235, 0.18)' : 'none',
+                  boxShadow: isTaskOverviewRoute ? '0 10px 24px rgba(37, 99, 235, 0.18)' : 'none',
                 }}
               >
-                {item.label}
+                任务概览
               </Button>
-            ))
+              {projectTopNavItems.map(item => (
+                <Button
+                  key={item.key}
+                  type={activeProjectTopKey === item.key ? 'primary' : 'text'}
+                  icon={item.icon}
+                  onClick={() => navigate(item.route)}
+                  style={{
+                    height: navButtonHeight,
+                    paddingInline: navButtonPadding,
+                    borderRadius: 16,
+                    fontWeight: 700,
+                    flexShrink: 0,
+                    boxShadow: activeProjectTopKey === item.key ? '0 10px 24px rgba(37, 99, 235, 0.18)' : 'none',
+                  }}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </>
           ) : (
             <>
+              <Button
+                type={activeTopTab === 'task-overview' ? 'primary' : 'text'}
+                icon={<HomeOutlined />}
+                onClick={openTaskOverview}
+                style={{
+                  height: navButtonHeight,
+                  paddingInline: ultraCompactHeader ? 12 : 18,
+                  borderRadius: 16,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                  boxShadow: activeTopTab === 'task-overview' ? '0 10px 24px rgba(37, 99, 235, 0.18)' : 'none',
+                }}
+              >
+                任务概览
+              </Button>
               <Button
                 type={activeTopTab === 'workspace' ? 'primary' : 'text'}
                 icon={<FolderOpenOutlined />}

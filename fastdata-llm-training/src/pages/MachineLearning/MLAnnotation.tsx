@@ -49,7 +49,7 @@ import {
   ZoomInOutlined,
 } from '@ant-design/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { getCurrentProjectMember, getCurrentUser, usePermissionStore } from '../../services/permissionStore'
+import { canAccessResourceData, getCurrentProjectMember, getCurrentUser, getOperationDeniedMessage, usePermissionStore } from '../../services/permissionStore'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 
 const { Title, Text } = Typography
@@ -736,6 +736,16 @@ const MLAnnotation: React.FC = () => {
   const [editingLabel, setEditingLabel] = useState<LabelItem | null>(null)
   const [labelDraftName, setLabelDraftName] = useState('')
   const currentOnlineTask = onlineTaskId ? onlineRows.find(item => item.id === onlineTaskId) : undefined
+  const canOperateAnnotationResource = (record?: Pick<MLAnnotationRecord | MultiAnnotationRecord, 'creator'> | null) =>
+    canAccessResourceData('machine', record?.creator).allowed
+  const warnNoAnnotationResourceAccess = (record?: Pick<MLAnnotationRecord | MultiAnnotationRecord, 'creator'> | null) => {
+    const permission = canAccessResourceData('machine', record?.creator)
+    if (permission.allowed) {
+      return true
+    }
+    message.warning(getOperationDeniedMessage(permission.reason))
+    return false
+  }
   const visibleAnnotationAssignments = canManageMultiAnnotation
     ? annotationAssignments
     : annotationAssignments.filter(item => item.member === currentUser.account)
@@ -818,7 +828,13 @@ const MLAnnotation: React.FC = () => {
           maxLength={80}
           strong
           placeholder="请输入任务名称"
-          onSave={name => setOnlineRows(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))}
+          disabled={!canOperateAnnotationResource(record)}
+          onSave={name => {
+            if (!warnNoAnnotationResourceAccess(record)) {
+              return
+            }
+            setOnlineRows(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))
+          }}
         />
       ),
     },
@@ -833,7 +849,13 @@ const MLAnnotation: React.FC = () => {
           emptyText="暂无描述"
           placeholder="请输入任务描述"
           type="secondary"
-          onSave={description => setOnlineRows(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))}
+          disabled={!canOperateAnnotationResource(record)}
+          onSave={description => {
+            if (!warnNoAnnotationResourceAccess(record)) {
+              return
+            }
+            setOnlineRows(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))
+          }}
         />
       ),
     },
@@ -852,8 +874,36 @@ const MLAnnotation: React.FC = () => {
       width: 130,
       render: (_, record) => (
         <Space size={0}>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/machine-annotation/online/${record.id}`)}>详情</Button>
-          <Button type="link" size="small" icon={<DeleteOutlined />} disabled={record.status === '已完成'} danger>删除</Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => {
+              const permission = canAccessResourceData('machine', record.creator)
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+                return
+              }
+              navigate(`/machine-annotation/online/${record.id}`)
+            }}
+          >
+            详情
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<DeleteOutlined />}
+            disabled={record.status === '已完成'}
+            danger
+            onClick={() => {
+              const permission = canAccessResourceData('machine', record.creator)
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+              }
+            }}
+          >
+            删除
+          </Button>
         </Space>
       ),
     },
@@ -872,7 +922,13 @@ const MLAnnotation: React.FC = () => {
           maxLength={80}
           strong
           placeholder="请输入标注任务名称"
-          onSave={name => setMultiRows(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))}
+          disabled={!canOperateAnnotationResource(record)}
+          onSave={name => {
+            if (!warnNoAnnotationResourceAccess(record)) {
+              return
+            }
+            setMultiRows(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))
+          }}
         />
       ),
     },
@@ -887,7 +943,13 @@ const MLAnnotation: React.FC = () => {
           emptyText="暂无描述"
           placeholder="请输入任务描述"
           type="secondary"
-          onSave={description => setMultiRows(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))}
+          disabled={!canOperateAnnotationResource(record)}
+          onSave={description => {
+            if (!warnNoAnnotationResourceAccess(record)) {
+              return
+            }
+            setMultiRows(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))
+          }}
         />
       ),
     },
@@ -904,10 +966,61 @@ const MLAnnotation: React.FC = () => {
       width: 280,
       render: (_, record) => (
         <Space size={0}>
-          <Button type="link" size="small" icon={<SendOutlined />} disabled={record.status !== '未发布'}>发布</Button>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setDetailRecord(record)}>详情</Button>
-          <Button type="link" size="small" icon={<TeamOutlined />} onClick={() => setMemberRecord(record)}>任务成员</Button>
-          <Button type="link" size="small" icon={<DeleteOutlined />} disabled={record.status === '已完成'} danger>删除</Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<SendOutlined />}
+            disabled={record.status !== '未发布'}
+            onClick={() => {
+              const permission = canAccessResourceData('machine', record.creator)
+              if (!permission.allowed) message.warning(getOperationDeniedMessage(permission.reason))
+            }}
+          >
+            发布
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => {
+              const permission = canAccessResourceData('machine', record.creator)
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+                return
+              }
+              setDetailRecord(record)
+            }}
+          >
+            详情
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<TeamOutlined />}
+            onClick={() => {
+              const permission = canAccessResourceData('machine', record.creator)
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+                return
+              }
+              setMemberRecord(record)
+            }}
+          >
+            任务成员
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<DeleteOutlined />}
+            disabled={record.status === '已完成'}
+            danger
+            onClick={() => {
+              const permission = canAccessResourceData('machine', record.creator)
+              if (!permission.allowed) message.warning(getOperationDeniedMessage(permission.reason))
+            }}
+          >
+            删除
+          </Button>
         </Space>
       ),
     },
@@ -1959,8 +2072,22 @@ const MLAnnotation: React.FC = () => {
       )
     }
 
-    const locked = workbenchSubmitted || currentOnlineTask.status === '已完成'
-    const workbenchKind = getAnnotationWorkbenchKind(currentOnlineTask)
+	    const locked = workbenchSubmitted || currentOnlineTask.status === '已完成'
+	    if (!canOperateAnnotationResource(currentOnlineTask)) {
+	      return (
+	        <div style={{ padding: '24px 32px', minHeight: '100%', background: '#f7f8fa' }}>
+	          <Card style={cardStyle}>
+	            <Result
+	              status="403"
+	              title="权限不足"
+	              subTitle="当前账号仅可操作个人数据/任务，无法进入其他创建人的在线标注任务。"
+	              extra={<Button type="primary" onClick={() => navigate('/machine-annotation')}>返回数据标注</Button>}
+	            />
+	          </Card>
+	        </div>
+	      )
+	    }
+	    const workbenchKind = getAnnotationWorkbenchKind(currentOnlineTask)
     const workbench = workbenchKind === 'text-classification'
       ? renderTextClassificationWorkbench(currentOnlineTask, locked)
       : workbenchKind === 'entity'

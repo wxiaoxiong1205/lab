@@ -10,6 +10,7 @@ import {
   Pagination,
   Progress,
   Radio,
+  Result,
   Select,
   Space,
   Table,
@@ -47,6 +48,7 @@ import {
 } from '../../services/dataServiceApi'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
+import { canAccessResourceData, getOperationDeniedMessage } from '../../services/permissionStore'
 
 const { Text, Title } = Typography
 
@@ -429,6 +431,22 @@ const DataAnnotation: React.FC = () => {
     presencePenalty: 1.0,
   })
   const isMultiCreatePage = location.pathname === '/data-annotation/multi/create'
+  const canOperateAnnotationTask = (record?: Pick<AnnotationTask, 'creator'> | null) =>
+    canAccessResourceData('llm', record?.creator).allowed
+  const warnNoAnnotationDataAccess = (record?: Pick<AnnotationTask, 'creator'> | null) => {
+    const permission = canAccessResourceData('llm', record?.creator)
+    if (permission.allowed) {
+      return true
+    }
+    message.warning(getOperationDeniedMessage(permission.reason))
+    return false
+  }
+  const openAnnotationTask = (record: AnnotationTask, suffix = '') => {
+    if (!warnNoAnnotationDataAccess(record)) {
+      return
+    }
+    navigate(`/data-annotation/${record.id}${suffix}`)
+  }
 
   const selectedDataset = useMemo(
     () =>
@@ -1164,6 +1182,9 @@ const DataAnnotation: React.FC = () => {
   }
 
   const updateAnnotationTaskMeta = async (record: AnnotationTask, value: { name?: string; description?: string }) => {
+    if (!warnNoAnnotationDataAccess(record)) {
+      return
+    }
     const nextRecord = {
       ...record,
       name: value.name ?? record.name,
@@ -1180,6 +1201,9 @@ const DataAnnotation: React.FC = () => {
   }
 
   const handleDeleteAnnotationTask = (record: AnnotationTask) => {
+    if (!warnNoAnnotationDataAccess(record)) {
+      return
+    }
     Modal.confirm({
       title: '确认删除该标注任务？',
       content: `删除后不可恢复：${record.name}`,
@@ -1230,6 +1254,7 @@ const DataAnnotation: React.FC = () => {
           maxLength={80}
           strong
           placeholder="请输入任务名称"
+          disabled={!canOperateAnnotationTask(record)}
           onSave={name => updateAnnotationTaskMeta(record, { name })}
         />
       ),
@@ -1252,7 +1277,7 @@ const DataAnnotation: React.FC = () => {
       width: 210,
       render: (_, record) => (
         <Space size={6}>
-          <Button type="link" size="small" icon={<InfoCircleOutlined />} onClick={() => navigate(`/data-annotation/${record.id}`)}>
+          <Button type="link" size="small" icon={<InfoCircleOutlined />} onClick={() => openAnnotationTask(record)}>
             详情
           </Button>
           <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeleteAnnotationTask(record)}>
@@ -1300,10 +1325,15 @@ const DataAnnotation: React.FC = () => {
           <Button type="link" size="small" icon={<SendOutlined />} disabled={record.status !== '已提交'}>
             发布
           </Button>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/data-annotation/${record.id}`)}>
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openAnnotationTask(record)}>
             详情
           </Button>
-          <Button type="link" size="small" icon={<TeamOutlined />} onClick={() => setMemberModalTask(record)}>
+          <Button type="link" size="small" icon={<TeamOutlined />} onClick={() => {
+            if (!warnNoAnnotationDataAccess(record)) {
+              return
+            }
+            setMemberModalTask(record)
+          }}>
             任务成员
           </Button>
         </Space>
@@ -1327,7 +1357,7 @@ const DataAnnotation: React.FC = () => {
       key: 'action',
       width: 120,
       render: (_, record) => (
-        <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/data-annotation/${record.id}?view=annotation`)}>
+        <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openAnnotationTask(record, '?view=annotation')}>
           详情
         </Button>
       ),
@@ -1350,7 +1380,7 @@ const DataAnnotation: React.FC = () => {
       key: 'action',
       width: 120,
       render: (_, record) => (
-        <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/data-annotation/${record.id}?view=review`)}>
+        <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openAnnotationTask(record, '?view=review')}>
           详情
         </Button>
       ),
@@ -1876,6 +1906,18 @@ const DataAnnotation: React.FC = () => {
 
   if (annotationId) {
     const task = fallbackAnnotationTask
+    if (task && !canOperateAnnotationTask(task)) {
+      return (
+        <div style={{ padding: '28px 32px', minHeight: '100%' }}>
+          <Result
+            status="403"
+            title="权限不足"
+            subTitle="当前账号仅可操作个人数据/任务，无法查看或处理其他创建人的标注任务。"
+            extra={<Button type="primary" onClick={() => navigate(`/data-annotation?dataset_type=${datasetType}`)}>返回列表</Button>}
+          />
+        </div>
+      )
+    }
     const serviceLabel = annotationServiceOptions.find(item => item.value === serviceConfig.service)?.label ?? '-'
     const taskStatus = task ? getAnnotationTaskStatus(task) : '未开始'
     const readonlyDetail = taskStatus === '已完成' || taskStatus === '已提交'

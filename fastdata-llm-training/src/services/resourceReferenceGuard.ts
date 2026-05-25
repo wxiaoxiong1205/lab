@@ -1,7 +1,7 @@
 import { getDataServiceState } from './dataServiceStore'
 import type { DatasetKind } from './dataServiceApi'
 import { getMachineDeploymentState } from './machineDeploymentStore'
-import { getCurrentProjectMember, getCurrentUser, getPermissionState } from './permissionStore'
+import { canAccessResourceData, getCurrentUser, getPermissionState, type DataPermissionDomain } from './permissionStore'
 import { getTrainingTasks } from './trainingTaskStore'
 
 export type ResourceLock = {
@@ -49,21 +49,18 @@ export function formatResourceLockMessage(resourceName: string, locks: ResourceL
   return `${resourceName} 正被任务引用：${topLocks.join('、')}${suffix}。请先删除相关任务或停止引用链后再删除该资源。`
 }
 
-export function getCreatorDeletePermission(creator?: string): ResourceDeletePermission {
+export function getCreatorDeletePermission(creator?: string, domain: DataPermissionDomain = 'llm'): ResourceDeletePermission {
   const permissionState = getPermissionState()
   const currentUser = getCurrentUser(permissionState)
-  const currentProjectMember = getCurrentProjectMember(permissionState)
-  const isTenantAdmin = currentUser.roleKeys.includes('platform_admin')
-  const isProjectAdmin = currentUser.roleKeys.includes('project_admin') || currentProjectMember?.roleKey === 'project_admin'
-  const isOwner = referencesAny(creator, [currentUser.account, currentUser.username])
+  const result = canAccessResourceData(domain, creator, permissionState)
 
-  if (isTenantAdmin || isProjectAdmin || isOwner) {
+  if (result.allowed) {
     return { allowed: true }
   }
 
   return {
     allowed: false,
-    reason: `仅创建人本人、项目管理员或租户管理员可删除该数据。当前登录账号：${currentUser.account}，数据创建人：${creator || '-'}`,
+    reason: `权限不足：当前账号 ${currentUser.account} 仅可操作个人数据/任务，数据创建人：${creator || '-'}`,
   }
 }
 

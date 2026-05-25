@@ -41,7 +41,7 @@ const ProjectSpace: React.FC = () => {
 
   const handleEnterProject = (projectId: string, mode: 'llm' | 'ml') => {
     setCurrentProject(projectId, mode)
-    navigate(mode === 'llm' ? '/home' : '/machine-data-management')
+    navigate(mode === 'llm' ? '/datasets' : '/machine-data-management')
   }
 
   return (

@@ -25,6 +25,7 @@ import {
   InputNumber,
   Progress,
   Radio,
+  Result,
   Select,
   Space,
   Switch,
@@ -61,6 +62,8 @@ import {
 import { dataServiceApi } from '../../services/dataServiceApi'
 import type { InferenceResultRecord as DataServiceInferenceResultRecord } from '../../services/dataServiceStore'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
+import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage } from '../../services/permissionStore'
+import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
 
 const { Text, Title } = Typography
 
@@ -1462,6 +1465,8 @@ const EffectEvaluation: React.FC = () => {
   const [tasks, setTasks] = useState(seedTasks)
   const [inferenceResultOptions, setInferenceResultOptions] = useState<InferenceResultOption[]>(seedInferenceResultOptions)
   const [inferenceResultModalOpen, setInferenceResultModalOpen] = useState(false)
+  const [datasetPickerOpen, setDatasetPickerOpen] = useState(false)
+  const [selectedEvaluationDataset, setSelectedEvaluationDataset] = useState<SelectedDatasetVersionRow | null>(null)
   const [searchValue, setSearchValue] = useState('')
   const [mode, setMode] = useState<EvaluationMode>('auto')
   const [datasetType, setDatasetType] = useState<DatasetType>('text-generation')
@@ -1529,7 +1534,7 @@ const EffectEvaluation: React.FC = () => {
   }
 
   const selectedInferenceResult = Form.useWatch('inferenceResult', form)
-  const selectedSourceType = Form.useWatch('sourceType', form)
+  const selectedSourceType = (Form.useWatch('sourceType', form) as 'existing' | 'new' | undefined) ?? 'existing'
   const selectedDatasetType = (Form.useWatch('datasetType', form) as DatasetType | undefined) ?? datasetType
   const selectedMethods = Form.useWatch('methods', form) as string[] | undefined
   const selectedIndicators = Form.useWatch('indicators', form) as IndicatorOption[] | undefined
@@ -1543,6 +1548,7 @@ const EffectEvaluation: React.FC = () => {
       inferenceResult: record.value,
       targetModel: record.targetModel,
     })
+    setSelectedEvaluationDataset(null)
     setInferenceResultModalOpen(false)
   }
 
@@ -1559,7 +1565,9 @@ const EffectEvaluation: React.FC = () => {
     form.setFieldsValue({
       inferenceResult: undefined,
       targetModel: undefined,
+      benchmarkDataset: undefined,
     })
+    setSelectedEvaluationDataset(null)
   }, [form, inferenceResultMeta, selectedDatasetType])
 
   const benchmarkCompletedTasks = useMemo(
@@ -1645,7 +1653,22 @@ const EffectEvaluation: React.FC = () => {
   }
 
   const updateEvaluationTaskMeta = (id: string, value: { name: string; description?: string }) => {
+    const record = tasks.find(task => task.id === id)
+    if (record && !warnNoEvaluationDataAccess(record)) {
+      return
+    }
     mutateTask(id, task => ({ ...task, name: value.name, description: value.description ?? '' }))
+  }
+
+  const canOperateEvaluationTask = (record?: Pick<EvaluationTask, 'creator'> | null) =>
+    canAccessResourceData('llm', record?.creator).allowed
+  const warnNoEvaluationDataAccess = (record?: Pick<EvaluationTask, 'creator'> | null) => {
+    const permission = canAccessResourceData('llm', record?.creator)
+    if (permission.allowed) {
+      return true
+    }
+    message.warning(getOperationDeniedMessage(permission.reason))
+    return false
   }
 
   useEffect(() => {
@@ -1663,6 +1686,9 @@ const EffectEvaluation: React.FC = () => {
   }, [inferenceResultOptions])
 
   const runAction = (record: EvaluationTask, action: 'start' | 'terminate' | 'resubmit' | 'delete') => {
+    if (!warnNoEvaluationDataAccess(record)) {
+      return
+    }
     if (action === 'start') {
       mutateTask(record.id, task => ({ ...task, status: '启动中', runtime: '-', progress: 0 }))
       return
@@ -1702,6 +1728,7 @@ const EffectEvaluation: React.FC = () => {
           maxLength={80}
           strong
           placeholder="请输入任务名称"
+          disabled={!canOperateEvaluationTask(record)}
           onSave={name => updateEvaluationTaskMeta(record.id, { name, description: record.description })}
         />
       ),
@@ -1717,6 +1744,7 @@ const EffectEvaluation: React.FC = () => {
           emptyText="暂无描述"
           placeholder="请输入任务描述"
           type="secondary"
+          disabled={!canOperateEvaluationTask(record)}
           onSave={description => updateEvaluationTaskMeta(record.id, { name: record.name, description })}
         />
       ),
@@ -1812,6 +1840,7 @@ const EffectEvaluation: React.FC = () => {
           maxLength={80}
           strong
           placeholder="请输入任务名称"
+          disabled={!canOperateEvaluationTask(record)}
           onSave={name => updateEvaluationTaskMeta(record.id, { name, description: record.description })}
         />
       ),
@@ -1827,6 +1856,7 @@ const EffectEvaluation: React.FC = () => {
           emptyText="暂无描述"
           placeholder="请输入任务描述"
           type="secondary"
+          disabled={!canOperateEvaluationTask(record)}
           onSave={description => updateEvaluationTaskMeta(record.id, { name: record.name, description })}
         />
       ),
@@ -1881,6 +1911,7 @@ const EffectEvaluation: React.FC = () => {
 
   const openCreate = () => {
     form.resetFields()
+    setSelectedEvaluationDataset(null)
     form.setFieldsValue({
       datasetType,
       sourceType: 'existing',
@@ -1891,12 +1922,18 @@ const EffectEvaluation: React.FC = () => {
   }
 
   const openReport = (record: EvaluationTask, initialTab: 'report' | 'detail' | 'logs' = 'report') => {
+    if (!warnNoEvaluationDataAccess(record)) {
+      return
+    }
     navigate(
       `/effect-evaluation/report/${record.id}?evaluationType=${record.mode}&dataset_type=${record.datasetType}&tab=${initialTab}`,
     )
   }
 
   const openManualReview = (record: EvaluationTask) => {
+    if (!warnNoEvaluationDataAccess(record)) {
+      return
+    }
     navigate(
       `/effect-evaluation/manual-review/${record.id}?evaluationType=${record.mode}&dataset_type=${record.datasetType}`,
     )
@@ -1909,6 +1946,7 @@ const EffectEvaluation: React.FC = () => {
   const submitCreate = async () => {
     try {
       const values = await form.validateFields()
+      const currentUser = getCurrentUser()
       const nextTask: EvaluationTask = {
         id: `eval-${Date.now()}`,
         name: values.name,
@@ -1918,7 +1956,7 @@ const EffectEvaluation: React.FC = () => {
         inferenceResult: values.inferenceResult || '待生成推理结果集',
         targetModel: values.targetModel ?? inferenceResultMeta?.targetModel ?? '待选择',
         methods: values.methods,
-        creator: 'zhangsan',
+        creator: currentUser.account,
         createdAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
         mode: values.mode ?? mode,
         datasetType: values.datasetType,
@@ -1972,6 +2010,56 @@ const EffectEvaluation: React.FC = () => {
     }
     return metricFieldMappingLibrary[target.name] ?? []
   }, [indicatorChoice])
+
+  const clearInferenceSourceFields = () => {
+    form.setFieldsValue({
+      inferenceResult: undefined,
+      targetModel: undefined,
+      benchmarkDataset: undefined,
+    })
+    setSelectedEvaluationDataset(null)
+  }
+
+  const renderExistingInferenceResultFields = () => (
+    <>
+      <Form.Item label="推理结果集" required>
+        <Space.Compact style={{ width: '100%' }}>
+          <Form.Item name="inferenceResult" noStyle rules={[{ required: true, message: '请选择推理结果集' }]}>
+            <Input readOnly placeholder="请选择已有推理结果集" />
+          </Form.Item>
+          <Button onClick={() => setInferenceResultModalOpen(true)}>选择</Button>
+        </Space.Compact>
+      </Form.Item>
+
+      <Form.Item label="待评估模型" name="targetModel">
+        <Input disabled placeholder="选择推理结果集后自动带出" />
+      </Form.Item>
+    </>
+  )
+
+  const renderNewInferenceResultFields = () => (
+    <>
+      <Form.Item label="待评估模型/服务" name="targetModel" rules={[{ required: true, message: '请选择待评估模型/服务' }]}>
+        <Select placeholder="请选择待评估模型/服务" options={judgeServiceOptions} />
+      </Form.Item>
+      <Form.Item
+        label="待推理数据"
+        name="benchmarkDataset"
+        rules={[{ required: true, message: '请选择待推理数据' }]}
+        extra={<Text type="secondary">当前推理结果集可选择数据集；训练/验证数据集中仅支持 SFT 类型，DPO/RFT 数据不会出现在选择列表中。</Text>}
+      >
+        <Input
+          readOnly
+          placeholder="请选择数据集分类、数据集和版本"
+          addonAfter={
+            <Button type="link" size="small" onClick={() => setDatasetPickerOpen(true)}>
+              选择
+            </Button>
+          }
+        />
+      </Form.Item>
+    </>
+  )
 
   const detailSummaryMetrics = useMemo(() => {
     if (!detailRecord) {
@@ -2104,6 +2192,19 @@ const EffectEvaluation: React.FC = () => {
               <Empty description="未找到人工评估任务" />
             </Card>
           </Space>
+        </div>
+      )
+    }
+
+    if (!canOperateEvaluationTask(manualReviewRecord)) {
+      return (
+        <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
+          <Result
+            status="403"
+            title="权限不足"
+            subTitle="当前账号仅可操作个人数据/任务，无法进入其他创建人的人工评估任务。"
+            extra={<Button type="primary" onClick={() => navigate(`/effect-evaluation?dataset_type=${backDatasetType}&mode=manual`)}>返回列表</Button>}
+          />
         </div>
       )
     }
@@ -2319,6 +2420,19 @@ const EffectEvaluation: React.FC = () => {
               <Empty description="未找到评估报告记录" />
             </Card>
           </Space>
+        </div>
+      )
+    }
+
+    if (!canOperateEvaluationTask(reportRecord)) {
+      return (
+        <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
+          <Result
+            status="403"
+            title="权限不足"
+            subTitle="当前账号仅可操作个人数据/任务，无法查看其他创建人的评估报告。"
+            extra={<Button type="primary" onClick={() => navigate(`/effect-evaluation?dataset_type=${backDatasetType}&mode=${backMode}`)}>返回列表</Button>}
+          />
         </div>
       )
     }
@@ -2799,7 +2913,11 @@ const EffectEvaluation: React.FC = () => {
         </div>
 
         <Card style={sectionCardStyle}>
-          <Form form={form} layout="vertical">
+          <Form
+            form={form}
+            layout="vertical"
+            initialValues={{ datasetType, sourceType: 'existing', methods: ['裁判员评估'], indicators: [] }}
+          >
             <Form.Item name="mode" initialValue={mode} hidden>
               <Input />
             </Form.Item>
@@ -2819,10 +2937,7 @@ const EffectEvaluation: React.FC = () => {
 
             <Form.Item label="评估类别" name="datasetType" rules={[{ required: true, message: '请选择评估类别' }]}>
               <Radio.Group
-                onChange={() => form.setFieldsValue({
-                  inferenceResult: undefined,
-                  targetModel: undefined,
-                })}
+                onChange={clearInferenceSourceFields}
               >
                 <Space size={16}>
                   <Radio value="text-generation">文本生成</Radio>
@@ -2832,7 +2947,7 @@ const EffectEvaluation: React.FC = () => {
             </Form.Item>
 
             <Form.Item label="评估数据来源" name="sourceType" rules={[{ required: true, message: '请选择评估数据来源' }]}>
-              <Radio.Group>
+              <Radio.Group onChange={clearInferenceSourceFields}>
                 <Space size={16}>
                   <Radio value="existing">已有推理结果集</Radio>
                   <Radio value="new">新建推理结果集</Radio>
@@ -2843,29 +2958,9 @@ const EffectEvaluation: React.FC = () => {
             {mode === 'auto' && (
               <>
                 {selectedSourceType === 'existing' ? (
-                  <>
-                    <Form.Item label="推理结果集" required>
-                      <Space.Compact style={{ width: '100%' }}>
-                        <Form.Item name="inferenceResult" noStyle rules={[{ required: true, message: '请选择推理结果集' }]}>
-                          <Input readOnly placeholder="请选择已有推理结果集" />
-                        </Form.Item>
-                        <Button onClick={() => setInferenceResultModalOpen(true)}>选择</Button>
-                      </Space.Compact>
-                    </Form.Item>
-
-                    <Form.Item label="待评估模型" name="targetModel">
-                      <Input disabled placeholder="选择推理结果集后自动带出" />
-                    </Form.Item>
-                  </>
+                  renderExistingInferenceResultFields()
                 ) : (
-                  <>
-                    <Form.Item label="待评估模型/服务" name="targetModel" rules={[{ required: true, message: '请选择待评估模型/服务' }]}>
-                      <Select placeholder="请选择待评估模型/服务" options={judgeServiceOptions} />
-                    </Form.Item>
-                    <Form.Item label="待评估数据集" name="benchmarkDataset" rules={[{ required: true, message: '请选择待评估数据集' }]}>
-                      <Select placeholder="请选择待评估数据集" options={benchmarkDatasetOptions} />
-                    </Form.Item>
-                  </>
+                  renderNewInferenceResultFields()
                 )}
 
                 <Form.Item label="评估方法" name="methods" rules={[{ required: true, message: '请选择评估方法' }]}>
@@ -2947,17 +3042,9 @@ const EffectEvaluation: React.FC = () => {
 
             {mode === 'manual' && (
               <>
-                <Form.Item label="推理结果集" required>
-                  <Space.Compact style={{ width: '100%' }}>
-                    <Form.Item name="inferenceResult" noStyle rules={[{ required: true, message: '请选择推理结果集' }]}>
-                      <Input readOnly placeholder="请选择已有推理结果集" />
-                    </Form.Item>
-                    <Button onClick={() => setInferenceResultModalOpen(true)}>选择</Button>
-                  </Space.Compact>
-                </Form.Item>
-                <Form.Item label="待评估模型" name="targetModel">
-                  <Input disabled placeholder="选择推理结果集后自动带出" />
-                </Form.Item>
+                {selectedSourceType === 'existing'
+                  ? renderExistingInferenceResultFields()
+                  : renderNewInferenceResultFields()}
                 <Form.Item label="数据采样率（可选）" name="sampleRate">
                   <InputNumber min={1} max={100} addonAfter="%" placeholder="请输入采样率（1-100）" style={{ width: 220 }} />
                 </Form.Item>
@@ -3061,6 +3148,32 @@ const EffectEvaluation: React.FC = () => {
           selectedValue={selectedInferenceResult}
           onCancel={() => setInferenceResultModalOpen(false)}
           onConfirm={handleInferenceResultConfirm}
+        />
+        <DatasetSelectModal
+          open={datasetPickerOpen}
+          title="选择待推理数据集"
+          mode="single"
+          trainingType="text"
+          defaultDataType="验证数据集"
+          defaultDataUsage=""
+          excludePreferenceOrRewardByDataType={['训练数据集', '验证数据集']}
+          dataScopeHint="可选择数据集；训练/验证数据集中仅展示 SFT 版本。DPO/RFT 偏好或奖励数据不支持创建推理结果集。"
+          emptyText="暂无可用于推理结果集的数据集版本"
+          emptyDescription="请先创建测试数据集，或发布 SFT 类型的训练/验证数据集。"
+          defaultSelectedKeys={selectedEvaluationDataset ? [selectedEvaluationDataset.key] : []}
+          onCancel={() => setDatasetPickerOpen(false)}
+          onConfirm={selectedRows => {
+            const selected = selectedRows[0]
+            if (!selected) {
+              setSelectedEvaluationDataset(null)
+              form.setFieldValue('benchmarkDataset', undefined)
+              setDatasetPickerOpen(false)
+              return
+            }
+            setSelectedEvaluationDataset(selected)
+            form.setFieldValue('benchmarkDataset', `${selected.datasetName}>${selected.version}`)
+            setDatasetPickerOpen(false)
+          }}
         />
       </div>
     )

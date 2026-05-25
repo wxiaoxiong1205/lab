@@ -9,6 +9,7 @@ import {
   Tooltip,
   Modal,
   message,
+  Result,
 } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -36,6 +37,7 @@ import {
   getVersionActionFlags,
   TERMINATE_BLOCKED_MESSAGE,
 } from './trainingVersionActions'
+import { canAccessResourceData, getOperationDeniedMessage } from '../../services/permissionStore'
 
 const { Title, Text } = Typography
 
@@ -54,6 +56,16 @@ const TrainingDetail: React.FC = () => {
   const task = tasks.find(t => t.id === id)
 
   const [versions, setVersions] = useState<TrainingVersion[]>(() => task?.versions ?? [])
+  const taskOwner = task?.versions[0]?.creator
+  const canOperateTask = canAccessResourceData('llm', taskOwner).allowed
+  const warnNoTrainingDataAccess = (creator?: string) => {
+    const permission = canAccessResourceData('llm', creator ?? taskOwner)
+    if (permission.allowed) {
+      return true
+    }
+    message.warning(getOperationDeniedMessage(permission.reason))
+    return false
+  }
 
   useEffect(() => {
     const t = tasks.find(x => x.id === id)
@@ -61,10 +73,16 @@ const TrainingDetail: React.FC = () => {
   }, [id, tasks])
 
   const goVersionDetail = (v: TrainingVersion) => {
+    if (!warnNoTrainingDataAccess(v.creator)) {
+      return
+    }
     navigate(`/training/detail/${id}/version/${v.id}`)
   }
 
   const handleStartVersion = (record: TrainingVersion) => {
+    if (!warnNoTrainingDataAccess(record.creator)) {
+      return
+    }
     setVersions(prev =>
       prev.map(v => (v.id === record.id ? { ...v, status: 'starting' as RunStatus } : v)),
     )
@@ -83,6 +101,9 @@ const TrainingDetail: React.FC = () => {
   }
 
   const handleTerminateVersion = (record: TrainingVersion) => {
+    if (!warnNoTrainingDataAccess(record.creator)) {
+      return
+    }
     Modal.confirm({
       title: '确认终止该版本训练？',
       okText: '确认',
@@ -108,6 +129,9 @@ const TrainingDetail: React.FC = () => {
   }
 
   const handleDeleteVersion = (record: TrainingVersion) => {
+    if (!warnNoTrainingDataAccess(record.creator)) {
+      return
+    }
     Modal.confirm({
       title: '确认删除该版本？',
       okType: 'danger',
@@ -120,10 +144,16 @@ const TrainingDetail: React.FC = () => {
   }
 
   const handleEditVersion = (record: TrainingVersion) => {
+    if (!warnNoTrainingDataAccess(record.creator)) {
+      return
+    }
     navigate(`/training/create?taskId=${id}&editVersion=${record.id}`)
   }
 
   const handleResubmitVersion = (record: TrainingVersion) => {
+    if (!warnNoTrainingDataAccess(record.creator)) {
+      return
+    }
     navigate(`/training/create?taskId=${id}&resubmitFrom=${record.id}`)
   }
 
@@ -137,6 +167,19 @@ const TrainingDetail: React.FC = () => {
             返回列表
           </Button>
         </Card>
+      </div>
+    )
+  }
+
+  if (!canOperateTask) {
+    return (
+      <div style={{ padding: '28px 32px', minHeight: '100%' }}>
+        <Result
+          status="403"
+          title="权限不足"
+          subTitle="当前账号仅可操作个人数据/任务，无法查看其他创建人的训练任务详情。"
+          extra={<Button type="primary" onClick={() => navigate('/training')}>返回列表</Button>}
+        />
       </div>
     )
   }
@@ -409,6 +452,9 @@ const TrainingDetail: React.FC = () => {
   ]
 
   const handleAddVersion = () => {
+    if (!warnNoTrainingDataAccess()) {
+      return
+    }
     navigate(`/training/create?taskId=${id}`)
   }
 

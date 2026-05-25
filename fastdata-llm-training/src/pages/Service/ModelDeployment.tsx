@@ -27,6 +27,7 @@ import {
 } from '../../services/taskLifecycle'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import { createTaskNotification } from '../../services/notificationStore'
+import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage } from '../../services/permissionStore'
 
 const { Text, Title } = Typography
 
@@ -73,6 +74,16 @@ const ModelDeployment: React.FC = () => {
   const deleteService = (id: string) => {
     setServiceRows(previous => previous.filter(item => item.id !== id))
   }
+  const canOperateService = (record?: Pick<ServiceRecord, 'creator'> | null) =>
+    canAccessResourceData('llm', record?.creator).allowed
+  const warnNoServiceDataAccess = (record?: Pick<ServiceRecord, 'creator'> | null) => {
+    const permission = canAccessResourceData('llm', record?.creator)
+    if (permission.allowed) {
+      return true
+    }
+    message.warning(getOperationDeniedMessage(permission.reason))
+    return false
+  }
 
   const columns: ColumnsType<ServiceRecord> = [
     {
@@ -87,7 +98,13 @@ const ModelDeployment: React.FC = () => {
           maxLength={80}
           strong
           placeholder="请输入服务名称"
-          onSave={name => updateService(record.id, item => ({ ...item, name }))}
+          disabled={!canOperateService(record)}
+          onSave={name => {
+            if (!warnNoServiceDataAccess(record)) {
+              return
+            }
+            updateService(record.id, item => ({ ...item, name }))
+          }}
         />
       ),
     },
@@ -102,7 +119,13 @@ const ModelDeployment: React.FC = () => {
           emptyText="暂无描述"
           placeholder="请输入服务描述"
           type="secondary"
-          onSave={description => updateService(record.id, item => ({ ...item, description }))}
+          disabled={!canOperateService(record)}
+          onSave={description => {
+            if (!warnNoServiceDataAccess(record)) {
+              return
+            }
+            updateService(record.id, item => ({ ...item, description }))
+          }}
         />
       ),
     },
@@ -130,6 +153,9 @@ const ModelDeployment: React.FC = () => {
               size="small"
               onClick={() =>
                 {
+                  if (!warnNoServiceDataAccess(record)) {
+                    return
+                  }
                   const nextStatus = getPrimaryTaskLifecycleAction(record.status) === 'start' ? '启动中' : '已创建'
                   updateService(record.id, item => ({
                     ...item,
@@ -156,6 +182,7 @@ const ModelDeployment: React.FC = () => {
             type="link"
             size="small"
             disabled={!canRunTaskLifecycleAction(record.status, 'edit')}
+            onClick={() => warnNoServiceDataAccess(record)}
           >
             编辑
           </Button>
@@ -164,6 +191,9 @@ const ModelDeployment: React.FC = () => {
             size="small"
             disabled={!canRunTaskLifecycleAction(record.status, 'terminate')}
             onClick={() => {
+              if (!warnNoServiceDataAccess(record)) {
+                return
+              }
               if (record.status === '启动中') {
                 return message.warning(STARTING_TERMINATE_BLOCKED_MESSAGE)
               }
@@ -183,13 +213,23 @@ const ModelDeployment: React.FC = () => {
           >
             终止
           </Button>
-          <Button type="link" size="small" onClick={() => setDetailRecord(record)}>查看详情</Button>
+          <Button type="link" size="small" onClick={() => {
+            if (!warnNoServiceDataAccess(record)) {
+              return
+            }
+            setDetailRecord(record)
+          }}>查看详情</Button>
           <Button
             type="link"
             size="small"
             danger
             disabled={!canRunTaskLifecycleAction(record.status, 'delete')}
-            onClick={() => deleteService(record.id)}
+            onClick={() => {
+              if (!warnNoServiceDataAccess(record)) {
+                return
+              }
+              deleteService(record.id)
+            }}
           >
             删除
           </Button>
@@ -211,6 +251,7 @@ const ModelDeployment: React.FC = () => {
     try {
       await form.validateFields()
       const values = form.getFieldsValue()
+      const currentUser = getCurrentUser()
       const nextRecord: ServiceRecord = {
         id: `svc-${Date.now()}`,
         name: values.name,
@@ -219,7 +260,7 @@ const ModelDeployment: React.FC = () => {
         modelSource: values.modelSource === 'base' ? '基础模型' : '训练生成',
         instanceCount: values.instanceCount ?? 1,
         status: '已创建',
-        creator: 'deepexilab',
+        creator: currentUser.account,
         createdAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
       }
       setServiceRows(previous => [

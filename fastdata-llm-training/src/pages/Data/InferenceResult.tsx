@@ -10,6 +10,7 @@ import {
   InputNumber,
   Modal,
   Radio,
+  Result,
   Select,
   Space,
   Switch,
@@ -39,6 +40,7 @@ import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../compon
 import ResumableUpload from '../../components/ResumableUpload'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import { dataServiceApi, selectInferenceResults, useDataServiceSnapshot } from '../../services/dataServiceApi'
+import { canAccessResourceData, getOperationDeniedMessage } from '../../services/permissionStore'
 
 const { Title, Text } = Typography
 
@@ -57,6 +59,7 @@ type InferenceResultRecord = {
   pendingModel: string
   dataVolume: number | '-'
   createdAt: string
+  creator?: string
   description?: string
   detailRows?: InferenceDetailRow[]
 }
@@ -225,6 +228,11 @@ const InferenceResult: React.FC = () => {
   )
 
   const handleDeleteInferenceDetailRow = (record: InferenceResultRecord, row: InferenceDetailRow) => {
+    const permission = canAccessResourceData('llm', record.creator)
+    if (!permission.allowed) {
+      message.warning(getOperationDeniedMessage(permission.reason))
+      return
+    }
     Modal.confirm({
       title: '确认删除该条推理明细？',
       content: '删除后不可恢复，请确认是否继续。',
@@ -234,6 +242,30 @@ const InferenceResult: React.FC = () => {
       onOk: () => {
         message.success(`已从当前预览中移除：${row.key}`)
       },
+    })
+  }
+
+  const handleOpenInferenceDetail = (record: InferenceResultRecord) => {
+    const permission = canAccessResourceData('llm', record.creator)
+    if (!permission.allowed) {
+      message.warning(getOperationDeniedMessage(permission.reason))
+      return
+    }
+    navigate(`/inference/${record.id}`)
+  }
+
+  const handleUpdateInferenceMeta = async (
+    record: InferenceResultRecord,
+    value: { name?: string; description?: string },
+  ) => {
+    const permission = canAccessResourceData('llm', record.creator)
+    if (!permission.allowed) {
+      message.warning(getOperationDeniedMessage(permission.reason))
+      return
+    }
+    await dataServiceApi.updateInferenceResultMeta(record.id, {
+      name: value.name ?? record.name,
+      description: value.description ?? record.description,
     })
   }
 
@@ -250,8 +282,9 @@ const InferenceResult: React.FC = () => {
           maxLength={80}
           strong
           placeholder="请输入数据集名称"
-          onTextClick={() => navigate(`/inference/${record.id}`)}
-          onSave={name => dataServiceApi.updateInferenceResultMeta(record.id, { name, description: record.description })}
+          disabled={!canAccessResourceData('llm', record.creator).allowed}
+          onTextClick={() => handleOpenInferenceDetail(record)}
+          onSave={name => handleUpdateInferenceMeta(record, { name })}
         />
       ),
     },
@@ -267,7 +300,8 @@ const InferenceResult: React.FC = () => {
           emptyText="暂无描述"
           placeholder="请输入描述"
           type="secondary"
-          onSave={description => dataServiceApi.updateInferenceResultMeta(record.id, { name: record.name, description })}
+          disabled={!canAccessResourceData('llm', record.creator).allowed}
+          onSave={description => handleUpdateInferenceMeta(record, { description })}
         />
       ),
     },
@@ -300,6 +334,11 @@ const InferenceResult: React.FC = () => {
             size="small"
             disabled={!canRunTaskLifecycleAction(record.progress, 'start') && !canRunTaskLifecycleAction(record.progress, 'resubmit')}
             onClick={async () => {
+              const permission = canAccessResourceData('llm', record.creator)
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+                return
+              }
               if (canRunTaskLifecycleAction(record.progress, 'start')) {
                 await dataServiceApi.startInferenceResult(record.id)
               }
@@ -312,7 +351,17 @@ const InferenceResult: React.FC = () => {
                 ? '重新提交'
                 : '启动'}
           </Button>
-          <Button type="link" size="small" disabled={!canRunTaskLifecycleAction(record.progress, 'edit')}>
+          <Button
+            type="link"
+            size="small"
+            disabled={!canRunTaskLifecycleAction(record.progress, 'edit')}
+            onClick={() => {
+              const permission = canAccessResourceData('llm', record.creator)
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+              }
+            }}
+          >
             编辑
           </Button>
           <Button
@@ -321,6 +370,11 @@ const InferenceResult: React.FC = () => {
             danger
             disabled={!canRunTaskLifecycleAction(record.progress, 'delete')}
             onClick={async () => {
+              const permission = canAccessResourceData('llm', record.creator)
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+                return
+              }
               await dataServiceApi.deleteInferenceResult(record.id)
               message.success('删除成功')
             }}
@@ -336,6 +390,11 @@ const InferenceResult: React.FC = () => {
                 ...(canRunTaskLifecycleAction(record.progress, 'terminate') ? [{ key: 'terminate', label: '终止' }] : []),
               ],
               onClick: ({ key }) => {
+                const permission = canAccessResourceData('llm', record.creator)
+                if (!permission.allowed) {
+                  message.warning(getOperationDeniedMessage(permission.reason))
+                  return
+                }
                 if (key === 'detail') {
                   navigate(`/inference/${record.id}`)
                   return
@@ -671,6 +730,19 @@ const InferenceResult: React.FC = () => {
     )
   }
 
+  if (isDetailRoute && selectedRecord && !canAccessResourceData('llm', selectedRecord.creator).allowed) {
+    return (
+      <div style={{ padding: '64px 32px' }}>
+        <Result
+          status="403"
+          title="权限不足"
+          subTitle="当前账号仅可查看和操作个人推理结果集；如需查看全部数据，请联系管理员授予对应角色的数据权限。"
+          extra={<Button type="primary" onClick={() => navigate('/inference')}>返回列表</Button>}
+        />
+      </div>
+    )
+  }
+
   if (isDetailRoute && selectedRecord) {
     return (
       <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
@@ -687,11 +759,39 @@ const InferenceResult: React.FC = () => {
             </div>
           </div>
           <Space>
-            <Button disabled={selectedRecord.progress !== '已完成'} onClick={() => navigate('/effect-evaluation')}>去评估</Button>
-            <Button onClick={() => message.success(`开始下载：${selectedRecord.name}`)}>下载</Button>
+            <Button
+              disabled={selectedRecord.progress !== '已完成'}
+              onClick={() => {
+                const permission = canAccessResourceData('llm', selectedRecord.creator)
+                if (!permission.allowed) {
+                  message.warning(getOperationDeniedMessage(permission.reason))
+                  return
+                }
+                navigate('/effect-evaluation')
+              }}
+            >
+              去评估
+            </Button>
+            <Button
+              onClick={() => {
+                const permission = canAccessResourceData('llm', selectedRecord.creator)
+                if (!permission.allowed) {
+                  message.warning(getOperationDeniedMessage(permission.reason))
+                  return
+                }
+                message.success(`开始下载：${selectedRecord.name}`)
+              }}
+            >
+              下载
+            </Button>
             <Button
               disabled={!canRunTaskLifecycleAction(selectedRecord.progress, 'terminate')}
               onClick={() => {
+                const permission = canAccessResourceData('llm', selectedRecord.creator)
+                if (!permission.allowed) {
+                  message.warning(getOperationDeniedMessage(permission.reason))
+                  return
+                }
                 if (selectedRecord.progress === '启动中') {
                   message.warning(STARTING_TERMINATE_BLOCKED_MESSAGE)
                   return
@@ -704,6 +804,11 @@ const InferenceResult: React.FC = () => {
             <Button
               danger
               onClick={async () => {
+                const permission = canAccessResourceData('llm', selectedRecord.creator)
+                if (!permission.allowed) {
+                  message.warning(getOperationDeniedMessage(permission.reason))
+                  return
+                }
                 await dataServiceApi.deleteInferenceResult(selectedRecord.id)
                 navigate('/inference')
               }}
@@ -723,7 +828,8 @@ const InferenceResult: React.FC = () => {
                 strong
                 alwaysShowEdit
                 placeholder="请输入数据集名称"
-                onSave={name => dataServiceApi.updateInferenceResultMeta(selectedRecord.id, { name, description: selectedRecord.description })}
+                disabled={!canAccessResourceData('llm', selectedRecord.creator).allowed}
+                onSave={name => handleUpdateInferenceMeta(selectedRecord, { name })}
               />
             </Descriptions.Item>
             <Descriptions.Item label="推理进度">
@@ -745,7 +851,8 @@ const InferenceResult: React.FC = () => {
                 placeholder="请输入描述"
                 type="secondary"
                 alwaysShowEdit
-                onSave={description => dataServiceApi.updateInferenceResultMeta(selectedRecord.id, { name: selectedRecord.name, description })}
+                disabled={!canAccessResourceData('llm', selectedRecord.creator).allowed}
+                onSave={description => handleUpdateInferenceMeta(selectedRecord, { description })}
               />
             </Descriptions.Item>
           </Descriptions>

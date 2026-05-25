@@ -24,6 +24,7 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom'
 import { formatResourceLockMessage, getOnlineInferenceServiceReferenceLocks } from '../../services/resourceReferenceGuard'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
+import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage } from '../../services/permissionStore'
 
 const { Title, Text } = Typography
 
@@ -70,6 +71,16 @@ const OnlineInferenceService: React.FC = () => {
       }),
     [modelTypeFilter, searchValue, services, statusFilter],
   )
+  const canOperateService = (record?: Pick<OnlineInferenceServiceRecord, 'creator'> | null) =>
+    canAccessResourceData('llm', record?.creator).allowed
+  const warnNoServiceDataAccess = (record?: Pick<OnlineInferenceServiceRecord, 'creator'> | null) => {
+    const permission = canAccessResourceData('llm', record?.creator)
+    if (permission.allowed) {
+      return true
+    }
+    message.warning(getOperationDeniedMessage(permission.reason))
+    return false
+  }
 
   const columns: ColumnsType<OnlineInferenceServiceRecord> = [
     {
@@ -84,7 +95,13 @@ const OnlineInferenceService: React.FC = () => {
           maxLength={80}
           strong
           placeholder="请输入服务名称"
-          onSave={name => onlineInferenceServiceActions.updateService(record.id, item => ({ ...item, name }))}
+          disabled={!canOperateService(record)}
+          onSave={name => {
+            if (!warnNoServiceDataAccess(record)) {
+              return
+            }
+            onlineInferenceServiceActions.updateService(record.id, item => ({ ...item, name }))
+          }}
         />
       ),
     },
@@ -106,7 +123,13 @@ const OnlineInferenceService: React.FC = () => {
           emptyText="暂无描述"
           placeholder="请输入描述"
           type="secondary"
-          onSave={description => onlineInferenceServiceActions.updateService(record.id, item => ({ ...item, description }))}
+          disabled={!canOperateService(record)}
+          onSave={description => {
+            if (!warnNoServiceDataAccess(record)) {
+              return
+            }
+            onlineInferenceServiceActions.updateService(record.id, item => ({ ...item, description }))
+          }}
         />
       ),
     },
@@ -119,8 +142,26 @@ const OnlineInferenceService: React.FC = () => {
       width: 320,
       render: (_, record) => (
         <Space size={0}>
-          <Button type="link" size="small" onClick={() => setDetailRecord(record)}>查看详情</Button>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => {
+              const permission = canAccessResourceData('llm', record.creator)
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+                return
+              }
+              setDetailRecord(record)
+            }}
+          >
+            查看详情
+          </Button>
           <Button type="link" size="small" onClick={() => {
+            const permission = canAccessResourceData('llm', record.creator)
+            if (!permission.allowed) {
+              message.warning(getOperationDeniedMessage(permission.reason))
+              return
+            }
             form.setFieldsValue(record)
             setDetailRecord(null)
             setEditingServiceId(record.id)
@@ -130,6 +171,11 @@ const OnlineInferenceService: React.FC = () => {
             type="link"
             size="small"
             onClick={() => {
+              const permission = canAccessResourceData('llm', record.creator)
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+                return
+              }
               onlineInferenceServiceActions.updateService(record.id, item =>
                 ({ ...item, connectionStatus: item.connectionStatus === '测试通过' ? '测试失败' : '测试通过' }),
               )
@@ -143,6 +189,11 @@ const OnlineInferenceService: React.FC = () => {
             size="small"
             danger
             onClick={() => {
+              const permission = canAccessResourceData('llm', record.creator)
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+                return
+              }
               const locks = getOnlineInferenceServiceReferenceLocks(record.name)
               if (locks.length) {
                 Modal.warning({
@@ -182,6 +233,10 @@ const OnlineInferenceService: React.FC = () => {
     try {
       const values = await form.validateFields()
       if (editingServiceId) {
+        const target = services.find(item => item.id === editingServiceId)
+        if (target && !warnNoServiceDataAccess(target)) {
+          return
+        }
         onlineInferenceServiceActions.updateService(editingServiceId, record => ({
           ...record,
           name: values.name,
@@ -190,12 +245,13 @@ const OnlineInferenceService: React.FC = () => {
         }))
         message.success('在线推理服务已更新')
       } else {
+        const currentUser = getCurrentUser()
         onlineInferenceServiceActions.createService({
           name: values.name,
           connectionStatus: '测试失败',
           description: values.description,
           modelType: values.modelType,
-          creator: 'zhangsan',
+          creator: currentUser.account,
         })
         message.success('在线推理服务已创建')
       }

@@ -4,6 +4,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { AppstoreOutlined, PlusOutlined } from '@ant-design/icons'
 import { formatResourceLockMessage, getOnlineAnnotationServiceReferenceLocks } from '../../services/resourceReferenceGuard'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
+import { canAccessResourceData, getOperationDeniedMessage } from '../../services/permissionStore'
 
 const { Title, Text } = Typography
 
@@ -33,13 +34,29 @@ const seedServices: AnnotationServiceRecord[] = [
 
 const MLAnnotationService: React.FC = () => {
   const [services, setServices] = useState<AnnotationServiceRecord[]>(seedServices)
+  const canOperateService = (record?: Pick<AnnotationServiceRecord, 'creator'> | null) =>
+    canAccessResourceData('machine', record?.creator).allowed
+  const warnNoServiceDataAccess = (record?: Pick<AnnotationServiceRecord, 'creator'> | null) => {
+    const permission = canAccessResourceData('machine', record?.creator)
+    if (permission.allowed) {
+      return true
+    }
+    message.warning(getOperationDeniedMessage(permission.reason))
+    return false
+  }
 
   const stopService = (record: AnnotationServiceRecord) => {
+    if (!warnNoServiceDataAccess(record)) {
+      return
+    }
     setServices(previous => previous.map(item => (item.id === record.id ? { ...item, status: '已停止' } : item)))
     message.success(`已停止在线标注服务：${record.name}`)
   }
 
   const deleteService = (record: AnnotationServiceRecord) => {
+    if (!warnNoServiceDataAccess(record)) {
+      return
+    }
     if (record.status === '运行中') {
       Modal.warning({
         title: '在线标注服务运行中，暂不可删除',
@@ -83,7 +100,13 @@ const MLAnnotationService: React.FC = () => {
           maxLength={80}
           strong
           placeholder="请输入服务名称"
-          onSave={name => setServices(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))}
+          disabled={!canOperateService(record)}
+          onSave={name => {
+            if (!warnNoServiceDataAccess(record)) {
+              return
+            }
+            setServices(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))
+          }}
         />
       ),
     },
@@ -98,7 +121,13 @@ const MLAnnotationService: React.FC = () => {
           emptyText="暂无描述"
           placeholder="请输入描述"
           type="secondary"
-          onSave={description => setServices(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))}
+          disabled={!canOperateService(record)}
+          onSave={description => {
+            if (!warnNoServiceDataAccess(record)) {
+              return
+            }
+            setServices(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))
+          }}
         />
       ),
     },
@@ -120,7 +149,15 @@ const MLAnnotationService: React.FC = () => {
       render: (_, record) => (
         <Space size={0}>
           <Button type="link" size="small" disabled={record.status !== '运行中'} onClick={() => stopService(record)}>停止</Button>
-          <Button type="link" size="small">查看详情</Button>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => {
+              warnNoServiceDataAccess(record)
+            }}
+          >
+            查看详情
+          </Button>
           <Button type="link" size="small" danger onClick={() => deleteService(record)}>删除</Button>
         </Space>
       ),

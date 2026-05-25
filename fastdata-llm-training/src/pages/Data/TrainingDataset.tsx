@@ -682,6 +682,11 @@ const TrainingDataset: React.FC = () => {
   }
 
   const handleOpenDetail = (record: TrainingDatasetRecord) => {
+    const permission = getCreatorDeletePermission(record.creator)
+    if (!permission.allowed) {
+      message.warning(permission.reason)
+      return
+    }
     navigate(`/datasets/training/${encodeURIComponent(record.name)}${datasetTab === 'validation' ? '?key=validation' : ''}`)
   }
 
@@ -702,6 +707,11 @@ const TrainingDataset: React.FC = () => {
     record: TrainingDatasetRecord,
     value: { name?: string },
   ) => {
+    const permission = getCreatorDeletePermission(record.creator)
+    if (!permission.allowed) {
+      message.warning(permission.reason)
+      return
+    }
     const nextName = value.name ?? record.name
     await dataServiceApi.updateDatasetMeta(datasetTab === 'validation' ? 'validation' : 'training', record.id, {
       name: nextName,
@@ -714,6 +724,12 @@ const TrainingDataset: React.FC = () => {
   }
 
   const handleUpdateDatasetVersionDescription = async (record: TrainingDatasetRecord, versionId: string, description: string) => {
+    const version = record.versions.find(item => item.id === versionId)
+    const permission = getCreatorDeletePermission(version?.creator ?? record.creator)
+    if (!permission.allowed) {
+      message.warning(permission.reason)
+      return
+    }
     await dataServiceApi.updateDatasetVersionDescription(
       datasetTab === 'validation' ? 'validation' : 'training',
       record.id,
@@ -774,6 +790,7 @@ const TrainingDataset: React.FC = () => {
           maxLength={64}
           strong
           placeholder="请输入数据集名称"
+          disabled={!getCreatorDeletePermission(record.creator).allowed}
           onTextClick={() => handleOpenDetail(record)}
           onSave={name => handleUpdateDatasetMeta(record, { name })}
         />
@@ -815,7 +832,20 @@ const TrainingDataset: React.FC = () => {
       width: 170,
       render: (_: unknown, record: TrainingDatasetRecord) => (
         <Space size={0} wrap>
-          <Button type="link" size="small" onClick={() => handleOpenDetail(record)}>查看详情</Button>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => {
+              const permission = getCreatorDeletePermission(record.creator)
+              if (!permission.allowed) {
+                Modal.warning({ title: '权限不足', content: permission.reason })
+                return
+              }
+              handleOpenDetail(record)
+            }}
+          >
+            查看详情
+          </Button>
           <Button
             type="link"
             size="small"
@@ -1115,6 +1145,12 @@ const TrainingDataset: React.FC = () => {
     if (!detailRecord) {
       return
     }
+    const permission = getCreatorDeletePermission(detailRecord.creator)
+    if (!permission.allowed) {
+      Modal.warning({ title: '权限不足', content: permission.reason })
+      navigate('/datasets', { replace: true })
+      return
+    }
 
     const nextTab = validationList.some(item => item.name === detailRecord.name) ? 'validation' : 'training'
     setDatasetTab(nextTab)
@@ -1132,7 +1168,7 @@ const TrainingDataset: React.FC = () => {
         sourceType: 'local',
       })
     }
-  }, [addVersionForm, detailRecord, isDetailRoute, isNewVersionRoute, validationList])
+  }, [addVersionForm, detailRecord, isDetailRoute, isNewVersionRoute, navigate, validationList])
 
   useEffect(() => {
     setDetailPage(1)
@@ -1198,6 +1234,11 @@ const TrainingDataset: React.FC = () => {
               type="primary"
               icon={<PlayCircleOutlined />}
               onClick={() => {
+                const permission = getCreatorDeletePermission(selectedRecord.creator)
+                if (!permission.allowed) {
+                  Modal.warning({ title: '权限不足', content: permission.reason })
+                  return
+                }
                 const params = new URLSearchParams({
                   prefillDatasetName: selectedRecord.name,
                   prefillDatasetVersion: activeVersion?.version ?? selectedRecord.latestVersion,
@@ -1215,6 +1256,11 @@ const TrainingDataset: React.FC = () => {
               menu={{
                 items: downloadItems,
                 onClick: ({ key }) => {
+                  const permission = getCreatorDeletePermission(selectedRecord.creator)
+                  if (!permission.allowed) {
+                    Modal.warning({ title: '权限不足', content: permission.reason })
+                    return
+                  }
                   downloadDatasetRows(
                     key as TemplateDownloadFormat,
                     detailRows,
@@ -1333,6 +1379,7 @@ const TrainingDataset: React.FC = () => {
                       strong
                       alwaysShowEdit
                       placeholder="请输入数据集名称"
+                      disabled={!getCreatorDeletePermission(selectedRecord.creator).allowed}
                       onSave={name => handleUpdateDatasetMeta(selectedRecord, { name })}
                     />
                   </div>
@@ -1351,6 +1398,7 @@ const TrainingDataset: React.FC = () => {
                       placeholder="请输入描述"
                       type="secondary"
                       alwaysShowEdit
+                      disabled={!getCreatorDeletePermission(activeVersion?.creator ?? selectedRecord.creator).allowed}
                       onSave={description => {
                         if (!activeVersion) return
                         return handleUpdateDatasetVersionDescription(selectedRecord, activeVersion.id, description)

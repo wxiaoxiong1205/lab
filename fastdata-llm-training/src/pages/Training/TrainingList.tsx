@@ -30,6 +30,7 @@ import {
   useTrainingTasks,
 } from '../../services/trainingTaskStore'
 import { isVersionInExecution } from './trainingVersionActions'
+import { canAccessResourceData, getOperationDeniedMessage } from '../../services/permissionStore'
 
 const { Title, Text } = Typography
 
@@ -45,6 +46,17 @@ const TrainingList: React.FC = () => {
 
   const taskHasActiveVersion = (t: TrainingTask) =>
     t.versions.some(v => isVersionInExecution(v.status))
+  const getTaskOwner = (record: TrainingTask) => record.versions[0]?.creator
+  const canOperateTrainingTask = (record: TrainingTask) =>
+    canAccessResourceData('llm', getTaskOwner(record)).allowed
+  const warnNoTrainingDataAccess = (record: TrainingTask) => {
+    const permission = canAccessResourceData('llm', getTaskOwner(record))
+    if (permission.allowed) {
+      return true
+    }
+    message.warning(getOperationDeniedMessage(permission.reason))
+    return false
+  }
 
   // 表格列定义
   const columns: ColumnsType<TrainingTask> = [
@@ -75,8 +87,19 @@ const TrainingList: React.FC = () => {
             maxLength={80}
             strong
             placeholder="请输入任务名称"
-            onTextClick={() => navigate(`/training/detail/${record.id}`)}
-            onSave={name => trainingTaskActions.updateTrainingTaskMeta(record.id, { name, description: record.description })}
+            disabled={!canOperateTrainingTask(record)}
+            onTextClick={() => {
+              if (!warnNoTrainingDataAccess(record)) {
+                return
+              }
+              navigate(`/training/detail/${record.id}`)
+            }}
+            onSave={name => {
+              if (!warnNoTrainingDataAccess(record)) {
+                return
+              }
+              trainingTaskActions.updateTrainingTaskMeta(record.id, { name, description: record.description })
+            }}
           />
         </div>
       ),
@@ -162,7 +185,12 @@ const TrainingList: React.FC = () => {
               type="text"
               size="small"
               icon={<EyeOutlined />}
-              onClick={() => navigate(`/training/detail/${record.id}`)}
+              onClick={() => {
+                if (!warnNoTrainingDataAccess(record)) {
+                  return
+                }
+                navigate(`/training/detail/${record.id}`)
+              }}
               style={{
                 color: '#2563eb',
                 background: 'rgba(37, 99, 235, 0.06)',
@@ -182,7 +210,7 @@ const TrainingList: React.FC = () => {
               size="small"
               icon={<DeleteOutlined />}
               disabled={taskHasActiveVersion(record)}
-              onClick={() => handleDelete(record.id)}
+              onClick={() => handleDelete(record)}
               style={{
                 color: '#ef4444',
                 background: 'rgba(239, 68, 68, 0.06)',
@@ -202,8 +230,11 @@ const TrainingList: React.FC = () => {
   ]
 
   // 删除处理
-  const handleDelete = (id: string) => {
-    trainingTaskActions.deleteTrainingTask(id)
+  const handleDelete = (record: TrainingTask) => {
+    if (!warnNoTrainingDataAccess(record)) {
+      return
+    }
+    trainingTaskActions.deleteTrainingTask(record.id)
     message.success('删除成功')
   }
 

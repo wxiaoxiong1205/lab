@@ -4,7 +4,7 @@ import { App as AntApp, ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import AppLayout from './components/Layout/AppLayout'
 import ProjectSpace from './pages/ProjectSpace'
-import Home from './pages/Home'
+import TaskOverview from './pages/TaskOverview'
 import TrainingList from './pages/Training/TrainingList'
 import CreateTraining from './pages/Training/CreateTraining'
 import TrainingDetail from './pages/Training/TrainingDetail'
@@ -52,7 +52,8 @@ const App: React.FC = () => {
             <Routes>
               <Route path="/" element={<Navigate to="/workspace" replace />} />
               <Route path="/workspace" element={<ProjectSpace />} />
-              <Route path="/home" element={<Home />} />
+              <Route path="/task-overview" element={<TaskOverview />} />
+              <Route path="/home" element={<Navigate to="/task-overview" replace />} />
               <Route path="/open-platform/api-keys" element={<OpenPlatformApiKeys />} />
 
               {/* 数据服务 */}

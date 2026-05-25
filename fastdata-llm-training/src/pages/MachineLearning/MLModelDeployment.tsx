@@ -40,6 +40,7 @@ import {
   type ResourceConfig,
   type StandardDeploymentConfig,
 } from '../../services/machineDeploymentStore'
+import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage } from '../../services/permissionStore'
 import ResumableUpload from '../../components/ResumableUpload'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 
@@ -431,9 +432,10 @@ const MLModelDeployment: React.FC = () => {
         machineDeploymentActions.updateDeployment(editingRecord.id, payload)
         message.success('部署配置已更新')
       } else {
+        const currentUser = getCurrentUser()
         machineDeploymentActions.createDeployment({
           ...payload,
-          creator: 'deepexilab',
+          creator: currentUser.account,
         })
         message.success(createType === 'standard' ? '标准部署已创建' : '自定义部署已创建')
       }
@@ -449,31 +451,51 @@ const MLModelDeployment: React.FC = () => {
       dataIndex: 'name',
       key: 'name',
       width: 260,
-      render: (_value, record) => (
-        <TaskMetadataEditor
-          value={record.name}
-          required
-          maxLength={80}
-          strong
-          placeholder="请输入服务名称"
-          onSave={name => machineDeploymentActions.updateDeploymentMeta(record.id, { name, description: record.description })}
-        />
-      ),
+      render: (_value, record) => {
+        const permission = canAccessResourceData('machine', record.creator)
+        return (
+          <TaskMetadataEditor
+            value={record.name}
+            required
+            maxLength={80}
+            strong
+            placeholder="请输入服务名称"
+            disabled={!permission.allowed}
+            onSave={name => {
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+                return
+              }
+              machineDeploymentActions.updateDeploymentMeta(record.id, { name, description: record.description })
+            }}
+          />
+        )
+      },
     },
     {
       title: '服务描述',
       dataIndex: 'description',
       key: 'description',
       width: 220,
-      render: (value, record) => (
-        <TaskMetadataEditor
-          value={value}
-          emptyText="暂无描述"
-          placeholder="请输入服务描述"
-          type="secondary"
-          onSave={description => machineDeploymentActions.updateDeploymentMeta(record.id, { name: record.name, description })}
-        />
-      ),
+      render: (value, record) => {
+        const permission = canAccessResourceData('machine', record.creator)
+        return (
+          <TaskMetadataEditor
+            value={value}
+            emptyText="暂无描述"
+            placeholder="请输入服务描述"
+            type="secondary"
+            disabled={!permission.allowed}
+            onSave={description => {
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+                return
+              }
+              machineDeploymentActions.updateDeploymentMeta(record.id, { name: record.name, description })
+            }}
+          />
+        )
+      },
     },
     {
       title: '模型名称',
@@ -516,23 +538,58 @@ const MLModelDeployment: React.FC = () => {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', alignItems: 'center' }}>
           {getPrimaryTaskLifecycleAction(record.status) &&
             createActionButton(getPrimaryTaskLifecycleAction(record.status) === 'start' ? '启动' : '重新提交', {
-              onClick: () => updateStatus(record),
+              onClick: () => {
+                const permission = canAccessResourceData('machine', record.creator)
+                if (!permission.allowed) {
+                  message.warning(getOperationDeniedMessage(permission.reason))
+                  return
+                }
+                updateStatus(record)
+              },
             })}
           {createActionButton('编辑', {
             disabled: !canRunTaskLifecycleAction(record.status, 'edit'),
-            onClick: () => openEdit(record),
+            onClick: () => {
+              const permission = canAccessResourceData('machine', record.creator)
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+                return
+              }
+              openEdit(record)
+            },
           })}
-          {createActionButton('访问信息', { onClick: () => setDetailRecord(record) })}
+          {createActionButton('访问信息', {
+            onClick: () => {
+              const permission = canAccessResourceData('machine', record.creator)
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+                return
+              }
+              setDetailRecord(record)
+            },
+          })}
           {createActionButton('删除', {
             danger: true,
             disabled: !canRunTaskLifecycleAction(record.status, 'delete'),
-            onClick: () => machineDeploymentActions.deleteDeployment(record.id),
+            onClick: () => {
+              const permission = canAccessResourceData('machine', record.creator)
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+                return
+              }
+              machineDeploymentActions.deleteDeployment(record.id)
+            },
           })}
           {createActionButton('终止', {
             disabled: !canRunTaskLifecycleAction(record.status, 'terminate'),
             onClick: () => {
               if (record.status === '启动中') {
                 return message.warning(STARTING_TERMINATE_BLOCKED_MESSAGE)
+              }
+              const permission = canAccessResourceData('machine', record.creator)
+              if (!permission.allowed) {
+                message.warning(getOperationDeniedMessage(permission.reason))
+                return
               }
               machineDeploymentActions.setDeploymentStatus(record.id, '已终止')
             },

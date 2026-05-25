@@ -9,6 +9,7 @@ import {
   Modal,
   Popconfirm,
   Radio,
+  Result,
   Select,
   Space,
   Table,
@@ -381,7 +382,7 @@ const MLDataset: React.FC = () => {
 
   const deleteRecord = (id: string) => {
     const record = rows.find(item => item.id === id)
-    const permission = getCreatorDeletePermission(record?.creator)
+    const permission = getCreatorDeletePermission(record?.creator, 'machine')
     if (record && !permission.allowed) {
       Modal.warning({
         title: '无权删除该数据集',
@@ -442,7 +443,22 @@ const MLDataset: React.FC = () => {
       width: 180,
       render: (_, record) => (
         <Space size={0}>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => { setActiveVersion(record.version); navigate(`/machine-data-management/${record.id}`) }}>查看详情</Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => {
+              const permission = getCreatorDeletePermission(record.creator, 'machine')
+              if (!permission.allowed) {
+                Modal.warning({ title: '权限不足', content: permission.reason })
+                return
+              }
+              setActiveVersion(record.version)
+              navigate(`/machine-data-management/${record.id}`)
+            }}
+          >
+            查看详情
+          </Button>
           <Popconfirm title="确认删除该数据集？" okText="删除" cancelText="取消" onConfirm={() => deleteRecord(record.id)}>
             <Button type="link" size="small" icon={<DeleteOutlined />} danger>删除</Button>
           </Popconfirm>
@@ -561,6 +577,19 @@ const MLDataset: React.FC = () => {
         </div>
       )
     }
+    const detailPermission = getCreatorDeletePermission(selectedDetailRecord.creator, 'machine')
+    if (!detailPermission.allowed) {
+      return (
+        <div style={{ padding: '64px 32px' }}>
+          <Result
+            status="403"
+            title="权限不足"
+            subTitle="当前账号仅可查看和操作个人机器学习数据；如需查看全部数据，请联系管理员授予对应角色的数据权限。"
+            extra={<Button type="primary" onClick={() => navigate('/machine-data-management')}>返回列表</Button>}
+          />
+        </div>
+      )
+    }
 
     const versions = getDatasetVersions(selectedDetailRecord)
     const activeDatasetVersion = getActiveDatasetVersion(selectedDetailRecord, detailVersion)
@@ -573,7 +602,19 @@ const MLDataset: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/machine-data-management')}>返回</Button>
           <Space>
-            <Button icon={<DownloadOutlined />} onClick={() => Modal.info({ title: '导出数据集', content: '已生成当前版本数据导出任务。' })}>导出</Button>
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={() => {
+                const permission = getCreatorDeletePermission(selectedDetailRecord.creator, 'machine')
+                if (!permission.allowed) {
+                  Modal.warning({ title: '权限不足', content: permission.reason })
+                  return
+                }
+                Modal.info({ title: '导出数据集', content: '已生成当前版本数据导出任务。' })
+              }}
+            >
+              导出
+            </Button>
             <Popconfirm title="确认删除该数据集？" okText="删除" cancelText="取消" onConfirm={() => { if (deleteRecord(selectedDetailRecord.id)) navigate('/machine-data-management') }}>
               <Button danger icon={<DeleteOutlined />}>删除</Button>
             </Popconfirm>

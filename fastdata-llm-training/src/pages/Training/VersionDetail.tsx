@@ -12,6 +12,7 @@ import {
   Col,
   Modal,
   message,
+  Result,
 } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -48,6 +49,7 @@ import {
   getVersionActionFlags,
   TERMINATE_BLOCKED_MESSAGE,
 } from './trainingVersionActions'
+import { canAccessResourceData, getOperationDeniedMessage } from '../../services/permissionStore'
 
 const { Title, Text } = Typography
 
@@ -192,6 +194,15 @@ const VersionDetail: React.FC = () => {
 
   const task = tasks.find(t => t.id === id)
   const version = task?.versions.find(v => v.id === versionId)
+  const canOperateVersion = canAccessResourceData('llm', version?.creator ?? task?.versions[0]?.creator).allowed
+  const warnNoVersionDataAccess = () => {
+    const permission = canAccessResourceData('llm', version?.creator ?? task?.versions[0]?.creator)
+    if (permission.allowed) {
+      return true
+    }
+    message.warning(getOperationDeniedMessage(permission.reason))
+    return false
+  }
 
   const handleBack = () => navigate(`/training/detail/${id}`)
 
@@ -221,10 +232,26 @@ const VersionDetail: React.FC = () => {
     )
   }
 
+  if (!canOperateVersion) {
+    return (
+      <div style={{ padding: '28px 32px', minHeight: '100%' }}>
+        <Result
+          status="403"
+          title="权限不足"
+          subTitle="当前账号仅可操作个人数据/任务，无法查看其他创建人的训练版本详情。"
+          extra={<Button type="primary" onClick={() => navigate('/training')}>返回列表</Button>}
+        />
+      </div>
+    )
+  }
+
   const statusCfg = TRAINING_RUN_STATUS_TAG[version.status]
   const actionFlags = getVersionActionFlags(version.status)
 
   const handleTerminate = () => {
+    if (!warnNoVersionDataAccess()) {
+      return
+    }
     Modal.confirm({
       title: '确认终止该版本训练？',
       okText: '确认',
@@ -247,14 +274,23 @@ const VersionDetail: React.FC = () => {
   }
 
   const handleResubmit = () => {
+    if (!warnNoVersionDataAccess()) {
+      return
+    }
     navigate(`/training/create?taskId=${id}&resubmitFrom=${versionId}`)
   }
 
   const handleEdit = () => {
+    if (!warnNoVersionDataAccess()) {
+      return
+    }
     navigate(`/training/create?taskId=${id}&editVersion=${versionId}`)
   }
 
   const handleDelete = () => {
+    if (!warnNoVersionDataAccess()) {
+      return
+    }
     Modal.confirm({
       title: '确认删除该版本？',
       okType: 'danger',

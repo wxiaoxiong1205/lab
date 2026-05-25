@@ -14,6 +14,7 @@ import {
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage } from '../../services/permissionStore'
 
 const { Title, Text } = Typography
 
@@ -108,6 +109,14 @@ const EvaluationIndicatorPage: React.FC = () => {
       ),
     [indicators, searchValue, tab],
   )
+  const warnNoIndicatorDataAccess = (record?: Pick<EvaluationIndicatorRecord, 'creator'> | null) => {
+    const permission = canAccessResourceData('llm', record?.creator)
+    if (permission.allowed) {
+      return true
+    }
+    message.warning(getOperationDeniedMessage(permission.reason))
+    return false
+  }
 
   const columns: ColumnsType<EvaluationIndicatorRecord> = [
     { title: '评估指标', dataIndex: 'name', key: 'name', width: 220 },
@@ -139,6 +148,9 @@ const EvaluationIndicatorPage: React.FC = () => {
                   type="link"
                   size="small"
                   onClick={() => {
+                    if (!warnNoIndicatorDataAccess(record)) {
+                      return
+                    }
                     setEditingRecord(record)
                     form.setFieldsValue(record)
                     setCreateOpen(true)
@@ -151,6 +163,9 @@ const EvaluationIndicatorPage: React.FC = () => {
                   size="small"
                   danger
                   onClick={() => {
+                    if (!warnNoIndicatorDataAccess(record)) {
+                      return
+                    }
                     setIndicators(previous => previous.filter(item => item.id !== record.id))
                     message.success('删除成功')
                   }}
@@ -184,13 +199,14 @@ const EvaluationIndicatorPage: React.FC = () => {
         )
         message.success('指标已更新')
       } else {
+        const currentUser = getCurrentUser()
         setIndicators(previous => [
           {
             id: `indicator-${Date.now()}`,
             name: values.name,
             description: values.description,
             scoreRange: values.scoreRange,
-            creator: 'zhangsan',
+            creator: currentUser.account,
             createdAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
             category: 'custom',
           },

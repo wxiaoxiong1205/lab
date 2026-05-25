@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react'
 import { ArrowLeftOutlined, DeleteOutlined, EyeOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
-import { Button, Card, Descriptions, Form, Input, Modal, Popconfirm, Radio, Select, Space, Table, Tabs, Typography } from 'antd'
+import { Button, Card, Descriptions, Form, Input, Modal, Popconfirm, Radio, Select, Space, Table, Tabs, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { formatResourceLockMessage, getModelReferenceLocks } from '../../services/resourceReferenceGuard'
 import ResumableUpload from '../../components/ResumableUpload'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
+import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage } from '../../services/permissionStore'
 
 const { Title, Text } = Typography
 
@@ -34,6 +35,7 @@ type MLModelRecord = {
   tokenizer?: string
   network?: string
   description?: string
+  creator: string
   createdAt: string
 }
 
@@ -50,11 +52,11 @@ const modelOptionsByType: Record<string, Array<{ value: string; label: string; t
 }
 
 const initialModels: MLModelRecord[] = [
-  { id: '1', name: '111', version: 'V1', versionCount: 1, modelType: '文本', annotationType: '文本分类', taskType: '文本单标签', source: 'Notebook 获取', weightFile: 'notebook://ml-nb-1/model.pt', tokenizer: 'notebook://ml-nb-1/tokenizer.json', network: 'TextClassifier', createdAt: '2026-04-22 15:11:38' },
-  { id: '2', name: 'basion-文本分类-单标签', version: 'V1', versionCount: 1, modelType: '文本', annotationType: '文本分类', taskType: '文本单标签', source: 'Notebook 获取', weightFile: 'notebook://ml-nb-2/model.pt', tokenizer: 'notebook://ml-nb-2/tokenizer.json', network: 'BertClassifier', createdAt: '2026-04-15 09:35:59' },
-  { id: '3', name: '测试数据001_hzj', version: 'V1', versionCount: 1, modelType: '文本', annotationType: '实体识别', taskType: '文本实体识别', source: '本地上传', weightFile: 'ner-model.pt', tokenizer: 'tokenizer.json', network: 'CRF-NER', createdAt: '2026-04-14 17:43:06' },
-  { id: '4', name: 'hzj_图片分类多标签', version: 'V1', versionCount: 1, modelType: '图片', annotationType: '图像分类', taskType: '单图多标签', source: 'Notebook 获取', weightFile: 'notebook://vision-lab/resnet.pt', network: 'ResNet50', createdAt: '2026-04-13 15:17:32' },
-  { id: '5', name: 'basion-图像分类-单标签', version: 'V1', versionCount: 1, modelType: '图片', annotationType: '图像分类', taskType: '单图单标签', source: '本地上传', weightFile: 'image-classifier.pt', network: 'ConvNeXt-Tiny', createdAt: '2026-04-10 10:00:00' },
+  { id: '1', name: '111', version: 'V1', versionCount: 1, modelType: '文本', annotationType: '文本分类', taskType: '文本单标签', source: 'Notebook 获取', weightFile: 'notebook://ml-nb-1/model.pt', tokenizer: 'notebook://ml-nb-1/tokenizer.json', network: 'TextClassifier', creator: 'zhangsan', createdAt: '2026-04-22 15:11:38' },
+  { id: '2', name: 'basion-文本分类-单标签', version: 'V1', versionCount: 1, modelType: '文本', annotationType: '文本分类', taskType: '文本单标签', source: 'Notebook 获取', weightFile: 'notebook://ml-nb-2/model.pt', tokenizer: 'notebook://ml-nb-2/tokenizer.json', network: 'BertClassifier', creator: 'lab1', createdAt: '2026-04-15 09:35:59' },
+  { id: '3', name: '测试数据001_hzj', version: 'V1', versionCount: 1, modelType: '文本', annotationType: '实体识别', taskType: '文本实体识别', source: '本地上传', weightFile: 'ner-model.pt', tokenizer: 'tokenizer.json', network: 'CRF-NER', creator: 'wangwu', createdAt: '2026-04-14 17:43:06' },
+  { id: '4', name: 'hzj_图片分类多标签', version: 'V1', versionCount: 1, modelType: '图片', annotationType: '图像分类', taskType: '单图多标签', source: 'Notebook 获取', weightFile: 'notebook://vision-lab/resnet.pt', network: 'ResNet50', creator: 'admin', createdAt: '2026-04-13 15:17:32' },
+  { id: '5', name: 'basion-图像分类-单标签', version: 'V1', versionCount: 1, modelType: '图片', annotationType: '图像分类', taskType: '单图单标签', source: '本地上传', weightFile: 'image-classifier.pt', network: 'ConvNeXt-Tiny', creator: 'lab1', createdAt: '2026-04-10 10:00:00' },
 ]
 
 function normalizeUploadFileName(value: unknown): string | undefined {
@@ -86,6 +88,16 @@ const MLModelManagement: React.FC = () => {
     () => models.filter(item => !searchValue || item.name.toLowerCase().includes(searchValue.toLowerCase())),
     [models, searchValue],
   )
+  const canOperateModel = (record?: Pick<MLModelRecord, 'creator'> | null) =>
+    canAccessResourceData('machine', record?.creator).allowed
+  const warnNoModelDataAccess = (record?: Pick<MLModelRecord, 'creator'> | null) => {
+    const permission = canAccessResourceData('machine', record?.creator)
+    if (permission.allowed) {
+      return true
+    }
+    message.warning(getOperationDeniedMessage(permission.reason))
+    return false
+  }
   const annotationOptions = modelOptionsByType[selectedModelType]
   const taskTypeOptions = annotationOptions.find(item => item.value === selectedAnnotationType)?.taskTypes ?? []
 
@@ -99,6 +111,7 @@ const MLModelManagement: React.FC = () => {
   const submitCreate = async () => {
     try {
       const values = await form.validateFields()
+      const currentUser = getCurrentUser()
       setModels(prev => [
         {
           id: `ml-model-${Date.now()}`,
@@ -113,6 +126,7 @@ const MLModelManagement: React.FC = () => {
           tokenizer: normalizeUploadFileName(values.tokenizer),
           network: values.network,
           description: values.description,
+          creator: currentUser.account,
           createdAt: new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-'),
         },
         ...prev,
@@ -137,7 +151,13 @@ const MLModelManagement: React.FC = () => {
           maxLength={80}
           strong
           placeholder="请输入模型名称"
-          onSave={name => setModels(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))}
+          disabled={!canOperateModel(record)}
+          onSave={name => {
+            if (!warnNoModelDataAccess(record)) {
+              return
+            }
+            setModels(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))
+          }}
         />
       ),
     },
@@ -152,23 +172,38 @@ const MLModelManagement: React.FC = () => {
           emptyText="暂无描述"
           placeholder="请输入模型描述"
           type="secondary"
-          onSave={description => setModels(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))}
+          disabled={!canOperateModel(record)}
+          onSave={description => {
+            if (!warnNoModelDataAccess(record)) {
+              return
+            }
+            setModels(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))
+          }}
         />
       ),
     },
     { title: '版本数量', dataIndex: 'versionCount', key: 'versionCount', width: 160 },
+    { title: '创建人', dataIndex: 'creator', key: 'creator', width: 120 },
     {
       title: '操作',
       key: 'action',
       width: 180,
       render: (_, record) => (
         <Space size={0}>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setDetailRecord(record)}>查看详情</Button>
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => {
+            if (!warnNoModelDataAccess(record)) {
+              return
+            }
+            setDetailRecord(record)
+          }}>查看详情</Button>
           <Popconfirm
             title="确认删除该模型？"
             okText="删除"
             cancelText="取消"
             onConfirm={() => {
+              if (!warnNoModelDataAccess(record)) {
+                return
+              }
               const locks = getModelReferenceLocks(record.name)
               if (locks.length) {
                 Modal.warning({
@@ -344,6 +379,7 @@ const MLModelManagement: React.FC = () => {
             <Descriptions.Item label="分词器" span={2}>{detailRecord.tokenizer || '-'}</Descriptions.Item>
             <Descriptions.Item label="网络结构" span={2}>{detailRecord.network || '-'}</Descriptions.Item>
             <Descriptions.Item label="模型描述" span={2}>{detailRecord.description || '-'}</Descriptions.Item>
+            <Descriptions.Item label="创建人">{detailRecord.creator}</Descriptions.Item>
             <Descriptions.Item label="创建时间" span={2}>{detailRecord.createdAt}</Descriptions.Item>
           </Descriptions>
         )}

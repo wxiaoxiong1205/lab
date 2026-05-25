@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { Button, Input, Space, Tooltip, Typography, message } from 'antd'
-import { CheckOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons'
+import { Button, Input, Tooltip, Typography, message } from 'antd'
+import { EditOutlined } from '@ant-design/icons'
 
 const { Text } = Typography
 
@@ -13,6 +13,7 @@ type TaskMetadataEditorProps = {
   strong?: boolean
   type?: 'default' | 'secondary'
   alwaysShowEdit?: boolean
+  disabled?: boolean
   onSave: (value: string) => void | Promise<void>
   onTextClick?: () => void
 }
@@ -26,6 +27,7 @@ const TaskMetadataEditor: React.FC<TaskMetadataEditorProps> = ({
   strong = false,
   type = 'default',
   alwaysShowEdit = false,
+  disabled = false,
   onSave,
   onTextClick,
 }) => {
@@ -36,6 +38,9 @@ const TaskMetadataEditor: React.FC<TaskMetadataEditorProps> = ({
   const [saving, setSaving] = useState(false)
 
   const beginEdit = () => {
+    if (disabled) {
+      return
+    }
     setDraftValue(displayValue)
     setEditing(true)
   }
@@ -47,6 +52,11 @@ const TaskMetadataEditor: React.FC<TaskMetadataEditorProps> = ({
 
   const save = async () => {
     const nextValue = draftValue.trim()
+
+    if (nextValue === displayValue) {
+      setEditing(false)
+      return
+    }
 
     if (required && !nextValue) {
       message.warning('名称不能为空')
@@ -70,19 +80,24 @@ const TaskMetadataEditor: React.FC<TaskMetadataEditorProps> = ({
 
   if (editing) {
     return (
-      <Space.Compact style={{ width: '100%' }}>
-        <Input
-          size="small"
-          value={draftValue}
-          maxLength={maxLength}
-          onChange={event => setDraftValue(event.target.value)}
-          onPressEnter={save}
-          placeholder={placeholder}
-          autoFocus
-        />
-        <Button size="small" icon={<CloseOutlined />} disabled={saving} onClick={cancelEdit} />
-        <Button type="primary" size="small" icon={<CheckOutlined />} loading={saving} onClick={save} />
-      </Space.Compact>
+      <Input
+        size="small"
+        value={draftValue}
+        maxLength={maxLength}
+        onBlur={save}
+        onChange={event => setDraftValue(event.target.value)}
+        onKeyDown={event => {
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            cancelEdit()
+          }
+        }}
+        onPressEnter={save}
+        placeholder={placeholder}
+        disabled={saving}
+        autoFocus
+        style={{ width: '100%' }}
+      />
     )
   }
 
@@ -122,11 +137,12 @@ const TaskMetadataEditor: React.FC<TaskMetadataEditorProps> = ({
           size="small"
           icon={<EditOutlined />}
           onClick={beginEdit}
+          disabled={disabled}
           style={{
             flex: '0 0 auto',
             color: '#1677ff',
-            opacity: hovered || alwaysShowEdit ? 1 : 0,
-            pointerEvents: hovered || alwaysShowEdit ? 'auto' : 'none',
+            opacity: disabled ? 0 : hovered || alwaysShowEdit ? 1 : 0,
+            pointerEvents: disabled ? 'none' : hovered || alwaysShowEdit ? 'auto' : 'none',
             transition: 'opacity 0.16s ease',
           }}
         />

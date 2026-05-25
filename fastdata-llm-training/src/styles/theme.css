@@ -325,6 +325,165 @@ body {
   font-size: 12px;
 }
 
+.design-doc-version-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 14px;
+  background: rgba(2, 6, 23, 0.32);
+}
+
+.design-doc-version-tabs__list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.design-doc-version-tab-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  border-radius: 12px;
+}
+
+.design-doc-version-tab-wrap--editing {
+  min-width: 92px;
+}
+
+.design-doc-version-tab-wrap--dragging {
+  opacity: 0.58;
+}
+
+.design-doc-version-tab {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.72);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: grab;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.design-doc-version-tab:active {
+  cursor: grabbing;
+}
+
+.design-doc-version-tab span {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.design-doc-version-tab:hover {
+  color: #fff;
+  background: rgba(96, 165, 250, 0.12);
+  border-color: rgba(96, 165, 250, 0.22);
+}
+
+.design-doc-version-tab em {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(148, 163, 184, 0.16);
+  color: rgba(226, 232, 240, 0.78);
+  font-style: normal;
+  font-size: 11px;
+}
+
+.design-doc-version-tab--active {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.32), rgba(99, 102, 241, 0.28));
+  border-color: rgba(147, 197, 253, 0.32);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.24);
+}
+
+.design-doc-version-tab--active em {
+  background: rgba(219, 234, 254, 0.2);
+  color: #dbeafe;
+}
+
+.design-doc-version-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-4px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.design-doc-version-action {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: rgba(191, 219, 254, 0);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.design-doc-version-tab-wrap:hover .design-doc-version-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.design-doc-version-tab-wrap:hover .design-doc-version-action {
+  color: rgba(191, 219, 254, 0.9);
+}
+
+.design-doc-version-action:hover {
+  color: #fff;
+  background: rgba(96, 165, 250, 0.16);
+}
+
+.design-doc-version-action--danger:hover {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.design-doc-version-input.ant-input {
+  width: 104px;
+  height: 28px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.92) !important;
+  border-color: rgba(147, 197, 253, 0.44) !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.14) !important;
+}
+
+.design-doc-version-add.ant-btn {
+  flex: 0 0 auto;
+  color: rgba(191, 219, 254, 0.9);
+}
+
+.design-doc-version-add.ant-btn:hover {
+  color: #fff !important;
+  background: rgba(59, 130, 246, 0.14) !important;
+}
+
 .design-doc-card {
   padding: 12px 14px;
   border-radius: 14px;

@@ -24,6 +24,7 @@ import {
 } from '../../services/taskLifecycle'
 import { formatResourceLockMessage, getModelReferenceLocks } from '../../services/resourceReferenceGuard'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
+import { canAccessResourceData } from '../../services/permissionStore'
 
 const { Text, Title } = Typography
 
@@ -64,6 +65,16 @@ const ModelManagement: React.FC = () => {
     () => rows.filter(item => item.name.toLowerCase().includes(searchValue.toLowerCase())),
     [rows, searchValue],
   )
+  const canOperateModel = (record?: Pick<ModelRecord, 'creator'> | null) =>
+    canAccessResourceData('llm', record?.creator).allowed
+  const warnNoModelDataAccess = (record?: Pick<ModelRecord, 'creator'> | null) => {
+    const permission = canAccessResourceData('llm', record?.creator)
+    if (permission.allowed) {
+      return true
+    }
+    Modal.warning({ title: '权限不足', content: '当前账号仅可操作个人模型。' })
+    return false
+  }
 
   const columns: ColumnsType<ModelRecord> = [
     {
@@ -78,7 +89,13 @@ const ModelManagement: React.FC = () => {
           maxLength={80}
           strong
           placeholder="请输入模型名称"
-          onSave={name => setRows(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))}
+          disabled={!canOperateModel(record)}
+          onSave={name => {
+            if (!warnNoModelDataAccess(record)) {
+              return
+            }
+            setRows(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))
+          }}
         />
       ),
     },
@@ -93,7 +110,13 @@ const ModelManagement: React.FC = () => {
           emptyText="暂无描述"
           placeholder="请输入模型描述"
           type="secondary"
-          onSave={description => setRows(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))}
+          disabled={!canOperateModel(record)}
+          onSave={description => {
+            if (!warnNoModelDataAccess(record)) {
+              return
+            }
+            setRows(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))
+          }}
         />
       ),
     },
@@ -111,7 +134,12 @@ const ModelManagement: React.FC = () => {
             <Button
               type="link"
               size="small"
-              onClick={() =>
+              onClick={() => {
+                const permission = canAccessResourceData('llm', record.creator)
+                if (!permission.allowed) {
+                  Modal.warning({ title: '权限不足', content: '当前账号仅可操作个人模型。' })
+                  return
+                }
                 setRows(previous =>
                   previous.map(item =>
                     item.id === record.id
@@ -122,19 +150,47 @@ const ModelManagement: React.FC = () => {
                       : item,
                   ),
                 )
-              }
+              }}
             >
               {getPrimaryTaskLifecycleAction(record.status) === 'start' ? '启动' : '重新提交'}
             </Button>
           )}
-          <Button type="link" size="small" disabled={!canRunTaskLifecycleAction(record.status, 'edit')}>编辑</Button>
-          <Button type="link" size="small" onClick={() => setDetailRecord(record)}>查看详情</Button>
+          <Button
+            type="link"
+            size="small"
+            disabled={!canRunTaskLifecycleAction(record.status, 'edit')}
+            onClick={() => {
+              const permission = canAccessResourceData('llm', record.creator)
+              if (!permission.allowed) Modal.warning({ title: '权限不足', content: '当前账号仅可操作个人模型。' })
+            }}
+          >
+            编辑
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => {
+              const permission = canAccessResourceData('llm', record.creator)
+              if (!permission.allowed) {
+                Modal.warning({ title: '权限不足', content: '当前账号仅可操作个人模型。' })
+                return
+              }
+              setDetailRecord(record)
+            }}
+          >
+            查看详情
+          </Button>
           <Button
             type="link"
             size="small"
             danger
             disabled={!canRunTaskLifecycleAction(record.status, 'delete')}
             onClick={() => {
+              const permission = canAccessResourceData('llm', record.creator)
+              if (!permission.allowed) {
+                Modal.warning({ title: '权限不足', content: '当前账号仅可操作个人模型。' })
+                return
+              }
               const locks = getModelReferenceLocks(record.name)
               if (locks.length) {
                 Modal.warning({

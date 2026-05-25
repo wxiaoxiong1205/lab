@@ -19,7 +19,7 @@ export interface RouteAccessRule {
 
 export const MENU_PERMISSION_TREE: PermissionTreeNode[] = [
   { key: '/workspace', label: '项目空间' },
-  { key: '/home', label: '首页' },
+  { key: '/task-overview', label: '任务概览' },
   {
     key: 'menu.data-services',
     label: '数据服务',
@@ -104,9 +104,9 @@ export const MENU_PERMISSION_TREE: PermissionTreeNode[] = [
 
 export const OPERATION_PERMISSION_TREE: PermissionTreeNode[] = [
   {
-    key: '/home',
-    label: '首页',
-    children: [{ key: 'home.view', label: '查看首页' }],
+    key: '/task-overview',
+    label: '任务概览',
+    children: [{ key: 'task-overview.view', label: '查看任务概览' }],
   },
   {
     key: 'ops.data-services',
@@ -400,7 +400,7 @@ function collectLeafKeys(nodes: PermissionTreeNode[], target: string[] = []): st
 export const ALL_MENU_PERMISSION_KEYS = collectLeafKeys(MENU_PERMISSION_TREE)
 
 export const OPERATION_DEFINITION_MAP: Record<string, OperationDefinition> = {
-  'home.view': { key: 'home.view', label: '查看首页', menuKey: '/home', requiresProject: false },
+  'task-overview.view': { key: 'task-overview.view', label: '查看任务概览', menuKey: '/task-overview', requiresProject: false },
   'datasets.training.create': { key: 'datasets.training.create', label: '创建训练数据集', menuKey: '/datasets', requiresProject: true },
   'datasets.training.detail': { key: 'datasets.training.detail', label: '查看训练数据详情', menuKey: '/datasets', requiresProject: true },
   'datasets.training.train': { key: 'datasets.training.train', label: '训练数据去训练', menuKey: '/datasets', requiresProject: true },
@@ -505,7 +505,7 @@ export const ALL_OPERATION_KEYS = ALL_OPERATION_DEFINITIONS.map(item => item.key
 
 export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   { menuKey: '/workspace', requiresProject: false, match: pathname => pathname === '/workspace' },
-  { menuKey: '/home', requiresProject: true, match: pathname => pathname === '/home' },
+  { menuKey: '/task-overview', requiresProject: false, match: pathname => pathname === '/task-overview' },
   { menuKey: '/datasets', requiresProject: true, match: pathname => pathname === '/datasets' || pathname.startsWith('/datasets/') },
   { menuKey: '/measurement', requiresProject: true, match: pathname => pathname === '/measurement' || pathname.startsWith('/measurement/') },
   { menuKey: '/inference', requiresProject: true, match: pathname => pathname === '/inference' || pathname.startsWith('/inference/') },

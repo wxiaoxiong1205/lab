@@ -45,7 +45,7 @@ import {
   TASK_LIFECYCLE_TAG,
   type TaskLifecycleStatus,
 } from '../../services/taskLifecycle'
-import { getCurrentUser, usePermissionStore } from '../../services/permissionStore'
+import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage, usePermissionStore } from '../../services/permissionStore'
 import { useOnlineInferenceServices } from '../../services/onlineInferenceServiceStore'
 import { createTaskNotification } from '../../services/notificationStore'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
@@ -734,6 +734,16 @@ const MLNotebook: React.FC = () => {
     () => (notebookId ? rows.find(item => item.id === notebookId) ?? null : null),
     [notebookId, rows],
   )
+  const canAccessNotebookData = (record?: Pick<MLNotebookRecord, 'creatorAccount'> | null) =>
+    canAccessResourceData('machine', record?.creatorAccount).allowed
+  const guardNotebookDataAccess = (record?: Pick<MLNotebookRecord, 'creatorAccount'> | null) => {
+    const permission = canAccessResourceData('machine', record?.creatorAccount)
+    if (!permission.allowed) {
+      message.warning(getOperationDeniedMessage(permission.reason))
+      return false
+    }
+    return true
+  }
   const caseDetail = useMemo(
     () => (caseId ? squareRows.find(item => item.id === caseId) ?? null : null),
     [caseId, squareRows],
@@ -1245,7 +1255,11 @@ const MLNotebook: React.FC = () => {
           maxLength={80}
           strong
           placeholder="请输入 Notebook 名称"
-          onSave={name => setRows(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))}
+          disabled={!canAccessNotebookData(record)}
+          onSave={name => {
+            if (!guardNotebookDataAccess(record)) return
+            setRows(previous => previous.map(item => (item.id === record.id ? { ...item, name } : item)))
+          }}
         />
       ),
     },
@@ -1260,7 +1274,11 @@ const MLNotebook: React.FC = () => {
           emptyText="暂无描述"
           placeholder="请输入描述"
           type="secondary"
-          onSave={description => setRows(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))}
+          disabled={!canAccessNotebookData(record)}
+          onSave={description => {
+            if (!guardNotebookDataAccess(record)) return
+            setRows(previous => previous.map(item => (item.id === record.id ? { ...item, description } : item)))
+          }}
         />
       ),
     },
@@ -1328,9 +1346,19 @@ const MLNotebook: React.FC = () => {
       width: 430,
       render: (_, record) => {
         const operable = canOperateNotebook(record, currentUser.account)
+        const dataPermission = canAccessResourceData('machine', record.creatorAccount)
         if (!operable) {
           return (
             <Tooltip title="私有 Notebook 仅创建人可操作">
+              <Button size="small" disabled>
+                不可操作
+              </Button>
+            </Tooltip>
+          )
+        }
+        if (!dataPermission.allowed) {
+          return (
+            <Tooltip title="权限不足">
               <Button size="small" disabled>
                 不可操作
               </Button>
@@ -1742,9 +1770,10 @@ const MLNotebook: React.FC = () => {
 
   if (
     isEditRoute &&
-    (!editingNotebook || !canOperateNotebook(editingNotebook, currentUser.account) || !canEditNotebook(editingNotebook.status))
+    (!editingNotebook || !canOperateNotebook(editingNotebook, currentUser.account) || !canAccessNotebookData(editingNotebook) || !canEditNotebook(editingNotebook.status))
   ) {
     const isPrivateReadonly = editingNotebook && !canOperateNotebook(editingNotebook, currentUser.account)
+    const isDataReadonly = editingNotebook && !canAccessNotebookData(editingNotebook)
     return (
       <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(editingNotebook ? `/machine-notebook/${editingNotebook.id}` : '/machine-notebook')} style={{ marginBottom: 20 }}>
@@ -1753,8 +1782,8 @@ const MLNotebook: React.FC = () => {
         <Alert
           type="warning"
           showIcon
-          message={isPrivateReadonly ? '私有 Notebook 仅创建人可操作' : editingNotebook ? '运行中的 Notebook 暂不支持编辑配置' : 'Notebook 不存在'}
-          description={isPrivateReadonly ? '该 Notebook 对你可见，但不能进入详情或执行启动、停止、编辑、删除、发布等操作。' : editingNotebook ? '请先停止 Notebook，停止后可进入编辑页修改原创建配置；再次启动前可反复编辑。' : '请返回列表重新选择要编辑的 Notebook。'}
+          message={isPrivateReadonly || isDataReadonly ? '权限不足' : editingNotebook ? '运行中的 Notebook 暂不支持编辑配置' : 'Notebook 不存在'}
+          description={isPrivateReadonly || isDataReadonly ? '该 Notebook 对你可见，但不能进入详情或执行启动、停止、编辑、删除、发布等操作。' : editingNotebook ? '请先停止 Notebook，停止后可进入编辑页修改原创建配置；再次启动前可反复编辑。' : '请返回列表重新选择要编辑的 Notebook。'}
         />
       </div>
     )
@@ -2163,7 +2192,7 @@ const MLNotebook: React.FC = () => {
   }
 
   if (isPublishCaseRoute || isCaseEditRoute) {
-    if (isPublishCaseRoute && sourceNotebook && !canOperateNotebook(sourceNotebook, currentUser.account)) {
+    if (isPublishCaseRoute && sourceNotebook && (!canOperateNotebook(sourceNotebook, currentUser.account) || !canAccessNotebookData(sourceNotebook))) {
       return (
         <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/machine-notebook')} style={{ marginBottom: 20 }}>
@@ -2172,8 +2201,8 @@ const MLNotebook: React.FC = () => {
           <Alert
             type="warning"
             showIcon
-            message="私有 Notebook 仅创建人可操作"
-            description="该 Notebook 对你可见，但不能发布为案例。"
+              message="权限不足"
+              description="该 Notebook 对你可见，但不能发布为案例。"
           />
         </div>
       )
@@ -2467,6 +2496,20 @@ const MLNotebook: React.FC = () => {
   }
 
   if (isDetailRoute && notebookDetail) {
+    if (!canOperateNotebook(notebookDetail, currentUser.account) || !canAccessNotebookData(notebookDetail)) {
+      return (
+        <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
+          <Card style={cardStyle}>
+            <Alert
+              type="warning"
+              showIcon
+              message="权限不足"
+              description="该 Notebook 对你可见，但不能进入详情或执行启动、停止、编辑、删除、发布等操作。"
+            />
+          </Card>
+        </div>
+      )
+    }
     return (
       <div style={{ padding: '28px 32px 40px', minHeight: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>

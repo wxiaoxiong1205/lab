@@ -36,6 +36,7 @@ type TestVersionRow = {
   version: string
   processStatus: string
   publishStatus: string
+  creator?: string
   sampleCount: number
   description?: string
   createdAt: string
@@ -311,6 +312,11 @@ const TestDataset: React.FC = () => {
   }
 
   const handleOpenDetail = (record: TestDatasetRecord) => {
+    const permission = getCreatorDeletePermission(record.creator)
+    if (!permission.allowed) {
+      message.warning(permission.reason)
+      return
+    }
     navigate(`/measurement/testing/${encodeURIComponent(record.name)}`)
   }
 
@@ -331,6 +337,11 @@ const TestDataset: React.FC = () => {
     record: TestDatasetRecord,
     value: { name?: string },
   ) => {
+    const permission = getCreatorDeletePermission(record.creator)
+    if (!permission.allowed) {
+      message.warning(permission.reason)
+      return
+    }
     const nextName = value.name ?? record.name
     await dataServiceApi.updateDatasetMeta('test', record.id, {
       name: nextName,
@@ -343,6 +354,12 @@ const TestDataset: React.FC = () => {
   }
 
   const handleUpdateDatasetVersionDescription = async (record: TestDatasetRecord, versionId: string, description: string) => {
+    const version = record.versions.find(item => item.id === versionId)
+    const permission = getCreatorDeletePermission(version?.creator ?? record.creator)
+    if (!permission.allowed) {
+      message.warning(permission.reason)
+      return
+    }
     await dataServiceApi.updateDatasetVersionDescription('test', record.id, versionId, { description })
   }
 
@@ -390,6 +407,7 @@ const TestDataset: React.FC = () => {
           maxLength={64}
           strong
           placeholder="请输入数据集名称"
+          disabled={!getCreatorDeletePermission(record.creator).allowed}
           onTextClick={() => handleOpenDetail(record)}
           onSave={name => handleUpdateDatasetMeta(record, { name })}
         />
@@ -431,7 +449,20 @@ const TestDataset: React.FC = () => {
       width: 170,
       render: (_: unknown, record: TestDatasetRecord) => (
         <Space size={0} wrap>
-          <Button type="link" size="small" onClick={() => handleOpenDetail(record)}>查看详情</Button>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => {
+              const permission = getCreatorDeletePermission(record.creator)
+              if (!permission.allowed) {
+                Modal.warning({ title: '权限不足', content: permission.reason })
+                return
+              }
+              handleOpenDetail(record)
+            }}
+          >
+            查看详情
+          </Button>
           <Button
             type="link"
             size="small"
@@ -496,6 +527,12 @@ const TestDataset: React.FC = () => {
     if (!detailRecord) {
       return
     }
+    const permission = getCreatorDeletePermission(detailRecord.creator)
+    if (!permission.allowed) {
+      Modal.warning({ title: '权限不足', content: permission.reason })
+      navigate('/measurement', { replace: true })
+      return
+    }
 
     setSelectedRecord(detailRecord)
     setActiveVersionId(detailRecord.versions[0]?.id)
@@ -511,7 +548,7 @@ const TestDataset: React.FC = () => {
         sourceType: 'local',
       })
     }
-  }, [addVersionForm, detailRecord, isDetailRoute, isNewVersionRoute])
+  }, [addVersionForm, detailRecord, isDetailRoute, isNewVersionRoute, navigate])
 
   useEffect(() => {
     let active = true
@@ -726,7 +763,19 @@ const TestDataset: React.FC = () => {
             </div>
           </div>
           <Space size={16}>
-            <Dropdown menu={{ items: downloadItems, onClick: ({ key }) => message.success(`开始下载 ${String(key).toUpperCase()}`) }}>
+            <Dropdown
+              menu={{
+                items: downloadItems,
+                onClick: ({ key }) => {
+                  const permission = getCreatorDeletePermission(selectedRecord.creator)
+                  if (!permission.allowed) {
+                    Modal.warning({ title: '权限不足', content: permission.reason })
+                    return
+                  }
+                  message.success(`开始下载 ${String(key).toUpperCase()}`)
+                },
+              }}
+            >
               <Button icon={<DownloadOutlined />}>下载</Button>
             </Dropdown>
             <Button
@@ -808,6 +857,7 @@ const TestDataset: React.FC = () => {
                       strong
                       alwaysShowEdit
                       placeholder="请输入数据集名称"
+                      disabled={!getCreatorDeletePermission(selectedRecord.creator).allowed}
                       onSave={name => handleUpdateDatasetMeta(selectedRecord, { name })}
                     />
                   </div>
@@ -826,6 +876,7 @@ const TestDataset: React.FC = () => {
                       placeholder="请输入描述"
                       type="secondary"
                       alwaysShowEdit
+                      disabled={!getCreatorDeletePermission(activeVersion?.creator ?? selectedRecord.creator).allowed}
                       onSave={description => {
                         if (!activeVersion) return
                         return handleUpdateDatasetVersionDescription(selectedRecord, activeVersion.id, description)

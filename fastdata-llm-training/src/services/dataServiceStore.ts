@@ -766,6 +766,7 @@ export const dataServiceActions = {
     outputMode?: string
   }) {
     update(draft => {
+      const currentUser = getCurrentUser()
       draft.annotationTasks.unshift({
         id: `ann-${Date.now()}`,
         name: params.name,
@@ -780,7 +781,7 @@ export const dataServiceActions = {
         preDataset: params.preDataset,
         postDataset: params.postDataset ?? '-',
         outputMode: params.outputMode,
-        creator: 'deepexilab',
+        creator: currentUser.account,
         createdAt: nowText().replace(/\//g, '-'),
       })
     })
@@ -809,6 +810,7 @@ export const dataServiceActions = {
     operatorValues?: string[]
   }) {
     update(draft => {
+      const currentUser = getCurrentUser()
       draft.cleaningTasks.unshift({
         id: `clean-${Date.now()}`,
         name: params.name,
@@ -817,7 +819,7 @@ export const dataServiceActions = {
         preDataset: params.preDataset,
         postDataset: params.postDataset ?? '-',
         operatorValues: params.operatorValues ?? [],
-        creator: 'deepexilab',
+        creator: currentUser.account,
         createdAt: nowText(),
       })
     })

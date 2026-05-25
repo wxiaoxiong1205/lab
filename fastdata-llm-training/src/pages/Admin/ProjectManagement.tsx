@@ -19,6 +19,7 @@ import {
   createProject,
   deleteProject,
   getCurrentUser,
+  getAssignableRolesForUser,
   getOperationDeniedMessage,
   getRoleLabel,
   getUserByAccount,
@@ -66,14 +67,14 @@ const ProjectManagement: React.FC = () => {
     }
 
     return permissionState.projects.filter(project =>
-      project.members.some(member => member.account === currentUser.account && member.hasDataPermission),
+      project.members.some(member => member.account === currentUser.account),
     )
   }, [currentUser.account, currentUser.roleKeys, permissionState.projects])
 
-  const projectAdminOptions = useMemo(
+  const memberOptions = useMemo(
     () =>
       permissionState.users
-        .filter(user => user.roleKeys.includes('project_admin') && !user.roleKeys.includes('platform_admin'))
+        .filter(user => !user.roleKeys.includes('platform_admin'))
         .map(user => ({
           value: user.account,
           label: `${user.account}（${user.username}）`,
@@ -81,27 +82,16 @@ const ProjectManagement: React.FC = () => {
     [permissionState.users],
   )
 
-  const getProjectAdminAccounts = (project: PermissionProject) =>
-    project.members
-      .filter(member => {
-        const user = getUserByAccount(member.account, permissionState)
-        return Boolean(member.hasDataPermission && user?.roleKeys.includes('project_admin') && !user.roleKeys.includes('platform_admin'))
-      })
-      .map(member => member.account)
-
-  const getPrimaryRoleKey = (account: string) => {
-    const user = getUserByAccount(account, permissionState)
-    if (!user) {
-      return 'training_engineer' as const
-    }
-    if (user.roleKeys.includes('platform_admin')) {
-      return 'platform_admin' as const
-    }
-    if (user.roleKeys.includes('project_admin')) {
-      return 'project_admin' as const
-    }
-    return user.roleKey
-  }
+  const selectedMemberRoleOptions = useMemo(
+    () =>
+      selectedMemberAccount
+        ? getAssignableRolesForUser(selectedMemberAccount, permissionState).map(role => ({
+            value: role.key,
+            label: role.name,
+          }))
+        : [],
+    [permissionState, selectedMemberAccount],
+  )
 
   const getRoleTags = (account: string) => {
     const user = getUserByAccount(account, permissionState)
@@ -136,7 +126,6 @@ const ProjectManagement: React.FC = () => {
     form.setFieldsValue({
       name: project.name,
       description: project.description,
-      projectAdmins: getProjectAdminAccounts(project),
       cluster: project.cluster,
     })
     setCreateOpen(true)
@@ -258,7 +247,7 @@ const ProjectManagement: React.FC = () => {
             onClick={() =>
               guardOperation('admin.project.members', () => {
                 setSelectedProject(record)
-                setDraftMembers(record.members.filter(member => member.hasDataPermission))
+                setDraftMembers(record.members)
                 memberForm.resetFields()
                 setSelectedMemberAccount(undefined)
                 setPermissionOpen(true)
@@ -301,7 +290,7 @@ const ProjectManagement: React.FC = () => {
       title: '角色',
       key: 'role',
       width: 260,
-      render: (_, record) => getRoleTags(record.account).join('、') || '-',
+      render: (_, record) => getRoleLabel(record.roleKey, permissionState),
     },
     {
       title: '邮箱',
@@ -340,7 +329,6 @@ const ProjectManagement: React.FC = () => {
       const payload = {
         name: values.name,
         description: values.description ?? '',
-        projectAdmins: values.projectAdmins ?? [],
         cluster: values.cluster,
       }
 
@@ -415,28 +403,24 @@ const ProjectManagement: React.FC = () => {
 
     try {
       const values = await memberForm.validateFields()
-      setDraftMembers(previous => {
-        const existingIndex = previous.findIndex(item => item.account === values.account)
-        const roleKey = getPrimaryRoleKey(values.account)
-        const nextMember: ProjectPermissionMember = {
-          account: values.account,
-          roleKey,
-          hasDataPermission: true,
-          joinedAt: previous[existingIndex]?.joinedAt ?? formatJoinedAt(),
-        }
+      const existingIndex = draftMembers.findIndex(item => item.account === values.account)
+      const nextMember: ProjectPermissionMember = {
+        account: values.account,
+        roleKey: values.roleKey,
+        joinedAt: draftMembers[existingIndex]?.joinedAt ?? formatJoinedAt(),
+      }
+      const nextMembers =
+        existingIndex >= 0
+          ? draftMembers.map((member, index) => (index === existingIndex ? nextMember : member))
+          : [...draftMembers, nextMember]
 
-        if (existingIndex >= 0) {
-          const nextMembers = [...previous]
-          nextMembers[existingIndex] = nextMember
-          return nextMembers
-        }
-
-        return [...previous, nextMember]
-      })
+      setDraftMembers(nextMembers)
+      setSelectedProject(previous => previous ? { ...previous, members: nextMembers } : previous)
+      updateProjectMembers(selectedProject.id, nextMembers)
 
       memberForm.resetFields()
       setSelectedMemberAccount(undefined)
-      message.success('成员已加入待保存列表')
+      message.success('成员已添加')
     } catch {
       return
     }
@@ -448,7 +432,7 @@ const ProjectManagement: React.FC = () => {
         <Card style={{ borderRadius: 20, border: '1px solid #e5e7eb' }}>
           <Title level={2}>项目管理</Title>
           <Text type="secondary" style={{ display: 'block', marginBottom: 18 }}>
-            统一维护项目基础信息、绑定集群、项目管理员、成员权限、SSH 配置与镜像命名空间。
+            统一维护项目基础信息、绑定集群、成员角色、SSH 配置与镜像命名空间。
           </Text>
 
           <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
@@ -491,14 +475,6 @@ const ProjectManagement: React.FC = () => {
           <Form.Item label="项目描述" name="description">
             <Input.TextArea rows={3} placeholder="请输入项目描述（可选）" />
           </Form.Item>
-          <Form.Item label="项目管理员" name="projectAdmins">
-            <Select
-              mode="multiple"
-              placeholder="请选择项目管理员"
-              options={projectAdminOptions}
-              optionFilterProp="label"
-            />
-          </Form.Item>
           <Form.Item label="绑定集群" name="cluster" rules={[{ required: true, message: '请选择绑定集群' }]}>
             <Select
               disabled={Boolean(editingProject)}
@@ -508,7 +484,7 @@ const ProjectManagement: React.FC = () => {
           </Form.Item>
           <div style={{ background: '#f8fafc', borderRadius: 10, padding: 14 }}>
             <Text type="secondary">
-              平台管理员在新建项目后默认拥有该项目数据权限，其他角色默认无数据权限。
+              项目创建后通过成员管理添加用户并选择项目内角色。
             </Text>
           </div>
         </Form>
@@ -529,7 +505,7 @@ const ProjectManagement: React.FC = () => {
         }
       >
         <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-          有菜单权限和操作权限但无项目权限的账号，不显示该项目，也不能进入该项目相关业务页面。
+          添加成员即表示该用户拥有当前项目访问权限；项目内操作权限和数据范围由此处选择的角色决定。
         </Text>
         <Card
           size="small"
@@ -544,13 +520,24 @@ const ProjectManagement: React.FC = () => {
             >
               <Select
                 placeholder="请选择成员"
-                options={permissionState.users.map(user => ({
-                  value: user.account,
-                  label: `${user.account}（${user.username}）`,
-                }))}
+                options={memberOptions}
                 onChange={value => {
                   setSelectedMemberAccount(value)
+                  const firstRole = getAssignableRolesForUser(value, permissionState)[0]
+                  memberForm.setFieldValue('roleKey', firstRole?.key)
                 }}
+              />
+            </Form.Item>
+            <Form.Item
+              label="项目角色"
+              name="roleKey"
+              rules={[{ required: true, message: '请选择项目角色' }]}
+              style={{ minWidth: 220 }}
+            >
+              <Select
+                disabled={!selectedMemberAccount}
+                placeholder="请选择项目角色"
+                options={selectedMemberRoleOptions}
               />
             </Form.Item>
             <Form.Item>
@@ -561,8 +548,8 @@ const ProjectManagement: React.FC = () => {
           </Form>
           {selectedMemberAccount && (
             <Text type="secondary" style={{ display: 'block', marginTop: 10 }}>
-              该成员已有角色：
-              {getRoleTags(selectedMemberAccount).join('、') || '-'}；项目内操作权限将按多个角色的权限合集生效。
+              控制台已授权角色：
+              {getRoleTags(selectedMemberAccount).join('、') || '-'}；项目成员只能从这些角色中选择一个作为当前项目角色。
             </Text>
           )}
         </Card>
@@ -571,7 +558,6 @@ const ProjectManagement: React.FC = () => {
           columns={permissionColumns}
           dataSource={draftMembers}
           pagination={false}
-          rowSelection={{}}
           scroll={{ x: 1170 }}
         />
       </Modal>
