@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { message, Modal, Form, Input, Select, Button, Typography, Space, Divider, Descriptions, Tag, Table, Card, Dropdown, Switch, Radio } from 'antd'
-import { DatabaseOutlined, PlusOutlined, DownloadOutlined, DeleteOutlined, FileTextOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { DatabaseOutlined, PlusOutlined, DownloadOutlined, DeleteOutlined, FileTextOutlined, ArrowLeftOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -11,6 +11,8 @@ import { formatResourceLockMessage, getCreatorDeletePermission, getDatasetRefere
 import { getDatasetFormatLabel, isDpoUsage, normalizeDatasetFormat } from '../../services/datasetFormats'
 import ResumableUpload from '../../components/ResumableUpload'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
+import DatasetVersionMergeModal from '../../components/DatasetVersionMergeModal'
+import { validateFieldsAndScroll } from '../../utils/formValidation'
 
 const { Text } = Typography
 
@@ -27,8 +29,22 @@ const statusMap: Record<string, { color: string; label: string }> = {
 
 const versionStatusMap: Record<string, { color: string; label: string }> = {
   已发布: { color: 'green', label: '已发布' },
-  草稿: { color: 'default', label: '草稿' },
-  已归档: { color: 'orange', label: '已归档' },
+  未发布: { color: 'default', label: '未发布' },
+  处理失败: { color: 'error', label: '处理失败' },
+}
+
+function resolveVersionPublishStatus(
+  version?: { processStatus?: string; publishStatus?: string },
+  fallbackPublishStatus?: string,
+  fallbackProcessStatus?: string,
+): keyof typeof versionStatusMap {
+  if (version?.processStatus === '处理失败' || fallbackProcessStatus === '处理失败') {
+    return '处理失败'
+  }
+  if (version?.publishStatus === '已发布' || fallbackPublishStatus === '已发布') {
+    return '已发布'
+  }
+  return '未发布'
 }
 
 type TestVersionRow = {
@@ -38,6 +54,8 @@ type TestVersionRow = {
   publishStatus: string
   creator?: string
   sampleCount: number
+  mergeSourceVersions?: string[]
+  mergeMode?: 'version-merge'
   description?: string
   createdAt: string
 }
@@ -58,6 +76,7 @@ type TestDatasetRecord = {
 
 type DatasetDetailRow = {
   key: string
+  sourceVersion?: string
   system?: string
   prompt?: string
   response?: string
@@ -110,7 +129,7 @@ function buildTestVersions(row: Omit<TestDatasetRecord, 'versions'>): TestVersio
       id: `${row.id}-v${i}`,
       version: `V${i}`,
       processStatus: '处理完成',
-      publishStatus: isLatest ? row.status : '已归档',
+      publishStatus: isLatest ? row.status : row.status === '已发布' ? '已发布' : '未发布',
       sampleCount: Math.max(10, Math.floor(500 * scale)),
       description: isLatest ? row.description : '',
       createdAt: row.createdAt,
@@ -202,6 +221,7 @@ const TestDataset: React.FC = () => {
   const [createModalVisible, setCreateModalVisible] = useState(false)
   const [detailModalVisible, setDetailModalVisible] = useState(false)
   const [addVersionModalVisible, setAddVersionModalVisible] = useState(false)
+  const [mergeVersionOpen, setMergeVersionOpen] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<TestDatasetRecord | null>(null)
   const [addVersionTarget, setAddVersionTarget] = useState<TestDatasetRecord | null>(null)
 
@@ -211,11 +231,13 @@ const TestDataset: React.FC = () => {
   const [addVersionFile, setAddVersionFile] = useState<UploadFile | null>(null)
   const [creating, setCreating] = useState(false)
   const [addingVersion, setAddingVersion] = useState(false)
+  const [mergingVersion, setMergingVersion] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [listLoading, setListLoading] = useState(false)
   const [listResult, setListResult] = useState<PaginatedResult<TestDatasetRecord>>({ items: [], total: 0 })
   const [activeVersionId, setActiveVersionId] = useState<string>()
+  const [pendingActiveVersion, setPendingActiveVersion] = useState<string>()
   const isCreateRoute = location.pathname === '/measurement/testing/create'
   const isNewVersionRoute = location.pathname.endsWith('/new-version')
   const isDetailRoute = location.pathname.startsWith('/measurement/testing/') && !isCreateRoute && !isNewVersionRoute
@@ -229,9 +251,14 @@ const TestDataset: React.FC = () => {
   }, [dataList, id, isDetailRoute])
   const activeVersion = selectedRecord?.versions.find(item => item.id === activeVersionId) ?? selectedRecord?.versions[0]
   const detailRows = selectedRecord ? buildDetailRows(selectedRecord, activeVersion ?? selectedRecord.versions[0]) : []
+  const isActiveVersionPublished = activeVersion?.publishStatus === '已发布'
 
   const handleDeleteDetailRow = (row: DatasetDetailRow) => {
     if (!selectedRecord || !activeVersion) return
+    if (isActiveVersionPublished) {
+      message.warning('已发布版本不可删除单条数据，请先新增未发布版本后调整。')
+      return
+    }
 
     Modal.confirm({
       title: '确认删除该条数据？',
@@ -267,8 +294,9 @@ const TestDataset: React.FC = () => {
       dataIndex: 'publishStatus',
       key: 'publishStatus',
       width: 88,
-      render: (v: string) => {
-        const s = versionStatusMap[v] || { color: 'default', label: v }
+      render: (_v: string, version: TestVersionRow) => {
+        const status = resolveVersionPublishStatus(version)
+        const s = versionStatusMap[status]
         return <Tag color={s.color}>{s.label}</Tag>
       },
     },
@@ -276,14 +304,37 @@ const TestDataset: React.FC = () => {
     { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', ellipsis: true },
   ]
 
+  const handlePublishVersion = (record: TestDatasetRecord, version: TestVersionRow) => {
+    const permission = getCreatorDeletePermission(version.creator ?? record.creator)
+    if (!permission.allowed) {
+      Modal.warning({ title: '权限不足', content: permission.reason })
+      return
+    }
+
+    Modal.confirm({
+      title: '确认发布当前版本？',
+      content: `发布后 ${record.name}-${version.version} 可用于推理、评估、标注和清洗，当前版本的数据明细将锁定。`,
+      okText: '发布',
+      cancelText: '取消',
+      onOk: async () => {
+        await dataServiceApi.publishDatasetVersion('test', record.id, { versionId: version.id })
+        message.success('发布成功')
+      },
+    })
+  }
+
   const handleOpenCreate = () => {
     navigate('/measurement/testing/create?type=test')
   }
 
   const handleSubmit = async () => {
+    const values = await validateFieldsAndScroll<Record<string, any>>(form, message)
+
+    if (!values) {
+      return
+    }
+
     try {
-      await form.validateFields()
-      const values = form.getFieldsValue()
       setCreating(true)
       await dataServiceApi.createDataset('test', {
         name: values.name,
@@ -394,6 +445,29 @@ const TestDataset: React.FC = () => {
     }
   }
 
+  const handleSubmitMergeVersion = async (sourceVersionIds: string[], description?: string) => {
+    if (!selectedRecord) return
+    const permission = getCreatorDeletePermission(selectedRecord.creator)
+    if (!permission.allowed) {
+      message.warning(permission.reason)
+      return
+    }
+
+    setMergingVersion(true)
+    try {
+      const nextVersion = nextVersionLabel(selectedRecord.latestVersion)
+      await dataServiceApi.mergeDatasetVersions('test', selectedRecord.id, {
+        sourceVersionIds,
+        description,
+      })
+      setPendingActiveVersion(nextVersion)
+      message.success(`版本合并成功，已生成 ${nextVersion}`)
+      setMergeVersionOpen(false)
+    } finally {
+      setMergingVersion(false)
+    }
+  }
+
   const columns: ColumnsType<TestDatasetRecord> = [
     {
       title: '数据集名称',
@@ -463,6 +537,15 @@ const TestDataset: React.FC = () => {
           >
             查看详情
           </Button>
+          {(() => {
+            const latestVersion = record.versions.find(item => item.version === record.latestVersion) ?? record.versions[0]
+            if (!latestVersion || latestVersion.publishStatus === '已发布') return null
+            return (
+              <Button type="link" size="small" onClick={() => handlePublishVersion(record, latestVersion)}>
+                发布
+              </Button>
+            )
+          })()}
           <Button
             type="link"
             size="small"
@@ -551,6 +634,18 @@ const TestDataset: React.FC = () => {
   }, [addVersionForm, detailRecord, isDetailRoute, isNewVersionRoute, navigate])
 
   useEffect(() => {
+    if (!pendingActiveVersion || !selectedRecord) {
+      return
+    }
+
+    const nextVersion = selectedRecord.versions.find(version => version.version === pendingActiveVersion)
+    if (nextVersion) {
+      setActiveVersionId(nextVersion.id)
+      setPendingActiveVersion(undefined)
+    }
+  }, [pendingActiveVersion, selectedRecord])
+
+  useEffect(() => {
     let active = true
     setListLoading(true)
 
@@ -583,6 +678,7 @@ const TestDataset: React.FC = () => {
       form={form}
       layout="vertical"
       initialValues={{ dataSource: 'local', dataUsage: '文本生成', dataFormat: 'PROMPT_RESPONSE' }}
+      scrollToFirstError={{ behavior: 'smooth', block: 'center' }}
     >
       <Divider plain style={{ margin: '0 0 16px', color: '#64748b', fontSize: 12 }}>基本信息</Divider>
 
@@ -681,38 +777,54 @@ const TestDataset: React.FC = () => {
     ),
   }
 
+  const sourceVersionColumns: ColumnsType<DatasetDetailRow> = detailRows.some(row => row.sourceVersion)
+    ? [
+        {
+          title: '来源版本',
+          dataIndex: 'sourceVersion',
+          key: 'sourceVersion',
+          width: 110,
+          render: (value: string) => value ? <Tag color="blue">{value}</Tag> : '-',
+        },
+      ]
+    : []
+
   const detailTableColumns: ColumnsType<DatasetDetailRow> =
     selectedRecord && isDpoUsage(selectedRecord.dataUsage)
       ? normalizeDatasetFormat(selectedRecord.dataFormat, selectedRecord.dataUsage) === 'role-based'
         ? [
             { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
+            ...sourceVersionColumns,
             { title: 'Messages', dataIndex: 'messages', key: 'messages', width: 360, render: renderDetailValue },
             { title: 'Chosen', dataIndex: 'chosen', key: 'chosen', width: 280, render: renderDetailValue },
             { title: 'Rejected', dataIndex: 'rejected', key: 'rejected', width: 280, render: renderDetailValue },
-            detailDeleteColumn,
+            ...(!isActiveVersionPublished ? [detailDeleteColumn] : []),
           ]
         : [
             { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
+            ...sourceVersionColumns,
             { title: 'Instruction', dataIndex: 'instruction', key: 'instruction', width: 260 },
             { title: 'Input', dataIndex: 'input', key: 'input', width: 220 },
             { title: 'Chosen', dataIndex: 'chosen', key: 'chosen', width: 280 },
             { title: 'Rejected', dataIndex: 'rejected', key: 'rejected', width: 280 },
-            detailDeleteColumn,
+            ...(!isActiveVersionPublished ? [detailDeleteColumn] : []),
           ]
       : selectedRecord?.dataFormat === 'role-based'
       ? [
           { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
+          ...sourceVersionColumns,
           { title: 'System', dataIndex: 'system', key: 'system' },
           { title: 'User', dataIndex: 'user', key: 'user' },
           { title: 'Assistant', dataIndex: 'assistant', key: 'assistant' },
-          detailDeleteColumn,
+          ...(!isActiveVersionPublished ? [detailDeleteColumn] : []),
         ]
       : [
           { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
+          ...sourceVersionColumns,
           { title: 'System', dataIndex: 'system', key: 'system' },
           { title: 'Prompt', dataIndex: 'prompt', key: 'prompt' },
           { title: 'Response', dataIndex: 'response', key: 'response' },
-          detailDeleteColumn,
+          ...(!isActiveVersionPublished ? [detailDeleteColumn] : []),
         ]
 
   const downloadItems = [
@@ -749,8 +861,9 @@ const TestDataset: React.FC = () => {
 
   if (isDetailRoute && selectedRecord) {
     return (
-      <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 22 }}>
+      <>
+        <div style={{ padding: '28px 32px', minHeight: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 22 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
             <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/measurement')}>返回列表</Button>
             <div>
@@ -763,6 +876,22 @@ const TestDataset: React.FC = () => {
             </div>
           </div>
           <Space size={16}>
+            {activeVersion && activeVersion.processStatus === '处理完成' && (
+              <Button
+                type="primary"
+                icon={isActiveVersionPublished ? <PlayCircleOutlined /> : undefined}
+                onClick={() => {
+                  if (!isActiveVersionPublished) {
+                    handlePublishVersion(selectedRecord, activeVersion)
+                    return
+                  }
+                  const datasetType = resolveTestUsageLabel(selectedRecord.dataUsage) === '图像理解' ? 'image-understanding' : 'text-generation'
+                  navigate(`/effect-evaluation/create?dataset_type=${datasetType}&mode=auto`)
+                }}
+              >
+                {isActiveVersionPublished ? '去评估' : '发布'}
+              </Button>
+            )}
             <Dropdown
               menu={{
                 items: downloadItems,
@@ -808,32 +937,44 @@ const TestDataset: React.FC = () => {
               删除
             </Button>
           </Space>
-        </div>
+          </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '188px minmax(0, 1fr)', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '188px minmax(0, 1fr)', gap: 20 }}>
           <div>
-            <Button type="primary" size="large" icon={<PlusOutlined />} block onClick={() => selectedRecord && handleOpenAddVersion(selectedRecord)} style={{ height: 52, marginBottom: 18 }}>
-              新增版本
-            </Button>
-            <Card style={{ borderRadius: 16 }}>
+            <div className="dataset-version-action-group">
+              <Button type="primary" icon={<PlusOutlined />} block onClick={() => selectedRecord && handleOpenAddVersion(selectedRecord)}>
+                新增版本
+              </Button>
+              <Button
+                block
+                className="dataset-version-action-secondary"
+                onClick={() => setMergeVersionOpen(true)}
+                disabled={selectedRecord.versions.filter(version => version.processStatus === '处理完成').length < 2}
+              >
+                合并版本
+              </Button>
+            </div>
+            <Card className="dataset-version-list-card">
               <Space direction="vertical" size={10} style={{ width: '100%' }}>
                 {selectedRecord.versions.map(version => {
                   const active = version.id === activeVersion?.id
                   return (
                     <div
                       key={version.id}
+                      className={`dataset-version-card${active ? ' dataset-version-card--active' : ''}`}
                       onClick={() => setActiveVersionId(version.id)}
-                      style={{
-                        cursor: 'pointer',
-                        padding: '14px 16px',
-                        borderRadius: 12,
-                        background: active ? 'rgba(59,130,246,0.12)' : '#fff',
-                        border: active ? '1px solid rgba(59,130,246,0.35)' : '1px solid #eef2f7',
-                        color: active ? '#2563eb' : '#0f172a',
-                        fontWeight: active ? 700 : 500,
-                      }}
                     >
-                      {version.version}
+                      <div className="dataset-version-card__header">
+                        <span className="dataset-version-card__name">{version.version}</span>
+                        {(() => {
+                          const status = resolveVersionPublishStatus(version)
+                          const s = versionStatusMap[status]
+                          return <Tag color={s.color} style={{ marginInlineEnd: 0 }}>{s.label}</Tag>
+                        })()}
+                      </div>
+                      <div className="dataset-version-card__meta">
+                        {version.sampleCount.toLocaleString()} 条样本
+                      </div>
                     </div>
                   )
                 })}
@@ -866,6 +1007,14 @@ const TestDataset: React.FC = () => {
                 <div><Text type="secondary">数据用途：</Text><Text strong>{resolveTestUsageLabel(selectedRecord.dataUsage)}</Text></div>
                 <div><Text type="secondary">数据格式：</Text><Tag>{resolveFormatLabel(selectedRecord.dataUsage, selectedRecord.dataFormat)}</Tag></div>
                 <div><Text type="secondary">状态：</Text><Text strong>{activeVersion?.processStatus ?? selectedRecord.versionStatus}</Text></div>
+                <div>
+                  <Text type="secondary">发布状态：</Text>
+                  {(() => {
+                    const status = resolveVersionPublishStatus(activeVersion, selectedRecord.status, selectedRecord.versionStatus)
+                    const s = versionStatusMap[status]
+                    return <Tag color={s.color}>{s.label}</Tag>
+                  })()}
+                </div>
                 <div><Text type="secondary">文件大小：</Text><Text strong>{formatFileSizeMB(activeVersion?.sampleCount ?? 0)}</Text></div>
                 <div>
                   <Text type="secondary">描述：</Text>
@@ -902,8 +1051,26 @@ const TestDataset: React.FC = () => {
               />
             </Card>
           </div>
+          </div>
         </div>
-      </div>
+        <DatasetVersionMergeModal
+          open={mergeVersionOpen}
+          loading={mergingVersion}
+          datasetName={selectedRecord.name}
+          nextVersion={nextVersionLabel(selectedRecord.latestVersion)}
+          versions={selectedRecord.versions.map(version => ({
+            id: version.id,
+            version: version.version,
+            processStatus: version.processStatus,
+            publishStatus: version.publishStatus,
+            sampleCount: version.sampleCount,
+            creator: version.creator ?? selectedRecord.creator,
+            createdAt: version.createdAt,
+          }))}
+          onCancel={() => setMergeVersionOpen(false)}
+          onSubmit={handleSubmitMergeVersion}
+        />
+      </>
     )
   }
 

@@ -41,6 +41,7 @@ import ResumableUpload from '../../components/ResumableUpload'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import { dataServiceApi, selectInferenceResults, useDataServiceSnapshot } from '../../services/dataServiceApi'
 import { canAccessResourceData, getOperationDeniedMessage } from '../../services/permissionStore'
+import { validateFieldsAndScroll } from '../../utils/formValidation'
 
 const { Title, Text } = Typography
 
@@ -448,25 +449,26 @@ const InferenceResult: React.FC = () => {
   }
 
   const submit = async () => {
-    try {
-      const values = await form.validateFields()
-      await dataServiceApi.createInferenceResult({
-        name: values.name,
-        description: values.description ?? '',
-        dataUsage: values.inferenceMode === '导入推理结果集'
-          ? getBaseDataUsage(values.importDataUsage)
-          : (selectedPendingDataset?.dataUsage === '图像理解' ? '图像理解' : '文本生成') as DataUsage,
-        inferenceMode: values.inferenceMode,
-        importFile: normalizeUploadFileName(values.importFile),
-        pendingData: values.inferenceMode === '导入推理结果集' ? '外部导入' : values.pendingData,
-        pendingModel: values.inferenceMode === '导入推理结果集' ? values.importModelName : normalizeModelLabel(values.pendingModel),
-        dataVolume: values.inferenceMode === '导入推理结果集' ? '-' : selectedPendingDataset?.sampleCount ?? '-',
-      })
-      message.success('推理结果集已创建')
-      closeCreate()
-    } catch {
+    const values = await validateFieldsAndScroll<Record<string, any>>(form, message)
+
+    if (!values) {
       return
     }
+
+    await dataServiceApi.createInferenceResult({
+      name: values.name,
+      description: values.description ?? '',
+      dataUsage: values.inferenceMode === '导入推理结果集'
+        ? getBaseDataUsage(values.importDataUsage)
+        : (selectedPendingDataset?.dataUsage === '图像理解' ? '图像理解' : '文本生成') as DataUsage,
+      inferenceMode: values.inferenceMode,
+      importFile: normalizeUploadFileName(values.importFile),
+      pendingData: values.inferenceMode === '导入推理结果集' ? '外部导入' : values.pendingData,
+      pendingModel: values.inferenceMode === '导入推理结果集' ? values.importModelName : normalizeModelLabel(values.pendingModel),
+      dataVolume: values.inferenceMode === '导入推理结果集' ? '-' : selectedPendingDataset?.sampleCount ?? '-',
+    })
+    message.success('推理结果集已创建')
+    closeCreate()
   }
 
   const adjustModelParameter = (field: string, delta: number, min?: number, max?: number) => {
@@ -523,7 +525,7 @@ const InferenceResult: React.FC = () => {
           </div>
 
           <Card style={sectionCardStyle}>
-            <Form form={form} layout="vertical" initialValues={createFormInitialValues}>
+            <Form form={form} layout="vertical" initialValues={createFormInitialValues} scrollToFirstError={{ behavior: 'smooth', block: 'center' }}>
               <Form.Item label="数据集名称" name="name" rules={[{ required: true, message: '请输入数据集名称' }]}>
                 <Input maxLength={50} showCount />
               </Form.Item>

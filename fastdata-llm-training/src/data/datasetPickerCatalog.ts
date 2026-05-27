@@ -5,6 +5,7 @@ export interface DatasetPickerVersion {
   label: string
   charCount: number
   sampleCount: number
+  publishStatus?: '已发布' | '未发布'
 }
 
 /** 数据类型：与推理/训练侧数据集分类一致（Mock） */
@@ -34,6 +35,7 @@ export interface DatasetPickerResolvedRow {
   sampleCount: number
   sampleRate: number
   trainRatio: number
+  publishStatus?: '已发布' | '未发布'
 }
 
 export const DATASET_PICKER_CATALOG: DatasetPickerItem[] = [
@@ -46,7 +48,7 @@ export const DATASET_PICKER_CATALOG: DatasetPickerItem[] = [
     dataFormat: 'PROMPT_RESPONSE',
     versions: [
       { id: 'v1', label: 'V1', charCount: 890_000, sampleCount: 2200 },
-      { id: 'v2', label: 'V2', charCount: 1_250_000, sampleCount: 3100 },
+      { id: 'v2', label: 'V2', charCount: 1_250_000, sampleCount: 3100, publishStatus: '未发布' },
     ],
   },
   {
@@ -91,7 +93,7 @@ export const DATASET_PICKER_CATALOG: DatasetPickerItem[] = [
     dataFormat: 'ROLE_BASED',
     versions: [
       { id: 'v1', label: 'V1', charCount: 72_000, sampleCount: 480 },
-      { id: 'v2', label: 'V2', charCount: 96_000, sampleCount: 640 },
+      { id: 'v2', label: 'V2', charCount: 96_000, sampleCount: 640, publishStatus: '未发布' },
     ],
   },
   {
@@ -113,7 +115,7 @@ export const DATASET_PICKER_CATALOG: DatasetPickerItem[] = [
     versions: [
       { id: 'v1', label: 'V1', charCount: 88_000, sampleCount: 720 },
       { id: 'v2', label: 'V2', charCount: 132_000, sampleCount: 1040 },
-      { id: 'v3', label: 'V3', charCount: 156_000, sampleCount: 1280 },
+      { id: 'v3', label: 'V3', charCount: 156_000, sampleCount: 1280, publishStatus: '未发布' },
     ],
   },
   {
@@ -387,5 +389,6 @@ export function resolveDatasetVersionRow(key: string): DatasetPickerResolvedRow 
     sampleCount: ver.sampleCount,
     sampleRate: 1,
     trainRatio: 0,
+    publishStatus: ver.publishStatus ?? '已发布',
   }
 }

@@ -49,6 +49,7 @@ import {
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
 import { canAccessResourceData, getOperationDeniedMessage } from '../../services/permissionStore'
+import { validateFieldsAndScroll } from '../../utils/formValidation'
 
 const { Text, Title } = Typography
 
@@ -692,25 +693,27 @@ const DataAnnotation: React.FC = () => {
   }
 
   const handleSubmitCreate = async () => {
-    try {
-      await form.validateFields()
-      if (!selectedDataset) {
-        message.warning('请选择需要标注的数据集')
-        return
-      }
-      setCreateOpen(false)
-    } catch {
+    const values = await validateFieldsAndScroll<Record<string, any>>(form, message)
+
+    if (!values) {
       return
     }
 
+    if (!selectedDataset) {
+      message.warning('请选择需要标注的数据集')
+      return
+    }
+
+    setCreateOpen(false)
+
     const datasetLabel = selectedDataset?.label ?? '-'
-    const outputMode = form.getFieldValue('outputMode')
+    const outputMode = values.outputMode
     const createMode = isMultiCreatePage ? 'multi' : collaborationTab
     const createAssignmentDraft = getAssignmentDraft(CREATE_ASSIGNMENT_KEY)
     setCreating(true)
     try {
       await dataServiceApi.createAnnotationTask({
-        name: form.getFieldValue('name'),
+        name: values.name,
         dataVolume: selectedDataset?.count ?? 0,
         collaborationMode: createMode,
         reviewerCount:
@@ -718,13 +721,13 @@ const DataAnnotation: React.FC = () => {
             ? createAssignmentDraft.annotators.length + createAssignmentDraft.reviewers.length
             : undefined,
         reviewMode: createMode === 'multi' ? '抽检审核' : undefined,
-        datasetType: form.getFieldValue('datasetType'),
+        datasetType: values.datasetType,
         preDataset: datasetLabel,
         postDataset: outputMode === '新增版本' ? `${datasetLabel}-标注结果` : '-',
         outputMode,
       })
       if (isMultiCreatePage) {
-        navigate(`/data-annotation?dataset_type=${form.getFieldValue('datasetType')}&mode=multi`)
+        navigate(`/data-annotation?dataset_type=${values.datasetType}&mode=multi`)
       }
     } finally {
       setCreating(false)
@@ -1710,8 +1713,8 @@ const DataAnnotation: React.FC = () => {
       detailedDataUsage
       allowedDetailedUsages={datasetType === 'image-understanding' ? ['图像理解'] : ['文本生成 / SFT', '文本生成 / DPO', '文本生成 / RFT-PPO', '文本生成 / RFT-GRPO']}
       dataScopeHint={datasetType === 'image-understanding'
-        ? '当前为图像理解标注任务，仅展示图像理解数据集；DPO 数据支持 Alpaca 与 Role-Based 两种格式。'
-        : '当前为文本生成标注任务，可选择 SFT、DPO、RFT 数据集；DPO 数据支持 Alpaca 与 Role-Based 两种格式。'}
+        ? '仅展示已发布的图像理解数据集；DPO 数据支持 Alpaca 与 Role-Based 两种格式。'
+        : '仅展示已发布的文本生成数据集，可选择 SFT、DPO、RFT；DPO 数据支持 Alpaca 与 Role-Based 两种格式。'}
       emptyText="当前无可用数据集"
       defaultSelectedKeys={selectedAnnotationDataset ? [selectedAnnotationDataset.key] : []}
       onCancel={() => setDatasetPickerOpen(false)}
@@ -1841,7 +1844,7 @@ const DataAnnotation: React.FC = () => {
         <Text type="secondary">配置数据集、输出结果与标注/审核成员分配。</Text>
 
         <Card style={{ marginTop: 20, borderRadius: 16, border: '1px solid #e2e8f0' }}>
-          <Form form={form} layout="vertical" initialValues={{ sourceType: '已有数据集', outputMode: '新增版本', datasetType }}>
+          <Form form={form} layout="vertical" initialValues={{ sourceType: '已有数据集', outputMode: '新增版本', datasetType }} scrollToFirstError={{ behavior: 'smooth', block: 'center' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 20px' }}>
               <Form.Item label="任务名称" name="name" rules={[{ required: true, message: '请输入任务名称' }]}>
                 <Input placeholder="请输入任务名称" />
@@ -2793,7 +2796,7 @@ const DataAnnotation: React.FC = () => {
           </Space>
         }
       >
-        <Form form={form} layout="vertical" initialValues={{ sourceType: '已有数据集', outputMode: '新增版本', datasetType }}>
+        <Form form={form} layout="vertical" initialValues={{ sourceType: '已有数据集', outputMode: '新增版本', datasetType }} scrollToFirstError={{ behavior: 'smooth', block: 'center' }}>
           <Form.Item
             label="任务名称"
             name="name"

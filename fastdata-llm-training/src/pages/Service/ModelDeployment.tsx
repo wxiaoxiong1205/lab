@@ -28,6 +28,7 @@ import {
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import { createTaskNotification } from '../../services/notificationStore'
 import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage } from '../../services/permissionStore'
+import { validateFieldsAndScroll } from '../../utils/formValidation'
 
 const { Text, Title } = Typography
 
@@ -248,9 +249,13 @@ const ModelDeployment: React.FC = () => {
   }
 
   const submitCreate = async () => {
+    const values = await validateFieldsAndScroll<Record<string, any>>(form, message)
+
+    if (!values) {
+      return
+    }
+
     try {
-      await form.validateFields()
-      const values = form.getFieldsValue()
       const currentUser = getCurrentUser()
       const nextRecord: ServiceRecord = {
         id: `svc-${Date.now()}`,
@@ -298,7 +303,12 @@ const ModelDeployment: React.FC = () => {
         </div>
 
         <Card style={{ borderRadius: 18, border: '1px solid #e5e7eb' }}>
-          <Form form={form} layout="vertical" initialValues={{ modelSource: 'trained', instanceCount: 1 }}>
+          <Form
+            form={form}
+            layout="vertical"
+            initialValues={{ modelSource: 'trained', instanceCount: 1 }}
+            scrollToFirstError={{ behavior: 'smooth', block: 'center' }}
+          >
             <Title level={3}>部署服务</Title>
             <Divider />
 

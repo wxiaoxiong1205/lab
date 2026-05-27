@@ -19,7 +19,8 @@ import {
 } from '@ant-design/icons'
 import DesignDocFab from '../DesignDoc/DesignDocFab'
 import DesignDocPanel from '../DesignDoc/DesignDocPanel'
-import { getPageDesignDoc } from '../../docs/pageDocs'
+import DesignDocReviewCenter from '../DesignDoc/DesignDocReviewCenter'
+import { GLOBAL_DESIGN_DOC_PATH, getGlobalDesignDoc, getPageDesignDoc } from '../../docs/pageDocs'
 import {
   canViewCurrentRoute,
   getAccessibleProjects,
@@ -173,11 +174,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
     return window.localStorage.getItem('design-doc-panel-open') === 'true'
   })
+  const [docScope, setDocScope] = useState<'page' | 'global'>('page')
+  const [docTargetVersion, setDocTargetVersion] = useState<string | null>(null)
+  const [currentPageHasReviewRequirements, setCurrentPageHasReviewRequirements] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [notificationFilter, setNotificationFilter] = useState<'all' | 'unread'>('all')
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1440 : window.innerWidth))
   const notifications = useNotifications()
   const currentDoc = getPageDesignDoc(location.pathname)
+  const activeDoc = docScope === 'global' ? getGlobalDesignDoc() : currentDoc
   const currentUser = getCurrentUser(permissionState)
   const currentProject = getCurrentProject(permissionState)
   const currentProjectMode = getCurrentProjectMode(permissionState)
@@ -318,6 +323,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   }, [docPanelOpen])
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const shouldOpenDoc = params.get('docOpen') === '1'
+    const versionName = params.get('docVersion')
+
+    if (versionName) {
+      setDocTargetVersion(versionName)
+    }
+
+    setDocScope(params.get('docScope') === 'global' ? 'global' : 'page')
+
+    if (shouldOpenDoc && !isDocsRoute && !isAnnotationWorkbenchRoute) {
+      setDocPanelOpen(true)
+    }
+  }, [isAnnotationWorkbenchRoute, isDocsRoute, location.pathname, location.search])
+
+  useEffect(() => {
     if (typeof window === 'undefined') {
       return
     }
@@ -341,6 +362,27 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   const toggleDocPanel = () => {
     setDocPanelOpen(previous => !previous)
+  }
+
+  const openReviewDocPage = (pagePath: string, versionName: string) => {
+    setDocTargetVersion(versionName)
+    setDocPanelOpen(true)
+
+    if (pagePath === GLOBAL_DESIGN_DOC_PATH) {
+      setDocScope('global')
+      navigate(`${location.pathname}?docOpen=1&docVersion=${encodeURIComponent(versionName)}&docScope=global`)
+      return
+    }
+
+    setDocScope('page')
+    navigate(`${pagePath}?docOpen=1&docVersion=${encodeURIComponent(versionName)}`)
+  }
+
+  const handleDocScopeChange = (scope: 'page' | 'global') => {
+    setDocScope(scope)
+    if (!docPanelOpen) {
+      setDocPanelOpen(true)
+    }
   }
 
   const openNotification = (notice: TaskNotification) => {
@@ -392,7 +434,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
       {!isDocsRoute && !isAnnotationWorkbenchRoute && (
         <div className={`app-shell__doc-rail ${docPanelOpen ? 'app-shell__doc-rail--open' : ''}`}>
-          <DesignDocPanel doc={currentDoc} open={docPanelOpen} onClose={() => setDocPanelOpen(false)} />
+          <DesignDocPanel
+            doc={activeDoc}
+            open={docPanelOpen}
+            activeVersionName={docTargetVersion}
+            onActiveVersionChange={setDocTargetVersion}
+            docScope={docScope}
+            onDocScopeChange={handleDocScopeChange}
+            onClose={() => setDocPanelOpen(false)}
+          />
         </div>
       )}
     </div>
@@ -780,11 +830,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           {contentNode}
 
           {!isDocsRoute && !isAnnotationWorkbenchRoute && (
-            <DesignDocFab
-              open={docPanelOpen}
-              onToggle={toggleDocPanel}
-              rightOffset={docPanelOpen ? 428 : 28}
-            />
+            <>
+              <DesignDocReviewCenter
+                selectedVersionName={docTargetVersion}
+                currentPagePath={currentDoc.pagePath}
+                rightOffset={docPanelOpen ? 552 : 160}
+                onVersionChange={setDocTargetVersion}
+                onOpenPage={openReviewDocPage}
+                onCurrentPageHasRequirementsChange={setCurrentPageHasReviewRequirements}
+              />
+              <DesignDocFab
+                open={docPanelOpen}
+                onToggle={toggleDocPanel}
+                rightOffset={docPanelOpen ? 428 : 28}
+                highlighted={currentPageHasReviewRequirements}
+              />
+            </>
           )}
         </Content>
       </Layout>

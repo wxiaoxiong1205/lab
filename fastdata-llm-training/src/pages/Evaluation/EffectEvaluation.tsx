@@ -64,6 +64,7 @@ import type { InferenceResultRecord as DataServiceInferenceResultRecord } from '
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage } from '../../services/permissionStore'
 import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
+import { validateFieldsAndScroll } from '../../utils/formValidation'
 
 const { Text, Title } = Typography
 
@@ -1945,7 +1946,12 @@ const EffectEvaluation: React.FC = () => {
 
   const submitCreate = async () => {
     try {
-      const values = await form.validateFields()
+      const values = await validateFieldsAndScroll<Record<string, any>>(form, message)
+
+      if (!values) {
+        return
+      }
+
       const currentUser = getCurrentUser()
       const nextTask: EvaluationTask = {
         id: `eval-${Date.now()}`,
@@ -2917,6 +2923,7 @@ const EffectEvaluation: React.FC = () => {
             form={form}
             layout="vertical"
             initialValues={{ datasetType, sourceType: 'existing', methods: ['裁判员评估'], indicators: [] }}
+            scrollToFirstError={{ behavior: 'smooth', block: 'center' }}
           >
             <Form.Item name="mode" initialValue={mode} hidden>
               <Input />

@@ -51,6 +51,7 @@ import { createTaskNotification } from '../../services/notificationStore'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import TableColumnFilterDropdown, { type TableColumnFilterOption } from '../../components/TableColumnFilterDropdown'
 import { PUBLISH_CASE_NOTICE } from '../notebookCaseNotice'
+import { validateFieldsAndScroll } from '../../utils/formValidation'
 
 const { Text, Title, Paragraph } = Typography
 
@@ -1508,56 +1509,57 @@ const OnlineNotebook: React.FC = () => {
   }
 
   const submitCreate = async () => {
-    try {
-      const values = await form.validateFields()
-      const newRecord: MyNotebookRecord = {
-        id: `nb-${Date.now()}`,
-        name: values.name || '未命名Notebook',
-        description: values.description?.trim() || '',
-        image: values.image || imageOptions[0].value,
-        sshSupported: PROJECT_SSH_SUPPORTED,
-        status: '已创建',
-        spec: buildSpecSummary(values),
-        runtimeLimit: buildRuntimeLimit(values),
-        createdAt: nowText(),
-        updatedAt: nowText(),
-        creator: currentUser.username,
-        creatorAccount: currentUser.account,
-        accessScope: values.accessScope ?? 'private',
-        aiService: formatAiServiceLabel(values.aiService),
-        dataset: values.dataset,
-        model: values.model,
-        cpuRequest: `${values.cpuRequest || '-'} Core`,
-        cpuLimit: `${values.cpuLimit || '-'} Core`,
-        memoryRequest: `${values.memoryRequest || '-'} GB`,
-        memoryLimit: `${values.memoryLimit || '-'} GB`,
-        gpuEnabled: Boolean(values.gpuEnabled),
-        gpuType: values.gpuEnabled ? values.gpuType : undefined,
-        gpuCount: values.gpuEnabled ? values.gpuCount : undefined,
-        runtimeEnabled: Boolean(values.runtimeEnabled),
-        runtimeHours: values.runtimeEnabled ? values.runtimeHours : undefined,
-        runtimeMinutes: values.runtimeEnabled ? values.runtimeMinutes : undefined,
-        openPorts: toPortRecords(values.openPorts),
-        sshConfig: PROJECT_SSH_CONFIG,
-      }
+    const values = await validateFieldsAndScroll<CreateFormValues>(form, message)
 
-      setRows(previous => [newRecord, ...previous])
-      createTaskNotification({
-        type: 'notebook',
-        status: 'created',
-        severity: 'info',
-        taskId: newRecord.id,
-        taskName: newRecord.name,
-        taskModule: '在线Notebook',
-        title: 'Notebook 已创建',
-        content: `${newRecord.name} 已创建，等待启动。`,
-        targetPath: `/finetune/notebooks/${newRecord.id}`,
-      })
-      message.success('Notebook 创建成功')
-      closeCreate()
-    } catch {
+    if (!values) {
       return
     }
+
+    const newRecord: MyNotebookRecord = {
+      id: `nb-${Date.now()}`,
+      name: values.name || '未命名Notebook',
+      description: values.description?.trim() || '',
+      image: values.image || imageOptions[0].value,
+      sshSupported: PROJECT_SSH_SUPPORTED,
+      status: '已创建',
+      spec: buildSpecSummary(values),
+      runtimeLimit: buildRuntimeLimit(values),
+      createdAt: nowText(),
+      updatedAt: nowText(),
+      creator: currentUser.username,
+      creatorAccount: currentUser.account,
+      accessScope: values.accessScope ?? 'private',
+      aiService: formatAiServiceLabel(values.aiService),
+      dataset: values.dataset,
+      model: values.model,
+      cpuRequest: `${values.cpuRequest || '-'} Core`,
+      cpuLimit: `${values.cpuLimit || '-'} Core`,
+      memoryRequest: `${values.memoryRequest || '-'} GB`,
+      memoryLimit: `${values.memoryLimit || '-'} GB`,
+      gpuEnabled: Boolean(values.gpuEnabled),
+      gpuType: values.gpuEnabled ? values.gpuType : undefined,
+      gpuCount: values.gpuEnabled ? values.gpuCount : undefined,
+      runtimeEnabled: Boolean(values.runtimeEnabled),
+      runtimeHours: values.runtimeEnabled ? values.runtimeHours : undefined,
+      runtimeMinutes: values.runtimeEnabled ? values.runtimeMinutes : undefined,
+      openPorts: toPortRecords(values.openPorts),
+      sshConfig: PROJECT_SSH_CONFIG,
+    }
+
+    setRows(previous => [newRecord, ...previous])
+    createTaskNotification({
+      type: 'notebook',
+      status: 'created',
+      severity: 'info',
+      taskId: newRecord.id,
+      taskName: newRecord.name,
+      taskModule: '在线Notebook',
+      title: 'Notebook 已创建',
+      content: `${newRecord.name} 已创建，等待启动。`,
+      targetPath: `/finetune/notebooks/${newRecord.id}`,
+    })
+    message.success('Notebook 创建成功')
+    closeCreate()
   }
 
   const submitEdit = async () => {
@@ -1566,43 +1568,44 @@ const OnlineNotebook: React.FC = () => {
       return
     }
 
-    try {
-      const values = await form.validateFields()
-      setRows(previous =>
-        previous.map(item =>
-          item.id === editingNotebook.id
-            ? {
-                ...item,
-                name: values.name || item.name,
-                description: values.description?.trim() || '',
-                accessScope: values.accessScope ?? item.accessScope,
-                image: values.image || item.image,
-                spec: buildSpecSummary(values),
-                runtimeLimit: buildRuntimeLimit(values),
-                updatedAt: nowText(),
-                aiService: formatAiServiceLabel(values.aiService),
-                dataset: values.dataset,
-                model: values.model,
-                cpuRequest: `${values.cpuRequest || '-'} Core`,
-                cpuLimit: `${values.cpuLimit || '-'} Core`,
-                memoryRequest: `${values.memoryRequest || '-'} GB`,
-                memoryLimit: `${values.memoryLimit || '-'} GB`,
-                gpuEnabled: Boolean(values.gpuEnabled),
-                gpuType: values.gpuEnabled ? values.gpuType : undefined,
-                gpuCount: values.gpuEnabled ? values.gpuCount : undefined,
-                runtimeEnabled: Boolean(values.runtimeEnabled),
-                runtimeHours: values.runtimeEnabled ? values.runtimeHours : undefined,
-                runtimeMinutes: values.runtimeEnabled ? values.runtimeMinutes : undefined,
-                openPorts: toPortRecords(values.openPorts),
-              }
-            : item,
-        ),
-      )
-      message.success('Notebook 配置已保存，重新启动后生效')
-      navigate(`/finetune/notebooks/${editingNotebook.id}`)
-    } catch {
+    const values = await validateFieldsAndScroll<CreateFormValues>(form, message)
+
+    if (!values) {
       return
     }
+
+    setRows(previous =>
+      previous.map(item =>
+        item.id === editingNotebook.id
+          ? {
+              ...item,
+              name: values.name || item.name,
+              description: values.description?.trim() || '',
+              accessScope: values.accessScope ?? item.accessScope,
+              image: values.image || item.image,
+              spec: buildSpecSummary(values),
+              runtimeLimit: buildRuntimeLimit(values),
+              updatedAt: nowText(),
+              aiService: formatAiServiceLabel(values.aiService),
+              dataset: values.dataset,
+              model: values.model,
+              cpuRequest: `${values.cpuRequest || '-'} Core`,
+              cpuLimit: `${values.cpuLimit || '-'} Core`,
+              memoryRequest: `${values.memoryRequest || '-'} GB`,
+              memoryLimit: `${values.memoryLimit || '-'} GB`,
+              gpuEnabled: Boolean(values.gpuEnabled),
+              gpuType: values.gpuEnabled ? values.gpuType : undefined,
+              gpuCount: values.gpuEnabled ? values.gpuCount : undefined,
+              runtimeEnabled: Boolean(values.runtimeEnabled),
+              runtimeHours: values.runtimeEnabled ? values.runtimeHours : undefined,
+              runtimeMinutes: values.runtimeEnabled ? values.runtimeMinutes : undefined,
+              openPorts: toPortRecords(values.openPorts),
+            }
+          : item,
+      ),
+    )
+    message.success('Notebook 配置已保存，重新启动后生效')
+    navigate(`/finetune/notebooks/${editingNotebook.id}`)
   }
 
   const submitCasePublish = async () => {
@@ -1789,7 +1792,7 @@ const OnlineNotebook: React.FC = () => {
           <Title level={4} style={{ marginTop: 0, marginBottom: 20 }}>
             {isEditing ? '编辑 Notebook' : '创建 Notebook'}
           </Title>
-          <Form form={form} layout="vertical" initialValues={getCreateInitialValues()}>
+          <Form form={form} layout="vertical" initialValues={getCreateInitialValues()} scrollToFirstError={{ behavior: 'smooth', block: 'center' }}>
             <div style={{ display: 'grid', gap: 18 }}>
               <Card size="small" style={sectionCardStyle}>
                 <Title level={5} style={{ marginBottom: 6 }}>
@@ -1942,7 +1945,7 @@ const OnlineNotebook: React.FC = () => {
                   validateStatus={form.getFieldError('image').length ? 'error' : ''}
                   help={form.getFieldError('image')[0]}
                 >
-                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                  <Space data-form-error-anchor="image" direction="vertical" size={12} style={{ width: '100%' }}>
                     <Button icon={<PlusOutlined />} onClick={openImagePicker} style={{ width: 160 }}>
                       添加镜像
                     </Button>

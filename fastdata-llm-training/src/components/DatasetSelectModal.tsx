@@ -90,6 +90,10 @@ function getDefaultDataUsage(trainingType: TrainingType): string {
 
 interface FormatOption { value: string; label: string; count: number }
 
+function isVersionPublished(version: { publishStatus?: string }): boolean {
+  return (version.publishStatus ?? '已发布') === '已发布'
+}
+
 function getDetailedUsage(item: DatasetPickerItem): string {
   if (item.dataUsage === '图像理解') return '图像理解'
   if (item.dataFormat === 'ALPACA' || (item.dataFormat === 'ROLE_BASED' && item.name.toUpperCase().includes('DPO'))) return '文本生成 / DPO'
@@ -346,7 +350,9 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
     const keys = new Set<string>()
     for (const item of baseCatalog) {
       for (const version of item.versions) {
-        keys.add(makeDatasetRowKey(item.id, version.id))
+        if (isVersionPublished(version)) {
+          keys.add(makeDatasetRowKey(item.id, version.id))
+        }
       }
     }
     return keys
@@ -656,8 +662,9 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
                       <Space orientation="vertical" size={10} onClick={event => event.stopPropagation()}>
                         {record.versions.map(v => {
                           const key = makeDatasetRowKey(record.id, v.id)
+                          const disabled = !isVersionPublished(v)
                           return (
-                            <Radio key={v.id} value={key}>
+                            <Radio key={v.id} value={key} disabled={disabled}>
                               <Text strong>{v.label}</Text>
                               <Text
                                 type="secondary"
@@ -665,6 +672,9 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
                               >
                                 数据量 {v.sampleCount.toLocaleString()}
                               </Text>
+                              <Tag color={disabled ? 'default' : 'green'} style={{ marginLeft: 10 }}>
+                                {v.publishStatus ?? '已发布'}
+                              </Tag>
                             </Radio>
                           )
                         })}
@@ -677,6 +687,8 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
                       {record.versions.map(v => {
                         const key = makeDatasetRowKey(record.id, v.id)
                         const excluded = excludeKeys.includes(key)
+                        const unpublished = !isVersionPublished(v)
+                        const disabled = excluded || unpublished
                         return (
                           <div
                             key={v.id}
@@ -684,11 +696,11 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
                               display: 'flex',
                               alignItems: 'center',
                               gap: 8,
-                              opacity: excluded ? 0.45 : 1,
+                              opacity: disabled ? 0.45 : 1,
                             }}
                           >
                             <Checkbox
-                              disabled={excluded}
+                              disabled={disabled}
                               checked={multiSelected.has(key)}
                               onChange={e => toggleMulti(key, e.target.checked)}
                             >
@@ -701,6 +713,11 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
                               <Text type="secondary" style={{ fontSize: 12 }}>
                                 已添加
                               </Text>
+                            )}
+                            {unpublished && (
+                              <Tag color="default" style={{ marginInlineEnd: 0 }}>
+                                未发布
+                              </Tag>
                             )}
                           </div>
                         )

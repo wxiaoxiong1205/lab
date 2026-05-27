@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { App, Button, Empty, Input, Popconfirm, Space, Tabs, Tag, Typography } from 'antd'
+import { App, Button, Empty, Input, Popconfirm, Segmented, Space, Tabs, Tag, Typography } from 'antd'
 import {
   CloseOutlined,
   CopyOutlined,
@@ -9,350 +9,36 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import type { PageDesignDoc } from '../../docs/pageDocs'
+import {
+  buildCopyText,
+  createRequirementChange,
+  createDefaultRequirementVersion,
+  createRequirementNote,
+  createRequirementVersion,
+  findVersionByName,
+  formatTimestamp,
+  getDesignDocStorageKey,
+  getReorderedVersions,
+  isSameVersion,
+  loadDesignDocState,
+  persistDesignDocState,
+  removeVersionFromStoredPages,
+  type RequirementChange,
+  type RequirementNote,
+  type RequirementVersion,
+} from './designDocStorage'
 
 const { Paragraph, Text, Title } = Typography
 const { TextArea } = Input
-const DESIGN_DOC_STORAGE_PREFIX = 'design-doc-notes:'
-const GLOBAL_VERSION_STORAGE_KEY = 'design-doc-requirement-versions'
-
-interface RequirementNote {
-  id: string
-  createdAt: string
-  content: string
-}
-
-interface RequirementChange {
-  id: string
-  createdAt: string
-  action: string
-  detail: string
-}
-
-interface RequirementVersionMeta {
-  id: string
-  name: string
-  createdAt: string
-}
-
-interface RequirementVersion extends RequirementVersionMeta {
-  notes: RequirementNote[]
-}
-
-interface StoredDesignDocNotes {
-  savedAt?: string
-  notes?: RequirementNote[]
-  versions?: RequirementVersion[]
-  activeVersionId?: string
-  changes?: RequirementChange[]
-}
-
-interface StoredGlobalRequirementVersions {
-  savedAt?: string
-  versions?: RequirementVersionMeta[]
-}
 
 interface DesignDocPanelProps {
   doc: PageDesignDoc
   open: boolean
   onClose: () => void
-}
-
-function formatTimestamp(value: string): string {
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
-}
-
-function createRequirementNote(content = ''): RequirementNote {
-  return {
-    id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-    createdAt: new Date().toISOString(),
-    content,
-  }
-}
-
-function createSeedRequirementNote(content: string, createdAt?: string): RequirementNote {
-  return {
-    ...createRequirementNote(content),
-    createdAt: createdAt ?? new Date().toISOString(),
-  }
-}
-
-function createRequirementChange(action: string, detail: string): RequirementChange {
-  return {
-    id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-    createdAt: new Date().toISOString(),
-    action,
-    detail,
-  }
-}
-
-function createRequirementVersionMeta(name: string): RequirementVersionMeta {
-  return {
-    id: `version-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-    name,
-    createdAt: new Date().toISOString(),
-  }
-}
-
-function createRequirementVersion(name: string, notes: RequirementNote[] = [createRequirementNote()]): RequirementVersion {
-  return {
-    ...createRequirementVersionMeta(name),
-    notes,
-  }
-}
-
-function toVersionMeta(version: RequirementVersion): RequirementVersionMeta {
-  return {
-    id: version.id,
-    name: version.name,
-    createdAt: version.createdAt,
-  }
-}
-
-function normalizeVersionMeta(version: Partial<RequirementVersionMeta>, index: number): RequirementVersionMeta {
-  return {
-    id: version.id || `version-global-${index + 1}`,
-    name: version.name || `V${index + 1}`,
-    createdAt: version.createdAt || new Date().toISOString(),
-  }
-}
-
-function mergeVersionMetas(...groups: RequirementVersionMeta[][]): RequirementVersionMeta[] {
-  const seenIds = new Set<string>()
-  const seenNames = new Set<string>()
-  const merged: RequirementVersionMeta[] = []
-
-  groups.flat().forEach((version, index) => {
-    const normalized = normalizeVersionMeta(version, index)
-    const nameKey = normalized.name.trim().toLowerCase()
-
-    if (seenIds.has(normalized.id) || seenNames.has(nameKey)) {
-      return
-    }
-
-    seenIds.add(normalized.id)
-    seenNames.add(nameKey)
-    merged.push(normalized)
-  })
-
-  return merged
-}
-
-function isSameVersion(target: Pick<RequirementVersionMeta, 'id' | 'name'>, candidate: Pick<RequirementVersionMeta, 'id' | 'name'>): boolean {
-  return target.id === candidate.id
-    || target.name.trim().toLowerCase() === candidate.name.trim().toLowerCase()
-}
-
-function getReorderedVersions(versions: RequirementVersion[], fromIndex: number, toIndex: number): RequirementVersion[] {
-  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= versions.length || toIndex >= versions.length) {
-    return versions
-  }
-
-  const next = [...versions]
-  const [moved] = next.splice(fromIndex, 1)
-  next.splice(toIndex, 0, moved)
-  return next
-}
-
-function hydrateVersionsFromGlobalMetas(
-  globalMetas: RequirementVersionMeta[],
-  pageVersions: RequirementVersion[],
-): RequirementVersion[] {
-  const pageById = new Map(pageVersions.map(version => [version.id, version]))
-  const pageByName = new Map(pageVersions.map(version => [version.name.trim().toLowerCase(), version]))
-
-  return globalMetas.map((meta, index) => {
-    const matchedPageVersion = pageById.get(meta.id) ?? pageByName.get(meta.name.trim().toLowerCase()) ?? pageVersions[index]
-
-    return {
-      ...meta,
-      notes: matchedPageVersion?.notes ?? [],
-    }
-  })
-}
-
-function normalizeStoredNotes(parsed?: StoredDesignDocNotes): {
-  versions: RequirementVersion[]
-  activeVersionId: string | null
-  changes: RequirementChange[]
-  savedAt: string | null
-} {
-  if (parsed?.versions?.length) {
-    const versions = parsed.versions.map((version, index) => ({
-      ...version,
-      name: version.name || `V${index + 1}`,
-      createdAt: version.createdAt || parsed.savedAt || new Date().toISOString(),
-      notes: version.notes ?? [],
-    }))
-    const activeVersionId = versions.some(version => version.id === parsed.activeVersionId)
-      ? parsed.activeVersionId!
-      : versions[0].id
-
-    return {
-      versions,
-      activeVersionId,
-      changes: parsed.changes ?? [],
-      savedAt: parsed.savedAt ?? null,
-    }
-  }
-
-  const legacyNotes = parsed?.notes?.length ? parsed.notes : [createRequirementNote()]
-  const legacyVersion = createRequirementVersion('V1', legacyNotes)
-
-  return {
-    versions: [legacyVersion],
-    activeVersionId: legacyVersion.id,
-    changes: parsed?.changes ?? [],
-    savedAt: parsed?.savedAt ?? null,
-  }
-}
-
-function normalizeStoredGlobalVersions(parsed?: StoredGlobalRequirementVersions): RequirementVersionMeta[] {
-  if (!parsed?.versions?.length) {
-    return []
-  }
-
-  return mergeVersionMetas(parsed.versions.map(normalizeVersionMeta))
-}
-
-function hasMeaningfulNotes(notes: RequirementNote[]): boolean {
-  return notes.some(note => note.content.trim())
-}
-
-function applyDefaultRequirements(doc: PageDesignDoc, versions: RequirementVersion[]): RequirementVersion[] {
-  if (!doc.defaultRequirements?.length) {
-    return versions
-  }
-
-  const nextVersions = [...versions]
-
-  doc.defaultRequirements.forEach(requirement => {
-    const versionName = requirement.version.trim() || 'V1'
-    const existingIndex = nextVersions.findIndex(version => version.name.trim().toLowerCase() === versionName.toLowerCase())
-    const seededNote = createSeedRequirementNote(requirement.content, requirement.createdAt)
-
-    if (existingIndex >= 0) {
-      const existing = nextVersions[existingIndex]
-
-      if (!hasMeaningfulNotes(existing.notes)) {
-        nextVersions[existingIndex] = {
-          ...existing,
-          notes: [seededNote],
-        }
-      }
-
-      return
-    }
-
-    nextVersions.push(createRequirementVersion(versionName, [seededNote]))
-  })
-
-  return nextVersions
-}
-
-function isBlankDefaultVersion(version: RequirementVersion, versionCount: number): boolean {
-  return versionCount === 1
-    && /^V\d+$/.test(version.name)
-    && version.notes.length <= 1
-    && version.notes.every(note => !note.content.trim())
-}
-
-function collectStoredPageVersionMetas(storage: Storage): RequirementVersionMeta[] {
-  const meaningfulMetas: RequirementVersionMeta[] = []
-  const fallbackMetas: RequirementVersionMeta[] = []
-
-  for (let index = 0; index < storage.length; index += 1) {
-    const key = storage.key(index)
-
-    if (!key?.startsWith(DESIGN_DOC_STORAGE_PREFIX)) {
-      continue
-    }
-
-    try {
-      const raw = storage.getItem(key)
-      const parsed = raw ? JSON.parse(raw) as StoredDesignDocNotes : undefined
-      const normalized = normalizeStoredNotes(parsed)
-
-      normalized.versions.forEach(version => {
-        if (isBlankDefaultVersion(version, normalized.versions.length)) {
-          fallbackMetas.push(toVersionMeta(version))
-          return
-        }
-
-        meaningfulMetas.push(toVersionMeta(version))
-      })
-    } catch {
-      // Ignore malformed local entries; the current page still has its fallback path.
-    }
-  }
-
-  return mergeVersionMetas(meaningfulMetas.length ? meaningfulMetas : fallbackMetas)
-}
-
-function removeVersionFromStoredPages(storage: Storage, deletedVersion: RequirementVersionMeta): void {
-  const updatedAt = new Date().toISOString()
-
-  for (let index = 0; index < storage.length; index += 1) {
-    const key = storage.key(index)
-
-    if (!key?.startsWith(DESIGN_DOC_STORAGE_PREFIX)) {
-      continue
-    }
-
-    try {
-      const raw = storage.getItem(key)
-      const parsed = raw ? JSON.parse(raw) as StoredDesignDocNotes : undefined
-      const normalized = normalizeStoredNotes(parsed)
-      const nextVersions = normalized.versions.filter(version => !isSameVersion(deletedVersion, version))
-      const nextActiveVersionId = nextVersions.some(version => version.id === normalized.activeVersionId)
-        ? normalized.activeVersionId
-        : nextVersions[0]?.id ?? null
-
-      storage.setItem(key, JSON.stringify({
-        ...parsed,
-        savedAt: updatedAt,
-        versions: nextVersions,
-        activeVersionId: nextActiveVersionId,
-        changes: parsed?.changes ?? [],
-      }))
-    } catch {
-      // Ignore malformed local entries; deletion still applies to the current in-memory state.
-    }
-  }
-}
-
-function buildCopyText(doc: PageDesignDoc, versions: RequirementVersion[], changes: RequirementChange[]): string {
-  const requirements = versions.length
-    ? versions.map(version => {
-      const versionNotes = version.notes.length
-        ? version.notes.map((item, index) => `- 需求 ${index + 1} | ${formatTimestamp(item.createdAt)}\n${item.content || '（未填写）'}`).join('\n\n')
-        : '- 暂无'
-
-      return `## ${version.name}\n${versionNotes}`
-    }).join('\n\n')
-    : '- 暂无'
-  const recentChanges = changes.length
-    ? changes.map(item => `- ${formatTimestamp(item.createdAt)} | ${item.action} | ${item.detail}`).join('\n')
-    : '- 暂无'
-
-  return [
-    `页面名称：${doc.pageName}`,
-    `页面路径：${doc.pagePath}`,
-    `所属模块：${doc.module}`,
-    `当前状态：${doc.status}`,
-    '说明存储：当前浏览器本地保存，不自动同步仓库文件',
-    '',
-    '需求说明',
-    requirements,
-    '',
-    '最近变更记录',
-    recentChanges,
-  ].join('\n')
+  activeVersionName?: string | null
+  onActiveVersionChange?: (versionName: string) => void
+  docScope?: 'page' | 'global'
+  onDocScopeChange?: (scope: 'page' | 'global') => void
 }
 
 async function copyToClipboard(text: string): Promise<void> {
@@ -387,9 +73,53 @@ async function copyToClipboard(text: string): Promise<void> {
   }
 }
 
-const DesignDocPanel: React.FC<DesignDocPanelProps> = ({ doc, open, onClose }) => {
+function getNextRequirementVersionName(versions: RequirementVersion[]): string {
+  const existingNames = new Set(versions.map(version => version.name.trim().toLowerCase()))
+  const numericVersions = versions
+    .map(version => version.name.trim().match(/^V(\d+)(?:\.(\d+))?$/i))
+    .filter(Boolean)
+    .map(match => {
+      const major = Number(match![1])
+      const minor = match![2] === undefined ? null : Number(match![2])
+      return { major, minor }
+    })
+
+  const decimalVersions = numericVersions.filter(version => version.minor !== null)
+
+  if (decimalVersions.length) {
+    const maxVersion = decimalVersions.reduce((max, version) => {
+      if (version.major > max.major) return version
+      if (version.major === max.major && (version.minor ?? 0) > (max.minor ?? 0)) return version
+      return max
+    }, decimalVersions[0])
+    const prefix = `V${maxVersion.major}.`
+    let nextMinor = (maxVersion.minor ?? 0) + 1
+    while (existingNames.has(`${prefix}${nextMinor}`.toLowerCase())) {
+      nextMinor += 1
+    }
+    return `${prefix}${nextMinor}`
+  }
+
+  let nextMajor = numericVersions.length
+    ? Math.max(...numericVersions.map(version => version.major)) + 1
+    : versions.length + 1
+  while (existingNames.has(`v${nextMajor}`)) {
+    nextMajor += 1
+  }
+  return `V${nextMajor}`
+}
+
+const DesignDocPanel: React.FC<DesignDocPanelProps> = ({
+  doc,
+  open,
+  onClose,
+  activeVersionName,
+  onActiveVersionChange,
+  docScope = 'page',
+  onDocScopeChange,
+}) => {
   const { message } = App.useApp()
-  const storageKey = useMemo(() => `design-doc-notes:${doc.pagePath}`, [doc.pagePath])
+  const storageKey = useMemo(() => getDesignDocStorageKey(doc.pagePath), [doc.pagePath])
   const [versions, setVersions] = useState<RequirementVersion[]>([])
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null)
   const [changes, setChanges] = useState<RequirementChange[]>([])
@@ -415,35 +145,17 @@ const DesignDocPanel: React.FC<DesignDocPanelProps> = ({ doc, open, onClose }) =
     setHydratedStorageKey(null)
 
     try {
-      const raw = window.localStorage.getItem(storageKey)
-      const rawGlobal = window.localStorage.getItem(GLOBAL_VERSION_STORAGE_KEY)
-      const parsed = raw ? JSON.parse(raw) as StoredDesignDocNotes : undefined
-      const parsedGlobal = rawGlobal ? JSON.parse(rawGlobal) as StoredGlobalRequirementVersions : undefined
-      const normalized = raw
-        ? normalizeStoredNotes(parsed)
-        : { versions: [], activeVersionId: null, changes: [], savedAt: null }
-      const globalMetas = normalizeStoredGlobalVersions(parsedGlobal)
-      const effectiveGlobalMetas = globalMetas.length ? globalMetas : collectStoredPageVersionMetas(window.localStorage)
-      const pageMetas = globalMetas.length
-        ? normalized.versions.slice(globalMetas.length).map(toVersionMeta)
-        : normalized.versions.map(toVersionMeta)
-      const mergedMetas = mergeVersionMetas(effectiveGlobalMetas, pageMetas)
-      const baseVersions = mergedMetas.length
-        ? hydrateVersionsFromGlobalMetas(mergedMetas, normalized.versions)
-        : [createRequirementVersion('V1')]
-      const nextVersions = applyDefaultRequirements(doc, baseVersions)
-      const activeVersionName = normalized.versions.find(version => version.id === normalized.activeVersionId)?.name
-      const nextActiveVersionId = nextVersions.find(version => version.id === normalized.activeVersionId)?.id
-        ?? nextVersions.find(version => version.name === activeVersionName)?.id
-        ?? nextVersions[0]?.id
+      const nextState = loadDesignDocState(doc, window.localStorage)
+      const nextActiveVersionId = nextState.versions.find(version => version.id === nextState.activeVersionId)?.id
+        ?? nextState.versions[0]?.id
         ?? null
 
-      setVersions(nextVersions)
+      setVersions(nextState.versions)
       setActiveVersionId(nextActiveVersionId)
-      setChanges(normalized.changes)
-      setSavedAt(normalized.savedAt ?? new Date().toISOString())
+      setChanges(nextState.changes)
+      setSavedAt(nextState.savedAt)
     } catch {
-      const fallbackVersion = createRequirementVersion('V1')
+      const fallbackVersion = createDefaultRequirementVersion()
       setVersions([fallbackVersion])
       setActiveVersionId(fallbackVersion.id)
       setChanges([])
@@ -458,19 +170,26 @@ const DesignDocPanel: React.FC<DesignDocPanelProps> = ({ doc, open, onClose }) =
       return
     }
 
-    const nextSavedAt = new Date().toISOString()
-    window.localStorage.setItem(GLOBAL_VERSION_STORAGE_KEY, JSON.stringify({
-      savedAt: nextSavedAt,
-      versions: versions.map(toVersionMeta),
-    }))
-    window.localStorage.setItem(storageKey, JSON.stringify({
-      savedAt: nextSavedAt,
-      versions,
-      activeVersionId,
-      changes,
-    }))
+    const nextSavedAt = persistDesignDocState(window.localStorage, storageKey, versions, activeVersionId, changes)
     setSavedAt(nextSavedAt)
+    window.dispatchEvent(new Event('design-doc-updated'))
   }, [activeVersionId, changes, hydratedStorageKey, storageKey, versions])
+
+  useEffect(() => {
+    if (!activeVersionName) {
+      return
+    }
+
+    const targetVersion = findVersionByName(versions, activeVersionName)
+    if (targetVersion && targetVersion.id !== activeVersionId) {
+      setActiveVersionId(targetVersion.id)
+    }
+  }, [activeVersionId, activeVersionName, versions])
+
+  const handleSelectVersion = (version: RequirementVersion) => {
+    setActiveVersionId(version.id)
+    onActiveVersionChange?.(version.name)
+  }
 
   const appendChange = (action: string, detail: string) => {
     setChanges(previous => [createRequirementChange(action, detail), ...previous].slice(0, 50))
@@ -489,9 +208,10 @@ const DesignDocPanel: React.FC<DesignDocPanelProps> = ({ doc, open, onClose }) =
   }
 
   const handleAddVersion = () => {
-    const nextVersion = createRequirementVersion(`V${versions.length + 1}`)
+    const nextVersion = createRequirementVersion(getNextRequirementVersionName(versions))
     setVersions(previous => [...previous, nextVersion])
     setActiveVersionId(nextVersion.id)
+    onActiveVersionChange?.(nextVersion.name)
     appendChange('新增版本', `新增了需求版本 ${nextVersion.name}`)
   }
 
@@ -533,12 +253,24 @@ const DesignDocPanel: React.FC<DesignDocPanelProps> = ({ doc, open, onClose }) =
       return
     }
 
+    const duplicateVersion = versions.some(version =>
+      version.id !== editingVersionId && version.name.trim().toLowerCase() === nextName.toLowerCase(),
+    )
+
+    if (duplicateVersion) {
+      message.warning('版本名称不能重复')
+      setVersionNameDraft(currentVersion.name)
+      handleCancelEditVersion()
+      return
+    }
+
     if (nextName !== currentVersion.name) {
       setVersions(previous =>
         previous.map(version =>
           version.id === editingVersionId ? { ...version, name: nextName } : version,
         ),
       )
+      onActiveVersionChange?.(nextName)
       appendChange('编辑版本', `将需求版本 ${currentVersion.name} 修改为 ${nextName}`)
     }
 
@@ -560,6 +292,7 @@ const DesignDocPanel: React.FC<DesignDocPanelProps> = ({ doc, open, onClose }) =
     const movedVersion = versions[fromIndex]
     setVersions(previous => getReorderedVersions(previous, fromIndex, toIndex))
     setActiveVersionId(movedVersion.id)
+    onActiveVersionChange?.(movedVersion.name)
     appendChange('调整版本顺序', `将需求版本 ${movedVersion.name} 调整到位置 ${toIndex + 1}`)
   }
 
@@ -581,6 +314,9 @@ const DesignDocPanel: React.FC<DesignDocPanelProps> = ({ doc, open, onClose }) =
 
     setVersions(nextVersions)
     setActiveVersionId(nextActiveVersion?.id ?? nextVersions[0]?.id ?? null)
+    if (nextActiveVersion?.name ?? nextVersions[0]?.name) {
+      onActiveVersionChange?.(nextActiveVersion?.name ?? nextVersions[0].name)
+    }
     appendChange('删除版本', `删除了需求版本 ${version.name}，并同步移除各页面该版本下的需求说明`)
   }
 
@@ -655,10 +391,24 @@ const DesignDocPanel: React.FC<DesignDocPanelProps> = ({ doc, open, onClose }) =
             <Title level={4} className="design-doc-panel__title">
               {doc.pageName}
             </Title>
+            <div className="design-doc-panel__module">
+              {doc.module}
+            </div>
           </div>
         </div>
 
         <Space size={8}>
+          {onDocScopeChange ? (
+            <Segmented
+              size="small"
+              value={docScope}
+              options={[
+                { label: '当前页面', value: 'page' },
+                { label: '全局模块', value: 'global' },
+              ]}
+              onChange={value => onDocScopeChange(value as 'page' | 'global')}
+            />
+          ) : null}
           <Button size="small" icon={<CopyOutlined />} onClick={handleCopy}>
             复制
           </Button>
@@ -741,7 +491,7 @@ const DesignDocPanel: React.FC<DesignDocPanelProps> = ({ doc, open, onClose }) =
                                 <button
                                   type="button"
                                   className={`design-doc-version-tab ${isActive ? 'design-doc-version-tab--active' : ''}`}
-                                  onClick={() => setActiveVersionId(version.id)}
+                                  onClick={() => handleSelectVersion(version)}
                                   onDoubleClick={() => handleStartEditVersion(version)}
                                 >
                                   <span>{version.name}</span>

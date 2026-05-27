@@ -5,6 +5,7 @@ import {
   Descriptions,
   Form,
   Input,
+  message,
   Modal,
   Select,
   Space,
@@ -25,6 +26,7 @@ import {
 import { formatResourceLockMessage, getModelReferenceLocks } from '../../services/resourceReferenceGuard'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import { canAccessResourceData } from '../../services/permissionStore'
+import { validateFieldsAndScroll } from '../../utils/formValidation'
 
 const { Text, Title } = Typography
 
@@ -220,12 +222,13 @@ const ModelManagement: React.FC = () => {
   }
 
   const submitCreate = async () => {
-    try {
-      await form.validateFields()
-      closeCreate()
-    } catch {
+    const values = await validateFieldsAndScroll<Record<string, any>>(form, message)
+
+    if (!values) {
       return
     }
+
+    closeCreate()
   }
 
   if (isCreateRoute) {
@@ -233,7 +236,7 @@ const ModelManagement: React.FC = () => {
       <div style={{ padding: '28px 32px', minHeight: '100%' }}>
         <div style={{ marginBottom: 20 }} />
         <Card style={{ borderRadius: 18, border: '1px solid #e5e7eb' }}>
-          <Form form={form} layout="vertical">
+          <Form form={form} layout="vertical" scrollToFirstError={{ behavior: 'smooth', block: 'center' }}>
             <Title level={3}>基础信息</Title>
 
             <Form.Item

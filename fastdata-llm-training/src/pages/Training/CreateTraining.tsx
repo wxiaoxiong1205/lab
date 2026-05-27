@@ -46,6 +46,7 @@ import { createTaskNotification } from '../../services/notificationStore'
 import { resolveDatasetVersionRow } from '../../data/datasetPickerCatalog'
 import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
 import RewardRulesConfig from '../../components/RewardRulesConfig'
+import { validateFieldsAndScroll } from '../../utils/formValidation'
 import {
   TRAINING_METHOD_LABELS,
   type TrainingMethod,
@@ -213,6 +214,7 @@ const BaseModelModalPicker: React.FC<{
   return (
     <>
       <div
+        data-form-error-anchor="baseModel"
         style={{
           border: '1px solid #e2e8f0',
           borderRadius: 12,
@@ -574,7 +576,7 @@ const TrainingDatasetPicker: React.FC<{
   }
 
   return (
-    <div>
+    <div data-form-error-anchor="trainingDatasets">
       <Button
         type="dashed"
         icon={<PlusOutlined />}
@@ -897,48 +899,44 @@ const CreateTraining: React.FC = () => {
 
   // 表单提交
   const handleSubmit = async () => {
-    try {
-      await form.validateFields()
+    const values = await validateFieldsAndScroll(form, message)
 
-      if (mode === 'editVersion') {
-        message.success('保存成功')
-        navigate(`/training/detail/${taskId}`)
-      } else if (mode === 'resubmitFrom') {
-        createTaskNotification({
-          type: 'training',
-          status: 'started',
-          severity: 'info',
-          taskId: taskId ?? `training-${Date.now()}`,
-          taskName: form.getFieldValue('taskName') || parentTask?.name || '训练任务',
-          taskModule: '大模型训练',
-          title: '训练任务已重新提交',
-          content: `${form.getFieldValue('taskName') || parentTask?.name || '训练任务'} 已重新提交，等待启动。`,
-          targetPath: taskId ? `/training/detail/${taskId}` : '/training',
-        })
-        message.success('重新提交成功')
-        navigate(`/training/detail/${taskId}`)
-      } else {
-        const taskName = form.getFieldValue('taskName') || '未命名训练任务'
-        createTaskNotification({
-          type: 'training',
-          status: 'created',
-          severity: 'info',
-          taskId: taskId ?? `training-${Date.now()}`,
-          taskName,
-          taskModule: '大模型训练',
-          title: '训练任务已创建',
-          content: `${taskName} 已创建，等待启动训练。`,
-          targetPath: taskId ? `/training/detail/${taskId}` : '/training',
-        })
-        message.success('创建成功')
-        navigate('/training')
-      }
-    } catch (error: unknown) {
-      console.error('验证失败:', error)
-      const err = error as { errorFields?: { name: string[] }[] }
-      if (err?.errorFields?.length) {
-        message.warning('请完善必填项后再提交')
-      }
+    if (!values) {
+      return
+    }
+
+    if (mode === 'editVersion') {
+      message.success('保存成功')
+      navigate(`/training/detail/${taskId}`)
+    } else if (mode === 'resubmitFrom') {
+      createTaskNotification({
+        type: 'training',
+        status: 'started',
+        severity: 'info',
+        taskId: taskId ?? `training-${Date.now()}`,
+        taskName: form.getFieldValue('taskName') || parentTask?.name || '训练任务',
+        taskModule: '大模型训练',
+        title: '训练任务已重新提交',
+        content: `${form.getFieldValue('taskName') || parentTask?.name || '训练任务'} 已重新提交，等待启动。`,
+        targetPath: taskId ? `/training/detail/${taskId}` : '/training',
+      })
+      message.success('重新提交成功')
+      navigate(`/training/detail/${taskId}`)
+    } else {
+      const taskName = form.getFieldValue('taskName') || '未命名训练任务'
+      createTaskNotification({
+        type: 'training',
+        status: 'created',
+        severity: 'info',
+        taskId: taskId ?? `training-${Date.now()}`,
+        taskName,
+        taskModule: '大模型训练',
+        title: '训练任务已创建',
+        content: `${taskName} 已创建，等待启动训练。`,
+        targetPath: taskId ? `/training/detail/${taskId}` : '/training',
+      })
+      message.success('创建成功')
+      navigate('/training')
     }
   }
 
@@ -1665,7 +1663,7 @@ const CreateTraining: React.FC = () => {
           }}
           styles={{ body: { padding: '24px' } }}
         >
-            <Form.Item
+          <Form.Item
             label="训练数据集"
             name="trainingDatasets"
             rules={[{ type: 'array', min: 1, message: '请至少添加一个训练数据集' }]}

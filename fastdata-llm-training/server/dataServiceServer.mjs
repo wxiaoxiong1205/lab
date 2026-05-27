@@ -690,7 +690,7 @@ const server = createServer(async (req, res) => {
       dataFormat: normalizeDataFormat(body.dataFormat, normalizeDatasetUsage(body.dataUsage)),
       creator: 'deepexilab',
       createdAt,
-      status: '已发布',
+      status: '未发布',
       sampleCount: Math.max(2, Math.floor(Math.random() * 40) + 2),
       charCount: kind === 'test' ? undefined : Math.floor(Math.random() * 90000) + 12000,
       trainRatio: kind === 'validation' ? 20 : kind === 'test' ? undefined : 80,
@@ -701,7 +701,7 @@ const server = createServer(async (req, res) => {
         id: `${item.id}-V1`,
         version: 'V1',
         processStatus: '处理完成',
-        publishStatus: '已发布',
+        publishStatus: '未发布',
         createdAt,
         sampleCount: item.sampleCount,
         charCount: item.charCount,
@@ -727,12 +727,9 @@ const server = createServer(async (req, res) => {
 
     const createdAt = nowText()
     const nextVersion = nextVersionLabel(target.latestVersion)
-    target.versions = target.versions.map(item =>
-      item.version === target.latestVersion ? { ...item, publishStatus: '已归档' } : item,
-    )
     target.latestVersion = nextVersion
     target.versionStatus = '处理完成'
-    target.status = '已发布'
+    target.status = '未发布'
     target.createdAt = createdAt
     target.sampleCount = Math.max(2, Math.floor(Math.random() * 40) + 2)
     if (typeof target.charCount === 'number') {
@@ -743,7 +740,7 @@ const server = createServer(async (req, res) => {
       id: `${target.id}-${nextVersion}`,
       version: nextVersion,
       processStatus: '处理完成',
-      publishStatus: '已发布',
+      publishStatus: '未发布',
       createdAt,
       sampleCount: target.sampleCount,
       charCount: target.charCount,
@@ -751,6 +748,98 @@ const server = createServer(async (req, res) => {
       description: body.description || '',
       detailRows: body.inheritFromPrevious ? clone(previousVersion?.detailRows || []) : (previousVersion?.detailRows || []).map(item => ({ ...item, key: `${nextVersion}-${Math.random().toString(16).slice(2, 6)}` })),
     })
+    await writeDb(state)
+    return json(req, res, 200, state)
+  }
+
+  const mergeVersionMatch = pathname.match(/^\/api\/data-service\/datasets\/(training|validation|test)\/([^/]+)\/versions\/merge$/)
+  if (req.method === 'POST' && mergeVersionMatch) {
+    const [, kind, rawId] = mergeVersionMatch
+    const targetId = decodeURIComponent(rawId)
+    const body = await readBody(req)
+    const state = await readDb()
+    const list = pickList(state, kind)
+    const target = list.find(item => item.id === targetId)
+    if (!target) {
+      return notFound(req, res)
+    }
+
+    const sourceVersionIds = Array.isArray(body.sourceVersionIds) ? body.sourceVersionIds.map(String) : []
+    const sourceVersions = sourceVersionIds
+      .map(versionId => target.versions.find(version => version.id === versionId))
+      .filter(version => version && version.processStatus === '处理完成')
+    if (sourceVersions.length < 2) {
+      return json(req, res, 400, { message: '至少选择 2 个处理完成的版本' })
+    }
+
+    const createdAt = nowText()
+    const nextVersion = nextVersionLabel(target.latestVersion)
+    const mergedRows = sourceVersions.flatMap(sourceVersion =>
+      (sourceVersion.detailRows || []).map((row, index) => ({
+        ...clone(row),
+        key: `${nextVersion}-${sourceVersion.version}-${index + 1}-${row.key}`,
+        sourceVersion: sourceVersion.version,
+      })),
+    )
+    const sampleCount = sourceVersions.reduce((sum, version) => sum + (version.sampleCount || (version.detailRows || []).length || 0), 0)
+    const charCounts = sourceVersions.map(version => version.charCount).filter(value => typeof value === 'number')
+    const charCount = charCounts.length ? charCounts.reduce((sum, value) => sum + value, 0) : undefined
+
+    target.latestVersion = nextVersion
+    target.versionStatus = '处理完成'
+    target.status = '未发布'
+    target.createdAt = createdAt
+    target.sampleCount = sampleCount
+    if (typeof charCount === 'number') {
+      target.charCount = charCount
+    }
+
+    target.versions.unshift({
+      id: `${target.id}-${nextVersion}-${Date.now()}`,
+      version: nextVersion,
+      processStatus: '处理完成',
+      publishStatus: '未发布',
+      creator: 'deepexilab',
+      createdAt,
+      sampleCount,
+      charCount,
+      trainRatio: target.trainRatio,
+      description: body.description || '',
+      mergeSourceVersions: sourceVersions.map(version => version.version),
+      mergeMode: 'version-merge',
+      detailRows: mergedRows,
+    })
+    await writeDb(state)
+    return json(req, res, 200, state)
+  }
+
+  const publishVersionMatch = pathname.match(/^\/api\/data-service\/datasets\/(training|validation|test)\/([^/]+)\/versions\/([^/]+)\/publish$/)
+  if (req.method === 'POST' && publishVersionMatch) {
+    const [, kind, rawId, rawVersionId] = publishVersionMatch
+    const targetId = decodeURIComponent(rawId)
+    const versionId = decodeURIComponent(rawVersionId)
+    const state = await readDb()
+    const list = pickList(state, kind)
+    const target = list.find(item => item.id === targetId)
+    const version = target?.versions?.find(item => item.id === versionId)
+    if (!target || !version) {
+      return notFound(req, res)
+    }
+
+    target.versions = target.versions.map(item => {
+      if (item.id === versionId) {
+        return { ...item, publishStatus: '已发布' }
+      }
+      return item
+    })
+
+    if (version.version === target.latestVersion) {
+      target.status = '已发布'
+      target.sampleCount = version.sampleCount
+      target.charCount = version.charCount
+      target.trainRatio = version.trainRatio
+    }
+
     await writeDb(state)
     return json(req, res, 200, state)
   }
@@ -857,6 +946,7 @@ const server = createServer(async (req, res) => {
       datasetType: body.datasetType,
       preDataset: body.preDataset,
       postDataset: body.postDataset || '-',
+      postDatasetPublishStatus: body.postDataset && body.postDataset !== '-' ? '未发布' : undefined,
       outputMode: body.outputMode,
       creator: 'deepexilab',
       createdAt: nowText().replace(/\//g, '-'),
@@ -891,6 +981,7 @@ const server = createServer(async (req, res) => {
       status: '启动中',
       preDataset: body.preDataset,
       postDataset: body.postDataset || '-',
+      postDatasetPublishStatus: body.postDataset && body.postDataset !== '-' ? '未发布' : undefined,
       operatorValues: body.operatorValues || [],
       creator: 'deepexilab',
       createdAt: nowText(),

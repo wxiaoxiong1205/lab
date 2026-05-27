@@ -15,6 +15,7 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage } from '../../services/permissionStore'
+import { validateFieldsAndScroll } from '../../utils/formValidation'
 
 const { Title, Text } = Typography
 
@@ -188,7 +189,12 @@ const EvaluationIndicatorPage: React.FC = () => {
 
   const submit = async () => {
     try {
-      const values = await form.validateFields()
+      const values = await validateFieldsAndScroll<Record<string, any>>(form, message)
+
+      if (!values) {
+        return
+      }
+
       if (editingRecord) {
         setIndicators(previous =>
           previous.map(item =>
@@ -280,7 +286,7 @@ const EvaluationIndicatorPage: React.FC = () => {
         onOk={submit}
         okText={editingRecord ? '保存' : '创建'}
       >
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" scrollToFirstError={{ behavior: 'smooth', block: 'center' }}>
           <Form.Item label="评估指标" name="name" rules={[{ required: true, message: '请输入评估指标' }]}>
             <Input maxLength={64} />
           </Form.Item>

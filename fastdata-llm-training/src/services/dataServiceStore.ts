@@ -17,6 +17,7 @@ export type TaskLifecycleStatus =
 
 export interface DatasetDetailRowRecord {
   key: string
+  sourceVersion?: string
   system?: string
   user?: string
   assistant?: string
@@ -40,6 +41,8 @@ export interface DatasetVersionRecord {
   charCount?: number
   trainRatio?: number
   description?: string
+  mergeSourceVersions?: string[]
+  mergeMode?: 'version-merge'
   detailRows: DatasetDetailRowRecord[]
 }
 
@@ -58,6 +61,32 @@ export interface DatasetRecord {
   charCount?: number
   trainRatio?: number
   versions: DatasetVersionRecord[]
+}
+
+export function isDatasetVersionPublished(version?: Pick<DatasetVersionRecord, 'publishStatus'> | null): boolean {
+  return version?.publishStatus === '已发布'
+}
+
+export function getLatestDatasetVersion(record?: Pick<DatasetRecord, 'latestVersion' | 'versions'> | null): DatasetVersionRecord | null {
+  if (!record) return null
+  return record.versions.find(item => item.version === record.latestVersion) ?? record.versions[0] ?? null
+}
+
+export function isDatasetPublished(record?: Pick<DatasetRecord, 'latestVersion' | 'versions' | 'status'> | null): boolean {
+  if (!record) return false
+  return getPublishedDatasetVersions(record as DatasetRecord).length > 0
+}
+
+export function getPublishedDatasetVersions(record?: Pick<DatasetRecord, 'latestVersion' | 'versions' | 'status'> | null): DatasetVersionRecord[] {
+  if (!record) return []
+  const versions = record.versions ?? []
+  const explicitPublished = versions.filter(version => version.publishStatus === '已发布')
+  if (explicitPublished.length) {
+    return explicitPublished
+  }
+
+  const latestVersion = getLatestDatasetVersion(record as DatasetRecord)
+  return record.status === '已发布' && latestVersion ? [latestVersion] : []
 }
 
 export interface InferenceResultRecord {
@@ -87,6 +116,7 @@ export interface AnnotationTaskRecord {
   datasetType?: 'text-generation' | 'image-understanding'
   preDataset: string
   postDataset: string
+  postDatasetPublishStatus?: '未发布' | '已发布'
   outputMode?: string
   creator: string
   createdAt: string
@@ -99,6 +129,7 @@ export interface CleaningTaskRecord {
   status: TaskLifecycleStatus
   preDataset: string
   postDataset: string
+  postDatasetPublishStatus?: '未发布' | '已发布'
   operatorValues?: string[]
   creator: string
   createdAt: string
@@ -522,12 +553,13 @@ function createDatasetVersion(
   description?: string,
   detailRows?: DatasetDetailRowRecord[],
   creator?: string,
+  publishStatus = '未发布',
 ): DatasetVersionRecord {
   return {
     id: `${version}-${Date.now()}`,
     version,
     processStatus: '处理完成',
-    publishStatus: '已发布',
+    publishStatus,
     creator,
     createdAt,
     sampleCount,
@@ -556,7 +588,7 @@ export const dataServiceActions = {
         dataFormat: normalizeDatasetFormat(params.dataFormat, normalizedUsage),
         creator: getCurrentUser().account,
         createdAt,
-        status: '已发布',
+        status: '未发布',
         sampleCount: Math.max(2, Math.floor(Math.random() * 40) + 2),
         charCount: kind === 'test' ? undefined : Math.floor(Math.random() * 90000) + 12000,
         trainRatio: kind === 'validation' ? 20 : kind === 'test' ? undefined : 80,
@@ -573,6 +605,7 @@ export const dataServiceActions = {
           params.description,
           buildSeedDetailRows(next.dataFormat, next.name, next.latestVersion, next.dataUsage),
           next.creator,
+          '未发布',
         ),
       ]
 
@@ -599,13 +632,10 @@ export const dataServiceActions = {
 
       const createdAt = nowText()
       const nextVersion = nextVersionLabel(target.latestVersion)
-      target.versions = target.versions.map(item =>
-        item.version === target.latestVersion ? { ...item, publishStatus: '已归档' } : item,
-      )
       target.latestVersion = nextVersion
       target.createdAt = createdAt
       target.versionStatus = '处理完成'
-      target.status = '已发布'
+      target.status = '未发布'
       target.sampleCount = Math.max(2, Math.floor(Math.random() * 40) + 2)
       if (typeof target.charCount === 'number') {
         target.charCount = Math.floor(Math.random() * 90000) + 12000
@@ -623,8 +653,98 @@ export const dataServiceActions = {
             ? JSON.parse(JSON.stringify(previousVersion?.detailRows ?? []))
             : buildSeedDetailRows(target.dataFormat, target.name, nextVersion, target.dataUsage),
           getCurrentUser().account,
+          '未发布',
         ),
       )
+    })
+  },
+
+  mergeDatasetVersions(
+    kind: 'training' | 'validation' | 'test',
+    id: string,
+    options: { sourceVersionIds: string[]; description?: string },
+  ) {
+    update(draft => {
+      const list =
+        kind === 'training'
+          ? draft.trainingDatasets
+          : kind === 'validation'
+            ? draft.validationDatasets
+            : draft.testDatasets
+      const target = list.find(item => item.id === id)
+      if (!target) return
+
+      const sourceVersions = options.sourceVersionIds
+        .map(versionId => target.versions.find(version => version.id === versionId))
+        .filter((version): version is DatasetVersionRecord => Boolean(version) && version?.processStatus === '处理完成')
+
+      if (sourceVersions.length < 2) return
+
+      const createdAt = nowText()
+      const nextVersion = nextVersionLabel(target.latestVersion)
+      const mergedRows = sourceVersions.flatMap(sourceVersion =>
+        (sourceVersion.detailRows ?? []).map((row, index) => ({
+          ...JSON.parse(JSON.stringify(row)),
+          key: `${nextVersion}-${sourceVersion.version}-${index + 1}-${row.key}`,
+          sourceVersion: sourceVersion.version,
+        })),
+      )
+      const sampleCount = sourceVersions.reduce((sum, version) => sum + (version.sampleCount ?? version.detailRows?.length ?? 0), 0)
+      const charCounts = sourceVersions.map(version => version.charCount).filter((value): value is number => typeof value === 'number')
+      const charCount = charCounts.length ? charCounts.reduce((sum, value) => sum + value, 0) : undefined
+
+      target.latestVersion = nextVersion
+      target.createdAt = createdAt
+      target.versionStatus = '处理完成'
+      target.status = '未发布'
+      target.sampleCount = sampleCount
+      if (typeof charCount === 'number') {
+        target.charCount = charCount
+      }
+
+      target.versions.unshift({
+        id: `${target.id}-${nextVersion}-${Date.now()}`,
+        version: nextVersion,
+        processStatus: '处理完成',
+        publishStatus: '未发布',
+        creator: getCurrentUser().account,
+        createdAt,
+        sampleCount,
+        charCount,
+        trainRatio: target.trainRatio,
+        description: options.description,
+        mergeSourceVersions: sourceVersions.map(version => version.version),
+        mergeMode: 'version-merge',
+        detailRows: mergedRows,
+      })
+    })
+  },
+
+  publishDatasetVersion(kind: 'training' | 'validation' | 'test', id: string, versionId: string) {
+    update(draft => {
+      const list =
+        kind === 'training'
+          ? draft.trainingDatasets
+          : kind === 'validation'
+            ? draft.validationDatasets
+            : draft.testDatasets
+      const target = list.find(item => item.id === id)
+      const version = target?.versions.find(item => item.id === versionId)
+      if (!target || !version) return
+
+      target.versions = target.versions.map(item => {
+        if (item.id === versionId) {
+          return { ...item, publishStatus: '已发布' }
+        }
+        return item
+      })
+
+      if (version.version === target.latestVersion) {
+        target.status = '已发布'
+        target.sampleCount = version.sampleCount
+        target.charCount = version.charCount
+        target.trainRatio = version.trainRatio
+      }
     })
   },
 
@@ -683,6 +803,7 @@ export const dataServiceActions = {
       const target = list.find(item => item.id === id)
       const version = target?.versions.find(item => item.id === versionId)
       if (!target || !version) return
+      if (version.publishStatus === '已发布') return
 
       const sourceRows = version.detailRows?.length ? version.detailRows : currentRows
       version.detailRows = sourceRows.filter(item => item.key !== rowKey)
@@ -780,6 +901,7 @@ export const dataServiceActions = {
         datasetType: params.datasetType,
         preDataset: params.preDataset,
         postDataset: params.postDataset ?? '-',
+        postDatasetPublishStatus: params.postDataset && params.postDataset !== '-' ? '未发布' : undefined,
         outputMode: params.outputMode,
         creator: currentUser.account,
         createdAt: nowText().replace(/\//g, '-'),
@@ -818,6 +940,7 @@ export const dataServiceActions = {
         status: '启动中',
         preDataset: params.preDataset,
         postDataset: params.postDataset ?? '-',
+        postDatasetPublishStatus: params.postDataset && params.postDataset !== '-' ? '未发布' : undefined,
         operatorValues: params.operatorValues ?? [],
         creator: currentUser.account,
         createdAt: nowText(),

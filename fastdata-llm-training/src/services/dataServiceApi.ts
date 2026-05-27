@@ -21,6 +21,8 @@ export interface DatasetOption {
   value: string
   label: string
   count: number
+  disabled?: boolean
+  publishStatus?: string
 }
 
 export interface CreateDatasetParams {
@@ -35,10 +37,19 @@ export interface AddDatasetVersionParams {
   description?: string
 }
 
+export interface MergeDatasetVersionsParams {
+  sourceVersionIds: string[]
+  description?: string
+}
+
 export interface DeleteDatasetDetailRowParams {
   versionId: string
   rowKey: string
   currentRows: DatasetDetailRowRecord[]
+}
+
+export interface PublishDatasetVersionParams {
+  versionId: string
 }
 
 export interface CreateInferenceResultParams {
@@ -251,41 +262,51 @@ export function buildAnnotationDatasetOptions(
   return groups.flatMap(group =>
     group.list
       .filter(item => String(item.dataUsage).includes(targetScene))
-      .map<DatasetOption>(item => ({
-        value: item.id,
-        label: `${group.prefix}/${item.name}-${item.latestVersion}`,
-        count: item.sampleCount,
-      })),
+      .flatMap<DatasetOption>(item => item.versions.map(version => ({
+        value: `${item.id}:${version.id}`,
+        label: `${group.prefix}/${item.name}-${version.version}`,
+        count: version.sampleCount,
+        disabled: version.publishStatus !== '已发布',
+        publishStatus: version.publishStatus,
+      }))),
   )
 }
 
 export function buildCleaningDatasetOptions(state: DataServiceState): DatasetOption[] {
   return [
-    ...state.trainingDatasets.map(item => ({
-      value: item.id,
-      label: `训练数据集/${item.name}-${item.latestVersion}`,
-      count: item.sampleCount,
-    })),
-    ...state.testDatasets.map(item => ({
-      value: item.id,
-      label: `测试数据集/${item.name}-${item.latestVersion}`,
-      count: item.sampleCount,
-    })),
+    ...state.trainingDatasets.flatMap(item => item.versions.map(version => ({
+      value: `${item.id}:${version.id}`,
+      label: `训练数据集/${item.name}-${version.version}`,
+      count: version.sampleCount,
+      disabled: version.publishStatus !== '已发布',
+      publishStatus: version.publishStatus,
+    }))),
+    ...state.testDatasets.flatMap(item => item.versions.map(version => ({
+      value: `${item.id}:${version.id}`,
+      label: `测试数据集/${item.name}-${version.version}`,
+      count: version.sampleCount,
+      disabled: version.publishStatus !== '已发布',
+      publishStatus: version.publishStatus,
+    }))),
   ]
 }
 
 export function buildInferencePendingDatasetOptions(
   state: DataServiceState,
-): Array<{ value: string; label: string }> {
+): Array<{ value: string; label: string; disabled?: boolean; publishStatus?: string }> {
   return [
-    ...state.testDatasets.map(item => ({
-      value: `测试数据集/${item.name}>${item.latestVersion}`,
-      label: `测试数据集/${item.name}>${item.latestVersion}`,
-    })),
-    ...state.validationDatasets.map(item => ({
-      value: `验证数据集/${item.name}>${item.latestVersion}`,
-      label: `验证数据集/${item.name}>${item.latestVersion}`,
-    })),
+    ...state.testDatasets.flatMap(item => item.versions.map(version => ({
+      value: `测试数据集/${item.name}>${version.version}`,
+      label: `测试数据集/${item.name}>${version.version}`,
+      disabled: version.publishStatus !== '已发布',
+      publishStatus: version.publishStatus,
+    }))),
+    ...state.validationDatasets.flatMap(item => item.versions.map(version => ({
+      value: `验证数据集/${item.name}>${version.version}`,
+      label: `验证数据集/${item.name}>${version.version}`,
+      disabled: version.publishStatus !== '已发布',
+      publishStatus: version.publishStatus,
+    }))),
   ]
 }
 
@@ -389,6 +410,34 @@ export const dataServiceApi = {
 
     await delay()
     dataServiceActions.addDatasetVersion(kind, id, params)
+  },
+
+  async mergeDatasetVersions(kind: DatasetKind, id: string, params: MergeDatasetVersionsParams): Promise<void> {
+    const snapshot = await requestSnapshot(`${API_ROOT}/datasets/${kind}/${encodeURIComponent(id)}/versions/merge`, {
+      method: 'POST',
+      body: JSON.stringify(params),
+    })
+
+    if (syncSnapshot(snapshot)) {
+      return
+    }
+
+    await delay()
+    dataServiceActions.mergeDatasetVersions(kind, id, params)
+  },
+
+  async publishDatasetVersion(kind: DatasetKind, id: string, params: PublishDatasetVersionParams): Promise<void> {
+    const snapshot = await requestSnapshot(
+      `${API_ROOT}/datasets/${kind}/${encodeURIComponent(id)}/versions/${encodeURIComponent(params.versionId)}/publish`,
+      { method: 'POST' },
+    )
+
+    if (syncSnapshot(snapshot)) {
+      return
+    }
+
+    await delay()
+    dataServiceActions.publishDatasetVersion(kind, id, params.versionId)
   },
 
   async deleteDataset(kind: DatasetKind, id: string): Promise<void> {

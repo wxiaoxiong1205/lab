@@ -41,6 +41,7 @@ import { type TaskLifecycleStatus } from '../../services/taskLifecycle'
 import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import { canAccessResourceData, getOperationDeniedMessage } from '../../services/permissionStore'
+import { validateFieldsAndScroll } from '../../utils/formValidation'
 
 const { Text, Title } = Typography
 
@@ -419,19 +420,19 @@ const DataCleaning: React.FC = () => {
   }
 
   const handleCreate = async () => {
-    try {
-      await form.validateFields()
-    } catch {
+    const values = await validateFieldsAndScroll<Record<string, any>>(form, message)
+
+    if (!values) {
       return
     }
 
     setCreating(true)
     try {
       await dataServiceApi.createCleaningTask({
-        name: form.getFieldValue('name'),
-        description: form.getFieldValue('description') ?? '',
+        name: values.name,
+        description: values.description ?? '',
         preDataset: selectedDatasetLabel,
-        postDataset: form.getFieldValue('outputName'),
+        postDataset: values.outputName,
         operatorValues: selectedOperators,
       })
     } finally {
@@ -490,7 +491,7 @@ const DataCleaning: React.FC = () => {
         </div>
 
         <Card style={{ borderRadius: 16, border: '1px solid #e2e8f0' }}>
-          <Form form={form} layout="vertical" initialValues={{ sourceType: '已有数据集', outputMode: '新增版本', scheduleEnabled: false }}>
+          <Form form={form} layout="vertical" initialValues={{ sourceType: '已有数据集', outputMode: '新增版本', scheduleEnabled: false }} scrollToFirstError={{ behavior: 'smooth', block: 'center' }}>
             <Divider style={{ marginTop: 0 }}>基本信息</Divider>
 
             <Form.Item label="任务名称" name="name" rules={[{ required: true, message: '请输入任务名称' }]}>
@@ -709,7 +710,7 @@ const DataCleaning: React.FC = () => {
           trainingType="text"
           defaultDataType="训练数据集"
           detailedDataUsage
-          dataScopeHint="可选择 SFT、DPO、RFT 以及测试数据集；DPO 支持 Alpaca 与 Role-Based 两种格式，清洗字段会随格式自动切换。"
+          dataScopeHint="仅展示已发布数据集；可选择 SFT、DPO、RFT 以及测试数据集，清洗字段会随格式自动切换。"
           defaultSelectedKeys={selectedCleaningDataset ? [selectedCleaningDataset.key] : []}
           onCancel={() => setDatasetPickerOpen(false)}
           onConfirm={selectedRows => {

@@ -51,6 +51,7 @@ import {
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { canAccessResourceData, getCurrentProjectMember, getCurrentUser, getOperationDeniedMessage, usePermissionStore } from '../../services/permissionStore'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
+import { validateFieldsAndScroll } from '../../utils/formValidation'
 
 const { Title, Text } = Typography
 
@@ -498,17 +499,19 @@ type LabelItem = { name: string; color: string; classId?: string }
 type EntityMark = { id: string; text: string; label: string; range: string; color: string }
 
 const datasetOptions = [
-  { value: 'image-multi-v2', label: '图像分类/Phoena-图像分类-单图多标签-有标注-V2', dataType: '图片', annotationType: '图像分类', count: 13, output: '图像分类/Phoena-图像分类-单图多标签-有标注-V3' },
-  { value: 'image-single-v1', label: '图像分类/Phoena-图像分类-单图单标签-无标注-V1', dataType: '图片', annotationType: '图像分类', count: 21, output: '图像分类/Phoena-图像分类-单图单标签-有标注-V2' },
-  { value: 'object-detection-v1', label: '物体检测/货架商品框选-无标注-V1', dataType: '图片', annotationType: '物体检测', count: 48, output: '物体检测/货架商品框选-有标注-V2' },
-  { value: 'defect-image-v1', label: '图像分类/设备缺陷多标签-无标注-V1', dataType: '图片', annotationType: '图像分类', count: 52, output: '图像分类/设备缺陷多标签-有标注-V2' },
-  { value: 'text-single-v1', label: '文本分类/Phoena-文本分类-文本单标签-无标注-V1', dataType: '文本', annotationType: '文本分类', count: 10, output: '文本分类/Phoena-文本分类-文本单标签-有标注-V2' },
-  { value: 'text-multi-v1', label: '文本分类/Phoena-文本分类-文本多标签-无标注-V1', dataType: '文本', annotationType: '文本分类', count: 10, output: '文本分类/Phoena-文本分类-文本多标签-有标注-V2' },
-  { value: 'entity-v1', label: '实体识别/实体识别---123-V1', dataType: '文本', annotationType: '实体识别', count: 30, output: '实体识别/实体识别---123-V2' },
-  { value: 'intent-v1', label: '文本分类/客服意图单标签-无标注-V1', dataType: '文本', annotationType: '文本分类', count: 36, output: '文本分类/客服意图单标签-有标注-V2' },
+  { value: 'image-multi-v2', label: '图像分类/Phoena-图像分类-单图多标签-有标注-V2', dataType: '图片', annotationType: '图像分类', count: 13, output: '图像分类/Phoena-图像分类-单图多标签-有标注-V3', publishStatus: '已发布' },
+  { value: 'image-single-v1', label: '图像分类/Phoena-图像分类-单图单标签-无标注-V1', dataType: '图片', annotationType: '图像分类', count: 21, output: '图像分类/Phoena-图像分类-单图单标签-有标注-V2', publishStatus: '未发布' },
+  { value: 'object-detection-v1', label: '物体检测/货架商品框选-无标注-V1', dataType: '图片', annotationType: '物体检测', count: 48, output: '物体检测/货架商品框选-有标注-V2', publishStatus: '已发布' },
+  { value: 'defect-image-v1', label: '图像分类/设备缺陷多标签-无标注-V1', dataType: '图片', annotationType: '图像分类', count: 52, output: '图像分类/设备缺陷多标签-有标注-V2', publishStatus: '已发布' },
+  { value: 'text-single-v1', label: '文本分类/Phoena-文本分类-文本单标签-无标注-V1', dataType: '文本', annotationType: '文本分类', count: 10, output: '文本分类/Phoena-文本分类-文本单标签-有标注-V2', publishStatus: '已发布' },
+  { value: 'text-multi-v1', label: '文本分类/Phoena-文本分类-文本多标签-无标注-V1', dataType: '文本', annotationType: '文本分类', count: 10, output: '文本分类/Phoena-文本分类-文本多标签-有标注-V2', publishStatus: '已发布' },
+  { value: 'entity-v1', label: '实体识别/实体识别---123-V1', dataType: '文本', annotationType: '实体识别', count: 30, output: '实体识别/实体识别---123-V2', publishStatus: '已发布' },
+  { value: 'intent-v1', label: '文本分类/客服意图单标签-无标注-V1', dataType: '文本', annotationType: '文本分类', count: 36, output: '文本分类/客服意图单标签-有标注-V2', publishStatus: '已发布' },
 ]
 
 type MachineAnnotationDatasetOption = (typeof datasetOptions)[number]
+
+const publishedDatasetOptions = datasetOptions.filter(item => item.publishStatus === '已发布')
 
 const memberOptions = [
   { value: 'lab1', label: 'lab1' },
@@ -709,7 +712,7 @@ const MLAnnotation: React.FC = () => {
   const [configModalOpen, setConfigModalOpen] = useState(false)
   const [annotatorDrafts, setAnnotatorDrafts] = useState<MemberDraft[]>([])
   const [reviewerDrafts, setReviewerDrafts] = useState<MemberDraft[]>([])
-  const [selectedDataset, setSelectedDataset] = useState(datasetOptions[0])
+  const [selectedDataset, setSelectedDataset] = useState(publishedDatasetOptions[0])
   const onlineDatasetOptions = datasetOptions.filter(item => item.dataType === onlineDatasetType)
   const onlineSelectedDataset = datasetOptions.find(item => item.value === onlineSelectedDatasetValue)
   const [workbenchSampleRows, setWorkbenchSampleRows] = useState(workbenchSamples)
@@ -1170,11 +1173,15 @@ const MLAnnotation: React.FC = () => {
     else setReviewerDrafts(applyDeadline)
   }
 
-  function submitCreatePage() {
-    form.validateFields().then(() => {
-      message.success('多人标注任务已创建')
-      navigate('/machine-annotation?tab=multi')
-    })
+  async function submitCreatePage() {
+    const values = await validateFieldsAndScroll<Record<string, any>>(form, message)
+
+    if (!values) {
+      return
+    }
+
+    message.success('多人标注任务已创建')
+    navigate('/machine-annotation?tab=multi')
   }
 
   function handleDeleteWorkbenchSample() {
@@ -1363,12 +1370,16 @@ const MLAnnotation: React.FC = () => {
     setOnlineCreateOpen(true)
   }
 
-  function submitOnlineCreate() {
-    onlineForm.validateFields().then(() => {
-      message.success('在线标注任务已创建')
-      setOnlineCreateOpen(false)
-      setOnlineSelectedDatasetValue(undefined)
-    })
+  async function submitOnlineCreate() {
+    const values = await validateFieldsAndScroll<Record<string, any>>(onlineForm, message)
+
+    if (!values) {
+      return
+    }
+
+    message.success('在线标注任务已创建')
+    setOnlineCreateOpen(false)
+    setOnlineSelectedDatasetValue(undefined)
   }
 
   function renderOnlineDatasetPickerModal() {
@@ -1389,6 +1400,7 @@ const MLAnnotation: React.FC = () => {
             { title: '数据类型', dataIndex: 'dataType', key: 'dataType', width: 100 },
             { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 120 },
             { title: '数据量', dataIndex: 'count', key: 'count', width: 100 },
+            { title: '发布状态', dataIndex: 'publishStatus', key: 'publishStatus', width: 100, render: value => <Tag color={value === '已发布' ? 'green' : 'default'}>{value}</Tag> },
             {
               title: '操作',
               key: 'action',
@@ -1396,6 +1408,7 @@ const MLAnnotation: React.FC = () => {
               render: (_, record) => (
                 <Button
                   type="link"
+                  disabled={record.publishStatus !== '已发布'}
                   onClick={() => {
                     setOnlineSelectedDatasetValue(record.value)
                     onlineForm.setFieldValue('dataset', record.value)
@@ -2313,6 +2326,7 @@ const MLAnnotation: React.FC = () => {
             form={form}
             layout="vertical"
             initialValues={{ datasetSource: 'existing', dataset: selectedDataset.value, outputMode: 'newVersion', sampleRatio: 100 }}
+            scrollToFirstError={{ behavior: 'smooth', block: 'center' }}
           >
             <Title level={4}>基本信息</Title>
             <Form.Item label="任务名称" name="name" rules={[{ required: true, message: '请输入标注任务名称' }]}>
@@ -2331,8 +2345,8 @@ const MLAnnotation: React.FC = () => {
             <Form.Item name="dataset" rules={[{ required: true, message: '请选择需要标注的数据集版本' }]}>
               <Select
                 placeholder="请选择需要标注的数据集版本"
-                options={datasetOptions.map(item => ({ value: item.value, label: item.label }))}
-                onChange={value => setSelectedDataset(datasetOptions.find(item => item.value === value) ?? datasetOptions[0])}
+                options={datasetOptions.map(item => ({ value: item.value, label: item.label, disabled: item.publishStatus !== '已发布' }))}
+                onChange={value => setSelectedDataset(datasetOptions.find(item => item.value === value) ?? publishedDatasetOptions[0])}
               />
             </Form.Item>
             <Text type="secondary">数据量：{selectedDataset.count} 条</Text>
@@ -2495,6 +2509,7 @@ const MLAnnotation: React.FC = () => {
           form={onlineForm}
           layout="vertical"
           initialValues={{ dataType: onlineDatasetType, sourceType: '已有数据集', outputMode: '新增版本' }}
+          scrollToFirstError={{ behavior: 'smooth', block: 'center' }}
         >
           <Form.Item label="任务名称" name="name" rules={[{ required: true, message: '请输入任务名称' }]}>
             <Input placeholder="请输入任务名称" />

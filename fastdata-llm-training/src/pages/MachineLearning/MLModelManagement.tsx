@@ -7,6 +7,7 @@ import { formatResourceLockMessage, getModelReferenceLocks } from '../../service
 import ResumableUpload from '../../components/ResumableUpload'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage } from '../../services/permissionStore'
+import { validateFieldsAndScroll } from '../../utils/formValidation'
 
 const { Title, Text } = Typography
 
@@ -109,33 +110,34 @@ const MLModelManagement: React.FC = () => {
   }
 
   const submitCreate = async () => {
-    try {
-      const values = await form.validateFields()
-      const currentUser = getCurrentUser()
-      setModels(prev => [
-        {
-          id: `ml-model-${Date.now()}`,
-          name: values.name,
-          version: 'V1',
-          versionCount: 1,
-          modelType: values.modelType === 'image' ? '图片' : '文本',
-          annotationType: values.annotationType,
-          taskType: values.taskType,
-          source: values.source === 'local' ? '本地上传' : 'Notebook 获取',
-          weightFile: normalizeUploadFileName(values.weightFile) || (values.source === 'local' ? 'model.pt' : 'notebook://请选择 Notebook/model.pt'),
-          tokenizer: normalizeUploadFileName(values.tokenizer),
-          network: values.network,
-          description: values.description,
-          creator: currentUser.account,
-          createdAt: new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-'),
-        },
-        ...prev,
-      ])
-      resetCreateState()
-      navigate('/machine-model-management')
-    } catch {
+    const values = await validateFieldsAndScroll<MLModelFormValues>(form, message)
+
+    if (!values) {
       return
     }
+
+    const currentUser = getCurrentUser()
+    setModels(prev => [
+      {
+        id: `ml-model-${Date.now()}`,
+        name: values.name,
+        version: 'V1',
+        versionCount: 1,
+        modelType: values.modelType === 'image' ? '图片' : '文本',
+        annotationType: values.annotationType,
+        taskType: values.taskType,
+        source: values.source === 'local' ? '本地上传' : 'Notebook 获取',
+        weightFile: normalizeUploadFileName(values.weightFile) || (values.source === 'local' ? 'model.pt' : 'notebook://请选择 Notebook/model.pt'),
+        tokenizer: normalizeUploadFileName(values.tokenizer),
+        network: values.network,
+        description: values.description,
+        creator: currentUser.account,
+        createdAt: new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-'),
+      },
+      ...prev,
+    ])
+    resetCreateState()
+    navigate('/machine-model-management')
   }
 
   const columns: ColumnsType<MLModelRecord> = [
@@ -239,6 +241,7 @@ const MLModelManagement: React.FC = () => {
             taskType: '文本单标签',
             source: 'notebook',
           }}
+          scrollToFirstError={{ behavior: 'smooth', block: 'center' }}
         >
           <Card title="基本信息" style={{ borderRadius: 12, marginBottom: 16 }}>
             <Form.Item label="模型名称" name="name" rules={[{ required: true, message: '请输入模型名称' }]}>

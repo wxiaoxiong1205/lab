@@ -25,6 +25,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { formatResourceLockMessage, getOnlineInferenceServiceReferenceLocks } from '../../services/resourceReferenceGuard'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage } from '../../services/permissionStore'
+import { validateFieldsAndScroll } from '../../utils/formValidation'
 
 const { Title, Text } = Typography
 
@@ -231,7 +232,12 @@ const OnlineInferenceService: React.FC = () => {
 
   const submit = async () => {
     try {
-      const values = await form.validateFields()
+      const values = await validateFieldsAndScroll<Record<string, any>>(form, message)
+
+      if (!values) {
+        return
+      }
+
       if (editingServiceId) {
         const target = services.find(item => item.id === editingServiceId)
         if (target && !warnNoServiceDataAccess(target)) {
@@ -366,7 +372,7 @@ const OnlineInferenceService: React.FC = () => {
         onOk={submit}
         okText={editingServiceId ? '保存' : '创建'}
       >
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" scrollToFirstError={{ behavior: 'smooth', block: 'center' }}>
           <Form.Item label="服务名称" name="name" rules={[{ required: true, message: '请输入服务名称' }]}>
             <Input />
           </Form.Item>

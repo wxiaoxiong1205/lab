@@ -43,6 +43,7 @@ import {
 import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage } from '../../services/permissionStore'
 import ResumableUpload from '../../components/ResumableUpload'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
+import { validateFieldsAndScroll } from '../../utils/formValidation'
 
 const { Title, Text } = Typography
 
@@ -415,7 +416,11 @@ const MLModelDeployment: React.FC = () => {
 
   const submitForm = async () => {
     try {
-      const values = await form.validateFields()
+      const values = await validateFieldsAndScroll<CreateFormValues>(form, message)
+
+      if (!values) {
+        return
+      }
 
       if (createType === 'custom') {
         try {
@@ -692,7 +697,7 @@ const MLModelDeployment: React.FC = () => {
               </div>
             </Card>
 
-            <Form form={form} layout="vertical">
+            <Form form={form} layout="vertical" scrollToFirstError={{ behavior: 'smooth', block: 'center' }}>
               <Card id="basic-info" style={{ ...sectionCardStyle, marginBottom: 20 }}>
                 <div style={sectionTitleStyle}>基本信息</div>
                 <Form.Item
