@@ -128,15 +128,6 @@ export const DATASET_PICKER_CATALOG: DatasetPickerItem[] = [
     versions: [{ id: 'v1', label: 'V1', charCount: 72_000, sampleCount: 360 }],
   },
   {
-    id: 'ds_vision_rft_1',
-    name: '图像理解-RFT-PPO-视觉推理奖励集',
-    latestVersion: 'V1',
-    dataType: '训练数据集',
-    dataUsage: '图像理解',
-    dataFormat: 'Completion_Reward',
-    versions: [{ id: 'v1', label: 'V1', charCount: 54_000, sampleCount: 260 }],
-  },
-  {
     id: 'ds_vision_rft_2',
     name: '图像理解-RFT-GRPO-图表推理集',
     latestVersion: 'V1',
@@ -313,29 +304,6 @@ export const DATASET_PICKER_CATALOG: DatasetPickerItem[] = [
     dataUsage: '文本生成',
     dataFormat: 'ROLE_BASED',
     versions: [{ id: 'v1', label: 'V1', charCount: 84_000, sampleCount: 210 }],
-  },
-  {
-    id: 'ds_pr_reward_1',
-    name: 'PPO-Completion_Reward-训练集A',
-    latestVersion: 'V1',
-    dataType: '训练数据集',
-    dataUsage: '文本生成',
-    dataFormat: 'Completion_Reward',
-    versions: [
-      { id: 'v1', label: 'V1', charCount: 320_000, sampleCount: 800 },
-    ],
-  },
-  {
-    id: 'ds_pr_reward_2',
-    name: 'PPO-Completion_Reward-业务场景',
-    latestVersion: 'V1',
-    dataType: '训练数据集',
-    dataUsage: '文本生成',
-    dataFormat: 'Completion_Reward',
-    versions: [
-      { id: 'v1', label: 'V1', charCount: 540_000, sampleCount: 1350 },
-      { id: 'v2', label: 'V2', charCount: 680_000, sampleCount: 1700 },
-    ],
   },
   {
     id: 'ds_grpo_reward_1',

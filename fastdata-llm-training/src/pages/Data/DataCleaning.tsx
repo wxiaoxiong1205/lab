@@ -710,7 +710,16 @@ const DataCleaning: React.FC = () => {
           trainingType="text"
           defaultDataType="训练数据集"
           detailedDataUsage
-          dataScopeHint="仅展示已发布数据集；可选择 SFT、DPO、RFT 以及测试数据集，清洗字段会随格式自动切换。"
+          groupDetailedUsageOptions
+          allowedDetailedUsages={[
+            '文本生成 / SFT',
+            '文本生成 / DPO',
+            '文本生成 / RFT-GRPO',
+            '图像理解 / SFT',
+            '图像理解 / DPO',
+            '图像理解 / RFT-GRPO',
+          ]}
+          dataScopeHint="仅展示已发布数据集；可选择 SFT、DPO、RFT-GRPO 以及测试数据集，清洗字段会随格式自动切换。"
           defaultSelectedKeys={selectedCleaningDataset ? [selectedCleaningDataset.key] : []}
           onCancel={() => setDatasetPickerOpen(false)}
           onConfirm={selectedRows => {

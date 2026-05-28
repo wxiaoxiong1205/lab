@@ -7,13 +7,12 @@ import {
   Modal,
   Select,
   Space,
-  Switch,
   Table,
   Typography,
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SettingOutlined, CloudServerOutlined } from '@ant-design/icons'
+import { PlusOutlined, CloudServerOutlined } from '@ant-design/icons'
 import {
   canRunOperation,
   createProject,
@@ -35,31 +34,20 @@ const { Title, Text } = Typography
 const clusterOptions = ['V1.12版本集群', '测试环境集群12', '生产环境集群A']
 const namespaceOptions = ['ai-infra', 'lab', 'fs']
 
-type SSHConfigRecord = {
-  enabled: boolean
-  username: string
-  password: string
-  sshKey: string
-}
-
 const ProjectManagement: React.FC = () => {
   const permissionState = usePermissionStore()
   const currentUser = getCurrentUser(permissionState)
   const [form] = Form.useForm()
   const [memberForm] = Form.useForm()
-  const [sshForm] = Form.useForm()
   const [namespaceForm] = Form.useForm()
   const [createOpen, setCreateOpen] = useState(false)
   const [permissionOpen, setPermissionOpen] = useState(false)
-  const [sshOpen, setSshOpen] = useState(false)
   const [namespaceOpen, setNamespaceOpen] = useState(false)
   const [selectedProject, setSelectedProject] = useState<PermissionProject | null>(null)
   const [editingProject, setEditingProject] = useState<PermissionProject | null>(null)
   const [draftMembers, setDraftMembers] = useState<ProjectPermissionMember[]>([])
   const [selectedMemberAccount, setSelectedMemberAccount] = useState<string>()
-  const [sshConfigs, setSshConfigs] = useState<Record<string, SSHConfigRecord>>({})
   const [namespaceConfigs, setNamespaceConfigs] = useState<Record<string, string>>({})
-  const sshEnabled = Form.useWatch('enabled', sshForm)
 
   const visibleProjects = useMemo(() => {
     if (currentUser.roleKeys.includes('platform_admin')) {
@@ -151,18 +139,6 @@ const ProjectManagement: React.FC = () => {
     })
   }
 
-  const generateSSHKey = () => {
-    const generatedKey = `ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDeepexiLabGeneratedKey-${Date.now()}`
-    sshForm.setFieldValue('sshKey', generatedKey)
-    const blob = new Blob([`${generatedKey}\n`], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${selectedProject?.name ?? 'project'}-ssh-key.pub`
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
   const columns: ColumnsType<PermissionProject> = [
     { title: '项目名称', dataIndex: 'name', key: 'name', width: 180 },
     {
@@ -174,15 +150,6 @@ const ProjectManagement: React.FC = () => {
       render: value => value || '-',
     },
     { title: '绑定集群', dataIndex: 'cluster', key: 'cluster', width: 180 },
-    {
-      title: 'SSH配置',
-      key: 'ssh',
-      width: 120,
-      render: (_, record) => {
-        const config = sshConfigs[record.id]
-        return config?.enabled ? '已配置' : '未配置'
-      },
-    },
     {
       title: '镜像命名空间',
       key: 'namespace',
@@ -206,26 +173,6 @@ const ProjectManagement: React.FC = () => {
             }
           >
             编辑
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<SettingOutlined />}
-            onClick={() =>
-              guardOperation('admin.project.edit', () => {
-                setSelectedProject(record)
-                const currentConfig = sshConfigs[record.id] ?? {
-                  enabled: false,
-                  username: '',
-                  password: '',
-                  sshKey: '',
-                }
-                sshForm.setFieldsValue(currentConfig)
-                setSshOpen(true)
-              })
-            }
-          >
-            SSH配置
           </Button>
           <Button
             type="link"
@@ -355,29 +302,6 @@ const ProjectManagement: React.FC = () => {
     message.success('项目权限已更新')
   }
 
-  const submitSSHConfig = async () => {
-    if (!selectedProject) {
-      return
-    }
-
-    try {
-      const values = await sshForm.validateFields()
-      setSshConfigs(previous => ({
-        ...previous,
-        [selectedProject.id]: {
-          enabled: Boolean(values.enabled),
-          username: values.username || '',
-          password: values.password || '',
-          sshKey: values.sshKey || '',
-        },
-      }))
-      setSshOpen(false)
-      message.success('SSH配置已保存')
-    } catch {
-      return
-    }
-  }
-
   const submitNamespace = async () => {
     if (!selectedProject) {
       return
@@ -432,7 +356,7 @@ const ProjectManagement: React.FC = () => {
         <Card style={{ borderRadius: 20, border: '1px solid #e5e7eb' }}>
           <Title level={2}>项目管理</Title>
           <Text type="secondary" style={{ display: 'block', marginBottom: 18 }}>
-            统一维护项目基础信息、绑定集群、成员角色、SSH 配置与镜像命名空间。
+            统一维护项目基础信息、绑定集群、成员角色与镜像命名空间。
           </Text>
 
           <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
@@ -560,45 +484,6 @@ const ProjectManagement: React.FC = () => {
           pagination={false}
           scroll={{ x: 1170 }}
         />
-      </Modal>
-
-      <Modal
-        title={selectedProject ? `${selectedProject.name} · SSH配置` : 'SSH配置'}
-        open={sshOpen}
-        onCancel={() => setSshOpen(false)}
-        footer={
-          <Space>
-            <Button onClick={() => setSshOpen(false)}>取消</Button>
-            <Button type="primary" onClick={submitSSHConfig}>确定</Button>
-          </Space>
-        }
-      >
-        <Form form={sshForm} layout="vertical" initialValues={{ enabled: false }}>
-          <Card size="small" style={{ borderRadius: 14, background: '#f8fafc', marginBottom: 16 }}>
-            <Form.Item label="ssh配置" name="enabled" valuePropName="checked" style={{ marginBottom: 0 }}>
-              <Switch checkedChildren="开启" unCheckedChildren="关闭" />
-            </Form.Item>
-            {!sshEnabled && (
-              <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
-                当前未开启 SSH 配置，开启后可填写用户名、密码并生成 SSH Key。
-              </Text>
-            )}
-          </Card>
-          {sshEnabled && (
-            <Card size="small" style={{ borderRadius: 14, border: '1px solid #e5e7eb' }}>
-              <Form.Item label="用户名" name="username">
-                <Input placeholder="请输入用户名" />
-              </Form.Item>
-              <Form.Item label="密码" name="password">
-                <Input.Password placeholder="请输入密码" />
-              </Form.Item>
-              <Form.Item label="SSH Key" name="sshKey">
-                <Input placeholder="可手动输入或生成 SSH Key" />
-              </Form.Item>
-              <Button onClick={generateSSHKey}>生成SSH Key</Button>
-            </Card>
-          )}
-        </Form>
       </Modal>
 
       <Modal

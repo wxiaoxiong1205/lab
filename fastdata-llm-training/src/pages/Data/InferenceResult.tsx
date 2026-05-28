@@ -47,7 +47,7 @@ const { Title, Text } = Typography
 
 type InferenceMode = '离线推理' | '在线推理' | '导入推理结果集'
 type DataUsage = '文本生成' | '图像理解'
-type ImportDataUsage = '文本生成 / SFT' | '文本生成 / DPO' | '文本生成 / RFT-PPO' | '文本生成 / RFT-GRPO' | '图像理解'
+type ImportDataUsage = '文本生成 / SFT' | '文本生成 / DPO' | '文本生成 / RFT-GRPO' | '图像理解'
 
 type InferenceResultRecord = {
   id: string
@@ -116,7 +116,6 @@ const pendingModelOptions = [
 const importUsageOptions: ImportDataUsage[] = [
   '文本生成 / SFT',
   '文本生成 / DPO',
-  '文本生成 / RFT-PPO',
   '文本生成 / RFT-GRPO',
   '图像理解',
 ]
@@ -144,7 +143,7 @@ function getBaseDataUsage(value?: ImportDataUsage): DataUsage {
 
 function getImportDataFormatOptions(value?: ImportDataUsage) {
   if (value === '文本生成 / DPO') return ['ALPACA', 'ROLE_BASED']
-  if (value === '文本生成 / RFT-PPO' || value === '文本生成 / RFT-GRPO') return ['Completion_Reward']
+  if (value === '文本生成 / RFT-GRPO') return ['Completion_Reward']
   if (value === '图像理解') return ['image_text_pair']
   return ['PROMPT_RESPONSE', 'ROLE_BASED']
 }

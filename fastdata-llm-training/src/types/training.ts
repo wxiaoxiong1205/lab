@@ -4,8 +4,8 @@ export type TrainingType = 'text' | 'vision'
 // 训练方法：SFT（监督微调）或强化学习（DPO / RFT）
 export type TrainingMethod = 'SFT' | 'DPO' | 'RFT'
 
-// RFT 子算法
-export type RFTAlgorithm = 'PPO' | 'GRPO'
+// RFT 子算法：PPO 暂不开放，当前仅支持 GRPO
+export type RFTAlgorithm = 'GRPO'
 
 // 强化学习方法对应的显示名称
 export const TRAINING_METHOD_LABELS: Record<TrainingMethod, string> = {
@@ -133,7 +133,7 @@ export interface RewardRule {
 
 // 强化学习额外配置
 export interface RLConfig {
-  /** RFT 时必填：算法类型（PPO / GRPO） */
+  /** RFT 时必填：算法类型（当前仅支持 GRPO） */
   rftAlgorithm?: RFTAlgorithm
   /** RFT 时必填：奖励规则 */
   rewardRule?: RewardRule

@@ -27,7 +27,15 @@ import { isPreferenceOrRewardFormat } from '../services/datasetFormats'
 const { Text } = Typography
 
 export type SelectedDatasetVersionRow = DatasetPickerResolvedRow
-export type DetailedDataUsage = '文本生成 / SFT' | '文本生成 / DPO' | '文本生成 / RFT-PPO' | '文本生成 / RFT-GRPO' | '图像理解'
+export type DetailedDataUsage =
+  | '文本生成 / SFT'
+  | '文本生成 / DPO'
+  | '文本生成 / RFT-PPO'
+  | '文本生成 / RFT-GRPO'
+  | '图像理解'
+  | '图像理解 / SFT'
+  | '图像理解 / DPO'
+  | '图像理解 / RFT-GRPO'
 
 export interface DatasetSelectModalProps {
   open: boolean
@@ -56,6 +64,8 @@ export interface DatasetSelectModalProps {
   hideEmptyDetailedUsageOptions?: boolean
   /** 隐藏细分用途选项，仅保留“全部” */
   hideDetailedUsageOptions?: boolean
+  /** 将细分用途拆成“数据场景 -> 训练方法”两段筛选 */
+  groupDetailedUsageOptions?: boolean
   /** 首次打开时默认选中的数据用途 */
   defaultDataUsage?: string
   /** 弹窗顶部的业务约束提示 */
@@ -84,23 +94,67 @@ function getAllowedFormats(trainingType: TrainingType, trainingMethod?: Training
 }
 
 /** 根据 trainingType 计算 dataUsage 默认值 */
-function getDefaultDataUsage(trainingType: TrainingType): string {
+function getDefaultDataUsage(trainingType: TrainingType, detailedDataUsage = false): string {
+  if (detailedDataUsage) {
+    return trainingType === 'vision' ? '图像理解' : '文本生成 / SFT'
+  }
   return trainingType === 'vision' ? '图像理解' : trainingType === 'text' ? '文本生成' : ''
 }
 
 interface FormatOption { value: string; label: string; count: number }
+type DetailedUsageScene = '文本生成' | '图像理解'
+type GroupedDetailedUsageMethod = 'SFT' | 'DPO' | 'RFT-GRPO'
+
+const GROUPED_DETAILED_USAGE_SCENES: DetailedUsageScene[] = ['文本生成', '图像理解']
+const GROUPED_DETAILED_USAGE_METHODS: GroupedDetailedUsageMethod[] = ['SFT', 'DPO', 'RFT-GRPO']
+const GROUPED_DETAILED_USAGE_VALUES: DetailedDataUsage[] = GROUPED_DETAILED_USAGE_SCENES.flatMap(scene =>
+  GROUPED_DETAILED_USAGE_METHODS.map(method => `${scene} / ${method}` as DetailedDataUsage),
+)
 
 function isVersionPublished(version: { publishStatus?: string }): boolean {
   return (version.publishStatus ?? '已发布') === '已发布'
 }
 
-function getDetailedUsage(item: DatasetPickerItem): string {
-  if (item.dataUsage === '图像理解') return '图像理解'
+function getDetailedUsage(item: DatasetPickerItem): DetailedDataUsage {
+  const scene = item.dataUsage === '图像理解' ? '图像理解' : '文本生成'
+  if (scene === '图像理解') {
+    if (item.dataFormat === 'Completion_Reward') return '图像理解 / RFT-GRPO'
+    if (item.dataFormat === 'ALPACA' || (item.dataFormat === 'ROLE_BASED' && item.name.toUpperCase().includes('DPO'))) return '图像理解 / DPO'
+    return '图像理解 / SFT'
+  }
   if (item.dataFormat === 'ALPACA' || (item.dataFormat === 'ROLE_BASED' && item.name.toUpperCase().includes('DPO'))) return '文本生成 / DPO'
   if (item.dataFormat === 'Completion_Reward') {
     return item.name.toUpperCase().includes('GRPO') ? '文本生成 / RFT-GRPO' : '文本生成 / RFT-PPO'
   }
   return '文本生成 / SFT'
+}
+
+function getDetailedUsageScene(value?: string): '文本生成' | '图像理解' | '' {
+  if (!value) return ''
+  return value.startsWith('图像理解') ? '图像理解' : '文本生成'
+}
+
+function getDetailedUsageMethod(value?: string): GroupedDetailedUsageMethod | '' {
+  if (!value || !value.includes('/')) return ''
+  const method = value.split('/')[1]?.trim()
+  return GROUPED_DETAILED_USAGE_METHODS.includes(method as GroupedDetailedUsageMethod)
+    ? method as GroupedDetailedUsageMethod
+    : ''
+}
+
+function makeGroupedDetailedUsage(scene: DetailedUsageScene, method: GroupedDetailedUsageMethod): DetailedDataUsage {
+  return `${scene} / ${method}` as DetailedDataUsage
+}
+
+function matchesDetailedUsage(item: DatasetPickerItem, value?: string): boolean {
+  if (!value) return true
+  if (value === '图像理解') return item.dataUsage === '图像理解'
+  return getDetailedUsage(item) === value
+}
+
+function isAllowedByDetailedUsageSet(item: DatasetPickerItem, allowedSet: Set<string>): boolean {
+  const usage = getDetailedUsage(item)
+  return allowedSet.has(usage) || (item.dataUsage === '图像理解' && allowedSet.has('图像理解'))
 }
 
 function matchesTrainingMethod(item: DatasetPickerItem, trainingMethod?: TrainingMethod): boolean {
@@ -112,6 +166,10 @@ function matchesTrainingMethod(item: DatasetPickerItem, trainingMethod?: Trainin
     return item.dataFormat === 'ALPACA' || (item.dataFormat === 'ROLE_BASED' && item.name.toUpperCase().includes('DPO'))
   }
   return item.dataFormat === 'Completion_Reward'
+}
+
+function isPpoDatasetItem(item: DatasetPickerItem): boolean {
+  return item.name.toUpperCase().includes('PPO') || getDetailedUsage(item) === '文本生成 / RFT-PPO'
 }
 
 /** 训练/验证弹窗固定为训练/验证数据集类型 */
@@ -131,6 +189,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
   excludePreferenceOrRewardByDataType,
   hideEmptyDetailedUsageOptions = false,
   hideDetailedUsageOptions = false,
+  groupDetailedUsageOptions = false,
   defaultDataUsage,
   dataScopeHint,
   emptyText = '暂无数据集',
@@ -146,7 +205,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
   const pageSize = 10
 
   const [dataType, setDataType] = useState<string>(fixedDataType ?? defaultDataType ?? '')
-  const [dataUsage, setDataUsage] = useState(() => defaultDataUsage ?? (detailedDataUsage ? '' : getDefaultDataUsage(trainingType)))
+  const [dataUsage, setDataUsage] = useState(() => defaultDataUsage ?? getDefaultDataUsage(trainingType, detailedDataUsage))
   const [dataFormat, setDataFormat] = useState('')
 
   // 选中状态
@@ -170,7 +229,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
       setPage(1)
       setExpandedIds(new Set())
       setDataType(fixedDataType ?? defaultDataType ?? '')
-      setDataUsage(defaultDataUsage ?? (detailedDataUsage ? '' : getDefaultDataUsage(trainingType)))
+      setDataUsage(defaultDataUsage ?? getDefaultDataUsage(trainingType, detailedDataUsage))
       setDataFormat('')
       if (mode === 'multiple') {
         setMultiSelected(new Set(defaultSelectedKeys.filter(k => !excludeKeys.includes(k))))
@@ -202,7 +261,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
     if (!allowedDetailedUsagesByDataType) return null
     return Object.fromEntries(
       Object.entries(allowedDetailedUsagesByDataType).map(([type, usages]) => [type, new Set(usages)]),
-    ) as Partial<Record<DatasetPickerDataType, Set<DetailedDataUsage>>>
+    ) as Partial<Record<DatasetPickerDataType, Set<string>>>
   }, [allowedDetailedUsagesByDataType])
   const excludedFormatByTypeSets = useMemo(() => {
     if (!excludedFormatsByDataType) return null
@@ -215,17 +274,17 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
     [excludePreferenceOrRewardByDataType],
   )
   const baseCatalog = useMemo(() => {
-    let list = DATASET_PICKER_CATALOG
+    let list = DATASET_PICKER_CATALOG.filter(item => !isPpoDatasetItem(item))
     if (allowedDataTypes?.length) {
       list = list.filter(d => allowedDataTypes.includes(d.dataType))
     }
     if (allowedDetailedUsageSet) {
-      list = list.filter(d => allowedDetailedUsageSet.has(getDetailedUsage(d)))
+      list = list.filter(d => isAllowedByDetailedUsageSet(d, allowedDetailedUsageSet))
     }
     if (allowedDetailedUsageByTypeSets) {
       list = list.filter(d => {
         const scopedSet = allowedDetailedUsageByTypeSets[d.dataType]
-        return !scopedSet || scopedSet.has(getDetailedUsage(d) as DetailedDataUsage)
+        return !scopedSet || isAllowedByDetailedUsageSet(d, scopedSet)
       })
     }
     if (excludedFormatByTypeSets) {
@@ -260,7 +319,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
     if (fixedDataType) list = list.filter(d => d.dataType === fixedDataType)
     else if (dataType) list = list.filter(d => d.dataType === dataType)
     if (dataUsage) {
-      list = list.filter(d => (detailedDataUsage ? getDetailedUsage(d) === dataUsage : d.dataUsage === dataUsage))
+      list = list.filter(d => (detailedDataUsage ? matchesDetailedUsage(d, dataUsage) : d.dataUsage === dataUsage))
     }
     if (dataFormat) list = list.filter(d => d.dataFormat === dataFormat)
     if (allowedFormats) list = list.filter(d => allowedFormats.has(d.dataFormat))
@@ -284,7 +343,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
     if (fixedDataType) list = list.filter(d => d.dataType === fixedDataType)
     else if (dataType) list = list.filter(d => d.dataType === dataType)
     if (dataUsage) {
-      list = list.filter(d => (detailedDataUsage ? getDetailedUsage(d) === dataUsage : d.dataUsage === dataUsage))
+      list = list.filter(d => (detailedDataUsage ? matchesDetailedUsage(d, dataUsage) : d.dataUsage === dataUsage))
     }
     if (allowedFormats) list = list.filter(d => allowedFormats.has(d.dataFormat))
     if (trainingMethod) list = list.filter(d => matchesTrainingMethod(d, trainingMethod))
@@ -293,17 +352,19 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
 
   const usageOptions = useMemo(() => {
     if (detailedDataUsage) {
-      const values: DetailedDataUsage[] = ['文本生成 / SFT', '文本生成 / DPO', '文本生成 / RFT-PPO', '文本生成 / RFT-GRPO', '图像理解']
+      const values: DetailedDataUsage[] = groupDetailedUsageOptions
+        ? GROUPED_DETAILED_USAGE_VALUES
+        : ['文本生成 / SFT', '文本生成 / DPO', '文本生成 / RFT-GRPO', '图像理解']
       const scopedValues = allowedDetailedUsages?.length ? values.filter(value => allowedDetailedUsages.includes(value)) : values
       const visibleValues = hideEmptyDetailedUsageOptions
-        ? scopedValues.filter(value => usageScope.some(item => getDetailedUsage(item) === value))
+        ? scopedValues.filter(value => usageScope.some(item => matchesDetailedUsage(item, value)))
         : scopedValues
       return [
-        { value: '', label: '全部', count: usageScope.length },
+        ...(groupDetailedUsageOptions ? [] : [{ value: '', label: '全部', count: usageScope.length }]),
         ...(hideDetailedUsageOptions ? [] : visibleValues.map(value => ({
           value,
           label: value,
-          count: usageScope.filter(item => getDetailedUsage(item) === value).length,
+          count: usageScope.filter(item => matchesDetailedUsage(item, value)).length,
         }))),
       ]
     }
@@ -314,15 +375,62 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
       { value: '文本生成', label: '文本生成', count: text },
       { value: '图像理解', label: '图像理解', count: vision },
     ]
-  }, [allowedDetailedUsages, detailedDataUsage, hideDetailedUsageOptions, hideEmptyDetailedUsageOptions, usageScope])
+  }, [allowedDetailedUsages, detailedDataUsage, groupDetailedUsageOptions, hideDetailedUsageOptions, hideEmptyDetailedUsageOptions, usageScope])
+
+  const groupedUsageScene = useMemo<DetailedUsageScene>(() => {
+    const scene = getDetailedUsageScene(dataUsage)
+    return scene || (trainingType === 'vision' ? '图像理解' : '文本生成')
+  }, [dataUsage, trainingType])
+
+  const groupedUsageMethod = useMemo<GroupedDetailedUsageMethod>(() => {
+    const method = getDetailedUsageMethod(dataUsage)
+    return method || 'SFT'
+  }, [dataUsage])
+
+  const groupedSceneOptions = useMemo(() => GROUPED_DETAILED_USAGE_SCENES.map(scene => ({
+    value: scene,
+    label: scene,
+    count: usageOptions
+      .filter(option => getDetailedUsageScene(option.value) === scene)
+      .reduce((sum, option) => sum + option.count, 0),
+    disabled: !usageOptions.some(option => getDetailedUsageScene(option.value) === scene),
+  })), [usageOptions])
+
+  const groupedMethodOptions = useMemo(() => GROUPED_DETAILED_USAGE_METHODS.map(method => {
+    const value = makeGroupedDetailedUsage(groupedUsageScene, method)
+    const option = usageOptions.find(item => item.value === value)
+    return {
+      value: method,
+      usageValue: value,
+      label: method,
+      count: option?.count ?? 0,
+      disabled: !option,
+    }
+  }), [groupedUsageScene, usageOptions])
+
+  const setGroupedUsage = useCallback((scene: DetailedUsageScene, method?: GroupedDetailedUsageMethod) => {
+    const preferredMethod = method ?? groupedUsageMethod
+    const preferredValue = makeGroupedDetailedUsage(scene, preferredMethod)
+    const availableValues = new Set(usageOptions.map(option => option.value))
+    const fallbackValue = (
+      availableValues.has(preferredValue)
+        ? preferredValue
+        : GROUPED_DETAILED_USAGE_METHODS
+            .map(nextMethod => makeGroupedDetailedUsage(scene, nextMethod))
+            .find(value => availableValues.has(value))
+    ) ?? ''
+    setDataUsage(fallbackValue)
+    setDataFormat('')
+    setPage(1)
+  }, [groupedUsageMethod, usageOptions])
 
   useEffect(() => {
     if (!dataUsage) return
     const allowed = new Set(usageOptions.map(option => option.value))
     if (!allowed.has(dataUsage)) {
-      setDataUsage('')
+      setDataUsage(groupDetailedUsageOptions ? usageOptions[0]?.value ?? '' : '')
     }
-  }, [dataUsage, usageOptions])
+  }, [dataUsage, groupDetailedUsageOptions, usageOptions])
 
   // dataFormat 超出范围时自动清除（单向监听 formatScope，避免无限循环）
   useEffect(() => {
@@ -476,7 +584,7 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
               style={{ padding: 0, height: 'auto' }}
               onClick={() => {
                 setDataType(fixedDataType ?? defaultDataType ?? '')
-                setDataUsage(defaultDataUsage ?? (detailedDataUsage ? '' : getDefaultDataUsage(trainingType)))
+                setDataUsage(defaultDataUsage ?? getDefaultDataUsage(trainingType, detailedDataUsage))
                 setDataFormat('')
                 setSearch('')
                 setPage(1)
@@ -520,21 +628,78 @@ const DatasetSelectModal: React.FC<DatasetSelectModalProps> = ({
             <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 10 }}>
               数据用途
             </Text>
-            <Radio.Group
-              value={dataUsage}
-              onChange={e => {
-                setDataUsage(e.target.value)
-                setPage(1)
-              }}
-            >
-              <Space orientation="vertical" size={6} style={{ width: '100%' }}>
-                {usageOptions.map(opt => (
-                  <Radio key={opt.value || 'all'} value={opt.value}>
-                    {opt.label}（{opt.count}）
-                  </Radio>
-                ))}
+            {detailedDataUsage && groupDetailedUsageOptions ? (
+              <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+                {groupedSceneOptions.map(sceneOpt => {
+                  const active = groupedUsageScene === sceneOpt.value
+                  const scopedMethods = active
+                    ? groupedMethodOptions
+                    : GROUPED_DETAILED_USAGE_METHODS.map(method => {
+                        const usageValue = makeGroupedDetailedUsage(sceneOpt.value, method)
+                        const option = usageOptions.find(item => item.value === usageValue)
+                        return {
+                          value: method,
+                          usageValue,
+                          label: method,
+                          count: option?.count ?? 0,
+                          disabled: !option,
+                        }
+                      })
+                  return (
+                    <div key={sceneOpt.value}>
+                      <Radio
+                        checked={active}
+                        disabled={sceneOpt.disabled}
+                        onChange={() => setGroupedUsage(sceneOpt.value)}
+                      >
+                        {sceneOpt.label}（{sceneOpt.count}）
+                      </Radio>
+                      {active ? (
+                        <Radio.Group
+                          value={groupedUsageMethod}
+                          onChange={e => setGroupedUsage(groupedUsageScene, e.target.value)}
+                          style={{
+                            display: 'block',
+                            marginTop: 8,
+                            marginLeft: 24,
+                            paddingLeft: 12,
+                            borderLeft: '1px solid #e5e7eb',
+                          }}
+                        >
+                          <Space orientation="vertical" size={6}>
+                            {scopedMethods.map(methodOpt => (
+                              <Radio
+                                key={methodOpt.value}
+                                value={methodOpt.value}
+                                disabled={methodOpt.disabled}
+                              >
+                                {methodOpt.label}（{methodOpt.count}）
+                              </Radio>
+                            ))}
+                          </Space>
+                        </Radio.Group>
+                      ) : null}
+                    </div>
+                  )
+                })}
               </Space>
-            </Radio.Group>
+            ) : (
+              <Radio.Group
+                value={dataUsage}
+                onChange={e => {
+                  setDataUsage(e.target.value)
+                  setPage(1)
+                }}
+              >
+                <Space orientation="vertical" size={6} style={{ width: '100%' }}>
+                  {usageOptions.map(opt => (
+                    <Radio key={opt.value || 'all'} value={opt.value}>
+                      {opt.label}（{opt.count}）
+                    </Radio>
+                  ))}
+                </Space>
+              </Radio.Group>
+            )}
           </div>
 
           {/* 数据格式 */}

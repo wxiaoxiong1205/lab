@@ -1069,8 +1069,14 @@ const CreateTraining: React.FC = () => {
   const validationSplitMode =
     (Form.useWatch('validationSplitMode', form) as 'split' | 'dataset' | undefined) ?? 'split'
   const scheduleEnabled = Form.useWatch('scheduleEnabled', form)
-  const rftAlgorithm = Form.useWatch('rftAlgorithm', form) as RFTAlgorithm | undefined
+  const rftAlgorithm = Form.useWatch('rftAlgorithm', form) as RFTAlgorithm | 'PPO' | undefined
   const rewardRuleType = Form.useWatch('rewardRuleType', form) as RewardRuleType | undefined
+
+  useEffect(() => {
+    if (trainingMethod === 'RFT' && rftAlgorithm === 'PPO') {
+      form.setFieldValue('rftAlgorithm', 'GRPO')
+    }
+  }, [form, trainingMethod, rftAlgorithm])
 
   const filteredVariants = useMemo<TrainingBaseModelOption[]>(
     () =>
@@ -1720,15 +1726,9 @@ const CreateTraining: React.FC = () => {
                 label="RFT 算法"
                 name="rftAlgorithm"
                 rules={[{ required: trainingMethod === 'RFT', message: '请选择 RFT 算法' }]}
-                tooltip="RFT 支持 PPO（近端策略优化）和 GRPO（群组相对策略优化）两种算法"
+                tooltip="RFT 当前支持 GRPO（群组相对策略优化）"
               >
                 <Radio.Group style={{ display: 'flex', gap: 16 }}>
-                  <Radio.Button value="PPO" style={{ height: 40, lineHeight: '38px', padding: '0 24px', borderRadius: 8 }}>
-                    <Space>
-                      <span style={{ fontSize: 11, color: '#9f1239', background: 'rgba(159,18,57,0.08)', padding: '1px 6px', borderRadius: 3, fontWeight: 600 }}>PPO</span>
-                      近端策略优化
-                    </Space>
-                  </Radio.Button>
                   <Radio.Button value="GRPO" style={{ height: 40, lineHeight: '38px', padding: '0 24px', borderRadius: 8 }}>
                     <Space>
                       <span style={{ fontSize: 11, color: '#0891b2', background: 'rgba(8,145,178,0.08)', padding: '1px 6px', borderRadius: 3, fontWeight: 600 }}>GRPO</span>

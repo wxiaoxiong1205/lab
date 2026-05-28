@@ -118,6 +118,37 @@ type ReviewDecision = {
   status: '待审核' | '已审核'
 }
 
+type AnnotationDatasetType = 'text-generation' | 'image-understanding'
+type AnnotationUsagePath = ['文本生成' | '图像理解', 'SFT' | 'DPO' | 'RFT-GRPO']
+
+function getDefaultAnnotationUsagePath(datasetType: AnnotationDatasetType): AnnotationUsagePath {
+  return datasetType === 'image-understanding' ? ['图像理解', 'SFT'] : ['文本生成', 'SFT']
+}
+
+function getDatasetTypeFromUsagePath(path: AnnotationUsagePath): AnnotationDatasetType {
+  return path[0] === '图像理解' ? 'image-understanding' : 'text-generation'
+}
+
+function getDetailedUsageFromUsagePath(path: AnnotationUsagePath) {
+  return `${path[0]} / ${path[1]}` as
+    | '文本生成 / SFT'
+    | '文本生成 / DPO'
+    | '文本生成 / RFT-GRPO'
+    | '图像理解 / SFT'
+    | '图像理解 / DPO'
+    | '图像理解 / RFT-GRPO'
+}
+
+function getAnnotationUsagePathFromDataset(row: SelectedDatasetVersionRow): AnnotationUsagePath {
+  const scene = row.dataUsage === '图像理解' ? '图像理解' : '文本生成'
+  const normalizedName = row.datasetName.toUpperCase()
+  if (row.dataFormat === 'Completion_Reward') return [scene, 'RFT-GRPO']
+  if (row.dataFormat === 'ALPACA' || (row.dataFormat === 'ROLE_BASED' && normalizedName.includes('DPO'))) {
+    return [scene, 'DPO']
+  }
+  return [scene, 'SFT']
+}
+
 const CREATE_ASSIGNMENT_KEY = '__create_multi_annotation__'
 
 const projectMemberOptions: ProjectMember[] = [
@@ -400,7 +431,8 @@ const DataAnnotation: React.FC = () => {
   const [configForm] = Form.useForm<AnnotationServiceConfig>()
   const [createOpen, setCreateOpen] = useState(false)
   const [collaborationTab, setCollaborationTab] = useState<'online' | 'multi'>('online')
-  const [datasetType, setDatasetType] = useState<'text-generation' | 'image-understanding'>('text-generation')
+  const [datasetType, setDatasetType] = useState<AnnotationDatasetType>('text-generation')
+  const [annotationUsagePath, setAnnotationUsagePath] = useState<AnnotationUsagePath>(getDefaultAnnotationUsagePath('text-generation'))
   const [selectedDatasetValue, setSelectedDatasetValue] = useState<string>()
   const [selectedAnnotationDataset, setSelectedAnnotationDataset] = useState<SelectedDatasetVersionRow | null>(null)
   const [datasetPickerOpen, setDatasetPickerOpen] = useState(false)
@@ -598,8 +630,10 @@ const DataAnnotation: React.FC = () => {
 
   useEffect(() => {
     const nextType = getDatasetTypeFromSearch(location.search)
+    const nextUsagePath = getDefaultAnnotationUsagePath(nextType)
     const mode = new URLSearchParams(location.search).get('mode')
     setDatasetType(nextType)
+    setAnnotationUsagePath(nextUsagePath)
     form.setFieldValue('datasetType', nextType)
     if (mode === 'multi' || isMultiCreatePage) {
       setCollaborationTab('multi')
@@ -670,12 +704,14 @@ const DataAnnotation: React.FC = () => {
   }
 
   const handleOpenCreate = () => {
+    const defaultUsagePath = getDefaultAnnotationUsagePath(datasetType)
     form.resetFields()
     form.setFieldsValue({
       datasetType,
       outputMode: '新增版本',
       sourceType: '已有数据集',
     })
+    setAnnotationUsagePath(defaultUsagePath)
     setSelectedDatasetValue(undefined)
     setSelectedAnnotationDataset(null)
     if (collaborationTab === 'multi') {
@@ -710,6 +746,9 @@ const DataAnnotation: React.FC = () => {
     const outputMode = values.outputMode
     const createMode = isMultiCreatePage ? 'multi' : collaborationTab
     const createAssignmentDraft = getAssignmentDraft(CREATE_ASSIGNMENT_KEY)
+    const createDatasetType = selectedAnnotationDataset
+      ? selectedAnnotationDataset.dataUsage === '图像理解' ? 'image-understanding' : 'text-generation'
+      : getDatasetTypeFromUsagePath(annotationUsagePath)
     setCreating(true)
     try {
       await dataServiceApi.createAnnotationTask({
@@ -721,13 +760,13 @@ const DataAnnotation: React.FC = () => {
             ? createAssignmentDraft.annotators.length + createAssignmentDraft.reviewers.length
             : undefined,
         reviewMode: createMode === 'multi' ? '抽检审核' : undefined,
-        datasetType: values.datasetType,
+        datasetType: createDatasetType,
         preDataset: datasetLabel,
         postDataset: outputMode === '新增版本' ? `${datasetLabel}-标注结果` : '-',
         outputMode,
       })
       if (isMultiCreatePage) {
-        navigate(`/data-annotation?dataset_type=${values.datasetType}&mode=multi`)
+        navigate(`/data-annotation?dataset_type=${createDatasetType}&mode=multi`)
       }
     } finally {
       setCreating(false)
@@ -1708,13 +1747,20 @@ const DataAnnotation: React.FC = () => {
       open={datasetPickerOpen}
       title="选择数据集"
       mode="single"
-      trainingType={datasetType === 'image-understanding' ? 'vision' : 'text'}
+      trainingType="text"
       defaultDataType="训练数据集"
       detailedDataUsage
-      allowedDetailedUsages={datasetType === 'image-understanding' ? ['图像理解'] : ['文本生成 / SFT', '文本生成 / DPO', '文本生成 / RFT-PPO', '文本生成 / RFT-GRPO']}
-      dataScopeHint={datasetType === 'image-understanding'
-        ? '仅展示已发布的图像理解数据集；DPO 数据支持 Alpaca 与 Role-Based 两种格式。'
-        : '仅展示已发布的文本生成数据集，可选择 SFT、DPO、RFT；DPO 数据支持 Alpaca 与 Role-Based 两种格式。'}
+      groupDetailedUsageOptions
+      allowedDetailedUsages={[
+        '文本生成 / SFT',
+        '文本生成 / DPO',
+        '文本生成 / RFT-GRPO',
+        '图像理解 / SFT',
+        '图像理解 / DPO',
+        '图像理解 / RFT-GRPO',
+      ]}
+      defaultDataUsage={getDetailedUsageFromUsagePath(annotationUsagePath)}
+      dataScopeHint="先在左侧选择数据用途，再从右侧列表选择已发布数据集版本。"
       emptyText="当前无可用数据集"
       defaultSelectedKeys={selectedAnnotationDataset ? [selectedAnnotationDataset.key] : []}
       onCancel={() => setDatasetPickerOpen(false)}
@@ -1727,9 +1773,12 @@ const DataAnnotation: React.FC = () => {
           setDatasetPickerOpen(false)
           return
         }
+        const nextDatasetType = selected.dataUsage === '图像理解' ? 'image-understanding' : 'text-generation'
+        setDatasetType(nextDatasetType)
+        setAnnotationUsagePath(getAnnotationUsagePathFromDataset(selected))
         setSelectedDatasetValue(selected.key)
         setSelectedAnnotationDataset(selected)
-        form.setFieldValue('dataset', selected.key)
+        form.setFieldsValue({ dataset: selected.key, datasetType: nextDatasetType })
         setDatasetPickerOpen(false)
       }}
     />
@@ -1844,24 +1893,19 @@ const DataAnnotation: React.FC = () => {
         <Text type="secondary">配置数据集、输出结果与标注/审核成员分配。</Text>
 
         <Card style={{ marginTop: 20, borderRadius: 16, border: '1px solid #e2e8f0' }}>
-          <Form form={form} layout="vertical" initialValues={{ sourceType: '已有数据集', outputMode: '新增版本', datasetType }} scrollToFirstError={{ behavior: 'smooth', block: 'center' }}>
+          <Form
+            form={form}
+            layout="vertical"
+            initialValues={{
+              sourceType: '已有数据集',
+              outputMode: '新增版本',
+              datasetType,
+            }}
+            scrollToFirstError={{ behavior: 'smooth', block: 'center' }}
+          >
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 20px' }}>
               <Form.Item label="任务名称" name="name" rules={[{ required: true, message: '请输入任务名称' }]}>
                 <Input placeholder="请输入任务名称" />
-              </Form.Item>
-              <Form.Item label="数据集类型" name="datasetType" rules={[{ required: true, message: '请选择数据集类型' }]}>
-                <Radio.Group
-                  onChange={event => {
-                    const nextType = event.target.value as 'text-generation' | 'image-understanding'
-                    setDatasetType(nextType)
-                    setSelectedDatasetValue(undefined)
-                    setSelectedAnnotationDataset(null)
-                    form.setFieldsValue({ dataset: undefined, datasetType: nextType, outputName: undefined })
-                  }}
-                >
-                  <Radio.Button value="text-generation">文本生成</Radio.Button>
-                  <Radio.Button value="image-understanding">图像理解</Radio.Button>
-                </Radio.Group>
               </Form.Item>
               <Form.Item label="数据选择" name="sourceType">
                 <Radio.Group>
@@ -2796,40 +2840,22 @@ const DataAnnotation: React.FC = () => {
           </Space>
         }
       >
-        <Form form={form} layout="vertical" initialValues={{ sourceType: '已有数据集', outputMode: '新增版本', datasetType }} scrollToFirstError={{ behavior: 'smooth', block: 'center' }}>
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{
+            sourceType: '已有数据集',
+            outputMode: '新增版本',
+            datasetType,
+          }}
+          scrollToFirstError={{ behavior: 'smooth', block: 'center' }}
+        >
           <Form.Item
             label="任务名称"
             name="name"
             rules={[{ required: true, message: '请输入任务名称' }]}
           >
             <Input placeholder="请输入任务名称" />
-          </Form.Item>
-
-          <Form.Item
-            label="数据集类型"
-            name="datasetType"
-            rules={[{ required: true, message: '请选择数据集类型' }]}
-          >
-            <Radio.Group
-              onChange={event => {
-                const nextType = event.target.value as 'text-generation' | 'image-understanding'
-                setDatasetType(nextType)
-                setSelectedDatasetValue(undefined)
-                setSelectedAnnotationDataset(null)
-                form.setFieldsValue({ dataset: undefined, datasetType: nextType, outputName: undefined })
-              }}
-            >
-              <Space size={12}>
-                <Radio.Button value="text-generation">
-                  <FileTextOutlined style={{ marginRight: 6 }} />
-                  文本生成
-                </Radio.Button>
-                <Radio.Button value="image-understanding">
-                  <PictureOutlined style={{ marginRight: 6 }} />
-                  图像理解
-                </Radio.Button>
-              </Space>
-            </Radio.Group>
           </Form.Item>
 
           <Form.Item label="数据选择" name="sourceType">

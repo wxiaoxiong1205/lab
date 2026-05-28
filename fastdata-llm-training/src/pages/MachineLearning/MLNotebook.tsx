@@ -69,17 +69,8 @@ type OpenPortRecord = {
 
 type SSHConfigRecord = {
   username: string
-  sshKey: string
-  sshCommand: string
+  password: string
 }
-
-const PROJECT_SSH_CONFIG: SSHConfigRecord = {
-  username: 'lab',
-  sshKey: 'SHA256:PO9za4v8KR0nQZHMIjPYXmnU8a3mA1uEBCexONB4yyYA',
-  sshCommand: 'ssh -p 31088 lab@ssh-zGVlcGV4aWxhYI9rZXIfc3NoOojc5QDUzMA==@deepexilab-test.deepexi.com',
-}
-
-const PROJECT_SSH_SUPPORTED = Boolean(PROJECT_SSH_CONFIG)
 
 type MLNotebookRecord = {
   id: string
@@ -190,6 +181,8 @@ interface CreateFormValues {
   runtimeMinutes?: number
   image?: string
   openPorts?: OpenPortFormValue[]
+  sshUsername?: string
+  sshPassword?: string
 }
 
 const datasetOptions = [
@@ -363,7 +356,7 @@ const myNotebooksSeed: MLNotebookRecord[] = [
     name: 'hzj_单图多标签-ml-dev',
     description: 'ML 部署在线开发：hzj_单图多标签',
     image: 'lab-cn-guangzhou.cr.volces.com/fs/jupyter/ml/deepexi-notebook:pytorch_2.5-cuda_12.1-py311-ubuntu22.04',
-    sshSupported: PROJECT_SSH_SUPPORTED,
+    sshSupported: true,
     status: '运行中',
     spec: '1x GPU\nCPU: 4 Core / 内存: 16 GB',
     runtimeLimit: '-',
@@ -387,14 +380,14 @@ const myNotebooksSeed: MLNotebookRecord[] = [
       { id: 'ml-port-1', protocol: 'TCP', port: 8000, purpose: 'Web UI' },
       { id: 'ml-port-2', protocol: 'TCP', port: 7860, purpose: 'Gradio UI' },
     ],
-    sshConfig: PROJECT_SSH_CONFIG,
+    sshConfig: { username: 'lab', password: 'Lab@2026' },
   },
   {
     id: 'ml-nb-2',
     name: 'basion-ml-dev',
     description: 'ML 部署在线开发：basion',
     image: 'lab-cn-guangzhou.cr.volces.com/fs/jupyter/ml/deepexi-notebook:datascience-cpu-python312-ubuntu24.04',
-    sshSupported: PROJECT_SSH_SUPPORTED,
+    sshSupported: false,
     status: '已终止',
     spec: 'CPU Only\nCPU: 2 Core / 内存: 8 GB',
     runtimeLimit: '2小时30分钟',
@@ -415,7 +408,6 @@ const myNotebooksSeed: MLNotebookRecord[] = [
     runtimeHours: 2,
     runtimeMinutes: 30,
     openPorts: [{ id: 'ml-port-3', protocol: 'TCP', port: 8888, purpose: 'Jupyter Lab' }],
-    sshConfig: PROJECT_SSH_CONFIG,
   },
 ]
 
@@ -503,19 +495,6 @@ const sectionCardStyle: React.CSSProperties = {
   background: '#ffffff',
 }
 
-const codeBlockStyle: React.CSSProperties = {
-  margin: 0,
-  padding: '14px 16px',
-  borderRadius: 14,
-  background: '#0f172a',
-  color: '#e2e8f0',
-  fontSize: 13,
-  lineHeight: 1.7,
-  fontFamily: 'SFMono-Regular, Consolas, Monaco, monospace',
-  whiteSpace: 'pre-wrap',
-  wordBreak: 'break-all',
-}
-
 const CASE_PUBLISH_READY_DELAY = 4800
 const CASE_HIGHLIGHT_DURATION = 5000
 const NOTEBOOK_STATUS_FILTERS = Object.keys(TASK_LIFECYCLE_TAG) as NotebookStatus[]
@@ -527,6 +506,17 @@ function statusTag(status: NotebookStatus): React.ReactNode {
 
 function accessScopeTag(scope?: NotebookAccessScope): React.ReactNode {
   return scope === 'private' ? <Tag color="orange">私有</Tag> : <Tag color="blue">公开</Tag>
+}
+
+function hasSSHConfig(config?: SSHConfigRecord): boolean {
+  return Boolean(config?.username?.trim() || config?.password?.trim())
+}
+
+function buildSSHConfig(values: Pick<CreateFormValues, 'sshUsername' | 'sshPassword'>): SSHConfigRecord | undefined {
+  const username = values.sshUsername?.trim() ?? ''
+  const password = values.sshPassword?.trim() ?? ''
+
+  return username || password ? { username, password } : undefined
 }
 
 function canOperateNotebook(record: Pick<MLNotebookRecord, 'accessScope' | 'creatorAccount'>, currentAccount: string): boolean {
@@ -549,6 +539,8 @@ function getCreateInitialValues(): CreateFormValues {
     runtimeEnabled: false,
     image: imageOptions[0].value,
     openPorts: [{ protocol: 'TCP', port: 8000, purpose: 'Web UI' }],
+    sshUsername: '',
+    sshPassword: '',
   }
 }
 
@@ -611,6 +603,8 @@ function toEditFormValues(record: MLNotebookRecord): CreateFormValues {
     runtimeHours: record.runtimeHours,
     runtimeMinutes: record.runtimeMinutes,
     image: record.image,
+    sshUsername: record.sshConfig?.username,
+    sshPassword: record.sshConfig?.password,
     openPorts: record.openPorts.map(port => ({
       protocol: port.protocol,
       port: port.port,
@@ -684,6 +678,7 @@ const MLNotebook: React.FC = () => {
   const [form] = Form.useForm<CreateFormValues>()
   const [caseForm] = Form.useForm<{ name: string; description: string }>()
   const [portForm] = Form.useForm<OpenPortFormValue>()
+  const [sshForm] = Form.useForm<SSHConfigRecord>()
   const [saveEnvForm] = Form.useForm<SaveEnvironmentFormValues>()
   const [customMirrorForm] = Form.useForm<CustomMirrorFormValues>()
   const [mirrorTagForm] = Form.useForm<CustomMirrorTagFormValues>()
@@ -706,6 +701,7 @@ const MLNotebook: React.FC = () => {
   const [editingMirror, setEditingMirror] = useState<CustomMirrorRecord | null>(null)
   const [customMirrorSearch, setCustomMirrorSearch] = useState('')
   const [editingPortId, setEditingPortId] = useState<string | null>(null)
+  const [sshEditing, setSshEditing] = useState(false)
   const [imageSource, setImageSource] = useState<'system' | 'custom'>('system')
   const [pythonVersionFilter, setPythonVersionFilter] = useState('python3.11')
   const [frameworkFilter, setFrameworkFilter] = useState('Pytorch 2.x')
@@ -777,6 +773,16 @@ const MLNotebook: React.FC = () => {
       form.setFieldsValue(toEditFormValues(editingNotebook))
     }
   }, [editingNotebook, form, isCreateRoute, isEditRoute])
+
+  useEffect(() => {
+    if (notebookDetail) {
+      sshForm.setFieldsValue({
+        username: notebookDetail.sshConfig?.username ?? '',
+        password: notebookDetail.sshConfig?.password ?? '',
+      })
+      setSshEditing(false)
+    }
+  }, [notebookDetail?.id, notebookDetail?.sshConfig?.username, notebookDetail?.sshConfig?.password, sshForm])
 
   useEffect(() => {
     if (
@@ -1234,6 +1240,26 @@ const MLNotebook: React.FC = () => {
     }
   }
 
+  const handleSubmitSSHConfig = async () => {
+    if (!notebookDetail) return
+
+    const values = await sshForm.validateFields()
+    const sshConfig = buildSSHConfig({
+      sshUsername: values.username,
+      sshPassword: values.password,
+    })
+
+    setRows(previous =>
+      previous.map(item =>
+        item.id === notebookDetail.id
+          ? { ...item, sshConfig, sshSupported: hasSSHConfig(sshConfig), updatedAt: nowText() }
+          : item,
+      ),
+    )
+    setSshEditing(false)
+    message.success(sshConfig ? 'SSH 配置已保存' : 'SSH 配置已清空')
+  }
+
   const notebookColumns: ColumnsType<MLNotebookRecord> = [
     {
       title: 'Notebook名称',
@@ -1286,7 +1312,7 @@ const MLNotebook: React.FC = () => {
       dataIndex: 'sshSupported',
       key: 'sshSupported',
       width: 120,
-      render: () => (PROJECT_SSH_SUPPORTED ? <Text style={{ color: '#059669' }}>已支持</Text> : <Text type="secondary">未支持</Text>),
+      render: (_value, record) => (hasSSHConfig(record.sshConfig) ? <Text style={{ color: '#059669' }}>已配置</Text> : <Text type="secondary">未配置</Text>),
     },
     {
       title: '状态',
@@ -1520,12 +1546,13 @@ const MLNotebook: React.FC = () => {
       return
     }
 
+    const sshConfig = buildSSHConfig(values)
     const newRecord: MLNotebookRecord = {
       id: `ml-nb-${Date.now()}`,
       name: values.name || '未命名Notebook',
       description: values.description?.trim() || '',
       image: values.image || imageOptions[0].value,
-      sshSupported: PROJECT_SSH_SUPPORTED,
+      sshSupported: hasSSHConfig(sshConfig),
       status: '已创建',
       spec: buildSpecSummary(values),
       runtimeLimit: buildRuntimeLimit(values),
@@ -1548,7 +1575,7 @@ const MLNotebook: React.FC = () => {
       runtimeHours: values.runtimeEnabled ? values.runtimeHours : undefined,
       runtimeMinutes: values.runtimeEnabled ? values.runtimeMinutes : undefined,
       openPorts: toPortRecords(values.openPorts),
-      sshConfig: PROJECT_SSH_CONFIG,
+      sshConfig,
     }
 
     setRows(previous => [newRecord, ...previous])
@@ -1605,6 +1632,8 @@ const MLNotebook: React.FC = () => {
               runtimeHours: values.runtimeEnabled ? values.runtimeHours : undefined,
               runtimeMinutes: values.runtimeEnabled ? values.runtimeMinutes : undefined,
               openPorts: toPortRecords(values.openPorts),
+              sshConfig: buildSSHConfig(values),
+              sshSupported: hasSSHConfig(buildSSHConfig(values)),
             }
           : item,
       ),
@@ -2061,6 +2090,23 @@ const MLNotebook: React.FC = () => {
                     </>
                   )}
                 </Form.List>
+              </Card>
+
+              <Card size="small" style={sectionCardStyle}>
+                <Title level={5} style={{ marginBottom: 6 }}>
+                  SSH配置
+                </Title>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 18 }}>
+                  可选配置。创建后也可以在 Notebook 详情页补充或修改。
+                </Text>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <Form.Item label="用户名" name="sshUsername">
+                    <Input placeholder="请输入 SSH 用户名（可选）" />
+                  </Form.Item>
+                  <Form.Item label="密码" name="sshPassword">
+                    <Input.Password placeholder="请输入 SSH 密码（可选）" />
+                  </Form.Item>
+                </div>
               </Card>
 
             </div>
@@ -2603,41 +2649,62 @@ const MLNotebook: React.FC = () => {
                 </div>
               </Card>
 
-              {notebookDetail.sshConfig && (
-                <Card title="SSH 配置信息" size="small" style={sectionCardStyle}>
-                  <div style={{ display: 'grid', gap: 14 }}>
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <Text strong>用户名</Text>
-                        <Button type="link" size="small" onClick={() => handleCopy(notebookDetail.sshConfig?.username || '', '用户名')}>
-                          复制
-                        </Button>
-                      </div>
-                      <pre style={codeBlockStyle}>{notebookDetail.sshConfig.username}</pre>
+              <Card
+                title="SSH 配置"
+                size="small"
+                style={sectionCardStyle}
+                extra={
+                  <Button
+                    type={sshEditing ? 'primary' : 'default'}
+                    onClick={sshEditing ? handleSubmitSSHConfig : () => setSshEditing(true)}
+                  >
+                    {sshEditing ? '保存' : '编辑'}
+                  </Button>
+                }
+              >
+                <Form form={sshForm} layout="vertical">
+                  <Form.Item label="用户名">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 40px', gap: 8, width: '100%' }}>
+                      <Form.Item name="username" noStyle>
+                        <Input disabled={!sshEditing} placeholder="请输入 SSH 用户名（可选）" />
+                      </Form.Item>
+                      <Button
+                        type="text"
+                        aria-label="复制用户名"
+                        icon={<CopyOutlined />}
+                        onClick={() => {
+                          const value = sshForm.getFieldValue('username')?.trim()
+                          if (!value) {
+                            message.warning('请先填写用户名')
+                            return
+                          }
+                          handleCopy(value, '用户名')
+                        }}
+                      />
                     </div>
-
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <Text strong>SSH Key</Text>
-                        <Button type="link" size="small" onClick={() => handleCopy(notebookDetail.sshConfig?.sshKey || '', 'SSH Key')}>
-                          复制
-                        </Button>
-                      </div>
-                      <pre style={codeBlockStyle}>{notebookDetail.sshConfig.sshKey}</pre>
+                  </Form.Item>
+                  <Form.Item label="密码">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 40px', gap: 8, width: '100%' }}>
+                      <Form.Item name="password" noStyle>
+                        <Input.Password disabled={!sshEditing} placeholder="请输入 SSH 密码（可选）" />
+                      </Form.Item>
+                      <Button
+                        type="text"
+                        aria-label="复制密码"
+                        icon={<CopyOutlined />}
+                        onClick={() => {
+                          const value = sshForm.getFieldValue('password')?.trim()
+                          if (!value) {
+                            message.warning('请先填写密码')
+                            return
+                          }
+                          handleCopy(value, '密码')
+                        }}
+                      />
                     </div>
-
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <Text strong>SSH 命令</Text>
-                        <Button type="link" size="small" onClick={() => handleCopy(notebookDetail.sshConfig?.sshCommand || '', 'SSH 命令')}>
-                          复制
-                        </Button>
-                      </div>
-                      <pre style={codeBlockStyle}>{notebookDetail.sshConfig.sshCommand}</pre>
-                    </div>
-                  </div>
-                </Card>
-              )}
+                  </Form.Item>
+                </Form>
+              </Card>
             </div>
           </div>
 

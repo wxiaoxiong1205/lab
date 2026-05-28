@@ -29,8 +29,6 @@ export const DATASET_USAGE_OPTIONS: Array<{
   { value: 'SFT-图像理解', method: 'SFT', scene: '图像理解' },
   { value: 'DPO-文本生成', method: 'DPO', scene: '文本生成' },
   { value: 'DPO-图像理解', method: 'DPO', scene: '图像理解' },
-  { value: 'RFT-PPO-文本生成', method: 'RFT', algorithm: 'PPO', scene: '文本生成' },
-  { value: 'RFT-PPO-图像理解', method: 'RFT', algorithm: 'PPO', scene: '图像理解' },
   { value: 'RFT-GRPO-文本生成', method: 'RFT', algorithm: 'GRPO', scene: '文本生成' },
   { value: 'RFT-GRPO-图像理解', method: 'RFT', algorithm: 'GRPO', scene: '图像理解' },
 ]
@@ -49,7 +47,6 @@ export const DATASET_USAGE_CASCADER_OPTIONS: DatasetUsageCascaderOption[] = [
     children: [
       { value: 'SFT', label: 'SFT', datasetUsage: 'SFT-文本生成' },
       { value: 'DPO', label: 'DPO', datasetUsage: 'DPO-文本生成' },
-      { value: 'RFT-PPO', label: 'RFT-PPO', datasetUsage: 'RFT-PPO-文本生成' },
       { value: 'RFT-GRPO', label: 'RFT-GRPO', datasetUsage: 'RFT-GRPO-文本生成' },
     ],
   },
@@ -59,11 +56,14 @@ export const DATASET_USAGE_CASCADER_OPTIONS: DatasetUsageCascaderOption[] = [
     children: [
       { value: 'SFT', label: 'SFT', datasetUsage: 'SFT-图像理解' },
       { value: 'DPO', label: 'DPO', datasetUsage: 'DPO-图像理解' },
-      { value: 'RFT-PPO', label: 'RFT-PPO', datasetUsage: 'RFT-PPO-图像理解' },
       { value: 'RFT-GRPO', label: 'RFT-GRPO', datasetUsage: 'RFT-GRPO-图像理解' },
     ],
   },
 ]
+
+export function isPpoDatasetUsage(value?: string): boolean {
+  return value === 'RFT-PPO' || value === 'RFT-PPO-文本生成' || value === 'RFT-PPO-图像理解'
+}
 
 export function getDatasetUsagePath(value?: string): [string, string] | undefined {
   const normalized = normalizeDatasetUsage(value)

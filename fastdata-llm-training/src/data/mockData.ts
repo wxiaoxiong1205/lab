@@ -650,14 +650,6 @@ export const trainedModels: TrainedModel[] = [
     createdAt: '2026/03/25 16:20:00',
   },
   {
-    id: 'trained-5',
-    name: '文本生成-PPO-Qwen2.5-7B',
-    type: 'text',
-    method: 'RFT',
-    versionCount: 1,
-    createdAt: '2026/03/24 11:00:00',
-  },
-  {
     id: 'trained-6',
     name: '文本生成-DPO-Qwen3-8B',
     type: 'text',
