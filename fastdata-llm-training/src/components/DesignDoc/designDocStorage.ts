@@ -228,11 +228,23 @@ function getRequirementIdentity(content: string): string {
 }
 
 export function applyDefaultRequirements(doc: PageDesignDoc, versions: RequirementVersion[]): RequirementVersion[] {
-  if (!doc.defaultRequirements?.length) {
+  if (!doc.defaultRequirements?.length && !doc.removedDefaultRequirementTitles?.length) {
     return versions
   }
 
-  const nextVersions = [...versions]
+  const removedRequirementIdentities = new Set(
+    (doc.removedDefaultRequirementTitles ?? []).map(title => getRequirementIdentity(`# ${title}`)),
+  )
+  const nextVersions = removedRequirementIdentities.size
+    ? versions.map(version => ({
+      ...version,
+      notes: version.notes.filter(note => !removedRequirementIdentities.has(getRequirementIdentity(note.content))),
+    }))
+    : [...versions]
+
+  if (!doc.defaultRequirements?.length) {
+    return nextVersions
+  }
 
   doc.defaultRequirements.forEach(requirement => {
     const versionName = requirement.version.trim() || DEFAULT_REQUIREMENT_VERSION
@@ -253,11 +265,19 @@ export function applyDefaultRequirements(doc: PageDesignDoc, versions: Requireme
 
       if (doc.syncMissingDefaultRequirements) {
         const seededIdentity = getRequirementIdentity(requirement.content)
-        const alreadyExists = existing.notes.some(note =>
-          getRequirementIdentity(note.content) === seededIdentity,
-        )
+        const existingNoteIndex = existing.notes.findIndex(note => getRequirementIdentity(note.content) === seededIdentity)
+        const shouldReplace = (doc.replaceDefaultRequirementTitles ?? [])
+          .map(title => getRequirementIdentity(`# ${title}`))
+          .includes(seededIdentity)
 
-        if (!alreadyExists) {
+        if (existingNoteIndex >= 0 && shouldReplace) {
+          nextVersions[existingIndex] = {
+            ...nextVersions[existingIndex],
+            notes: nextVersions[existingIndex].notes.map((note, index) =>
+              index === existingNoteIndex ? seededNote : note,
+            ),
+          }
+        } else if (existingNoteIndex < 0) {
           nextVersions[existingIndex] = {
             ...nextVersions[existingIndex],
             notes: [...nextVersions[existingIndex].notes, seededNote],

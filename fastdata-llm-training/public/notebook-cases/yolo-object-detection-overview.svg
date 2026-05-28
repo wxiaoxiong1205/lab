@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="520" viewBox="0 0 1120 520">
+  <rect width="1120" height="520" fill="#ffffff"/>
+  <text x="560" y="48" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" font-weight="700" fill="#111827">YOLO11n 目标检测示例（基于 COCO128 数据集）</text>
+  <rect x="140" y="72" width="840" height="44" rx="8" fill="#f8fbff" stroke="#9bb7df"/>
+  <text x="560" y="101" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#2b4f89">目标检测的目标：在图像中定位并识别出多个目标对象，预测每个对象的类别和边界框位置。</text>
+
+  <g transform="translate(120 142)">
+    <rect width="260" height="76" rx="10" fill="#f5f7fb"/>
+    <circle cx="42" cy="38" r="22" fill="#d94b4b"/>
+    <text x="86" y="32" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#243b63">目标定位</text>
+    <text x="86" y="58" font-family="Arial, sans-serif" font-size="14" fill="#374151">确定目标在图像中的位置</text>
+  </g>
+  <g transform="translate(430 142)">
+    <rect width="260" height="76" rx="10" fill="#f5f7fb"/>
+    <path d="M42 18 L64 38 L42 60 L20 38 Z" fill="#4077c8"/>
+    <text x="86" y="32" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#243b63">目标分类</text>
+    <text x="86" y="58" font-family="Arial, sans-serif" font-size="14" fill="#374151">识别每个目标的类别</text>
+  </g>
+  <g transform="translate(740 142)">
+    <rect width="260" height="76" rx="10" fill="#f5f7fb"/>
+    <circle cx="28" cy="34" r="12" fill="#3ca263"/>
+    <circle cx="50" cy="30" r="14" fill="#3ca263"/>
+    <circle cx="69" cy="39" r="11" fill="#3ca263"/>
+    <text x="100" y="32" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#243b63">多目标处理</text>
+    <text x="100" y="58" font-family="Arial, sans-serif" font-size="14" fill="#374151">一张图中检测多个类别目标</text>
+  </g>
+
+  <g transform="translate(100 260)">
+    <rect width="400" height="38" rx="6" fill="#f9fafb" stroke="#cbd5e1"/>
+    <text x="200" y="25" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#111827">输入图像（COCO128 示例）</text>
+    <rect x="0" y="50" width="400" height="210" rx="10" fill="#e5e7eb"/>
+    <rect x="34" y="82" width="332" height="146" fill="#d1d5db"/>
+    <path d="M34 190 C120 130 160 160 230 104 C300 48 350 94 366 76 L366 228 L34 228 Z" fill="#9ca3af"/>
+    <rect x="256" y="106" width="64" height="30" fill="#374151"/>
+    <rect x="248" y="136" width="92" height="22" fill="#4b5563"/>
+    <circle cx="270" cy="164" r="10" fill="#111827"/>
+    <circle cx="320" cy="164" r="10" fill="#111827"/>
+  </g>
+
+  <g transform="translate(520 300)">
+    <rect width="130" height="120" rx="10" fill="#5661c9"/>
+    <text x="65" y="32" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#ffffff">YOLO11n</text>
+    <text x="65" y="58" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#eef2ff">模型</text>
+    <path d="M42 92 L65 68 L88 92 Z" fill="#a5b4fc"/>
+  </g>
+  <path d="M500 365 L520 365" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M650 365 L670 365" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <g transform="translate(670 260)">
+    <rect width="400" height="38" rx="6" fill="#ecfdf5" stroke="#8fcaa7"/>
+    <text x="200" y="25" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#187247">检测结果（多目标 + 多类别）</text>
+    <rect x="0" y="50" width="400" height="210" rx="10" fill="#e5e7eb"/>
+    <rect x="34" y="82" width="332" height="146" fill="#d1d5db"/>
+    <path d="M34 190 C120 130 160 160 230 104 C300 48 350 94 366 76 L366 228 L34 228 Z" fill="#9ca3af"/>
+    <rect x="256" y="106" width="64" height="30" fill="#374151"/>
+    <rect x="248" y="136" width="92" height="22" fill="#4b5563"/>
+    <rect x="238" y="96" width="118" height="84" fill="none" stroke="#a855f7" stroke-width="4"/>
+    <rect x="292" y="92" width="66" height="24" rx="4" fill="#a855f7"/>
+    <text x="325" y="109" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#ffffff">bus 0.90</text>
+  </g>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+</svg>

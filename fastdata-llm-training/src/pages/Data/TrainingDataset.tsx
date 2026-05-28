@@ -1124,24 +1124,11 @@ const TrainingDataset: React.FC = () => {
     ),
   }
 
-  const sourceVersionColumns: ColumnsType<DatasetDetailRow> = detailRows.some(row => row.sourceVersion)
-    ? [
-        {
-          title: '来源版本',
-          dataIndex: 'sourceVersion',
-          key: 'sourceVersion',
-          width: 110,
-          render: (value: string) => value ? <Tag color="blue">{value}</Tag> : '-',
-        },
-      ]
-    : []
-
   const detailTableColumns: ColumnsType<DatasetDetailRow> =
     selectedRecord && isDpoUsage(selectedRecord.dataUsage)
       ? normalizeDatasetFormat(selectedRecord.dataFormat, selectedRecord.dataUsage) === 'role-based'
         ? [
             { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => (detailPage - 1) * detailPageSize + index + 1 },
-            ...sourceVersionColumns,
             { title: 'Messages', dataIndex: 'messages', key: 'messages', width: 360, render: renderJsonLike },
             { title: 'Chosen', dataIndex: 'chosen', key: 'chosen', width: 320, render: renderJsonLike },
             { title: 'Rejected', dataIndex: 'rejected', key: 'rejected', width: 320, render: renderJsonLike },
@@ -1149,7 +1136,6 @@ const TrainingDataset: React.FC = () => {
           ]
         : [
             { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => (detailPage - 1) * detailPageSize + index + 1 },
-            ...sourceVersionColumns,
             { title: 'Instruction', dataIndex: 'instruction', key: 'instruction', width: 260, render: renderJsonLike },
             { title: 'Input', dataIndex: 'input', key: 'input', width: 220, render: renderJsonLike },
             { title: 'Chosen', dataIndex: 'chosen', key: 'chosen', width: 300, render: renderJsonLike },
@@ -1159,7 +1145,6 @@ const TrainingDataset: React.FC = () => {
       : selectedRecord?.dataFormat === 'role-based'
       ? [
           { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => (detailPage - 1) * detailPageSize + index + 1 },
-          ...sourceVersionColumns,
           { title: 'System', dataIndex: 'system', key: 'system' },
           { title: 'User', dataIndex: 'user', key: 'user' },
           { title: 'Assistant', dataIndex: 'assistant', key: 'assistant' },
@@ -1167,7 +1152,6 @@ const TrainingDataset: React.FC = () => {
         ]
       : [
           { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => (detailPage - 1) * detailPageSize + index + 1 },
-          ...sourceVersionColumns,
           { title: 'System', dataIndex: 'system', key: 'system' },
           { title: 'Prompt', dataIndex: 'prompt', key: 'prompt' },
           { title: 'Response', dataIndex: 'response', key: 'response' },

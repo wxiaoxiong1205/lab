@@ -158,6 +158,11 @@ function nextVersionLabel(current: string): string {
   return `V${num + 1}`
 }
 
+function parseVersionNum(version: string): number {
+  const match = /^V(\d+)$/i.exec(String(version || '').trim())
+  return match ? Number(match[1]) : 1
+}
+
 function buildSeedDetailRows(
   format: DataFormat,
   name: string,
@@ -463,7 +468,8 @@ function enrichStateWithTrainingSeeds(nextState: DataServiceState): DataServiceS
     }
   })
 
-  const normalizeDatasetList = (items: DatasetRecord[]) => items.map(item => {
+  const normalizeDatasetList = (items: DatasetRecord[]) => items.map(rawItem => {
+    const item = ensureDatasetVersionHistory(rawItem)
     if (!isDpoUsage(item.dataUsage)) {
       return item
     }
@@ -568,6 +574,64 @@ function createDatasetVersion(
     description,
     detailRows: detailRows ?? [],
   }
+}
+
+function ensureDatasetVersionHistory(record: DatasetRecord): DatasetRecord {
+  const latestNum = parseVersionNum(record.latestVersion)
+  if (latestNum <= 1) {
+    return {
+      ...record,
+      versions: (record.versions ?? []).map(version => ({
+        ...version,
+        detailRows: version.detailRows?.length
+          ? version.detailRows
+          : buildSeedDetailRows(record.dataFormat, record.name, version.version, record.dataUsage),
+      })),
+    }
+  }
+
+  const versions = record.versions ?? []
+  const versionsByLabel = new Map(versions.map(version => [version.version, version]))
+  const latestVersion = versionsByLabel.get(record.latestVersion) ?? versions[0]
+  const baseSampleCount = record.sampleCount ?? latestVersion?.sampleCount ?? 10
+  const baseCharCount = record.charCount ?? latestVersion?.charCount
+  const nextVersions: DatasetVersionRecord[] = []
+
+  for (let index = latestNum; index >= 1; index -= 1) {
+    const versionLabel = `V${index}`
+    const existing = versionsByLabel.get(versionLabel)
+    if (existing) {
+      nextVersions.push({
+        ...existing,
+        id: existing.id || `${record.id}-${versionLabel}`,
+        creator: existing.creator ?? record.creator,
+        detailRows: existing.detailRows?.length
+          ? existing.detailRows
+          : buildSeedDetailRows(record.dataFormat, record.name, versionLabel, record.dataUsage),
+      })
+      continue
+    }
+
+    const distance = latestNum - index
+    const scale = index === latestNum ? 1 : Math.max(0.3, 0.82 - distance * 0.08)
+    const sampleCount = Math.max(2, Math.floor(baseSampleCount * scale))
+    const charCount = typeof baseCharCount === 'number' ? Math.max(1000, Math.floor(baseCharCount * scale)) : undefined
+    nextVersions.push({
+      id: `${record.id}-${versionLabel}`,
+      version: versionLabel,
+      processStatus: record.versionStatus === '处理失败' ? '处理失败' : '处理完成',
+      publishStatus: record.status === '已发布' ? '已发布' : '未发布',
+      creator: record.creator,
+      createdAt: record.createdAt,
+      sampleCount,
+      charCount,
+      trainRatio: record.trainRatio,
+      description: versionLabel === record.latestVersion ? record.description : '',
+      detailRows: buildSeedDetailRows(record.dataFormat, record.name, versionLabel, record.dataUsage),
+    })
+  }
+
+  return { ...record, versions: nextVersions }
 }
 
 export const dataServiceActions = {
@@ -675,7 +739,12 @@ export const dataServiceActions = {
       if (!target) return
 
       const sourceVersions = options.sourceVersionIds
-        .map(versionId => target.versions.find(version => version.id === versionId))
+        .map(versionId => {
+          const normalizedId = String(versionId)
+          const versionLabel = /(?:^|-)v(\d+)$/i.exec(normalizedId)?.[1]
+          return target.versions.find(version => version.id === normalizedId) ??
+            (versionLabel ? target.versions.find(version => version.version.toLowerCase() === `v${versionLabel}`.toLowerCase()) : undefined)
+        })
         .filter((version): version is DatasetVersionRecord => Boolean(version) && version?.processStatus === '处理完成')
 
       if (sourceVersions.length < 2) return

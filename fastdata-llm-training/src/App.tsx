@@ -88,6 +88,8 @@ const App: React.FC = () => {
               <Route path="/training/detail/:id/version/:versionId" element={<VersionDetail />} />
               <Route path="/model" element={<ModelManagement />} />
               <Route path="/model/create" element={<ModelManagement />} />
+              <Route path="/model/:id" element={<ModelManagement />} />
+              <Route path="/model/:id/version/create" element={<ModelManagement />} />
 
               {/* 模型评估 */}
               <Route path="/effect-evaluation" element={<EffectEvaluation />} />

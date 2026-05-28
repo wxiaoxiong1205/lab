@@ -114,6 +114,16 @@ type TrainingBaseModelOption = {
   downloaded: boolean
 }
 
+type TrainedModelVersionOption = {
+  id: string
+  version: string
+  createdAt: string
+}
+
+type TrainedModelOption = TrainedModel & {
+  versions: TrainedModelVersionOption[]
+}
+
 /** 将版本上的 scheduleTime 字符串转为 DatePicker 可用的 dayjs（与 mock 中 `2026/04/02 10:00:00` 等格式兼容） */
 function scheduleTimeToPickerValue(raw?: string) {
   if (!raw?.trim()) return undefined
@@ -228,7 +238,7 @@ const BaseModelModalPicker: React.FC<{
       >
         <div style={{ minWidth: 0 }}>
           <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 6 }}>
-            当前基础模型
+            当前模型仓库选项
           </Text>
           {selectedModel ? (
             <Space wrap size={8}>
@@ -238,14 +248,14 @@ const BaseModelModalPicker: React.FC<{
               <Tag color="blue">{selectedModel.provider}</Tag>
             </Space>
           ) : (
-            <Text type="secondary">请选择基础模型</Text>
+            <Text type="secondary">请选择模型仓库选项</Text>
           )}
         </div>
-        <Button onClick={() => setOpen(true)}>选择基础模型</Button>
+        <Button onClick={() => setOpen(true)}>选择模型仓库选项</Button>
       </div>
 
       <Modal
-        title="选择基础模型"
+        title="选择模型仓库选项"
         open={open}
         width={900}
         onCancel={() => setOpen(false)}
@@ -353,6 +363,228 @@ const BaseModelModalPicker: React.FC<{
                 }}
               >
                 <Text type="secondary">当前提供商暂无匹配模型</Text>
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
+    </>
+  )
+}
+
+const TrainedModelModalPicker: React.FC<{
+  value?: string
+  onChange?: (id: string) => void
+  options: TrainedModelOption[]
+}> = ({ value, onChange, options }) => {
+  const [open, setOpen] = useState(false)
+  const [activeType, setActiveType] = useState<TrainingType>('text')
+  const [activeMethod, setActiveMethod] = useState<TrainingMethod | 'all'>('all')
+  const selectedModel = useMemo(
+    () =>
+      options.find(
+        model =>
+          model.id === value ||
+          model.name === value ||
+          model.versions.some(version => version.id === value),
+      ),
+    [options, value],
+  )
+  const selectedVersion = selectedModel?.versions.find(version => version.id === value) ?? selectedModel?.versions[0]
+  const currentModels = useMemo(
+    () => options.filter(model => model.type === activeType && (activeMethod === 'all' || model.method === activeMethod)),
+    [activeMethod, activeType, options],
+  )
+  const methodFilters = useMemo(
+    () =>
+      [
+        { value: 'all' as const, label: '全部' },
+        { value: 'SFT' as const, label: 'SFT' },
+        { value: 'DPO' as const, label: 'DPO' },
+        { value: 'RFT' as const, label: 'RFT' },
+      ].map(item => ({
+        ...item,
+        count: options.filter(model => model.type === activeType && (item.value === 'all' || model.method === item.value)).length,
+      })),
+    [activeType, options],
+  )
+
+  useEffect(() => {
+    if (selectedModel) {
+      setActiveType(selectedModel.type)
+      setActiveMethod(selectedModel.method)
+    }
+  }, [selectedModel])
+
+  if (options.length === 0) {
+    return (
+      <div style={{ padding: '24px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: 12, border: '1px dashed #cbd5e1', color: '#94a3b8' }}>
+        当前暂无已训练模型
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <div
+        data-form-error-anchor="trainedModelId"
+        style={{
+          border: '1px solid #e2e8f0',
+          borderRadius: 12,
+          background: '#f8fafc',
+          padding: 16,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 6 }}>
+            当前我的模型
+          </Text>
+          {selectedModel && selectedVersion ? (
+            <Space wrap size={8}>
+              <Text strong style={{ fontSize: 15 }}>{selectedModel.name}</Text>
+              <Tag color="blue">{selectedVersion.version}</Tag>
+              <Tag color={selectedModel.type === 'vision' ? 'cyan' : 'geekblue'}>{selectedModel.type === 'vision' ? '图像理解' : '文本生成'}</Tag>
+              <Tag color={selectedModel.method === 'DPO' ? 'green' : selectedModel.method === 'RFT' ? 'purple' : 'blue'}>{selectedModel.method}</Tag>
+            </Space>
+          ) : (
+            <Text type="secondary">请选择我的模型版本</Text>
+          )}
+        </div>
+        <Button onClick={() => setOpen(true)}>选择我的模型</Button>
+      </div>
+
+      <Modal
+        title="选择我的模型"
+        open={open}
+        width={980}
+        onCancel={() => setOpen(false)}
+        footer={<Button onClick={() => setOpen(false)}>关闭</Button>}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: '220px minmax(0,1fr)', gap: 20, minHeight: 460 }}>
+          <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: 16 }}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>训练类型</Text>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              {([
+                { value: 'text' as TrainingType, label: '文本生成' },
+                { value: 'vision' as TrainingType, label: '图像理解' },
+              ]).map(item => {
+                const active = item.value === activeType
+                const count = options.filter(model => model.type === item.value).length
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setActiveType(item.value)}
+                    style={{
+                      width: '100%',
+                      border: active ? '1px solid #1677ff' : '1px solid #e2e8f0',
+                      background: active ? 'rgba(22, 119, 255, 0.08)' : '#fff',
+                      color: active ? '#0958d9' : '#334155',
+                      borderRadius: 10,
+                      padding: '10px 12px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span>{item.label}</span>
+                    <span>{count}</span>
+                  </button>
+                )
+              })}
+            </Space>
+
+            <Divider style={{ margin: '18px 0 14px' }} />
+
+            <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>训练方法</Text>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              {methodFilters.map(item => {
+                const active = item.value === activeMethod
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setActiveMethod(item.value)}
+                    style={{
+                      width: '100%',
+                      border: active ? '1px solid #1677ff' : '1px solid #e2e8f0',
+                      background: active ? 'rgba(22, 119, 255, 0.08)' : '#fff',
+                      color: active ? '#0958d9' : '#334155',
+                      borderRadius: 10,
+                      padding: '10px 12px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span>{item.label}</span>
+                    <span>{item.count}</span>
+                  </button>
+                )
+              })}
+            </Space>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text strong>{activeType === 'vision' ? '图像理解' : '文本生成'} · {currentModels.length} 个模型</Text>
+              <Text type="secondary">先选模型，再选版本</Text>
+            </div>
+            {currentModels.map(model => (
+              <div key={model.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, background: '#fff', padding: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <Text strong style={{ fontSize: 15 }}>{model.name}</Text>
+                    <div style={{ marginTop: 4, fontSize: 12, color: '#64748b' }}>
+                      {model.versions.length} 个版本 · {model.createdAt}
+                    </div>
+                  </div>
+                  <Space>
+                    <Tag color={model.type === 'vision' ? 'cyan' : 'geekblue'}>{model.type === 'vision' ? '图像理解' : '文本生成'}</Tag>
+                    <Tag color={model.method === 'DPO' ? 'green' : model.method === 'RFT' ? 'purple' : 'blue'}>{model.method}</Tag>
+                  </Space>
+                </div>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {model.versions.map(version => {
+                    const selected = version.id === value
+                    return (
+                      <button
+                        key={version.id}
+                        type="button"
+                        onClick={() => {
+                          onChange?.(version.id)
+                          setOpen(false)
+                        }}
+                        style={{
+                          border: selected ? '1px solid #1677ff' : '1px solid #e2e8f0',
+                          background: selected ? 'rgba(22, 119, 255, 0.08)' : '#f8fafc',
+                          borderRadius: 10,
+                          padding: '10px 12px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <Space>
+                          <Text strong>{version.version}</Text>
+                          <Text type="secondary">{version.createdAt}</Text>
+                        </Space>
+                        {selected ? <CheckOutlined style={{ color: '#52c41a' }} /> : <Text type="secondary">选择</Text>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+            {currentModels.length === 0 && (
+              <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8', border: '1px dashed #cbd5e1', borderRadius: 12 }}>
+                当前筛选条件暂无可用我的模型
               </div>
             )}
           </div>
@@ -862,10 +1094,17 @@ const CreateTraining: React.FC = () => {
     [baseModelCatalog, trainingType],
   )
 
-  /** 我的模型：按训练类型过滤（DPO/RFT 可用已训练的模型作基础） */
-  const filteredTrainedModels = useMemo(
-    () => trainedModels.filter(m => m.type === trainingType),
-    [trainingType],
+  const trainedModelOptions = useMemo<TrainedModelOption[]>(
+    () =>
+      trainedModels.map(model => ({
+        ...model,
+        versions: Array.from({ length: model.versionCount ?? 1 }, (_, index) => ({
+          id: `${model.id}__V${index + 1}`,
+          version: `V${index + 1}`,
+          createdAt: model.createdAt,
+        })),
+      })),
+    [],
   )
 
   useEffect(() => {
@@ -1528,12 +1767,12 @@ const CreateTraining: React.FC = () => {
           />
         </Card>
 
-        {/* 模型配置（互换位置后移至第三） */}
+        {/* 基础模型配置（互换位置后移至第三） */}
         <Card
           title={
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 4, height: 18, background: 'linear-gradient(180deg, #7c3aed 0%, #a78bfa 100%)', borderRadius: 2 }} />
-              <span style={{ fontWeight: 600, fontSize: 15 }}>模型配置</span>
+              <span style={{ fontWeight: 600, fontSize: 15 }}>基础模型配置</span>
             </div>
           }
           style={{
@@ -1546,7 +1785,7 @@ const CreateTraining: React.FC = () => {
           }}
           styles={{ body: { padding: '24px' } }}
         >
-          {/* 基础模型来源切换：基础模型 / 我的模型 */}
+          {/* 模型来源切换：模型仓库 / 我的模型 */}
           <Form.Item label="模型来源" name="baseModelSource">
             <Radio.Group
               value={baseModelSource}
@@ -1559,7 +1798,7 @@ const CreateTraining: React.FC = () => {
               <Radio.Button value="base">
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <CloudServerOutlined />
-                  基础模型
+                  模型仓库
                 </span>
               </Radio.Button>
               <Radio.Button value="my">
@@ -1571,13 +1810,13 @@ const CreateTraining: React.FC = () => {
             </Radio.Group>
           </Form.Item>
 
-          {/* 选择基础模型（基础模型来源时） */}
+          {/* 选择模型仓库选项（模型仓库来源时） */}
           {baseModelSource === 'base' && (
             <Form.Item
-              label="基础模型版本"
+              label="模型仓库选项"
               name="baseModel"
-              rules={[{ required: baseModelSource === 'base', message: '请选择具体模型版本' }]}
-              tooltip="通过弹窗先选择模型提供商，再选择具体模型；Qwen 本期标记为已适配，其它提供商可选并标记为未适配"
+              rules={[{ required: baseModelSource === 'base', message: '请选择模型仓库选项' }]}
+              tooltip="通过弹窗先选择模型提供商，再选择模型仓库中的具体模型；Qwen 本期标记为已适配，其它提供商可选并标记为未适配"
             >
               <BaseModelModalPicker options={filteredVariants} trainingType={trainingType} />
             </Form.Item>
@@ -1586,61 +1825,12 @@ const CreateTraining: React.FC = () => {
           {/* 选择我的模型（我的模型来源时） */}
           {baseModelSource === 'my' && (
             <Form.Item
-              label="选择已训练模型"
+              label="我的模型版本"
               name="trainedModelId"
-              rules={[{ required: baseModelSource === 'my', message: '请选择已训练的模型' }]}
-              tooltip="选择已训练完成的模型作为基础模型进行强化学习训练"
+              rules={[{ required: baseModelSource === 'my', message: '请选择我的模型版本' }]}
+              tooltip="通过弹窗按训练类型筛选我的模型，并选择具体模型版本作为本次训练的基础模型"
             >
-              {filteredTrainedModels.length === 0 ? (
-                <div style={{ padding: '24px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: 12, border: '1px dashed #cbd5e1', color: '#94a3b8' }}>
-                  当前训练类型暂无已训练模型
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {filteredTrainedModels.map(m => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => form.setFieldValue('trainedModelId', m.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '12px 16px',
-                        borderRadius: 10,
-                        border: form.getFieldValue('trainedModelId') === m.id ? '2px solid #1677ff' : '1px solid #e2e8f0',
-                        background: form.getFieldValue('trainedModelId') === m.id ? 'rgba(22,119,255,0.06)' : '#fff',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        transition: 'all 0.2s',
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: '#0f172a' }}>{m.name}</div>
-                        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
-                          {m.versionCount ?? 1}个版本 · {m.createdAt}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Tag
-                          color={
-                            m.method === 'SFT' ? 'blue'
-                            : m.method === 'DPO' ? 'green'
-                            : m.method === 'RFT' ? 'purple'
-                            : 'default'
-                          }
-                          style={{ fontWeight: 600 }}
-                        >
-                          {m.method}
-                        </Tag>
-                        {form.getFieldValue('trainedModelId') === m.id && (
-                          <CheckOutlined style={{ color: '#52c41a', fontSize: 16 }} />
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <TrainedModelModalPicker options={trainedModelOptions} />
             </Form.Item>
           )}
         </Card>

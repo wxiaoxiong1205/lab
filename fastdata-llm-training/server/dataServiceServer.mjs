@@ -29,6 +29,148 @@ function normalizeDataFormat(format, dataUsage) {
   return value === 'role-based' || value === 'ROLE_BASED' ? 'role-based' : 'prompt-response'
 }
 
+function parseVersionNum(version) {
+  const match = /^V(\d+)$/i.exec(String(version || '').trim())
+  return match ? Number(match[1]) : 1
+}
+
+function buildDatasetDetailRows(format, name, version, dataUsage = 'SFT-文本生成') {
+  const normalizedFormat = normalizeDataFormat(format, dataUsage)
+  if (isDpoUsage(dataUsage)) {
+    if (normalizedFormat === 'role-based') {
+      return [
+        {
+          key: `${name}-${version}-1`,
+          messages: [
+            { role: 'system', content: '你是一名偏好数据审核助手。' },
+            { role: 'user', content: `${name} ${version} 的偏好样例。` },
+          ],
+          chosen: { role: 'assistant', content: '这是更完整、稳妥且符合要求的回复。' },
+          rejected: { role: 'assistant', content: '这是信息不足或不够稳妥的回复。' },
+        },
+        {
+          key: `${name}-${version}-2`,
+          messages: [
+            { role: 'system', content: '你是一名多模态偏好数据审核助手。' },
+            { role: 'user', content: '请判断两条回答中哪条更适合业务场景。' },
+          ],
+          chosen: { role: 'assistant', content: '优先选择事实准确、表达清楚且风险可控的回答。' },
+          rejected: { role: 'assistant', content: '随便选择一条即可。' },
+        },
+      ]
+    }
+
+    return [
+      {
+        key: `${name}-${version}-1`,
+        instruction: '请选择更合适的回答',
+        input: `${name} ${version} 的偏好样例`,
+        chosen: '这是更完整、稳妥且符合要求的回复。',
+        rejected: '这是信息不足或不够稳妥的回复。',
+      },
+      {
+        key: `${name}-${version}-2`,
+        instruction: '请改写为更稳妥的答复',
+        input: '用户要求给出高风险操作建议。',
+        chosen: '建议先核实背景和风险边界，再提供合规、安全的替代方案。',
+        rejected: '可以直接照做，无需关注风险。',
+      },
+    ]
+  }
+
+  if (normalizedFormat === 'role-based') {
+    return [
+      {
+        key: `${name}-${version}-1`,
+        system: '你是一名数据质量审核助手。',
+        user: `${name} ${version} 的示例输入 1`,
+        assistant: '这是示例输出。',
+      },
+      {
+        key: `${name}-${version}-2`,
+        system: '你是一名数据质量审核助手。',
+        user: '请判断这段内容是否合规。',
+        assistant: '判断结果：合规。',
+      },
+    ]
+  }
+
+  return [
+    {
+      key: `${name}-${version}-1`,
+      system: '# 角色：内容安全审核专家',
+      prompt: `${name} ${version} 的示例输入 1`,
+      response: '判断结果：【安全】 示例输出内容。',
+    },
+    {
+      key: `${name}-${version}-2`,
+      system: '# 角色：内容安全审核专家',
+      prompt: '请生成一段合规的客服回复。',
+      response: '判断结果：【安全】 内容为正常客服沟通场景。',
+    },
+  ]
+}
+
+function ensureDatasetVersionHistory(record) {
+  const latestNum = parseVersionNum(record.latestVersion)
+  const versions = record.versions || []
+  const versionsByLabel = new Map(versions.map(version => [version.version, version]))
+  const latestVersion = versionsByLabel.get(record.latestVersion) || versions[0]
+
+  if (latestNum <= 1) {
+    record.versions = versions.map(version => ({
+      ...version,
+      id: version.id || `${record.id}-${version.version}`,
+      creator: version.creator || record.creator,
+      detailRows: Array.isArray(version.detailRows) && version.detailRows.length
+        ? version.detailRows
+        : buildDatasetDetailRows(record.dataFormat, record.name, version.version, record.dataUsage),
+    }))
+    return record
+  }
+
+  const baseSampleCount = record.sampleCount || latestVersion?.sampleCount || 10
+  const baseCharCount = typeof record.charCount === 'number' ? record.charCount : latestVersion?.charCount
+  const nextVersions = []
+
+  for (let index = latestNum; index >= 1; index -= 1) {
+    const versionLabel = `V${index}`
+    const existing = versionsByLabel.get(versionLabel)
+    if (existing) {
+      nextVersions.push({
+        ...existing,
+        id: existing.id || `${record.id}-${versionLabel}`,
+        creator: existing.creator || record.creator,
+        detailRows: Array.isArray(existing.detailRows) && existing.detailRows.length
+          ? existing.detailRows
+          : buildDatasetDetailRows(record.dataFormat, record.name, versionLabel, record.dataUsage),
+      })
+      continue
+    }
+
+    const distance = latestNum - index
+    const scale = index === latestNum ? 1 : Math.max(0.3, 0.82 - distance * 0.08)
+    const sampleCount = Math.max(2, Math.floor(baseSampleCount * scale))
+    const charCount = typeof baseCharCount === 'number' ? Math.max(1000, Math.floor(baseCharCount * scale)) : undefined
+    nextVersions.push({
+      id: `${record.id}-${versionLabel}`,
+      version: versionLabel,
+      processStatus: record.versionStatus === '处理失败' ? '处理失败' : '处理完成',
+      publishStatus: record.status === '已发布' ? '已发布' : '未发布',
+      creator: record.creator,
+      createdAt: record.createdAt,
+      sampleCount,
+      charCount,
+      trainRatio: record.trainRatio,
+      description: versionLabel === record.latestVersion ? record.description || '' : '',
+      detailRows: buildDatasetDetailRows(record.dataFormat, record.name, versionLabel, record.dataUsage),
+    })
+  }
+
+  record.versions = nextVersions
+  return record
+}
+
 function makeDataset({
   id,
   name,
@@ -40,6 +182,7 @@ function makeDataset({
   sampleCount,
   charCount,
   trainRatio,
+  description = '',
   status = '已发布',
 }) {
   return {
@@ -65,6 +208,8 @@ function makeDataset({
         sampleCount,
         charCount,
         trainRatio,
+        description,
+        detailRows: buildDatasetDetailRows(dataFormat, name, latestVersion, dataUsage),
       },
     ],
   }
@@ -261,6 +406,7 @@ async function readDb() {
         item.dataUsage = seedDataset.dataUsage
       }
       item.dataFormat = seedFormatById.get(item.id) || normalizeDataFormat(item.dataFormat, item.dataUsage)
+      ensureDatasetVersionHistory(item)
     }
   }
 
@@ -766,7 +912,11 @@ const server = createServer(async (req, res) => {
 
     const sourceVersionIds = Array.isArray(body.sourceVersionIds) ? body.sourceVersionIds.map(String) : []
     const sourceVersions = sourceVersionIds
-      .map(versionId => target.versions.find(version => version.id === versionId))
+      .map(versionId => {
+        const versionLabel = /(?:^|-)v(\d+)$/i.exec(versionId)?.[1]
+        return target.versions.find(version => version.id === versionId) ||
+          (versionLabel ? target.versions.find(version => String(version.version).toLowerCase() === `v${versionLabel}`.toLowerCase()) : undefined)
+      })
       .filter(version => version && version.processStatus === '处理完成')
     if (sourceVersions.length < 2) {
       return json(req, res, 400, { message: '至少选择 2 个处理完成的版本' })

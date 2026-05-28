@@ -52,6 +52,8 @@ import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import TableColumnFilterDropdown, { type TableColumnFilterOption } from '../../components/TableColumnFilterDropdown'
 import { PUBLISH_CASE_NOTICE } from '../notebookCaseNotice'
 import { validateFieldsAndScroll } from '../../utils/formValidation'
+import NotebookCaseArticle from '../NotebookCaseArticle'
+import { llmNotebookCases } from '../notebookBuiltinCases'
 
 const { Text, Title, Paragraph } = Typography
 
@@ -113,7 +115,13 @@ type MyNotebookRecord = {
 type SquareNotebookRecord = {
   id: string
   name: string
+  summary?: string
   description: string
+  category?: '机器学习' | '大模型'
+  taskType?: string
+  datasetName?: string
+  runtime?: string
+  tags?: string[]
   creatorAccount: string
   creator: string
   createdAt: string
@@ -397,24 +405,7 @@ const myNotebooksSeed: MyNotebookRecord[] = [
   },
 ]
 
-const squareNotebooks: SquareNotebookRecord[] = [
-  {
-    id: 'sq-1',
-    name: '新建 Notebook-无数据集和模型-案例',
-    description: '',
-    creatorAccount: 'zhangsan',
-    creator: '平台',
-    createdAt: '2026/03/23 09:20:00',
-  },
-  {
-    id: 'sq-2',
-    name: '新建 Notebook-1-lab5发布的案例',
-    description: '# 3.23金价暴跌事件 2026年3月23日上午，国内黄金价迅速暴跌破1000元...',
-    creatorAccount: 'lisi',
-    creator: 'lab5',
-    createdAt: '2026/03/23 11:08:00',
-  },
-]
+const squareNotebooks: SquareNotebookRecord[] = llmNotebookCases
 
 const customMirrorSeed: CustomMirrorRecord[] = [
   {
@@ -2454,14 +2445,7 @@ const OnlineNotebook: React.FC = () => {
             </div>
           </Card>
 
-          <Card style={cardStyle}>
-            <Title level={3} style={{ marginBottom: 20 }}>
-              案例说明
-            </Title>
-            <div style={{ whiteSpace: 'pre-wrap', color: '#0f172a', lineHeight: 1.9, fontSize: 16 }}>
-              {caseDetail.description || '暂无案例说明'}
-            </div>
-          </Card>
+          <NotebookCaseArticle caseRecord={caseDetail} />
         </div>
       </div>
     )
@@ -2827,7 +2811,7 @@ const OnlineNotebook: React.FC = () => {
                           </Text>
                         )}
                         <Paragraph type="secondary" style={{ minHeight: 72 }}>
-                          {item.description || '暂无说明'}
+                          {item.summary || item.description || '暂无说明'}
                         </Paragraph>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
                           <Button
@@ -2838,7 +2822,13 @@ const OnlineNotebook: React.FC = () => {
                           >
                             查看详情
                           </Button>
-                          <Button type="primary" icon={<CopyOutlined />} disabled={isProcessing} style={{ width: '100%' }}>
+                          <Button
+                            type="primary"
+                            icon={<CopyOutlined />}
+                            disabled={isProcessing}
+                            onClick={() => handleCopy(item.description || '', '案例内容')}
+                            style={{ width: '100%' }}
+                          >
                             复制案例
                           </Button>
                         </div>

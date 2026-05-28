@@ -777,24 +777,11 @@ const TestDataset: React.FC = () => {
     ),
   }
 
-  const sourceVersionColumns: ColumnsType<DatasetDetailRow> = detailRows.some(row => row.sourceVersion)
-    ? [
-        {
-          title: '来源版本',
-          dataIndex: 'sourceVersion',
-          key: 'sourceVersion',
-          width: 110,
-          render: (value: string) => value ? <Tag color="blue">{value}</Tag> : '-',
-        },
-      ]
-    : []
-
   const detailTableColumns: ColumnsType<DatasetDetailRow> =
     selectedRecord && isDpoUsage(selectedRecord.dataUsage)
       ? normalizeDatasetFormat(selectedRecord.dataFormat, selectedRecord.dataUsage) === 'role-based'
         ? [
             { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
-            ...sourceVersionColumns,
             { title: 'Messages', dataIndex: 'messages', key: 'messages', width: 360, render: renderDetailValue },
             { title: 'Chosen', dataIndex: 'chosen', key: 'chosen', width: 280, render: renderDetailValue },
             { title: 'Rejected', dataIndex: 'rejected', key: 'rejected', width: 280, render: renderDetailValue },
@@ -802,7 +789,6 @@ const TestDataset: React.FC = () => {
           ]
         : [
             { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
-            ...sourceVersionColumns,
             { title: 'Instruction', dataIndex: 'instruction', key: 'instruction', width: 260 },
             { title: 'Input', dataIndex: 'input', key: 'input', width: 220 },
             { title: 'Chosen', dataIndex: 'chosen', key: 'chosen', width: 280 },
@@ -812,7 +798,6 @@ const TestDataset: React.FC = () => {
       : selectedRecord?.dataFormat === 'role-based'
       ? [
           { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
-          ...sourceVersionColumns,
           { title: 'System', dataIndex: 'system', key: 'system' },
           { title: 'User', dataIndex: 'user', key: 'user' },
           { title: 'Assistant', dataIndex: 'assistant', key: 'assistant' },
@@ -820,7 +805,6 @@ const TestDataset: React.FC = () => {
         ]
       : [
           { title: '序号', dataIndex: 'key', key: 'index', width: 84, render: (_value, _row, index) => index + 1 },
-          ...sourceVersionColumns,
           { title: 'System', dataIndex: 'system', key: 'system' },
           { title: 'Prompt', dataIndex: 'prompt', key: 'prompt' },
           { title: 'Response', dataIndex: 'response', key: 'response' },
@@ -1123,7 +1107,6 @@ const TestDataset: React.FC = () => {
               <div>
                 <ResumableUpload
                   accept=".jsonl,.json,.csv"
-                  disabled={inheritHistoryVersion}
                   title="点击或拖拽文件到此区域上传"
                   hint="支持 .jsonl/.json/.csv 格式，文件大小不设前端限制"
                   value={addVersionFile}

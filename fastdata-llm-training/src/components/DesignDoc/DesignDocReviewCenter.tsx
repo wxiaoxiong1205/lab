@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Empty, Input, Popover, Select, Space, Tag, Typography } from 'antd'
 import { FileSearchOutlined, RightOutlined, SearchOutlined } from '@ant-design/icons'
-import { getAllPageDesignDocs, GLOBAL_DESIGN_DOC_MODULE, type PageDesignDoc } from '../../docs/pageDocs'
+import { getAllPageDesignDocs, GLOBAL_DESIGN_DOC_MODULE, GLOBAL_DESIGN_DOC_PATH, type PageDesignDoc } from '../../docs/pageDocs'
 import {
   DEFAULT_REQUIREMENT_VERSION,
   formatTimestamp,
@@ -38,9 +38,102 @@ function summarize(content: string): string {
     ?.slice(0, 72) || '暂无摘要'
 }
 
+function summarizeNotes(notes: RequirementNote[]): string {
+  return notes
+    .map(note => summarize(note.content))
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((summary, index) => `${index + 1}. ${summary}`)
+    .join('\n')
+}
+
 function getVersionSortValue(versionName: string): number {
   const matched = versionName.match(/V(\d+(?:\.\d+)?)/i)
   return matched ? Number(matched[1]) : 0
+}
+
+const MODULE_REVIEW_ORDER = [
+  GLOBAL_DESIGN_DOC_MODULE,
+  '任务概览',
+  '项目空间',
+  '数据管理',
+  '数据处理',
+  '在线 Notebook',
+  '模型训练',
+  '模型训练 / 机器学习',
+  '模型评估',
+  '模型服务',
+  '机器学习',
+  '系统管理',
+  '个人中心',
+  '文档中心',
+  '未分类',
+]
+
+const PAGE_REVIEW_ORDER = [
+  GLOBAL_DESIGN_DOC_PATH,
+  '/task-overview',
+  '/workspace',
+  '/datasets',
+  '/measurement',
+  '/inference',
+  '/data-annotation',
+  '/data-cleaning',
+  '/finetune/notebooks',
+  '/training',
+  '/model',
+  '/effect-evaluation',
+  '/evaluation-indicator',
+  '/service/inference/hosted',
+  '/service/inference/external',
+  '/machine-data-management',
+  '/machine-annotation',
+  '/machine-model-management',
+  '/machine-model-deployment',
+  '/machine-notebook',
+  '/machine-annotation-service',
+  '/admin/projects',
+  '/admin/kubernetes',
+  '/admin/storage',
+  '/admin/image-list',
+  '/admin/registry',
+  '/admin/base-model',
+  '/admin/settings',
+  '/admin/permissions',
+  '/docs',
+]
+
+function getModuleReviewOrder(module: string): number {
+  const index = MODULE_REVIEW_ORDER.indexOf(module)
+  return index >= 0 ? index : MODULE_REVIEW_ORDER.length
+}
+
+function getPageReviewOrder(pagePath: string): number {
+  const exactIndex = PAGE_REVIEW_ORDER.indexOf(pagePath)
+  if (exactIndex >= 0) {
+    return exactIndex
+  }
+
+  const prefixIndex = PAGE_REVIEW_ORDER.findIndex(path => path !== '/' && pagePath.startsWith(`${path}/`))
+  return prefixIndex >= 0 ? prefixIndex : PAGE_REVIEW_ORDER.length
+}
+
+function compareReviewEntries(a: ReviewRequirementEntry, b: ReviewRequirementEntry): number {
+  const moduleOrder = getModuleReviewOrder(a.doc.module) - getModuleReviewOrder(b.doc.module)
+  if (moduleOrder !== 0) {
+    return moduleOrder
+  }
+
+  const pageOrder = getPageReviewOrder(a.doc.pagePath) - getPageReviewOrder(b.doc.pagePath)
+  if (pageOrder !== 0) {
+    return pageOrder
+  }
+
+  return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+}
+
+function compareModules(a: string, b: string): number {
+  return getModuleReviewOrder(a) - getModuleReviewOrder(b) || a.localeCompare(b)
 }
 
 function collectReviewState(storage: Storage): { versions: string[]; entries: ReviewRequirementEntry[] } {
@@ -68,7 +161,7 @@ function collectReviewState(storage: Storage): { versions: string[]; entries: Re
           versionName: version.name,
           notes,
           updatedAt,
-          summary: summarize(notes[0].content),
+          summary: summarizeNotes(notes),
         })
       })
     } catch {
@@ -130,6 +223,10 @@ const DesignDocReviewCenter: React.FC<DesignDocReviewCenterProps> = ({
     () => reviewState.entries.filter(entry => entry.versionName === activeVersionName),
     [activeVersionName, reviewState.entries],
   )
+  const versionRequirementCount = useMemo(
+    () => versionEntries.reduce((total, entry) => total + entry.notes.length, 0),
+    [versionEntries],
+  )
 
   const filteredEntries = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -146,12 +243,13 @@ const DesignDocReviewCenter: React.FC<DesignDocReviewCenterProps> = ({
           entry.notes.map(note => note.content).join('\n'),
         ].join('\n').toLowerCase().includes(query)
       })
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .sort(compareReviewEntries)
   }, [moduleFilter, search, versionEntries])
 
   const modules = useMemo(() => {
     const allModules = getAllPageDesignDocs().map(doc => doc.module)
     return Array.from(new Set([GLOBAL_DESIGN_DOC_MODULE, ...allModules, ...versionEntries.map(entry => entry.doc.module)]))
+      .sort(compareModules)
   }, [versionEntries])
 
   useEffect(() => {
@@ -176,7 +274,7 @@ const DesignDocReviewCenter: React.FC<DesignDocReviewCenterProps> = ({
           <Text strong>需求评审中心</Text>
           <div className="design-doc-review-popover__sub">按版本定位有新需求的页面</div>
         </div>
-        <Tag color="blue" style={{ margin: 0 }}>{activeVersionName} · {versionEntries.length}</Tag>
+        <Tag color="blue" style={{ margin: 0 }}>{activeVersionName} · {versionRequirementCount}</Tag>
       </div>
 
       <Space.Compact style={{ width: '100%', marginBottom: 10 }}>
@@ -249,7 +347,7 @@ const DesignDocReviewCenter: React.FC<DesignDocReviewCenterProps> = ({
     >
       <span className="design-doc-review-fab-wrap" style={{ right: fixedRightOffset }}>
         <Badge
-          count={versionEntries.length}
+          count={versionRequirementCount}
           size="small"
           offset={[-5, 6]}
         >

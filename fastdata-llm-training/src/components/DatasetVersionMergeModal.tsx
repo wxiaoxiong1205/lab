@@ -42,7 +42,6 @@ const DatasetVersionMergeModal: React.FC<DatasetVersionMergeModalProps> = ({
     [selectedVersionIds, versions],
   )
   const totalSampleCount = selectedVersions.reduce((sum, version) => sum + (version.sampleCount ?? 0), 0)
-  const totalCharCount = selectedVersions.reduce((sum, version) => sum + (version.charCount ?? 0), 0)
 
   const columns: ColumnsType<MergeableDatasetVersion> = [
     { title: '版本', dataIndex: 'version', key: 'version', width: 88, render: value => <Text strong>{value}</Text> },
@@ -53,7 +52,7 @@ const DatasetVersionMergeModal: React.FC<DatasetVersionMergeModalProps> = ({
       width: 110,
       render: value => <Tag color={value === '处理完成' ? 'success' : 'default'}>{value}</Tag>,
     },
-    { title: '样本数', dataIndex: 'sampleCount', key: 'sampleCount', width: 110, render: value => Number(value ?? 0).toLocaleString() },
+    { title: '数据量', dataIndex: 'sampleCount', key: 'sampleCount', width: 110, render: value => Number(value ?? 0).toLocaleString() },
     { title: '创建人', dataIndex: 'creator', key: 'creator', width: 110, render: value => value || '-' },
     { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', ellipsis: true },
   ]
@@ -88,18 +87,14 @@ const DatasetVersionMergeModal: React.FC<DatasetVersionMergeModalProps> = ({
         description="仅支持同一数据集内合并处理完成的版本。合并后源版本不变，重复样本全部保留。"
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
         <div style={{ padding: 12, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
           <Text type="secondary">已选版本</Text>
           <div style={{ marginTop: 4, fontSize: 20, fontWeight: 800 }}>{selectedVersionIds.length}</div>
         </div>
         <div style={{ padding: 12, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-          <Text type="secondary">合并样本数</Text>
+          <Text type="secondary">合并数据量</Text>
           <div style={{ marginTop: 4, fontSize: 20, fontWeight: 800 }}>{totalSampleCount.toLocaleString()}</div>
-        </div>
-        <div style={{ padding: 12, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-          <Text type="secondary">合并字符数</Text>
-          <div style={{ marginTop: 4, fontSize: 20, fontWeight: 800 }}>{totalCharCount ? totalCharCount.toLocaleString() : '-'}</div>
         </div>
       </div>
 

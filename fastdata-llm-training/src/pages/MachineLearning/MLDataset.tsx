@@ -106,7 +106,7 @@ function renderMLPublishStatus(status?: string) {
 
 function renderMLVersionDataSource(version: MLDatasetVersion) {
   if (version.mergeMode === 'version-merge' && version.mergeSourceVersions?.length) {
-    return `版本合并（${version.mergeSourceVersions.join('、')}）`
+    return '版本合并'
   }
 
   return version.dataSource
@@ -746,7 +746,6 @@ const MLDataset: React.FC = () => {
     const versions = getDatasetVersions(selectedDetailRecord)
     const activeDatasetVersion = getActiveDatasetVersion(selectedDetailRecord, detailVersion)
     const detailRows = activeDatasetVersion.detailRows
-    const hasSourceVersion = detailRows.some(row => row.sourceVersion)
     const datasetLabels = selectedDetailRecord.dataType === '图片'
       ? ['食品', '人物', '物体', '动物', '文字', '车辆']
       : ['正向', '负向', '中性', '实体']
@@ -841,17 +840,6 @@ const MLDataset: React.FC = () => {
                 pagination={{ pageSize: 5, showTotal: total => `共 ${total} 条` }}
                 columns={[
                   { title: '序号', key: 'index', width: 100, align: 'center', render: (_value, _row, index) => index + 1 },
-                  ...(hasSourceVersion
-                    ? [
-                        {
-                          title: '来源版本',
-                          dataIndex: 'sourceVersion',
-                          key: 'sourceVersion',
-                          width: 110,
-                          render: (value: string) => value ? <Tag color="blue">{value}</Tag> : '-',
-                        } as ColumnsType<MLDatasetDetailRow>[number],
-                      ]
-                    : []),
                   {
                     title: selectedDetailRecord.dataType === '图片' ? '图片' : '数据内容',
                     key: 'content',

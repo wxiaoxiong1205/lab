@@ -748,6 +748,7 @@ body {
 .design-doc-review-item__summary {
   margin-top: 4px;
   color: #334155;
+  white-space: pre-line;
 }
 
 @media (max-width: 1280px) {

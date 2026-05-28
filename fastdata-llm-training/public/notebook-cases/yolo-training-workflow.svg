@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="430" viewBox="0 0 1120 430">
+  <rect width="1120" height="430" fill="#ffffff"/>
+  <text x="150" y="45" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#1f3b70">训练流程概览</text>
+  <g font-family="Arial, sans-serif">
+    <g transform="translate(90 76)">
+      <rect width="132" height="88" rx="10" fill="#f8fbff" stroke="#b9cce8"/>
+      <text x="20" y="30" font-size="16" font-weight="700" fill="#3b6ea8">1 数据格式转换</text>
+      <text x="20" y="62" font-size="13" fill="#475569">标注转 YOLO 格式</text>
+    </g>
+    <g transform="translate(258 76)">
+      <rect width="132" height="88" rx="10" fill="#f7fbf5" stroke="#b9d6b5"/>
+      <text x="20" y="30" font-size="16" font-weight="700" fill="#43815d">2 数据集划分</text>
+      <text x="20" y="62" font-size="13" fill="#475569">训练集 / 验证集</text>
+    </g>
+    <g transform="translate(426 76)">
+      <rect width="132" height="88" rx="10" fill="#fffaf0" stroke="#efd18b"/>
+      <text x="20" y="30" font-size="16" font-weight="700" fill="#a66f00">3 模型加载微调</text>
+      <text x="20" y="62" font-size="13" fill="#475569">加载 YOLO11n</text>
+    </g>
+    <g transform="translate(594 76)">
+      <rect width="132" height="88" rx="10" fill="#f8f5ff" stroke="#c8b6ef"/>
+      <text x="20" y="30" font-size="16" font-weight="700" fill="#6840b3">4 模型训练</text>
+      <text x="20" y="62" font-size="13" fill="#475569">Loss / mAP 监控</text>
+    </g>
+    <g transform="translate(762 76)">
+      <rect width="132" height="88" rx="10" fill="#fff4f4" stroke="#efb6b6"/>
+      <text x="20" y="30" font-size="16" font-weight="700" fill="#ba4545">5 模型评估</text>
+      <text x="20" y="62" font-size="13" fill="#475569">Precision / Recall</text>
+    </g>
+    <g transform="translate(930 76)">
+      <rect width="132" height="88" rx="10" fill="#f2fbfb" stroke="#a6dddd"/>
+      <text x="20" y="30" font-size="16" font-weight="700" fill="#237b87">6 单图推理</text>
+      <text x="20" y="62" font-size="13" fill="#475569">检测结果验证</text>
+    </g>
+    <g stroke="#64748b" stroke-width="3">
+      <path d="M222 120 L252 120"/>
+      <path d="M390 120 L420 120"/>
+      <path d="M558 120 L588 120"/>
+      <path d="M726 120 L756 120"/>
+      <path d="M894 120 L924 120"/>
+    </g>
+  </g>
+
+  <g transform="translate(90 210)">
+    <rect width="360" height="164" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="180" y="28" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#1f3b70">训练过程监控（示例）</text>
+    <text x="52" y="72" font-family="Arial, sans-serif" font-size="13" fill="#111827">Loss 曲线</text>
+    <polyline points="48,138 78,92 108,80 138,73 168,69 198,66 228,63 258,61 288,60 318,59" fill="none" stroke="#5b78c7" stroke-width="4"/>
+    <text x="226" y="72" font-family="Arial, sans-serif" font-size="13" fill="#111827">mAP 曲线</text>
+    <polyline points="218,138 248,112 278,94 308,80 338,70" fill="none" stroke="#4b9a68" stroke-width="4"/>
+  </g>
+
+  <g transform="translate(490 210)">
+    <rect width="190" height="164" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="95" y="28" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#1f3b70">评估指标</text>
+    <text x="28" y="66" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#111827">mAP@0.5</text>
+    <text x="138" y="66" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#111827">0.87</text>
+    <text x="28" y="98" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#111827">Precision</text>
+    <text x="138" y="98" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#111827">0.88</text>
+    <text x="28" y="130" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#111827">Recall</text>
+    <text x="138" y="130" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#111827">0.83</text>
+  </g>
+
+  <g transform="translate(720 210)">
+    <rect width="190" height="164" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="95" y="28" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#1f3b70">迁移学习优势</text>
+    <text x="38" y="70" font-family="Arial, sans-serif" font-size="15" fill="#334155">大幅减少训练时间</text>
+    <text x="38" y="104" font-family="Arial, sans-serif" font-size="15" fill="#334155">降低过拟合风险</text>
+    <text x="38" y="138" font-family="Arial, sans-serif" font-size="15" fill="#334155">小数据集效果更稳</text>
+  </g>
+
+  <g transform="translate(950 210)">
+    <rect width="120" height="164" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="60" y="28" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#1f3b70">模型导出</text>
+    <circle cx="60" cy="78" r="26" fill="#ede9fe"/>
+    <text x="60" y="86" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#6d28d9">.pt</text>
+    <text x="60" y="126" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#334155">TorchScript</text>
+  </g>
+</svg>

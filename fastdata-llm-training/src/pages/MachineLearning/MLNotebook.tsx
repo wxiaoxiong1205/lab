@@ -52,6 +52,8 @@ import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import TableColumnFilterDropdown, { type TableColumnFilterOption } from '../../components/TableColumnFilterDropdown'
 import { PUBLISH_CASE_NOTICE } from '../notebookCaseNotice'
 import { validateFieldsAndScroll } from '../../utils/formValidation'
+import NotebookCaseArticle from '../NotebookCaseArticle'
+import { machineLearningNotebookCases } from '../notebookBuiltinCases'
 
 const { Text, Title, Paragraph } = Typography
 
@@ -113,7 +115,13 @@ type MLNotebookRecord = {
 type MLSquareRecord = {
   id: string
   name: string
+  summary?: string
   description: string
+  category?: '机器学习' | '大模型'
+  taskType?: string
+  datasetName?: string
+  runtime?: string
+  tags?: string[]
   creatorAccount: string
   creator: string
   createdAt: string
@@ -411,24 +419,7 @@ const myNotebooksSeed: MLNotebookRecord[] = [
   },
 ]
 
-const squareNotebooks: MLSquareRecord[] = [
-  {
-    id: 'ml-square-1',
-    name: '图像分类开发案例',
-    description: '用于机器学习图像分类任务的在线开发模板。',
-    creatorAccount: 'zhangsan',
-    creator: '平台',
-    createdAt: '2026/03/23 09:20:00',
-  },
-  {
-    id: 'ml-square-2',
-    name: '实体识别开发案例',
-    description: '用于机器学习文本实体识别任务的在线开发模板。',
-    creatorAccount: 'lisi',
-    creator: 'lab5',
-    createdAt: '2026/03/23 11:08:00',
-  },
-]
+const squareNotebooks: MLSquareRecord[] = machineLearningNotebookCases
 
 const customMirrorSeed: CustomMirrorRecord[] = [
   {
@@ -2474,14 +2465,7 @@ const MLNotebook: React.FC = () => {
             </div>
           </Card>
 
-          <Card style={cardStyle}>
-            <Title level={3} style={{ marginBottom: 20 }}>
-              案例说明
-            </Title>
-            <div style={{ whiteSpace: 'pre-wrap', color: '#0f172a', lineHeight: 1.9, fontSize: 16 }}>
-              {caseDetail.description || '暂无案例说明'}
-            </div>
-          </Card>
+          <NotebookCaseArticle caseRecord={caseDetail} />
         </div>
       </div>
     )
@@ -2847,7 +2831,7 @@ const MLNotebook: React.FC = () => {
                           </Text>
                         )}
                         <Paragraph type="secondary" style={{ minHeight: 72 }}>
-                          {item.description || '暂无说明'}
+                          {item.summary || item.description || '暂无说明'}
                         </Paragraph>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
                           <Button
@@ -2858,7 +2842,13 @@ const MLNotebook: React.FC = () => {
                           >
                             查看详情
                           </Button>
-                          <Button type="primary" icon={<CopyOutlined />} disabled={isProcessing} style={{ width: '100%' }}>
+                          <Button
+                            type="primary"
+                            icon={<CopyOutlined />}
+                            disabled={isProcessing}
+                            onClick={() => handleCopy(item.description || '', '案例内容')}
+                            style={{ width: '100%' }}
+                          >
                             复制案例
                           </Button>
                         </div>
