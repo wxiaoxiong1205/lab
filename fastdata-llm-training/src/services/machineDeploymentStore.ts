@@ -167,7 +167,7 @@ const seedState: MachineDeploymentState = {
       name: 'custom-image-classifier',
       description: '基于自定义镜像的图片分类服务',
       deploymentType: 'custom',
-      targetSummary: '镜像部署 / python-inference:3.9-ubuntu2004',
+      targetSummary: '镜像部署 / registry.cn-shanghai.aliyuncs.com/ml/custom-serving:1.0.0',
       resourceSummary: '6C / 24GB / NVIDIA Tesla T4 x1',
       instanceCount: '0/2',
       status: '运行中',
@@ -190,8 +190,8 @@ const seedState: MachineDeploymentState = {
       },
       customConfig: {
         deployMode: '镜像部署',
-        imageSource: 'system',
-        systemImage: 'python-inference:3.9-ubuntu2004',
+        imageSource: 'custom',
+        customImage: 'registry.cn-shanghai.aliyuncs.com/ml/custom-serving:1.0.0',
         command: 'python app.py --port 8000',
         port: 8000,
         dependencies: [

@@ -66,12 +66,6 @@ const gpuOptions = [
   { value: 'NVIDIA V100', label: 'NVIDIA V100' },
 ]
 
-const systemImageOptions = [
-  { value: 'python-inference:3.9-ubuntu2004', label: 'python-inference:3.9-ubuntu2004' },
-  { value: 'pytorch-inference:2.1-cuda12.1', label: 'pytorch-inference:2.1-cuda12.1' },
-  { value: 'sklearn-serving:1.4-ubuntu2204', label: 'sklearn-serving:1.4-ubuntu2204' },
-]
-
 const customImageOptions = [
   { value: 'registry.cn-shanghai.aliyuncs.com/ml/custom-serving:1.0.0', label: 'registry.cn-shanghai.aliyuncs.com/ml/custom-serving:1.0.0' },
   { value: 'registry.cn-beijing.aliyuncs.com/ml/yolov8-serving:2.1.0', label: 'registry.cn-beijing.aliyuncs.com/ml/yolov8-serving:2.1.0' },
@@ -139,7 +133,7 @@ function buildInstanceCount(resource: ResourceConfig) {
 }
 
 function buildImageSummary(config: CustomDeploymentConfig) {
-  const imageName = config.imageSource === 'system' ? config.systemImage : config.customImage
+  const imageName = config.customImage
   return imageName ? `镜像部署 / ${imageName}` : '镜像部署'
 }
 
@@ -193,9 +187,9 @@ function getCreateInitialValues(): CreateFormValues {
     },
     custom: {
       deployMode: '镜像部署',
-      imageSource: 'system',
-      systemImage: 'python-inference:3.9-ubuntu2004',
-      customImage: '',
+      imageSource: 'custom',
+      systemImage: undefined,
+      customImage: customImageOptions[0]?.value,
       command: 'python app.py',
       port: 8000,
       dependencies: [],
@@ -220,9 +214,17 @@ function buildFormValuesFromRecord(record: MLDeploymentRecord): CreateFormValues
   return {
     name: record.name,
     description: record.description ?? '',
-    standard: record.standardConfig ?? initialValues.standard,
+    standard: {
+      ...initialValues.standard,
+      ...(record.standardConfig ?? {}),
+      imageSource: 'system',
+    },
     custom: {
-      ...(record.customConfig ?? initialValues.custom),
+      ...initialValues.custom,
+      ...(record.customConfig ?? {}),
+      imageSource: 'custom',
+      customImage: record.customConfig?.customImage ?? record.customConfig?.systemImage ?? initialValues.custom.customImage,
+      systemImage: undefined,
       serviceConfigJson: record.customConfig?.serviceConfigJson ?? defaultCustomSpec,
     },
   }
@@ -234,6 +236,8 @@ function buildDeploymentPayload(values: CreateFormValues, deploymentType: Deploy
   if (deploymentType === 'standard') {
     const standardConfig = {
       ...standard,
+      imageSource: 'system' as const,
+      customImage: undefined,
       pythonFile: normalizeUploadFileName(standard.pythonFile),
     }
 
@@ -250,15 +254,20 @@ function buildDeploymentPayload(values: CreateFormValues, deploymentType: Deploy
   }
 
   const custom = values.custom
+  const customConfig = {
+    ...custom,
+    imageSource: 'custom' as const,
+    systemImage: undefined,
+  }
   return {
     name: values.name?.trim() ?? '',
     description: values.description?.trim() ?? '',
     deploymentType,
-    targetSummary: buildImageSummary(custom),
-    resourceSummary: buildResourceSummary(custom.resources),
-    instanceCount: buildInstanceCount(custom.resources),
+    targetSummary: buildImageSummary(customConfig),
+    resourceSummary: buildResourceSummary(customConfig.resources),
+    instanceCount: buildInstanceCount(customConfig.resources),
     standardConfig: standard,
-    customConfig: custom,
+    customConfig,
   }
 }
 
@@ -347,8 +356,6 @@ const MLModelDeployment: React.FC = () => {
     () => (editId ? rows.find(item => item.id === editId) ?? null : null),
     [editId, rows],
   )
-  const customImageSource = Form.useWatch(['custom', 'imageSource'], form) ?? 'system'
-  const standardImageSource = Form.useWatch(['standard', 'imageSource'], form) ?? 'system'
   const standardPythonSource = Form.useWatch(['standard', 'pythonSource'], form) ?? 'local'
   const selectedModel = Form.useWatch(['standard', 'model'], form)
   const availableVersions = useMemo(
@@ -768,38 +775,20 @@ const MLModelDeployment: React.FC = () => {
                   <Card id="environment-info" style={{ ...sectionCardStyle, marginBottom: 20 }}>
                     <div style={sectionTitleStyle}>环境信息</div>
                     <Form.Item
-                      label="镜像配置"
-                      name={['standard', 'imageSource']}
-                      rules={[{ required: true, message: '请选择镜像配置' }]}
+                      label="系统镜像"
+                      name={['standard', 'imageSelection']}
+                      rules={[{ required: true, message: '请选择系统镜像' }]}
                     >
-                      <Radio.Group optionType="button" buttonStyle="solid">
-                        <Radio.Button value="system">系统镜像</Radio.Button>
-                        <Radio.Button value="custom">自定义镜像</Radio.Button>
-                      </Radio.Group>
+                      <Cascader
+                        placeholder="请选择镜像类型 / 镜像"
+                        options={standardImageOptions}
+                        expandTrigger="hover"
+                        style={{ width: '100%' }}
+                      />
                     </Form.Item>
-
-                    {standardImageSource === 'system' ? (
-                      <Form.Item
-                        label="系统镜像"
-                        name={['standard', 'imageSelection']}
-                        rules={[{ required: true, message: '请选择系统镜像' }]}
-                      >
-                        <Cascader
-                          placeholder="请选择镜像类型 / 镜像"
-                          options={standardImageOptions}
-                          expandTrigger="hover"
-                          style={{ width: '100%' }}
-                        />
-                      </Form.Item>
-                    ) : (
-                      <Form.Item
-                        label="自定义镜像"
-                        name={['standard', 'customImage']}
-                        rules={[{ required: true, message: '请选择自定义镜像' }]}
-                      >
-                        <Select placeholder="请选择自定义镜像" options={customImageOptions} />
-                      </Form.Item>
-                    )}
+                    <Form.Item name={['standard', 'imageSource']} hidden>
+                      <Input />
+                    </Form.Item>
 
                     <Form.Item
                       label="部署实例数"
@@ -901,33 +890,15 @@ const MLModelDeployment: React.FC = () => {
                   <Card id="environment-info" style={{ ...sectionCardStyle, marginBottom: 20 }}>
                     <div style={sectionTitleStyle}>环境信息</div>
                     <Form.Item
-                      label="镜像配置"
-                      name={['custom', 'imageSource']}
-                      rules={[{ required: true, message: '请选择镜像配置' }]}
+                      label="自定义镜像"
+                      name={['custom', 'customImage']}
+                      rules={[{ required: true, message: '请选择自定义镜像' }]}
                     >
-                      <Radio.Group optionType="button" buttonStyle="solid">
-                        <Radio.Button value="system">系统镜像</Radio.Button>
-                        <Radio.Button value="custom">自定义镜像</Radio.Button>
-                      </Radio.Group>
+                      <Select placeholder="请选择自定义镜像" options={customImageOptions} />
                     </Form.Item>
-
-                    {customImageSource === 'system' ? (
-                      <Form.Item
-                        label="系统镜像"
-                        name={['custom', 'systemImage']}
-                        rules={[{ required: true, message: '请选择系统镜像' }]}
-                      >
-                        <Select placeholder="请选择系统镜像" options={systemImageOptions} />
-                      </Form.Item>
-                    ) : (
-                      <Form.Item
-                        label="自定义镜像"
-                        name={['custom', 'customImage']}
-                        rules={[{ required: true, message: '请输入自定义镜像地址' }]}
-                      >
-                        <Select placeholder="请选择自定义镜像" options={customImageOptions} />
-                      </Form.Item>
-                    )}
+                    <Form.Item name={['custom', 'imageSource']} hidden>
+                      <Input />
+                    </Form.Item>
 
                     <Form.Item
                       label="运行命令"
