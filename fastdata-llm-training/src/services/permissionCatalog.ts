@@ -30,6 +30,7 @@ export const MENU_PERMISSION_TREE: PermissionTreeNode[] = [
         children: [
           { key: '/datasets', label: '训练数据管理' },
           { key: '/measurement', label: '测试数据管理' },
+          { key: '/file-management', label: '文件管理' },
           { key: '/inference', label: '推理结果集' },
         ],
       },
@@ -133,6 +134,14 @@ export const OPERATION_PERMISSION_TREE: PermissionTreeNode[] = [
           { key: 'datasets.test.version.create', label: '新增版本' },
           { key: 'datasets.test.download', label: '下载' },
           { key: 'datasets.test.delete', label: '删除' },
+        ],
+      },
+      {
+        key: '/file-management',
+        label: '文件管理',
+        children: [
+          { key: 'file-management.detail', label: '查看文件夹' },
+          { key: 'file-management.create', label: '创建文件夹' },
         ],
       },
       {
@@ -412,6 +421,8 @@ export const OPERATION_DEFINITION_MAP: Record<string, OperationDefinition> = {
   'datasets.test.version.create': { key: 'datasets.test.version.create', label: '测试数据新增版本', menuKey: '/measurement', requiresProject: true },
   'datasets.test.download': { key: 'datasets.test.download', label: '下载测试数据', menuKey: '/measurement', requiresProject: true },
   'datasets.test.delete': { key: 'datasets.test.delete', label: '删除测试数据', menuKey: '/measurement', requiresProject: true },
+  'file-management.detail': { key: 'file-management.detail', label: '查看文件夹', menuKey: '/file-management', requiresProject: true },
+  'file-management.create': { key: 'file-management.create', label: '创建文件夹', menuKey: '/file-management', requiresProject: true },
   'inference.create': { key: 'inference.create', label: '创建推理结果集', menuKey: '/inference', requiresProject: true },
   'inference.start': { key: 'inference.start', label: '启动推理结果集', menuKey: '/inference', requiresProject: true },
   'inference.edit': { key: 'inference.edit', label: '编辑推理结果集', menuKey: '/inference', requiresProject: true },
@@ -508,6 +519,7 @@ export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   { menuKey: '/task-overview', requiresProject: false, match: pathname => pathname === '/task-overview' },
   { menuKey: '/datasets', requiresProject: true, match: pathname => pathname === '/datasets' || pathname.startsWith('/datasets/') },
   { menuKey: '/measurement', requiresProject: true, match: pathname => pathname === '/measurement' || pathname.startsWith('/measurement/') },
+  { menuKey: '/file-management', requiresProject: true, match: pathname => pathname === '/file-management' || pathname.startsWith('/file-management/') },
   { menuKey: '/inference', requiresProject: true, match: pathname => pathname === '/inference' || pathname.startsWith('/inference/') },
   { menuKey: '/data-annotation', requiresProject: true, match: pathname => pathname === '/data-annotation' || pathname.startsWith('/data-annotation/') },
   { menuKey: '/data-cleaning', requiresProject: true, match: pathname => pathname === '/data-cleaning' || pathname.startsWith('/data-cleaning/') },

@@ -54,6 +54,7 @@ const projectMenuSource: MenuItemList = [
         children: [
           { key: '/datasets', label: '训练数据管理' },
           { key: '/measurement', label: '测试数据管理' },
+          { key: '/file-management', label: '文件管理' },
           { key: '/inference', label: '推理结果集' },
         ],
       },

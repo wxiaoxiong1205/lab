@@ -87,6 +87,7 @@ const projectAdminMenuPermissions = [
   '/task-overview',
   '/datasets',
   '/measurement',
+  '/file-management',
   '/inference',
   '/data-annotation',
   '/data-cleaning',
@@ -111,6 +112,7 @@ const trainingEngineerMenuPermissions = [
   '/task-overview',
   '/datasets',
   '/measurement',
+  '/file-management',
   '/inference',
   '/data-annotation',
   '/data-cleaning',
@@ -180,12 +182,13 @@ const seedRoles: PermissionRole[] = [
       '/task-overview',
       '/datasets',
       '/measurement',
+      '/file-management',
       '/inference',
       '/data-annotation',
       '/data-cleaning',
     ],
     operationPermissions: ALL_OPERATION_KEYS.filter(key =>
-      ['/task-overview', '/datasets', '/measurement', '/inference', '/data-annotation', '/data-cleaning'].includes(
+      ['/task-overview', '/datasets', '/measurement', '/file-management', '/inference', '/data-annotation', '/data-cleaning'].includes(
         OPERATION_DEFINITION_MAP[key]?.menuKey ?? '',
       ),
     ),
@@ -262,6 +265,7 @@ const seedRoles: PermissionRole[] = [
       '/task-overview',
       '/datasets',
       '/measurement',
+      '/file-management',
       '/inference',
       '/effect-evaluation',
       '/machine-data-management',
@@ -270,7 +274,7 @@ const seedRoles: PermissionRole[] = [
     operationPermissions: ALL_OPERATION_KEYS.filter(key => {
       const definition = OPERATION_DEFINITION_MAP[key]
       return (
-        ['/task-overview', '/datasets', '/measurement', '/inference', '/effect-evaluation', '/machine-data-management', '/admin/projects'].includes(
+        ['/task-overview', '/datasets', '/measurement', '/file-management', '/inference', '/effect-evaluation', '/machine-data-management', '/admin/projects'].includes(
           definition?.menuKey ?? '',
         ) && (definition?.label.includes('查看') || definition?.label.includes('详情'))
       )
@@ -346,17 +350,19 @@ function loadState(): PermissionState {
     const migratedRoleMap = new Map(seedRoles.map(role => [role.key, cloneState(role)]))
     parsedRoles.forEach(role => {
       const isTenantAdmin = role.key === TENANT_ADMIN_ROLE_KEY
+      const seedRole = seedRoles.find(item => item.key === role.key)
+      const isBuiltInRole = BUILT_IN_ROLE_KEYS.includes(role.key as (typeof BUILT_IN_ROLE_KEYS)[number])
       migratedRoleMap.set(role.key, {
         ...role,
         name: isTenantAdmin ? '平台管理员' : role.name,
         hidden: isTenantAdmin ? false : role.hidden,
-        lockedName: BUILT_IN_ROLE_KEYS.includes(role.key as (typeof BUILT_IN_ROLE_KEYS)[number]) ? true : Boolean(role.lockedName),
-        lockedOperations: BUILT_IN_ROLE_KEYS.includes(role.key as (typeof BUILT_IN_ROLE_KEYS)[number]) ? true : Boolean(role.lockedOperations),
+        lockedName: isBuiltInRole ? true : Boolean(role.lockedName),
+        lockedOperations: isBuiltInRole ? true : Boolean(role.lockedOperations),
         menuPermissions: uniqueValues(
-          (role.menuPermissions ?? []).map(key => (key === '/home' ? '/task-overview' : key)),
+          [...(isBuiltInRole ? seedRole?.menuPermissions ?? [] : []), ...(role.menuPermissions ?? [])].map(key => (key === '/home' ? '/task-overview' : key)),
         ),
         operationPermissions: uniqueValues(
-          (role.operationPermissions ?? []).map(key => (key === 'home.view' ? 'task-overview.view' : key)),
+          [...(isBuiltInRole ? seedRole?.operationPermissions ?? [] : []), ...(role.operationPermissions ?? [])].map(key => (key === 'home.view' ? 'task-overview.view' : key)),
         ),
         dataPermissions: normalizeDataPermissions(isTenantAdmin ? allDataPermissions : role.dataPermissions),
       })

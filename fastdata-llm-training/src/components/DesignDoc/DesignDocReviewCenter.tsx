@@ -76,6 +76,7 @@ const PAGE_REVIEW_ORDER = [
   '/workspace',
   '/datasets',
   '/measurement',
+  '/file-management',
   '/inference',
   '/data-annotation',
   '/data-cleaning',

@@ -188,7 +188,37 @@ interface CreateFormValues {
 const datasetOptions = [
   { value: '训练数据集/roleBased-V5', label: '训练数据集/roleBased-V5' },
   { value: '训练数据集/小量训练数据-xjh-test-V3', label: '训练数据集/小量训练数据-xjh-test-V3' },
+  { value: '文件管理/默认文件夹/llm_sft_sample.jsonl', label: '文件管理/默认文件夹/llm_sft_sample.jsonl' },
+  { value: '文件管理/Notebook示例/knowledge_base.zip', label: '文件管理/Notebook示例/knowledge_base.zip' },
 ]
+
+type NotebookDatasetSourceType = '训练数据集' | '验证数据集' | '测试数据集' | '文件管理'
+
+type NotebookDatasetSourceOption = {
+  key: string
+  type: NotebookDatasetSourceType
+  name: string
+  version?: string
+  format: string
+  size: string
+  updatedAt: string
+}
+
+const notebookDatasetSourceOptions: NotebookDatasetSourceOption[] = [
+  { key: 'train-role-v5', type: '训练数据集', name: 'roleBased', version: 'V5', format: 'ROLE_BASED', size: '2,460 条', updatedAt: '2026/05/27 15:20:11' },
+  { key: 'train-small-v3', type: '训练数据集', name: '小量训练数据-xjh-test', version: 'V3', format: 'PROMPT_RESPONSE', size: '320 条', updatedAt: '2026/05/26 11:08:32' },
+  { key: 'val-dpo-v2', type: '验证数据集', name: 'DPO-Role-Based-验证集', version: 'V2', format: 'ROLE_BASED', size: '180 条', updatedAt: '2026/05/25 18:42:03' },
+  { key: 'test-mm-v1', type: '测试数据集', name: '图像理解测试集', version: 'V1', format: 'image_text_pair', size: '86 条', updatedAt: '2026/05/24 10:16:55' },
+  { key: 'file-sft-sample', type: '文件管理', name: '默认文件夹/llm_sft_sample.jsonl', format: 'JSONL', size: '18.4 MB', updatedAt: '2026/05/28 09:34:18' },
+  { key: 'file-rag-zip', type: '文件管理', name: 'Notebook示例/knowledge_base.zip', format: 'ZIP', size: '412 MB', updatedAt: '2026/05/28 14:02:41' },
+  { key: 'file-image-pack', type: '文件管理', name: '图像理解/vision_demo_images.zip', format: 'ZIP', size: '268 MB', updatedAt: '2026/05/27 19:20:36' },
+]
+
+function formatNotebookDatasetValue(option: NotebookDatasetSourceOption) {
+  return option.type === '文件管理'
+    ? `文件管理/${option.name}`
+    : `${option.type}/${option.name}-${option.version}`
+}
 
 const modelOptions = [
   { value: 'Qwen2.5-7B-Instruct', label: 'Qwen2.5-7B-Instruct' },
@@ -692,6 +722,8 @@ const OnlineNotebook: React.FC = () => {
   const [pythonVersionFilter, setPythonVersionFilter] = useState('python3.11')
   const [frameworkFilter, setFrameworkFilter] = useState('Pytorch 2.x')
   const [previewImageValue, setPreviewImageValue] = useState<string>()
+  const [datasetPickerOpen, setDatasetPickerOpen] = useState(false)
+  const [datasetSourceType, setDatasetSourceType] = useState<NotebookDatasetSourceType>('训练数据集')
   const isCreateRoute = location.pathname === '/finetune/notebooks/create'
   const isMirrorRoute = location.pathname === '/finetune/notebooks/mirror'
   const isEditRoute = /^\/finetune\/notebooks\/[^/]+\/edit$/.test(location.pathname)
@@ -750,6 +782,18 @@ const OnlineNotebook: React.FC = () => {
       },
     ],
     [onlineInferenceServices],
+  )
+  const datasetPickerRows = useMemo(
+    () => notebookDatasetSourceOptions.filter(item => item.type === datasetSourceType),
+    [datasetSourceType],
+  )
+  const datasetSourceTypeOptions = useMemo(
+    () =>
+      (['训练数据集', '验证数据集', '测试数据集', '文件管理'] as NotebookDatasetSourceType[]).map(type => ({
+        value: type,
+        label: `${type}（${notebookDatasetSourceOptions.filter(item => item.type === type).length}）`,
+      })),
+    [],
   )
 
   useEffect(() => {
@@ -1525,6 +1569,42 @@ const OnlineNotebook: React.FC = () => {
     message.success('镜像已选择')
   }
 
+  const selectNotebookDataset = (record: NotebookDatasetSourceOption) => {
+    form.setFieldValue('dataset', formatNotebookDatasetValue(record))
+    setDatasetPickerOpen(false)
+    message.success('数据已选择')
+  }
+
+  const notebookDatasetColumns: ColumnsType<NotebookDatasetSourceOption> = [
+    {
+      title: datasetSourceType === '文件管理' ? '文件路径' : '数据集名称',
+      dataIndex: 'name',
+      key: 'name',
+      render: (value, record) => (
+        <Space direction="vertical" size={2}>
+          <Text strong>{value}</Text>
+          <Space size={6}>
+            <Tag color={record.type === '文件管理' ? 'cyan' : 'blue'}>{record.type}</Tag>
+            {record.version ? <Tag>{record.version}</Tag> : null}
+          </Space>
+        </Space>
+      ),
+    },
+    { title: '格式', dataIndex: 'format', key: 'format', width: 140 },
+    { title: datasetSourceType === '文件管理' ? '文件大小' : '数据量', dataIndex: 'size', key: 'size', width: 140 },
+    { title: '更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 180 },
+    {
+      title: '操作',
+      key: 'action',
+      width: 100,
+      render: (_, record) => (
+        <Button type="link" onClick={() => selectNotebookDataset(record)}>
+          选择
+        </Button>
+      ),
+    },
+  ]
+
   const submitCreate = async () => {
     const values = await validateFieldsAndScroll<CreateFormValues>(form, message)
 
@@ -1854,7 +1934,7 @@ const OnlineNotebook: React.FC = () => {
                     <Form.Item name="dataset" noStyle>
                       <Select allowClear placeholder="请选择1-3个数据集（展开行勾选版本）" options={datasetOptions} style={{ width: 'calc(100% - 72px)' }} />
                     </Form.Item>
-                    <Button type="primary">选择</Button>
+                    <Button type="primary" onClick={() => setDatasetPickerOpen(true)}>选择</Button>
                   </Input.Group>
                 </Form.Item>
                 <Form.Item label="模型" name="model">
@@ -2100,6 +2180,55 @@ const OnlineNotebook: React.FC = () => {
             </div>
           </Form>
         </Card>
+
+        <Modal
+          title="选择数据"
+          open={datasetPickerOpen}
+          footer={null}
+          width={920}
+          onCancel={() => setDatasetPickerOpen(false)}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '220px minmax(0, 1fr)', gap: 20, minHeight: 430 }}>
+            <div style={{ borderRight: '1px solid #f1f5f9', paddingRight: 18 }}>
+              <Text strong style={{ display: 'block', marginBottom: 12 }}>
+                数据类型
+              </Text>
+              <Radio.Group
+                value={datasetSourceType}
+                onChange={event => setDatasetSourceType(event.target.value)}
+                style={{ width: '100%' }}
+              >
+                <Space direction="vertical" size={10} style={{ width: '100%' }}>
+                  {datasetSourceTypeOptions.map(option => (
+                    <Radio key={option.value} value={option.value}>
+                      {option.label}
+                    </Radio>
+                  ))}
+                </Space>
+              </Radio.Group>
+            </div>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <Space direction="vertical" size={2}>
+                  <Text strong>{datasetSourceType}</Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {datasetSourceType === '文件管理'
+                      ? '从文件管理选择项目文件，适合 Notebook 直接挂载或读取。'
+                      : '从已管理的数据集版本中选择 Notebook 输入数据。'}
+                  </Text>
+                </Space>
+                <Tag color={datasetSourceType === '文件管理' ? 'cyan' : 'blue'}>{datasetPickerRows.length} 项</Tag>
+              </div>
+              <Table
+                rowKey="key"
+                size="middle"
+                columns={notebookDatasetColumns}
+                dataSource={datasetPickerRows}
+                pagination={false}
+              />
+            </div>
+          </div>
+        </Modal>
 
         <Drawer
           title="镜像"

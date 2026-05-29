@@ -13,6 +13,7 @@ import OnlineNotebook from './pages/Training/OnlineNotebook'
 import ModelManagement from './pages/Training/ModelManagement'
 import TrainingDataset from './pages/Data/TrainingDataset'
 import TestDataset from './pages/Data/TestDataset'
+import FileManagement from './pages/Data/FileManagement'
 import InferenceResult from './pages/Data/InferenceResult'
 import DataAnnotation from './pages/Data/DataAnnotation'
 import DataCleaning from './pages/Data/DataCleaning'
@@ -65,6 +66,8 @@ const App: React.FC = () => {
               <Route path="/measurement/testing/create" element={<TestDataset />} />
               <Route path="/measurement/testing/:id/new-version" element={<TestDataset />} />
               <Route path="/measurement/testing/:id" element={<TestDataset />} />
+              <Route path="/file-management" element={<FileManagement />} />
+              <Route path="/file-management/:folderId" element={<FileManagement />} />
               <Route path="/inference" element={<InferenceResult />} />
               <Route path="/inference/create" element={<InferenceResult />} />
               <Route path="/inference/:id" element={<InferenceResult />} />
