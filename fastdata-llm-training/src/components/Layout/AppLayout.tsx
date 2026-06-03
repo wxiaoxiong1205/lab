@@ -158,6 +158,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
     return window.localStorage.getItem('design-doc-panel-open') === 'true'
   })
+  const [docPanelDisplayMode, setDocPanelDisplayMode] = useState<'side' | 'fullscreen'>('side')
   const [docScope, setDocScope] = useState<'page' | 'global'>('page')
   const [docTargetVersion, setDocTargetVersion] = useState<string | null>(null)
   const [currentPageHasReviewRequirements, setCurrentPageHasReviewRequirements] = useState(false)
@@ -300,6 +301,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     const params = new URLSearchParams(location.search)
     const shouldOpenDoc = params.get('docOpen') === '1'
     const versionName = params.get('docVersion')
+    const displayMode = params.get('docMode') === 'fullscreen' ? 'fullscreen' : 'side'
 
     if (versionName) {
       setDocTargetVersion(versionName)
@@ -309,6 +311,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
     if (shouldOpenDoc && !isDocsRoute && !isAnnotationWorkbenchRoute) {
       setDocPanelOpen(true)
+      setDocPanelDisplayMode(displayMode)
     }
   }, [isAnnotationWorkbenchRoute, isDocsRoute, location.pathname, location.search])
 
@@ -325,6 +328,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   useEffect(() => {
     if (isDocsRoute) {
       setDocPanelOpen(false)
+      setDocPanelDisplayMode('side')
     }
   }, [isDocsRoute])
 
@@ -335,12 +339,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   }, [navigate, shouldRedirectToWorkspace])
 
   const toggleDocPanel = () => {
-    setDocPanelOpen(previous => !previous)
+    setDocPanelOpen(previous => {
+      if (previous) {
+        setDocPanelDisplayMode('side')
+      }
+      return !previous
+    })
   }
 
   const openReviewDocPage = (pagePath: string, versionName: string) => {
     setDocTargetVersion(versionName)
     setDocPanelOpen(true)
+    setDocPanelDisplayMode('side')
 
     if (pagePath === GLOBAL_DESIGN_DOC_PATH) {
       setDocScope('global')
@@ -357,6 +367,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     if (!docPanelOpen) {
       setDocPanelOpen(true)
     }
+  }
+
+  const closeDocPanel = () => {
+    setDocPanelOpen(false)
+    setDocPanelDisplayMode('side')
   }
 
   const openStandaloneWindow = (path: string) => {
@@ -397,19 +412,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       : 'minmax(220px, 1fr) minmax(0, 760px) minmax(280px, 1fr)'
 
   const contentNode = routeAccess.allowed ? (
-    <div className={`app-shell ${docPanelOpen && !isDocsRoute && !isAnnotationWorkbenchRoute ? 'app-shell--doc-open' : ''}`}>
+    <div className={`app-shell ${docPanelOpen && !isDocsRoute && !isAnnotationWorkbenchRoute ? 'app-shell--doc-open' : ''} ${docPanelOpen && docPanelDisplayMode === 'fullscreen' ? 'app-shell--doc-fullscreen' : ''}`}>
       <div className="app-shell__main">{children}</div>
 
       {!isDocsRoute && !isAnnotationWorkbenchRoute && (
-        <div className={`app-shell__doc-rail ${docPanelOpen ? 'app-shell__doc-rail--open' : ''}`}>
+        <div className={`app-shell__doc-rail ${docPanelOpen ? 'app-shell__doc-rail--open' : ''} ${docPanelDisplayMode === 'fullscreen' ? 'app-shell__doc-rail--fullscreen' : ''}`}>
           <DesignDocPanel
             doc={activeDoc}
             open={docPanelOpen}
+            displayMode={docPanelDisplayMode}
+            onDisplayModeChange={setDocPanelDisplayMode}
             activeVersionName={docTargetVersion}
             onActiveVersionChange={setDocTargetVersion}
             docScope={effectiveDocScope}
             onDocScopeChange={useGlobalDocOnly ? undefined : handleDocScopeChange}
-            onClose={() => setDocPanelOpen(false)}
+            onClose={closeDocPanel}
           />
         </div>
       )}
@@ -785,7 +802,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               <DesignDocReviewCenter
                 selectedVersionName={docTargetVersion}
                 currentPagePath={useGlobalDocOnly ? GLOBAL_DESIGN_DOC_PATH : currentDoc.pagePath}
-                rightOffset={docPanelOpen ? 552 : 160}
+                rightOffset={docPanelOpen && docPanelDisplayMode === 'side' ? 552 : 160}
                 onVersionChange={setDocTargetVersion}
                 onOpenPage={openReviewDocPage}
                 onCurrentPageHasRequirementsChange={setCurrentPageHasReviewRequirements}
@@ -793,7 +810,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               <DesignDocFab
                 open={docPanelOpen}
                 onToggle={toggleDocPanel}
-                rightOffset={docPanelOpen ? 428 : 28}
+                rightOffset={docPanelOpen && docPanelDisplayMode === 'side' ? 428 : 28}
                 highlighted={currentPageHasReviewRequirements}
               />
             </>

@@ -5,6 +5,8 @@ import {
   CopyOutlined,
   DeleteOutlined,
   EditOutlined,
+  FullscreenExitOutlined,
+  FullscreenOutlined,
   HolderOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
@@ -35,6 +37,8 @@ interface DesignDocPanelProps {
   doc: PageDesignDoc
   open: boolean
   onClose: () => void
+  displayMode?: 'side' | 'fullscreen'
+  onDisplayModeChange?: (mode: 'side' | 'fullscreen') => void
   activeVersionName?: string | null
   onActiveVersionChange?: (versionName: string) => void
   docScope?: 'page' | 'global'
@@ -113,6 +117,8 @@ const DesignDocPanel: React.FC<DesignDocPanelProps> = ({
   doc,
   open,
   onClose,
+  displayMode = 'side',
+  onDisplayModeChange,
   activeVersionName,
   onActiveVersionChange,
   docScope = 'page',
@@ -383,8 +389,10 @@ const DesignDocPanel: React.FC<DesignDocPanelProps> = ({
     }
   }
 
+  const isFullscreen = displayMode === 'fullscreen'
+
   return (
-    <aside className={`design-doc-panel ${open ? 'design-doc-panel--open' : ''}`}>
+    <aside className={`design-doc-panel ${open ? 'design-doc-panel--open' : ''} ${isFullscreen ? 'design-doc-panel--fullscreen' : ''}`}>
       <div className="design-doc-panel__header">
         <div className="design-doc-panel__header-main">
           <div>
@@ -412,6 +420,16 @@ const DesignDocPanel: React.FC<DesignDocPanelProps> = ({
           <Button size="small" icon={<CopyOutlined />} onClick={handleCopy}>
             复制
           </Button>
+          {onDisplayModeChange ? (
+            <Button
+              size="small"
+              aria-label={isFullscreen ? '退出全屏' : '全屏展示'}
+              icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+              onClick={() => onDisplayModeChange(isFullscreen ? 'side' : 'fullscreen')}
+            >
+              {isFullscreen ? '退出全屏' : '全屏展示'}
+            </Button>
+          ) : null}
           <Button size="small" type="text" icon={<CloseOutlined />} onClick={onClose} />
         </Space>
       </div>
@@ -614,7 +632,7 @@ const DesignDocPanel: React.FC<DesignDocPanelProps> = ({
                               focusContentRef.current[note.id] = note.content
                             }
                           }}
-                          autoSize={{ minRows: 5, maxRows: 12 }}
+                          autoSize={{ minRows: isFullscreen ? 10 : 5, maxRows: isFullscreen ? 22 : 12 }}
                           placeholder="在这里记录当前页面的需求说明、字段调整、交互要求、补充说明等。"
                           className="design-doc-textarea"
                         />
