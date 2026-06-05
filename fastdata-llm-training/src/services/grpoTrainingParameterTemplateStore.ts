@@ -78,6 +78,143 @@ export const GRPO_TEMPLATE_PARAM_KEYS = [
 
 const STORAGE_KEY = 'lab-coding:grpo-training-parameter-templates:v1'
 
+function formatYamlScalar(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(item => String(item)).join(', ')}]`
+  }
+  if (typeof value === 'string') {
+    return /^[A-Za-z0-9_.-]+$/.test(value) ? value : JSON.stringify(value)
+  }
+  return String(value)
+}
+
+function parseYamlScalar(raw: string): unknown {
+  const value = raw.trim()
+  if (!value) return ''
+  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    return value.slice(1, -1)
+  }
+  if (value === 'true') return true
+  if (value === 'false') return false
+  if (value === 'null') return null
+  if (value.startsWith('[') && value.endsWith(']')) {
+    const inner = value.slice(1, -1).trim()
+    if (!inner) return []
+    return inner.split(',').map(item => parseYamlScalar(item.trim()))
+  }
+  const numberValue = Number(value)
+  if (value !== '' && Number.isFinite(numberValue)) return numberValue
+  return value
+}
+
+export function buildGrpoTemplateYaml(template: { fineTuneType: FineTuneType; params: Record<string, unknown> }): string {
+  const lines = [`fineTuneType: ${template.fineTuneType}`, 'params:']
+  for (const [key, value] of Object.entries(template.params)) {
+    if (Array.isArray(value)) {
+      lines.push(`  ${key}:`)
+      value.forEach(item => lines.push(`    - ${formatYamlScalar(item)}`))
+    } else {
+      lines.push(`  ${key}: ${formatYamlScalar(value)}`)
+    }
+  }
+  return lines.join('\n')
+}
+
+export function parseGrpoTemplateYaml(raw?: string): { fineTuneType: FineTuneType; params: GrpoTrainingParameterValues } {
+  const content = (raw ?? '').trim()
+  if (!content) {
+    throw new Error('模板内容不能为空')
+  }
+
+  if (content.startsWith('{')) {
+    const parsed = JSON.parse(content) as Record<string, unknown>
+    return normalizeGrpoTemplateContent(parsed)
+  }
+
+  const result: Record<string, unknown> = {}
+  const params: Record<string, unknown> = {}
+  let inParams = false
+  let currentArrayKey: string | null = null
+
+  for (const originalLine of content.split(/\r?\n/)) {
+    const lineWithoutComment = originalLine.replace(/\s+#.*$/, '')
+    if (!lineWithoutComment.trim()) continue
+
+    if (/^\S/.test(lineWithoutComment)) {
+      const [key, ...rest] = lineWithoutComment.split(':')
+      const trimmedKey = key.trim()
+      const rawValue = rest.join(':').trim()
+      if (trimmedKey === 'params') {
+        if (rawValue) throw new Error('params 必须使用缩进对象形式')
+        result.params = params
+        inParams = true
+        currentArrayKey = null
+        continue
+      }
+      result[trimmedKey] = parseYamlScalar(rawValue)
+      inParams = false
+      currentArrayKey = null
+      continue
+    }
+
+    if (!inParams) {
+      throw new Error('仅支持 fineTuneType 与 params 两个根字段')
+    }
+
+    const trimmed = lineWithoutComment.trim()
+    if (trimmed.startsWith('- ')) {
+      if (!currentArrayKey) {
+        throw new Error('数组项必须归属于 params 下的字段')
+      }
+      const current = Array.isArray(params[currentArrayKey]) ? params[currentArrayKey] as unknown[] : []
+      current.push(parseYamlScalar(trimmed.slice(2)))
+      params[currentArrayKey] = current
+      continue
+    }
+
+    const [key, ...rest] = trimmed.split(':')
+    const trimmedKey = key.trim()
+    const rawValue = rest.join(':').trim()
+    if (!rawValue) {
+      params[trimmedKey] = []
+      currentArrayKey = trimmedKey
+    } else {
+      params[trimmedKey] = parseYamlScalar(rawValue)
+      currentArrayKey = null
+    }
+  }
+
+  result.params = params
+  return normalizeGrpoTemplateContent(result)
+}
+
+function normalizeGrpoTemplateContent(parsed: Record<string, unknown>): { fineTuneType: FineTuneType; params: GrpoTrainingParameterValues } {
+  const invalidRootKeys = Object.keys(parsed).filter(key => key !== 'fineTuneType' && key !== 'params')
+  if (invalidRootKeys.length > 0) {
+    throw new Error(`不支持的根字段：${invalidRootKeys.join('、')}`)
+  }
+
+  if (parsed.fineTuneType !== 'full' && parsed.fineTuneType !== 'lora') {
+    throw new Error('fineTuneType 仅支持 full 或 lora')
+  }
+
+  if (!parsed.params || typeof parsed.params !== 'object' || Array.isArray(parsed.params)) {
+    throw new Error('params 必须是对象')
+  }
+
+  const params = parsed.params as Record<string, unknown>
+  const allowed = new Set<string>(GRPO_TEMPLATE_PARAM_KEYS)
+  const invalidParamKeys = Object.keys(params).filter(key => !allowed.has(key))
+  if (invalidParamKeys.length > 0) {
+    throw new Error(`不支持的训练参数字段：${invalidParamKeys.join('、')}`)
+  }
+
+  return {
+    fineTuneType: parsed.fineTuneType,
+    params: normalizeGrpoTemplateParams(params),
+  }
+}
+
 const commonParams: GrpoTrainingParameterValues = {
   learningRate: 0.00005,
   numEpochs: 3,

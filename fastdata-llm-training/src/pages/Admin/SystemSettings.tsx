@@ -84,7 +84,7 @@ const SystemSettings: React.FC = () => {
     const tab = new URLSearchParams(location.search).get('tab')
     if (tab === 'agent' || tab === 'grpoTemplates') {
       setActiveTab(tab)
-      setActiveGroup(tab === 'agent' ? '文档中心' : '模板管理')
+      setActiveGroup(tab === 'agent' ? '文档中心' : 'GRPO训练参数')
       setSearchValue('')
     }
   }, [location.search])
@@ -247,7 +247,7 @@ const SystemSettings: React.FC = () => {
     : activeTab === 'labels'
       ? labelMenu
       : activeTab === 'grpoTemplates'
-        ? [{ group: '', items: ['模板管理'] }]
+        ? [{ group: '', items: ['GRPO训练参数'] }]
         : [{ group: '', items: ['文档中心'] }]
 
   return (
@@ -267,14 +267,14 @@ const SystemSettings: React.FC = () => {
                   : key === 'labels'
                     ? '自定义镜像'
                     : key === 'grpoTemplates'
-                      ? '模板管理'
+                      ? 'GRPO训练参数'
                       : '文档中心',
               )
             }}
             items={[
               { key: 'attributes', label: '属性配置' },
               { key: 'labels', label: '标签配置' },
-              { key: 'grpoTemplates', label: 'GRPO训练参数配置' },
+              { key: 'grpoTemplates', label: '模板管理' },
               { key: 'agent', label: 'Agent助手' },
             ]}
           />

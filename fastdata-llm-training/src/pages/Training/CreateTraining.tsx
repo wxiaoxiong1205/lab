@@ -43,8 +43,8 @@ import { trainedModels } from '../../data/mockData'
 import { getTrainingTypeFromModel, isQwenProvider, loadBaseModelCatalog } from '../../data/modelCatalog'
 import { useTrainingTasks } from '../../services/trainingTaskStore'
 import {
-  GRPO_TEMPLATE_PARAM_KEYS,
-  normalizeGrpoTemplateParams,
+  buildGrpoTemplateYaml,
+  parseGrpoTemplateYaml,
   useGrpoTrainingParameterTemplates,
   type GrpoTrainingParameterTemplate,
 } from '../../services/grpoTrainingParameterTemplateStore'
@@ -145,38 +145,11 @@ function scheduleTimeToPickerValue(raw?: string) {
 const { TextArea } = Input
 
 function buildGrpoTemplateContent(template: { fineTuneType: FineTuneType; params: Record<string, unknown> }) {
-  return JSON.stringify(
-    {
-      fineTuneType: template.fineTuneType,
-      params: template.params,
-    },
-    null,
-    2,
-  )
+  return buildGrpoTemplateYaml(template)
 }
 
 function parseGrpoTemplateContent(raw?: string): { fineTuneType: FineTuneType; params: Record<string, unknown> } {
-  const parsed = JSON.parse(raw || '{}') as Record<string, unknown>
-  const invalidRootKeys = Object.keys(parsed).filter(key => key !== 'fineTuneType' && key !== 'params')
-  if (invalidRootKeys.length > 0) {
-    throw new Error(`不支持的根字段：${invalidRootKeys.join('、')}`)
-  }
-  if (parsed.fineTuneType !== 'full' && parsed.fineTuneType !== 'lora') {
-    throw new Error('fineTuneType 仅支持 full 或 lora')
-  }
-  if (!parsed.params || typeof parsed.params !== 'object' || Array.isArray(parsed.params)) {
-    throw new Error('params 必须是对象')
-  }
-  const params = parsed.params as Record<string, unknown>
-  const allowed = new Set<string>(GRPO_TEMPLATE_PARAM_KEYS)
-  const invalidParamKeys = Object.keys(params).filter(key => !allowed.has(key))
-  if (invalidParamKeys.length > 0) {
-    throw new Error(`不支持的训练参数字段：${invalidParamKeys.join('、')}`)
-  }
-  return {
-    fineTuneType: parsed.fineTuneType,
-    params: normalizeGrpoTemplateParams(params),
-  }
+  return parseGrpoTemplateYaml(raw)
 }
 
 /** 微调类型：与 Form 联动，切换时回到基础参数 Tab */
@@ -805,7 +778,7 @@ const GrpoTrainingParameterTemplateField: React.FC<{
       ...template.params,
     })
     onApplied()
-    message.success('已应用GRPO训练参数配置，可继续调整本次训练参数')
+    message.success('已应用模板管理，可继续调整本次训练参数')
   }
 
   return (
@@ -814,13 +787,13 @@ const GrpoTrainingParameterTemplateField: React.FC<{
         <Input />
       </Form.Item>
       <Form.Item
-        label="GRPO训练参数配置"
+        label="模板管理"
         name="grpoTemplateId"
-        rules={[{ required: true, message: '请选择GRPO训练参数配置' }]}
+        rules={[{ required: true, message: '请选择模板管理' }]}
         tooltip="选择一套 GRPO 训练参数模板，并可在本次任务中继续编辑模板内容。"
       >
         <Select
-          placeholder="请选择GRPO训练参数配置"
+          placeholder="请选择模板管理"
           onChange={applyTemplate}
           options={templates.map(template => ({
             value: template.id,
@@ -835,7 +808,7 @@ const GrpoTrainingParameterTemplateField: React.FC<{
           label="参数模板"
           name="grpoTemplateContent"
           rules={[
-            { required: true, message: '请填写GRPO训练参数配置模板' },
+            { required: true, message: '请填写模板内容' },
             {
               validator: async (_, value) => {
                 try {
@@ -870,6 +843,88 @@ const GrpoTrainingParameterTemplateField: React.FC<{
     </div>
   )
 }
+
+type GrpoResourceStage = 'hand' | 'work' | 'submit'
+
+const resourceStageLabels: Record<GrpoResourceStage, string> = {
+  hand: 'Hand',
+  work: 'Work',
+  submit: 'Submit',
+}
+
+const ComputeResourceFields: React.FC<{
+  namePrefix?: (string | number)[]
+  includeGpu?: boolean
+  required?: boolean
+}> = ({ namePrefix = [], includeGpu = true, required = false }) => {
+  const fieldName = (name: string) => [...namePrefix, name]
+  const requiredRule = (message: string) => required ? [{ required: true, message }] : undefined
+
+  return (
+    <>
+      {includeGpu && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>
+          <Form.Item label="显卡类型及型号" name={fieldName('gpuType')} rules={requiredRule('请选择显卡类型及型号')}>
+            <Select placeholder="请选择显卡类型及型号">
+              <Select.Option value="A100">NVIDIA A100</Select.Option>
+              <Select.Option value="V100">NVIDIA V100</Select.Option>
+              <Select.Option value="T4">NVIDIA T4</Select.Option>
+              <Select.Option value="H100">NVIDIA H100</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item label="显卡卡数配置" name={fieldName('gpuCount')} rules={requiredRule('请选择显卡数量')}>
+            <Select placeholder="请选择显卡数量">
+              <Select.Option value={1}>1卡</Select.Option>
+              <Select.Option value={2}>2卡</Select.Option>
+              <Select.Option value={4}>4卡</Select.Option>
+              <Select.Option value={8}>8卡</Select.Option>
+            </Select>
+          </Form.Item>
+        </div>
+      )}
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 16,
+        marginTop: includeGpu ? 20 : 0,
+        padding: 20,
+        background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.03) 0%, rgba(99, 102, 241, 0.03) 100%)',
+        borderRadius: 12,
+        border: '1px solid #e2e8f0',
+      }}>
+        <Form.Item label="CPU请求" name={fieldName('cpuRequest')} style={{ marginBottom: 0 }} rules={requiredRule('请输入CPU请求')}>
+          <InputNumber style={{ width: '100%' }} min={1} addonAfter="Core" placeholder="如: 8" />
+        </Form.Item>
+        <Form.Item label="CPU限制" name={fieldName('cpuLimit')} style={{ marginBottom: 0 }} rules={requiredRule('请输入CPU限制')}>
+          <InputNumber style={{ width: '100%' }} min={1} addonAfter="Core" placeholder="如: 16" />
+        </Form.Item>
+        <Form.Item label="内存请求" name={fieldName('memoryRequest')} style={{ marginBottom: 0 }} rules={requiredRule('请输入内存请求')}>
+          <InputNumber style={{ width: '100%' }} min={1} addonAfter="GB" placeholder="如: 32" />
+        </Form.Item>
+        <Form.Item label="内存限制" name={fieldName('memoryLimit')} style={{ marginBottom: 0 }} rules={requiredRule('请输入内存限制')}>
+          <InputNumber style={{ width: '100%' }} min={1} addonAfter="GB" placeholder="如: 64" />
+        </Form.Item>
+      </div>
+    </>
+  )
+}
+
+const GrpoResourceConfigTabs: React.FC = () => (
+  <Tabs
+    items={(Object.keys(resourceStageLabels) as GrpoResourceStage[]).map(stage => ({
+      key: stage,
+      label: resourceStageLabels[stage],
+      children: (
+        <ComputeResourceFields
+          namePrefix={['grpoResourceConfig', stage]}
+          includeGpu={stage !== 'submit'}
+          required
+        />
+      ),
+    }))}
+  />
+)
 
 type TrainingDatasetRow = {
   key: string
@@ -1087,6 +1142,7 @@ function mapVersionToFormValues(
     baseModel: baseModelId,
     trainedModelId: version.modelSource === 'trained' ? version.baseModel : undefined,
     rewardModelId: undefined,
+    rftAlgorithm: version.trainingMethod === 'RFT' ? 'GRPO' : undefined,
     scheduleEnabled: Boolean(version.scheduleTime),
     taskSchedule: scheduleTimeToPickerValue(version.scheduleTime),
     learningRate: c.learningRate,
@@ -1128,6 +1184,7 @@ function mapVersionToFormValues(
     cpuLimit: c.cpuLimit,
     memoryRequest: c.memoryRequest,
     memoryLimit: c.memoryLimit,
+    grpoResourceConfig: c.grpoResourceConfig,
   }
 }
 
@@ -1198,6 +1255,7 @@ const CreateTraining: React.FC = () => {
         ...mapped,
         trainingType: parentTask.trainingType ?? 'text',
         trainingMethod: sourceVersion.trainingMethod,
+        rftAlgorithm: sourceVersion.trainingMethod === 'RFT' ? 'GRPO' : undefined,
         taskVersion: sourceVersion.version,
       }
     }
@@ -1226,7 +1284,7 @@ const CreateTraining: React.FC = () => {
   const enabledGrpoTemplates = useMemo(() => grpoTemplates.filter(template => template.enabled), [grpoTemplates])
 
   useEffect(() => {
-    if (trainingMethod === 'RFT' && rftAlgorithm === 'PPO') {
+    if (trainingMethod === 'RFT' && rftAlgorithm !== 'GRPO') {
       form.setFieldValue('rftAlgorithm', 'GRPO')
     }
   }, [form, trainingMethod, rftAlgorithm])
@@ -2120,49 +2178,11 @@ const CreateTraining: React.FC = () => {
           }}
           styles={{ body: { padding: '24px' } }}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>
-            <Form.Item label="显卡类型及型号" name="gpuType">
-              <Select placeholder="请选择显卡类型及型号">
-                <Select.Option value="A100">NVIDIA A100</Select.Option>
-                <Select.Option value="V100">NVIDIA V100</Select.Option>
-                <Select.Option value="T4">NVIDIA T4</Select.Option>
-                <Select.Option value="H100">NVIDIA H100</Select.Option>
-              </Select>
-            </Form.Item>
-            <Form.Item label="显卡卡数配置" name="gpuCount">
-              <Select placeholder="请选择显卡数量">
-                <Select.Option value={1}>1卡</Select.Option>
-                <Select.Option value={2}>2卡</Select.Option>
-                <Select.Option value={4}>4卡</Select.Option>
-                <Select.Option value={8}>8卡</Select.Option>
-              </Select>
-            </Form.Item>
-          </div>
-
-          {/* GPU 资源配置卡片 */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: 16,
-            marginTop: 20,
-            padding: 20,
-            background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.03) 0%, rgba(99, 102, 241, 0.03) 100%)',
-            borderRadius: 12,
-            border: '1px solid #e2e8f0',
-          }}>
-            <Form.Item label="CPU请求" name="cpuRequest" style={{ marginBottom: 0 }}>
-              <InputNumber style={{ width: '100%' }} min={1} addonAfter="Core" placeholder="如: 8" />
-            </Form.Item>
-            <Form.Item label="CPU限制" name="cpuLimit" style={{ marginBottom: 0 }}>
-              <InputNumber style={{ width: '100%' }} min={1} addonAfter="Core" placeholder="如: 16" />
-            </Form.Item>
-            <Form.Item label="内存请求" name="memoryRequest" style={{ marginBottom: 0 }}>
-              <InputNumber style={{ width: '100%' }} min={1} addonAfter="GB" placeholder="如: 32" />
-            </Form.Item>
-            <Form.Item label="内存限制" name="memoryLimit" style={{ marginBottom: 0 }}>
-              <InputNumber style={{ width: '100%' }} min={1} addonAfter="GB" placeholder="如: 64" />
-            </Form.Item>
-          </div>
+          {isGrpoTraining ? (
+            <GrpoResourceConfigTabs />
+          ) : (
+            <ComputeResourceFields />
+          )}
         </Card>
 
         {/* 操作按钮（避免 opacity:0 动画未完成时影响点击与可见性） */}

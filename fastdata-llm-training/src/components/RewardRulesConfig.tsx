@@ -4,21 +4,21 @@ import {
   Form,
   Typography,
   Space,
-  Divider,
   Alert,
-  Tabs,
+  Button,
 } from 'antd'
 import {
   SafetyCertificateOutlined,
   CodeOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import type { RewardRuleType } from '../types/training'
 import ResumableUpload from './ResumableUpload'
 
-const { Text, Paragraph } = Typography
+const { Text } = Typography
 
 /** 预设奖励规则列表 */
 const PRESET_RULES: Array<{
@@ -59,7 +59,7 @@ const PRESET_RULES: Array<{
   },
 ]
 
-/** 自定义代码模板（参考千帆平台格式） */
+/** 自定义奖励函数参考模板 */
 const CUSTOM_CODE_TEMPLATE = `import torch
 import os
 
@@ -114,6 +114,22 @@ const RewardRulesConfig: React.FC<RewardRulesConfigProps> = ({ value, onChange }
     const nextFile = file ?? undefined
     setCustomFile(nextFile)
     onChange?.({ type: ruleType, customFile: nextFile })
+  }
+
+  const handleDownloadTemplate = () => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const blob = new Blob([CUSTOM_CODE_TEMPLATE], { type: 'text/x-python;charset=utf-8' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'grpo-custom-reward-template.py'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
   }
 
   return (
@@ -201,33 +217,29 @@ const RewardRulesConfig: React.FC<RewardRulesConfigProps> = ({ value, onChange }
                   onChange={handleCustomFileChange}
                 />
 
-                {/* 代码模板展示 */}
-                <Tabs
-                  size="small"
-                  style={{ marginTop: 12 }}
-                  items={[{
-                    key: 'template',
-                    label: '参考模板',
-                    children: (
-                      <pre
-                        style={{
-                          background: '#0f172a',
-                          borderRadius: 8,
-                          padding: '12px 16px',
-                          fontSize: 11,
-                          color: '#a5f3fc',
-                          fontFamily: 'monospace',
-                          lineHeight: 1.7,
-                          overflowX: 'auto',
-                          maxHeight: 280,
-                          overflowY: 'auto',
-                        }}
-                      >
-                        {CUSTOM_CODE_TEMPLATE}
-                      </pre>
-                    ),
-                  }]}
-                />
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: '12px 14px',
+                    borderRadius: 10,
+                    border: '1px solid #dbeafe',
+                    background: '#f8fbff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                  }}
+                >
+                  <Space direction="vertical" size={2}>
+                    <Text strong style={{ color: '#0f172a' }}>参考模板</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      下载 Python 模板文件后补充奖励逻辑，再上传为本次任务的自定义奖励函数。
+                    </Text>
+                  </Space>
+                  <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate}>
+                    下载模板
+                  </Button>
+                </div>
               </div>
             )}
           </Card>

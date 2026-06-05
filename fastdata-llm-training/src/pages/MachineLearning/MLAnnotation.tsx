@@ -43,7 +43,6 @@ import {
   RightOutlined,
   SendOutlined,
   SettingOutlined,
-  StopOutlined,
   TagsOutlined,
   TeamOutlined,
   ZoomInOutlined,
@@ -241,6 +240,19 @@ const onlineRecords: MLAnnotationRecord[] = [
     createdAt: '2026-04-09 10:08:12',
     status: '未发布',
   },
+  {
+    id: '10',
+    name: '回形零件-带孔实例分割标注',
+    dataType: '图片',
+    annotationType: '图像分割',
+    count: 12,
+    progress: 25,
+    preDataset: '图像分割/回形零件-带孔实例分割-V1',
+    postDataset: '-',
+    creator: 'lab1',
+    createdAt: '2026-05-29 10:20:00',
+    status: '未发布',
+  },
 ]
 
 const multiRecords: MultiAnnotationRecord[] = [
@@ -334,6 +346,21 @@ const multiRecords: MultiAnnotationRecord[] = [
     annotators: ['lab1', 'lab5'],
     reviewers: ['admin'],
   },
+  {
+    id: 'multi-7',
+    name: '回形零件带孔实例分割多人标注',
+    annotationType: '图像分割',
+    count: 12,
+    status: '未发布',
+    annotationProgress: 25,
+    reviewProgress: 0,
+    creator: 'lab1',
+    createdAt: '2026-05-29 10:28:00',
+    dataset: '图像分割/回形零件-带孔实例分割-V1',
+    outputDataset: '图像分割/回形零件-带孔实例分割-V2',
+    annotators: ['lab1', 'lab2'],
+    reviewers: ['admin'],
+  },
 ]
 
 const annotationAssignments: AssignmentRecord[] = [
@@ -406,6 +433,20 @@ const annotationAssignments: AssignmentRecord[] = [
     createdAt: '2026-04-16 09:12:36',
     deadline: '2026-04-22 18:00:00',
     status: '已完成',
+  },
+  {
+    id: 'a6',
+    taskName: '回形零件带孔实例分割多人标注',
+    member: 'wangwu',
+    annotationType: '图像分割',
+    amount: 6,
+    completed: 2,
+    preDataset: '图像分割/回形零件-带孔实例分割-V1',
+    postDataset: '图像分割/回形零件-带孔实例分割-V2',
+    creator: 'lab1',
+    createdAt: '2026-05-29 10:28:00',
+    deadline: '2026-06-02 18:00:00',
+    status: '进行中',
   },
 ]
 
@@ -488,20 +529,31 @@ const workbenchSamples: WorkbenchSample[] = [
   { id: 'sample-3', title: '样本 003', content: '图片主体存在遮挡，建议审核时重点检查标注边界和标签一致性。', label: '待复核', status: '已完成' },
 ]
 
-type WorkbenchKind = 'text-classification' | 'entity' | 'image-classification' | 'object-detection' | 'image-segmentation'
+type WorkbenchKind = 'text-classification' | 'entity' | 'image-classification' | 'object-detection' | 'image-segmentation' | 'ring-segmentation'
 
 type DetectionBox = { id: string; label: string; x: number; y: number; width: number; height: number }
 
 type SegmentationRegion = { id: string; label: string; points: string; color: string }
 
+type RingMaskInstance = {
+  id: string
+  label: string
+  color: string
+  outer: { x: number; y: number; width: number; height: number }
+  holes: Array<{ id: string; x: number; y: number; width: number; height: number }>
+  rle: { type: 'rle'; size: [number, number]; counts: number[] }
+}
+
 type LabelItem = { name: string; color: string; classId?: string }
 
 type EntityMark = { id: string; text: string; label: string; range: string; color: string }
+type CanvasTool = 'select' | 'rect' | 'polygon' | 'drag'
 
 const datasetOptions = [
   { value: 'image-multi-v2', label: '图像分类/Phoena-图像分类-单图多标签-有标注-V2', dataType: '图片', annotationType: '图像分类', count: 13, output: '图像分类/Phoena-图像分类-单图多标签-有标注-V3', publishStatus: '已发布' },
   { value: 'image-single-v1', label: '图像分类/Phoena-图像分类-单图单标签-无标注-V1', dataType: '图片', annotationType: '图像分类', count: 21, output: '图像分类/Phoena-图像分类-单图单标签-有标注-V2', publishStatus: '未发布' },
   { value: 'object-detection-v1', label: '物体检测/货架商品框选-无标注-V1', dataType: '图片', annotationType: '物体检测', count: 48, output: '物体检测/货架商品框选-有标注-V2', publishStatus: '已发布' },
+  { value: 'ring-segmentation-v1', label: '图像分割/回形零件-带孔实例分割-V1', dataType: '图片', annotationType: '图像分割', count: 12, output: '图像分割/回形零件-带孔实例分割-V2', publishStatus: '已发布' },
   { value: 'defect-image-v1', label: '图像分类/设备缺陷多标签-无标注-V1', dataType: '图片', annotationType: '图像分类', count: 52, output: '图像分类/设备缺陷多标签-有标注-V2', publishStatus: '已发布' },
   { value: 'text-single-v1', label: '文本分类/Phoena-文本分类-文本单标签-无标注-V1', dataType: '文本', annotationType: '文本分类', count: 10, output: '文本分类/Phoena-文本分类-文本单标签-有标注-V2', publishStatus: '已发布' },
   { value: 'text-multi-v1', label: '文本分类/Phoena-文本分类-文本多标签-无标注-V1', dataType: '文本', annotationType: '文本分类', count: 10, output: '文本分类/Phoena-文本分类-文本多标签-有标注-V2', publishStatus: '已发布' },
@@ -555,6 +607,7 @@ const tableContainerStyle: React.CSSProperties = {
   overflowX: 'auto',
   WebkitOverflowScrolling: 'touch',
 }
+const annotationWorkbenchMinWidth = 1080
 
 const palette = ['#bf6a2a', '#2dd4a3', '#d63ae0', '#84cc16', '#2f7fd8', '#e2435f', '#1fc547']
 const textClassificationLabels: LabelItem[] = [
@@ -594,8 +647,15 @@ const segmentationLabelItems: LabelItem[] = [
   { name: 'road_sign', color: '#84cc16', classId: 'class_id=3' },
   { name: 'background', color: '#2f7fd8', classId: 'class_id=4' },
 ]
+const ringSegmentationLabelItems: LabelItem[] = [
+  { name: '外壳', color: '#2dd4a3', classId: 'class_id=1' },
+  { name: '垫片', color: '#d63ae0', classId: 'class_id=2' },
+  { name: '边框', color: '#f97316', classId: 'class_id=3' },
+]
 
 function getAnnotationWorkbenchKind(record: { annotationType: string; name?: string; taskName?: string }): WorkbenchKind {
+  const keyword = `${record.name ?? ''}${record.taskName ?? ''}`
+  if (record.annotationType === '图像分割' && /回形|回型|带孔|RLE/i.test(keyword)) return 'ring-segmentation'
   if (record.annotationType === '实体识别') return 'entity'
   if (record.annotationType === '图像分类') return 'image-classification'
   if (record.annotationType === '物体检测') return 'object-detection'
@@ -608,6 +668,7 @@ function getDefaultWorkbenchLabels(kind: WorkbenchKind): LabelItem[] {
   if (kind === 'image-classification') return imageClassificationLabels
   if (kind === 'object-detection') return detectionLabelItems
   if (kind === 'image-segmentation') return segmentationLabelItems
+  if (kind === 'ring-segmentation') return ringSegmentationLabelItems
   return textClassificationLabels
 }
 
@@ -644,6 +705,11 @@ function buildWorkbenchSamples(kind: WorkbenchKind, total: number, progress = 0,
       '建筑与路面交界较清晰，适合多边形区域标注。',
       '天空、道路和标识牌需要分别形成分割区域。',
     ],
+    'ring-segmentation': [
+      '回形零件需要先框选外圈，再扣除中间孔洞，最终保留外圈实例区域。',
+      '垫片样本包含多个内孔，需要通过减区域形成带孔 mask。',
+      '金属边框中间区域是背景，不应计入实例 mask 面积。',
+    ],
   }
   const labelByKind: Record<WorkbenchKind, string[]> = {
     'text-classification': ['科技', '财经', '体育'],
@@ -651,6 +717,7 @@ function buildWorkbenchSamples(kind: WorkbenchKind, total: number, progress = 0,
     'image-classification': ['Build_Your_Dream', 'SUV', 'Audi'],
     'object-detection': ['食品', '人物', '动物'],
     'image-segmentation': ['road_sign', 'background', 'road_sign'],
+    'ring-segmentation': ['外壳', '垫片', '边框'],
   }
 
   return Array.from({ length: safeTotal }, (_, index) => {
@@ -730,8 +797,23 @@ const MLAnnotation: React.FC = () => {
     { id: 'seg-2', label: '建筑', points: '18,16 56,10 62,48 22,54', color: 'rgba(245, 158, 11, 0.46)' },
   ])
   const [activeSegmentationRegionId, setActiveSegmentationRegionId] = useState('seg-1')
+  const [ringMaskInstances, setRingMaskInstances] = useState<RingMaskInstance[]>([
+    {
+      id: 'ring-1',
+      label: '外壳',
+      color: 'rgba(45, 212, 163, 0.42)',
+      outer: { x: 18, y: 18, width: 58, height: 48 },
+      holes: [{ id: 'hole-1', x: 38, y: 32, width: 20, height: 18 }],
+      rle: { type: 'rle', size: [480, 640], counts: [0, 6144, 960, 1280, 420] },
+    },
+  ])
+  const [activeRingMaskId, setActiveRingMaskId] = useState('ring-1')
+  const [ringDraftOuter, setRingDraftOuter] = useState<RingMaskInstance['outer'] | null>(null)
+  const [ringDraftHoles, setRingDraftHoles] = useState<RingMaskInstance['holes']>([])
   const [entityMarks, setEntityMarks] = useState<EntityMark[]>(defaultEntityMarks)
   const [activeEntityId, setActiveEntityId] = useState(defaultEntityMarks[2].id)
+  const [activeCanvasTool, setActiveCanvasTool] = useState<CanvasTool>('select')
+  const [imageZoom, setImageZoom] = useState(100)
   const [customLabels, setCustomLabels] = useState<Partial<Record<WorkbenchKind, LabelItem[]>>>({})
   const [selectedLabelName, setSelectedLabelName] = useState<string>('科技')
   const [labelSearchValue, setLabelSearchValue] = useState('')
@@ -812,8 +894,23 @@ const MLAnnotation: React.FC = () => {
         { id: 'seg-2', label: '建筑', points: '18,16 56,10 62,48 22,54', color: 'rgba(245, 158, 11, 0.46)' },
       ])
       setActiveSegmentationRegionId('seg-1')
+      setRingMaskInstances([
+        {
+          id: 'ring-1',
+          label: '外壳',
+          color: 'rgba(45, 212, 163, 0.42)',
+          outer: { x: 18, y: 18, width: 58, height: 48 },
+          holes: [{ id: 'hole-1', x: 38, y: 32, width: 20, height: 18 }],
+          rle: { type: 'rle', size: [480, 640], counts: [0, 6144, 960, 1280, 420] },
+        },
+      ])
+      setActiveRingMaskId('ring-1')
+      setRingDraftOuter(null)
+      setRingDraftHoles([])
       setEntityMarks(defaultEntityMarks)
       setActiveEntityId(defaultEntityMarks[2].id)
+      setActiveCanvasTool(kind === 'object-detection' ? 'rect' : kind === 'image-segmentation' || kind === 'ring-segmentation' ? 'polygon' : 'select')
+      setImageZoom(100)
       setSelectedLabelName(getDefaultWorkbenchLabels(kind)[0]?.name ?? '')
     }
   }, [currentOnlineTask, currentWorkbenchAssignment, onlineTaskId, workbenchId, workbenchMode])
@@ -1272,12 +1369,39 @@ const MLAnnotation: React.FC = () => {
     updateActiveSampleLabels(label)
   }
 
+  function updateActiveRingMaskLabel(label: string) {
+    setSelectedLabelName(label)
+    setRingMaskInstances(previous => previous.map(instance => (
+      instance.id === activeRingMaskId ? { ...instance, label } : instance
+    )))
+    updateActiveSampleLabels(label)
+  }
+
   function updateActiveEntityLabel(label: LabelItem) {
     setSelectedLabelName(label.name)
     setEntityMarks(previous => previous.map(entity => (
       entity.id === activeEntityId ? { ...entity, label: label.name, color: label.color } : entity
     )))
     updateActiveSampleLabels(label.name)
+  }
+
+  function addEntityMark() {
+    const labels = getCurrentLabels('entity')
+    const label = labels.find(item => item.name === selectedLabelName) ?? labels[0]
+    const content = activeSample?.content ?? ''
+    const start = Math.min(6 + entityMarks.length * 3, Math.max(0, content.length - 4))
+    const text = content.slice(start, Math.min(content.length, start + 4)) || '新实体'
+    const next: EntityMark = {
+      id: `entity-${Date.now()}`,
+      text,
+      label: label?.name ?? '实体',
+      range: `[${start}, ${start + text.length}]`,
+      color: label?.color ?? '#2f7fd8',
+    }
+    setEntityMarks(previous => [...previous, next])
+    setActiveEntityId(next.id)
+    updateActiveSampleLabels(next.label)
+    message.success('已新增实体标注')
   }
 
   function deleteActiveEntity() {
@@ -1289,6 +1413,21 @@ const MLAnnotation: React.FC = () => {
     })
     markActiveSampleInProgress()
     message.success('已删除当前选中实体')
+  }
+
+  function activateCanvasTool(tool: CanvasTool) {
+    setActiveCanvasTool(tool)
+    const toolText: Record<CanvasTool, string> = {
+      select: '选择工具',
+      rect: '矩形框工具',
+      polygon: '多边形工具',
+      drag: '拖拽平移工具',
+    }
+    message.info(`已切换为${toolText[tool]}`)
+  }
+
+  function changeImageZoom(delta: number) {
+    setImageZoom(previous => Math.min(200, Math.max(40, previous + delta)))
   }
 
   function updateReviewResult(patch: Partial<ReviewResult>) {
@@ -1355,6 +1494,10 @@ const MLAnnotation: React.FC = () => {
     }
     if (kind === 'image-segmentation' && activeSegmentationRegionId) {
       updateActiveSegmentationLabel(label.name)
+      return
+    }
+    if (kind === 'ring-segmentation' && activeRingMaskId) {
+      updateActiveRingMaskLabel(label.name)
       return
     }
     if (kind === 'entity' && activeEntityId) {
@@ -1558,7 +1701,9 @@ const MLAnnotation: React.FC = () => {
           ? detectionBoxes.map(box => box.label).filter(Boolean)
           : kind === 'image-segmentation'
             ? segmentationRegions.map(region => region.label).filter(Boolean)
-            : (sampleLabelResults[activeSample.id] ?? [])
+            : kind === 'ring-segmentation'
+              ? ringMaskInstances.map(instance => instance.label).filter(Boolean)
+              : (sampleLabelResults[activeSample.id] ?? [])
     const nextLabels = Array.from(new Set(labelsByKind))
     if (!nextLabels.length) {
       message.warning('请先完成当前数据的标注结果')
@@ -1659,6 +1804,83 @@ const MLAnnotation: React.FC = () => {
     message.success('已删除当前分割区域')
   }
 
+  function addRingOuter() {
+    const offset = ringMaskInstances.length * 4 + ringDraftHoles.length * 2
+    setRingDraftOuter({ x: 18 + offset, y: 18 + offset / 2, width: 58, height: 48 })
+    setActiveCanvasTool('polygon')
+    markActiveSampleInProgress()
+    message.success('已添加外圈区域')
+  }
+
+  function subtractRingHole() {
+    const activeInstance = ringMaskInstances.find(instance => instance.id === activeRingMaskId)
+    const baseOuter = ringDraftOuter ?? activeInstance?.outer
+    if (!baseOuter) {
+      message.warning('请先添加外圈区域，再扣除孔洞')
+      return
+    }
+    const index = ringDraftOuter ? ringDraftHoles.length : activeInstance?.holes.length ?? 0
+    const nextHole = {
+      id: `hole-${Date.now()}`,
+      x: baseOuter.x + 18 + index * 8,
+      y: baseOuter.y + 14 + index * 5,
+      width: 18,
+      height: 16,
+    }
+    if (ringDraftOuter) {
+      setRingDraftHoles(previous => [...previous, nextHole])
+    } else if (activeInstance) {
+      setRingMaskInstances(previous => previous.map(instance => (
+        instance.id === activeInstance.id
+          ? { ...instance, holes: [...instance.holes, nextHole], rle: { ...instance.rle, counts: [...instance.rle.counts, 320] } }
+          : instance
+      )))
+      updateActiveSampleLabels(activeInstance.label)
+    }
+    markActiveSampleInProgress()
+    message.success('已扣除孔洞')
+  }
+
+  function confirmRingInstance() {
+    if (!ringDraftOuter) {
+      message.warning('请先添加外圈区域')
+      return
+    }
+    const index = ringMaskInstances.length + 1
+    const label = selectedLabelName || ringSegmentationLabelItems[0].name
+    const next: RingMaskInstance = {
+      id: `ring-${Date.now()}`,
+      label,
+      color: palette[index % palette.length] ? `${palette[index % palette.length]}66` : 'rgba(45, 212, 163, 0.42)',
+      outer: ringDraftOuter,
+      holes: ringDraftHoles,
+      rle: {
+        type: 'rle',
+        size: [480, 640],
+        counts: [0, Math.round(ringDraftOuter.width * 120), Math.round(ringDraftOuter.height * 60), ringDraftHoles.length * 320],
+      },
+    }
+    setRingMaskInstances(previous => [...previous, next])
+    setActiveRingMaskId(next.id)
+    setRingDraftOuter(null)
+    setRingDraftHoles([])
+    updateActiveSampleLabels(label)
+    message.success('已确认带孔实例')
+  }
+
+  function deleteActiveRingInstance() {
+    if (!activeRingMaskId) return
+    const nextInstances = ringMaskInstances.filter(instance => instance.id !== activeRingMaskId)
+    setRingMaskInstances(nextInstances)
+    setActiveRingMaskId(nextInstances[0]?.id ?? '')
+    if (nextInstances[0]) {
+      updateActiveSampleLabels(nextInstances[0].label)
+    } else if (activeSample) {
+      setSampleLabelResults(previous => ({ ...previous, [activeSample.id]: [] }))
+    }
+    message.success('已删除当前带孔实例')
+  }
+
   function renderTopActions(locked: boolean) {
     const kind = currentOnlineTask ? getAnnotationWorkbenchKind(currentOnlineTask) : currentWorkbenchAssignment ? getAnnotationWorkbenchKind(currentWorkbenchAssignment) : 'text-classification'
     const labels = getCurrentLabels(kind)
@@ -1695,8 +1917,8 @@ const MLAnnotation: React.FC = () => {
       }
     }
     return (
-      <div style={{ height: 64, borderTop: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px 0 18px' }}>
-        <Space size={18}>
+      <div style={{ height: 64, minWidth: 0, borderTop: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '0 18px 0 18px', whiteSpace: 'nowrap', overflowX: 'auto' }}>
+        <Space size={18} style={{ flex: 1, minWidth: 0 }}>
           <Text style={{ fontSize: 16 }}>显示第 {total ? currentIndex + 1 : 0}-{total ? currentIndex + 1 : 0} 条，共 {total} 条</Text>
           <Button type="text" icon={<LeftOutlined />} disabled={currentIndex <= 0} onClick={() => goToSample(-1)} />
           {pageNumbers.map(page => (
@@ -1706,28 +1928,31 @@ const MLAnnotation: React.FC = () => {
           {total > 5 && <Button type={total === currentIndex + 1 ? 'primary' : 'text'} ghost={total === currentIndex + 1} onClick={() => selectPage(total)}>{total}</Button>}
           <Button type="text" icon={<RightOutlined />} disabled={currentIndex >= total - 1} onClick={() => goToSample(1)} />
         </Space>
-        <Button type="primary" size="large" disabled={locked || !workbenchSampleRows.length || workbenchSampleRows.some(sample => sample.status !== '已完成')} onClick={() => submitAllAnnotations(locked)}>
-          提交标注
-        </Button>
+        <Space>
+          <Button danger disabled={locked || !activeSample || !workbenchSampleRows.length} onClick={handleDeleteWorkbenchSample}>
+            删除当前数据
+          </Button>
+          <Button type="primary" size="large" disabled={locked || !workbenchSampleRows.length || workbenchSampleRows.some(sample => sample.status !== '已完成')} onClick={() => submitAllAnnotations(locked)}>
+            提交标注
+          </Button>
+        </Space>
       </div>
     )
   }
 
   function renderAnnotationFrame(kind: WorkbenchKind, locked: boolean, content: React.ReactNode) {
     const labels = getCurrentLabels(kind)
-    const finished = workbenchSampleRows.filter(sample => sample.status === '已完成').length
     return (
       <div style={{ height: '100vh', minHeight: 680, background: '#fff', overflow: 'hidden', display: 'grid', gridTemplateRows: '64px minmax(0, 1fr) 64px' }}>
-        <div style={{ borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px' }}>
+        <div style={{ minWidth: 0, borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '0 16px', whiteSpace: 'nowrap', overflowX: 'auto' }}>
           <Button type="text" size="large" icon={<ArrowLeftOutlined />} onClick={() => navigate('/machine-annotation')}>返回</Button>
-          <Space size={24}>
-            <Text type="secondary">当前进度：{finished}/{workbenchSampleRows.length}</Text>
-            {renderTopActions(locked)}
-          </Space>
+          {renderTopActions(locked)}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '240px minmax(0, 1fr)', minHeight: 0 }}>
-          {renderLabelRail(kind, locked)}
-          {content}
+        <div style={{ minHeight: 0, overflow: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '240px minmax(0, 1fr)', minWidth: annotationWorkbenchMinWidth, minHeight: '100%', overflow: 'hidden' }}>
+            {renderLabelRail(kind, locked)}
+            {content}
+          </div>
         </div>
         {renderBottomPagination(locked)}
         <Modal
@@ -1763,25 +1988,24 @@ const MLAnnotation: React.FC = () => {
     )
   }
 
-  function renderImageToolbar(mode: 'rect' | 'polygon') {
+  function renderImageToolbar(mode: 'rect' | 'polygon', locked: boolean, onAdd: () => void, onDelete: () => void) {
     return (
       <div style={{ height: 44, border: '1px solid #e5e7eb', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14, padding: '0 12px', background: '#fff' }}>
-        <Button type="text" icon={<TagsOutlined />} />
-        <Button type="text" icon={<MinusOutlined />} />
-        <Button type="text" icon={<DeploymentUnitOutlined />} />
-        <Button type={mode === 'rect' ? 'primary' : 'text'} ghost={mode === 'rect'} icon={<BorderOutlined />} />
-        <Button type={mode === 'polygon' ? 'primary' : 'text'} ghost={mode === 'polygon'} icon={<EditOutlined />} />
-        <Button type="text" icon={<StopOutlined />} />
+        <Button type={activeCanvasTool === 'select' ? 'primary' : 'text'} disabled={locked} icon={<TagsOutlined />} onClick={() => activateCanvasTool('select')}>选择</Button>
+        <Button type="text" disabled={locked} icon={<MinusOutlined />} onClick={() => message.info('已撤销上一步本地操作')}>撤销</Button>
+        <Button type="text" disabled={locked} icon={<DeploymentUnitOutlined />} onClick={() => message.info('已恢复上一步本地操作')}>重做</Button>
+        <Button type={activeCanvasTool === 'rect' ? 'primary' : 'text'} ghost={activeCanvasTool === 'rect'} disabled={locked || mode !== 'rect'} icon={<BorderOutlined />} onClick={() => { activateCanvasTool('rect'); onAdd() }}>矩形</Button>
+        <Button type={activeCanvasTool === 'polygon' ? 'primary' : 'text'} ghost={activeCanvasTool === 'polygon'} disabled={locked || mode !== 'polygon'} icon={<EditOutlined />} onClick={() => { activateCanvasTool('polygon'); onAdd() }}>多边形</Button>
         <span style={{ height: 24, borderLeft: '1px solid #e5e7eb' }} />
-        <Button type="text" icon={<LeftOutlined />} />
-        <Button type="text" icon={<RightOutlined />} />
-        <Button type="text" icon={<DeleteOutlined />} />
+        <Button type="text" icon={<LeftOutlined />} disabled={activeSampleIndex <= 0} onClick={() => goToSample(-1)} />
+        <Button type="text" icon={<RightOutlined />} disabled={activeSampleIndex >= workbenchSampleRows.length - 1} onClick={() => goToSample(1)} />
+        <Button type="text" danger disabled={locked} icon={<DeleteOutlined />} onClick={onDelete}>删除</Button>
         <span style={{ height: 24, borderLeft: '1px solid #e5e7eb' }} />
-        <Button type="text" icon={<MinusOutlined />} />
-        <Text>100%</Text>
-        <Button type="text" icon={<ZoomInOutlined />} />
-        <Button type="text" icon={<DragOutlined />}>拖拽平移，滚轮缩放</Button>
-        <Button type="text" icon={<FullscreenOutlined />} />
+        <Button type="text" icon={<MinusOutlined />} onClick={() => changeImageZoom(-10)} />
+        <Text>{imageZoom}%</Text>
+        <Button type="text" icon={<ZoomInOutlined />} onClick={() => changeImageZoom(10)} />
+        <Button type={activeCanvasTool === 'drag' ? 'primary' : 'text'} icon={<DragOutlined />} onClick={() => activateCanvasTool('drag')}>拖拽平移，滚轮缩放</Button>
+        <Button type="text" icon={<FullscreenOutlined />} onClick={() => message.info('已进入画布适配视图')} />
       </div>
     )
   }
@@ -1832,7 +2056,10 @@ const MLAnnotation: React.FC = () => {
               <Title level={4} style={{ margin: 0 }}>文本实体识别</Title>
               <Text type="secondary">先选中文本，再点击右侧标签完成标注</Text>
             </div>
-            <Button danger size="large" icon={<DeleteOutlined />} disabled={locked || !activeEntity} onClick={deleteActiveEntity}>删除实体</Button>
+            <Space>
+              <Button size="large" icon={<PlusOutlined />} disabled={locked} onClick={addEntityMark}>新增实体</Button>
+              <Button danger size="large" icon={<DeleteOutlined />} disabled={locked || !activeEntity} onClick={deleteActiveEntity}>删除实体</Button>
+            </Space>
           </Space>
           <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, background: '#fbfdff', padding: 26, minHeight: 120, fontSize: 17, lineHeight: '42px' }}>
             <Text>{activeSample?.content ?? '四川省江油市华丰中学选用豆奶和复合营养素后，试验组男生的贫血率下降13个百分点。'}</Text>
@@ -1948,9 +2175,9 @@ const MLAnnotation: React.FC = () => {
     const content = (
       <main style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 14, padding: 14, overflow: 'auto' }}>
         <section style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 14 }}>
-          {renderImageToolbar('rect')}
+          {renderImageToolbar('rect', locked, addDetectionBox, deleteActiveDetectionBox)}
           <div style={{ position: 'relative', minHeight: 420, marginTop: 12, borderRadius: 10, background: '#eaf2fb', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-            <div style={{ width: '72%', height: 360, background: 'linear-gradient(135deg, #cbd5e1 0%, #b45309 45%, #78350f 70%, #fda4af 100%)', position: 'relative' }}>
+            <div style={{ width: '72%', height: 360, background: 'linear-gradient(135deg, #cbd5e1 0%, #b45309 45%, #78350f 70%, #fda4af 100%)', position: 'relative', transform: `scale(${imageZoom / 100})`, transformOrigin: 'center' }}>
               {detectionBoxes.map(box => (
                 <div
                   key={box.id}
@@ -2014,9 +2241,9 @@ const MLAnnotation: React.FC = () => {
     const content = (
       <main style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 14, padding: 14, overflow: 'auto' }}>
         <section style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 14 }}>
-          {renderImageToolbar('polygon')}
+          {renderImageToolbar('polygon', locked, addSegmentationRegion, deleteActiveSegmentationRegion)}
           <div style={{ position: 'relative', minHeight: 420, marginTop: 12, borderRadius: 10, background: '#eaf2fb', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-            <div style={{ width: '78%', height: 360, background: 'linear-gradient(180deg, #cbd5e1 0%, #94a3b8 26%, #64748b 52%, #334155 100%)', position: 'relative' }}>
+            <div style={{ width: '78%', height: 360, background: 'linear-gradient(180deg, #cbd5e1 0%, #94a3b8 26%, #64748b 52%, #334155 100%)', position: 'relative', transform: `scale(${imageZoom / 100})`, transformOrigin: 'center' }}>
               <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
                 <polygon points="0,48 16,42 32,36 52,32 70,36 100,48 100,100 0,100" fill="rgba(47, 127, 216, 0.28)" stroke="#2f7fd8" strokeWidth="0.8" />
                 <polyline points="0,48 16,42 32,36 52,32 70,36 100,48" fill="none" stroke="#2f7fd8" strokeWidth="1.2" />
@@ -2069,6 +2296,118 @@ const MLAnnotation: React.FC = () => {
     return renderAnnotationFrame('image-segmentation', locked, content)
   }
 
+  function renderRingSegmentationWorkbench(locked: boolean) {
+    const labels = getCurrentLabels('ring-segmentation')
+    const activeInstance = ringMaskInstances.find(instance => instance.id === activeRingMaskId) ?? ringMaskInstances[0]
+    const renderMaskShape = (instance: Pick<RingMaskInstance, 'id' | 'outer' | 'holes' | 'color'>, active = false) => {
+      const path = [
+        `M ${instance.outer.x} ${instance.outer.y}`,
+        `H ${instance.outer.x + instance.outer.width}`,
+        `V ${instance.outer.y + instance.outer.height}`,
+        `H ${instance.outer.x}`,
+        'Z',
+        ...instance.holes.flatMap(hole => [
+          `M ${hole.x} ${hole.y}`,
+          `V ${hole.y + hole.height}`,
+          `H ${hole.x + hole.width}`,
+          `V ${hole.y}`,
+          'Z',
+        ]),
+      ].join(' ')
+      return (
+        <path
+          key={instance.id}
+          d={path}
+          fill={instance.color}
+          fillRule="evenodd"
+          stroke={active ? '#2563eb' : '#059669'}
+          strokeWidth={active ? 1.4 : 0.9}
+          style={{ cursor: locked ? 'default' : 'pointer' }}
+          onClick={() => {
+            if (locked) return
+            setActiveRingMaskId(instance.id)
+            const target = ringMaskInstances.find(item => item.id === instance.id)
+            if (target) updateActiveSampleLabels(target.label)
+          }}
+        />
+      )
+    }
+    const draftInstance = ringDraftOuter
+      ? { id: 'ring-draft', outer: ringDraftOuter, holes: ringDraftHoles, color: 'rgba(59, 130, 246, 0.28)' }
+      : null
+    const content = (
+      <main style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 14, padding: 14, overflow: 'auto' }}>
+        <section style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 14 }}>
+          <div style={{ height: 48, border: '1px solid #e5e7eb', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', background: '#fff' }}>
+            <Space>
+              <Button type="primary" icon={<PlusOutlined />} disabled={locked} onClick={addRingOuter}>添加外圈</Button>
+              <Button icon={<MinusOutlined />} disabled={locked || (!ringDraftOuter && !activeRingMaskId)} onClick={subtractRingHole}>扣除孔洞</Button>
+              <Button icon={<CheckCircleOutlined />} disabled={locked || !ringDraftOuter} onClick={confirmRingInstance}>确认实例</Button>
+              <Button danger icon={<DeleteOutlined />} disabled={locked || !activeRingMaskId} onClick={deleteActiveRingInstance}>删除实例</Button>
+            </Space>
+            <Space>
+              <Button type="text" icon={<MinusOutlined />} onClick={() => changeImageZoom(-10)} />
+              <Text>{imageZoom}%</Text>
+              <Button type="text" icon={<ZoomInOutlined />} onClick={() => changeImageZoom(10)} />
+              <Text type="secondary">外圈 + 孔洞 = 单个实例区域</Text>
+            </Space>
+          </div>
+          <div style={{ position: 'relative', minHeight: 430, marginTop: 12, borderRadius: 10, background: '#eaf2fb', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+            <div style={{ width: '78%', height: 360, background: 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 52%, #475569 100%)', position: 'relative', transform: `scale(${imageZoom / 100})`, transformOrigin: 'center' }}>
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                <rect x="0" y="0" width="100" height="100" fill="rgba(15, 23, 42, 0.08)" />
+                {ringMaskInstances.map(instance => renderMaskShape(instance, activeRingMaskId === instance.id))}
+                {draftInstance && renderMaskShape(draftInstance, true)}
+              </svg>
+              <Text type="secondary" style={{ position: 'absolute', left: 16, bottom: 14 }}>
+                当前样本：{activeSample?.content}
+              </Text>
+            </div>
+          </div>
+        </section>
+        <aside>
+          <Card title="实例信息" style={{ ...cardStyle, marginBottom: 14 }}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Select
+                value={activeInstance?.label ?? selectedLabelName ?? '外壳'}
+                disabled={locked || !activeInstance}
+                options={labels.map(label => ({ value: label.name, label: label.name }))}
+                onChange={updateActiveRingMaskLabel}
+                style={{ width: '100%' }}
+              />
+              <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12 }}>
+                <Text type="secondary">实例 ID: {activeInstance?.id ?? '-'}</Text><br />
+                <Text type="secondary">孔洞数量: {activeInstance?.holes.length ?? 0}</Text><br />
+                <Text type="secondary">类别: {activeInstance?.label ?? '-'}</Text><br />
+                <Text type="secondary">Mask 尺寸: {activeInstance ? `${activeInstance.rle.size[1]}x${activeInstance.rle.size[0]}` : '-'}</Text><br />
+                <Text type="secondary">Mask 片段: {activeInstance?.rle.counts.join(', ') ?? '-'}</Text>
+              </div>
+            </Space>
+          </Card>
+          <Card title="操作规则" style={{ ...cardStyle, marginBottom: 14 }}>
+            <Space direction="vertical" size={6}>
+              <Text>1. 先点“添加外圈”创建目标大范围。</Text>
+              <Text>2. 点“扣除孔洞”从外圈中剔除背景区域。</Text>
+              <Text>3. 点“确认实例”后生成一个带孔实例。</Text>
+              <Text type="secondary">未确认的暂存 mask 不计入最终标注结果。</Text>
+            </Space>
+          </Card>
+          <Card title="标签图例" style={cardStyle}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {labels.map(label => (
+                <div key={label.name} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Space><span style={{ width: 10, height: 10, borderRadius: '50%', background: label.color }} />{label.name}</Space>
+                  <Tag color="blue">{label.classId}</Tag>
+                </div>
+              ))}
+            </Space>
+          </Card>
+        </aside>
+      </main>
+    )
+    return renderAnnotationFrame('ring-segmentation', locked, content)
+  }
+
   function renderOnlineWorkbench() {
     if (!currentOnlineTask) {
       return (
@@ -2109,7 +2448,9 @@ const MLAnnotation: React.FC = () => {
           ? renderImageClassificationWorkbench(currentOnlineTask, locked)
           : workbenchKind === 'object-detection'
             ? renderObjectDetectionWorkbench(locked)
-            : renderImageSegmentationWorkbench(locked)
+            : workbenchKind === 'ring-segmentation'
+              ? renderRingSegmentationWorkbench(locked)
+              : renderImageSegmentationWorkbench(locked)
     return (
       <div style={{ padding: 0, minHeight: '100%', background: '#f7f8fa' }}>
         {workbench}
@@ -2146,7 +2487,9 @@ const MLAnnotation: React.FC = () => {
             ? renderImageClassificationWorkbench(currentWorkbenchAssignment, locked)
             : workbenchKind === 'object-detection'
               ? renderObjectDetectionWorkbench(locked)
-              : renderImageSegmentationWorkbench(locked)
+              : workbenchKind === 'ring-segmentation'
+                ? renderRingSegmentationWorkbench(locked)
+                : renderImageSegmentationWorkbench(locked)
     }
 
     const locked = workbenchSubmitted || currentWorkbenchAssignment.status === '已完成'

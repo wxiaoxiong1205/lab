@@ -276,6 +276,32 @@ export interface TrainingConfig {
   cpuLimit?: number
   memoryRequest?: number
   memoryLimit?: number
+
+  // GRPO 三阶段资源配置
+  grpoResourceConfig?: {
+    hand?: {
+      gpuType?: string
+      gpuCount?: number
+      cpuRequest?: number
+      cpuLimit?: number
+      memoryRequest?: number
+      memoryLimit?: number
+    }
+    work?: {
+      gpuType?: string
+      gpuCount?: number
+      cpuRequest?: number
+      cpuLimit?: number
+      memoryRequest?: number
+      memoryLimit?: number
+    }
+    submit?: {
+      cpuRequest?: number
+      cpuLimit?: number
+      memoryRequest?: number
+      memoryLimit?: number
+    }
+  }
 }
 
 // 数据集

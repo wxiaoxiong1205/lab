@@ -59,6 +59,7 @@ const { Text, Title, Paragraph } = Typography
 
 type NotebookStatus = TaskLifecycleStatus
 type NotebookAccessScope = 'public' | 'private'
+type NotebookSavedImageType = 'standard' | 'temporary'
 
 type OpenPortRecord = {
   id: string
@@ -134,6 +135,7 @@ type CustomMirrorRecord = {
   namespace: string
   imageName: string
   version: string
+  savedImageType: NotebookSavedImageType
   description: string
   status: '已完成' | '生成中' | '失败'
   taskSource: string
@@ -143,6 +145,7 @@ type CustomMirrorRecord = {
 }
 
 type SaveEnvironmentFormValues = {
+  savedImageType?: NotebookSavedImageType
   includePackages?: boolean
   includeWorkspace?: boolean
   imageName?: string
@@ -152,6 +155,7 @@ type SaveEnvironmentFormValues = {
 type CustomMirrorFormValues = {
   namespace?: string
   imageName?: string
+  savedImageType?: NotebookSavedImageType
   description?: string
 }
 
@@ -419,6 +423,7 @@ const customMirrorSeed: CustomMirrorRecord[] = [
     namespace: 'fs',
     imageName: 'jupyter/ml/deepexi-notebook',
     version: 'datascience-cpu-python312-ubuntu24.04-noconda',
+    savedImageType: 'standard',
     description: 'ai镜像',
     status: '已完成',
     taskSource: '-',
@@ -431,6 +436,7 @@ const customMirrorSeed: CustomMirrorRecord[] = [
     namespace: 'lab',
     imageName: 'jupyter/ml/deepexi-notebook',
     version: 'datascience-cpu-python3223-2',
+    savedImageType: 'temporary',
     description: '暂无描述',
     status: '已完成',
     taskSource: '新建 Notebook 6',
@@ -443,6 +449,7 @@ const customMirrorSeed: CustomMirrorRecord[] = [
     namespace: 'lab',
     imageName: 'jupyter/ml/deepexi-notebook',
     version: 'datascience-cpu-python312-ubuntu24.01',
+    savedImageType: 'standard',
     description: '暂无描述',
     status: '已完成',
     taskSource: '新建 Notebook -2',
@@ -455,6 +462,7 @@ const customMirrorSeed: CustomMirrorRecord[] = [
     namespace: 'lab',
     imageName: 'jupyter/ml/deepexi-notebook',
     version: 'datascience-cpu-python312-ubuntu24.02',
+    savedImageType: 'temporary',
     description: '暂无描述',
     status: '失败',
     taskSource: '新建 Notebook -1',
@@ -499,9 +507,19 @@ const CASE_PUBLISH_READY_DELAY = 4800
 const CASE_HIGHLIGHT_DURATION = 5000
 const NOTEBOOK_STATUS_FILTERS = Object.keys(TASK_LIFECYCLE_TAG) as NotebookStatus[]
 
+const savedImageTypeMeta: Record<NotebookSavedImageType, { label: string; color: string }> = {
+  standard: { label: '标准镜像', color: 'blue' },
+  temporary: { label: '临时镜像', color: 'orange' },
+}
+
 function statusTag(status: NotebookStatus): React.ReactNode {
   const config = TASK_LIFECYCLE_TAG[status]
   return <Tag color={config.color}>{config.label}</Tag>
+}
+
+function savedImageTypeTag(value?: NotebookSavedImageType): React.ReactNode {
+  const meta = savedImageTypeMeta[value ?? 'temporary']
+  return <Tag color={meta.color}>{meta.label}</Tag>
 }
 
 function accessScopeTag(scope?: NotebookAccessScope): React.ReactNode {
@@ -989,6 +1007,7 @@ const MLNotebook: React.FC = () => {
         namespace: 'lab',
         imageName: 'jupyter/ml/deepexi-notebook',
         version: values.imageName?.trim() || `${record.name}-env`,
+        savedImageType: values.savedImageType ?? 'standard',
         description: values.imageDescription?.trim() || '暂无描述',
         status: '已完成',
         taskSource: record.name,
@@ -1013,6 +1032,7 @@ const MLNotebook: React.FC = () => {
 
   const setSaveEnvironmentDefaults = (record: MLNotebookRecord) => {
     saveEnvForm.setFieldsValue({
+      savedImageType: 'standard',
       includePackages: true,
       includeWorkspace: false,
       imageName: `${record.name}-env`,
@@ -1087,6 +1107,7 @@ const MLNotebook: React.FC = () => {
           namespace: values.namespace || 'lab',
           imageName: values.imageName || 'jupyter/ml/deepexi-notebook',
           version: `custom-${Date.now()}`,
+          savedImageType: values.savedImageType ?? 'standard',
           description: values.description?.trim() || '暂无描述',
           status: '已完成',
           taskSource: '-',
@@ -1259,6 +1280,33 @@ const MLNotebook: React.FC = () => {
     setSshEditing(false)
     message.success(sshConfig ? 'SSH 配置已保存' : 'SSH 配置已清空')
   }
+
+  const renderSavedImageTypeSelector = () => (
+    <Form.Item name="savedImageType" initialValue="standard" style={{ marginBottom: 14 }}>
+      <Radio.Group style={{ width: '100%' }}>
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <Radio value="standard" style={{ marginTop: 2 }} />
+            <div>
+              <Text strong>构建为标准镜像</Text>
+              <div style={{ marginTop: 6, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                通过 Dockerfile 构建稳定环境，可作为正式镜像长期复用。
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <Radio value="temporary" style={{ marginTop: 2 }} />
+            <div>
+              <Text strong>保存为临时镜像</Text>
+              <div style={{ marginTop: 6, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                快速保存当前运行环境，适合临时调试和短期复用。
+              </div>
+            </div>
+          </div>
+        </Space>
+      </Radio.Group>
+    </Form.Item>
+  )
 
   const notebookColumns: ColumnsType<MLNotebookRecord> = [
     {
@@ -1726,6 +1774,7 @@ const MLNotebook: React.FC = () => {
               <div style={{ marginBottom: 16 }}>
                 <Text type="secondary">选择需要保存到自定义镜像的内容，并填写镜像信息。</Text>
               </div>
+              {renderSavedImageTypeSelector()}
               <Form.Item name="includePackages" valuePropName="checked" style={{ marginBottom: 8 }}>
                 <Checkbox disabled>包+依赖库</Checkbox>
               </Form.Item>
@@ -1767,6 +1816,7 @@ const MLNotebook: React.FC = () => {
           <div style={{ marginBottom: 16 }}>
             <Text type="secondary">选择需要保存到自定义镜像的内容，并填写镜像信息。</Text>
           </div>
+          {renderSavedImageTypeSelector()}
           <Form.Item name="includePackages" valuePropName="checked" style={{ marginBottom: 8 }}>
             <Checkbox disabled>包+依赖库</Checkbox>
           </Form.Item>
@@ -2327,6 +2377,13 @@ const MLNotebook: React.FC = () => {
       },
       { title: '描述', dataIndex: 'description', key: 'description', width: 180 },
       {
+        title: '镜像类型',
+        dataIndex: 'savedImageType',
+        key: 'savedImageType',
+        width: 120,
+        render: value => savedImageTypeTag(value as NotebookSavedImageType),
+      },
+      {
         title: '状态',
         dataIndex: 'status',
         key: 'status',
@@ -2414,7 +2471,7 @@ const MLNotebook: React.FC = () => {
             rowKey="id"
             columns={mirrorColumns}
             dataSource={customMirrorList}
-            scroll={{ x: 1450 }}
+            scroll={{ x: 1560 }}
             tableLayout="fixed"
             pagination={{ pageSize: 10, showTotal: total => `第 1-${total} 条，共 ${total} 条` }}
           />
@@ -2441,6 +2498,12 @@ const MLNotebook: React.FC = () => {
                 placeholder={mirrorNamespace ? '请选择镜像名称' : '请先选择命名空间'}
                 options={mirrorNameOptions}
               />
+            </Form.Item>
+            <Form.Item label="镜像类型" name="savedImageType" initialValue="standard" rules={[{ required: true, message: '请选择镜像类型' }]}>
+              <Radio.Group>
+                <Radio value="standard">标准镜像</Radio>
+                <Radio value="temporary">临时镜像</Radio>
+              </Radio.Group>
             </Form.Item>
             <Form.Item label="描述" name="description">
               <Input.TextArea rows={4} placeholder="请输入描述（选填）" />

@@ -16,11 +16,10 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import { CopyOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import {
-  GRPO_TEMPLATE_PARAM_KEYS,
+  buildGrpoTemplateYaml,
   grpoTrainingParameterTemplateActions,
-  normalizeGrpoTemplateParams,
+  parseGrpoTemplateYaml,
   type GrpoTrainingParameterTemplate,
-  type GrpoTrainingParameterValues,
   useGrpoTrainingParameterTemplates,
 } from '../services/grpoTrainingParameterTemplateStore'
 import type { FineTuneType } from '../types/training'
@@ -33,7 +32,7 @@ type TemplateMetaFormValues = {
   enabled: boolean
 }
 
-const defaultTemplateJson = {
+const defaultTemplate: { fineTuneType: FineTuneType; params: Record<string, unknown> } = {
   fineTuneType: 'lora',
   params: {
     learningRate: 0.00002,
@@ -69,45 +68,12 @@ const defaultTemplateJson = {
 
 function buildTemplateDraft(template?: GrpoTrainingParameterTemplate) {
   if (!template) {
-    return JSON.stringify(defaultTemplateJson, null, 2)
+    return buildGrpoTemplateYaml(defaultTemplate)
   }
-  return JSON.stringify(
-    {
-      fineTuneType: template.fineTuneType,
-      params: template.params,
-    },
-    null,
-    2,
-  )
-}
-
-function validateTemplateDraft(raw: string): { fineTuneType: FineTuneType; params: GrpoTrainingParameterValues } {
-  const parsed = JSON.parse(raw) as Record<string, unknown>
-  const rootKeys = Object.keys(parsed)
-  const invalidRootKeys = rootKeys.filter(key => key !== 'fineTuneType' && key !== 'params')
-  if (invalidRootKeys.length > 0) {
-    throw new Error(`不支持的根字段：${invalidRootKeys.join('、')}`)
-  }
-
-  if (parsed.fineTuneType !== 'full' && parsed.fineTuneType !== 'lora') {
-    throw new Error('fineTuneType 仅支持 full 或 lora')
-  }
-
-  if (!parsed.params || typeof parsed.params !== 'object' || Array.isArray(parsed.params)) {
-    throw new Error('params 必须是对象')
-  }
-
-  const params = parsed.params as Record<string, unknown>
-  const allowed = new Set<string>(GRPO_TEMPLATE_PARAM_KEYS)
-  const invalidParamKeys = Object.keys(params).filter(key => !allowed.has(key))
-  if (invalidParamKeys.length > 0) {
-    throw new Error(`不支持的训练参数字段：${invalidParamKeys.join('、')}`)
-  }
-
-  return {
-    fineTuneType: parsed.fineTuneType,
-    params: normalizeGrpoTemplateParams(params),
-  }
+  return buildGrpoTemplateYaml({
+    fineTuneType: template.fineTuneType,
+    params: template.params,
+  })
 }
 
 const GrpoTemplateSettings: React.FC = () => {
@@ -138,7 +104,7 @@ const GrpoTemplateSettings: React.FC = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
-      const parsed = validateTemplateDraft(templateDraft)
+      const parsed = parseGrpoTemplateYaml(templateDraft)
       grpoTrainingParameterTemplateActions.upsert({
         id: editingTemplate?.id ?? `grpo-template-${Date.now()}`,
         name: values.name,
@@ -284,13 +250,13 @@ const GrpoTemplateSettings: React.FC = () => {
         <Space direction="vertical" size={8} style={{ width: '100%' }}>
           <Text strong>参数模板</Text>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            在下方直接维护 JSON 模板。只允许 fineTuneType 与 params；params 只支持当前产品已有训练参数字段。
+            在下方直接维护 YAML 模板。只允许 fineTuneType 与 params；params 只支持当前产品已有训练参数字段。
           </Text>
           <Input.TextArea
             rows={22}
             value={templateDraft}
             onChange={event => setTemplateDraft(event.target.value)}
-            placeholder={JSON.stringify(defaultTemplateJson, null, 2)}
+            placeholder={buildGrpoTemplateYaml(defaultTemplate)}
             style={{
               fontFamily: 'Menlo, Monaco, Consolas, "Liberation Mono", monospace',
               fontSize: 12,

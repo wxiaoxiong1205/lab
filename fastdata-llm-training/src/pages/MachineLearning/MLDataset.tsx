@@ -79,6 +79,14 @@ type MLDatasetDetailRow = {
   imageDescription?: string
   boxes?: Array<{ id: string; label: string; x: number; y: number; width: number; height: number }>
   segments?: Array<{ id: string; label: string; points: string }>
+  rleMasks?: Array<{
+    id: string
+    label: string
+    type: 'rle'
+    size: [number, number]
+    counts: number[]
+    holes: number
+  }>
 }
 
 type AddVersionFormValues = {
@@ -124,9 +132,244 @@ const annotationTypesByDataType: Record<string, Array<{ value: string; label: st
   ],
   image: [
     { value: '图像分类', label: '图像分类', templates: ['单图单标签', '单图多标签'] },
-    { value: '图像分割', label: '图像分割', templates: ['实例分割'] },
+    { value: '图像分割', label: '图像分割', templates: ['实例分割', '语义分割'] },
     { value: '物体检测', label: '物体检测', templates: ['矩阵框标注'] },
   ],
+}
+
+type TemplateFile = {
+  path: string
+  content: string
+}
+
+type DatasetTemplateConfig = {
+  title: string
+  fileName: string
+  format: 'CSV' | 'JSONL' | 'ZIP'
+  description: string
+  files: TemplateFile[]
+}
+
+function getDatasetTemplateConfig(annotationType: string, annotationTemplate: string): DatasetTemplateConfig {
+  if (annotationType === '文本分类') {
+    return {
+      title: annotationTemplate === '文本多标签' ? '文本多标签分类模板' : '文本单标签分类模板',
+      fileName: annotationTemplate === '文本多标签' ? 'text-multi-label-template.csv' : 'text-single-label-template.csv',
+      format: 'CSV',
+      description: '每行一条文本样本，label 为单标签或英文逗号分隔的多标签。',
+      files: [{
+        path: 'template.csv',
+        content: annotationTemplate === '文本多标签'
+          ? 'id,text,label\n1,这是一条售后咨询文本,售后,物流\n2,这是一条产品评价文本,质量,包装\n'
+          : 'id,text,label\n1,这是一条售后咨询文本,售后\n2,这是一条产品评价文本,质量\n',
+      }],
+    }
+  }
+
+  if (annotationType === '实体识别') {
+    return {
+      title: '文本实体识别模板',
+      fileName: 'entity-recognition-template.jsonl',
+      format: 'JSONL',
+      description: '每行一条文本样本，entities 记录实体起止位置与实体类型。',
+      files: [{
+        path: 'template.jsonl',
+        content: [
+          JSON.stringify({ id: 'ner-001', text: '张三在北京大学附属医院完成随访。', entities: [{ start: 0, end: 2, label: '人名' }, { start: 3, end: 11, label: '机构' }] }),
+          JSON.stringify({ id: 'ner-002', text: '杭州某科技公司发布新一代智能终端。', entities: [{ start: 0, end: 2, label: '地点' }, { start: 3, end: 8, label: '企业' }] }),
+          '',
+        ].join('\n'),
+      }],
+    }
+  }
+
+  if (annotationType === '图像分类') {
+    return {
+      title: annotationTemplate === '单图多标签' ? '图像多标签分类 ZIP 模板' : '图像单标签分类 ZIP 模板',
+      fileName: annotationTemplate === '单图多标签' ? 'image-multi-label-template.zip' : 'image-single-label-template.zip',
+      format: 'ZIP',
+      description: '图片放在 images 目录，annotations.csv 记录图片文件与标签。',
+      files: [
+        { path: 'images/README.txt', content: '将 jpg/png 图片放在该目录下，例如 image_001.jpg。' },
+        { path: 'annotations.csv', content: annotationTemplate === '单图多标签' ? 'file_name,labels\nimages/image_001.jpg,SUV|缺陷\n' : 'file_name,label\nimages/image_001.jpg,SUV\n' },
+      ],
+    }
+  }
+
+  if (annotationType === '物体检测') {
+    return {
+      title: '物体检测 ZIP 模板',
+      fileName: 'object-detection-template.zip',
+      format: 'ZIP',
+      description: '图片放在 images 目录，annotations.json 使用 bbox 记录矩形框。',
+      files: [
+        { path: 'images/README.txt', content: '将 jpg/png 图片放在该目录下，例如 shelf_001.jpg。' },
+        {
+          path: 'annotations.json',
+          content: JSON.stringify({
+            images: [{ id: 'img-001', file_name: 'images/shelf_001.jpg', width: 1280, height: 720 }],
+            annotations: [{ image_id: 'img-001', label: '食品', bbox: [120, 90, 360, 240] }],
+          }, null, 2),
+        },
+      ],
+    }
+  }
+
+  if (annotationType === '图像分割' && annotationTemplate === '语义分割') {
+    return {
+      title: '语义分割 ZIP 模板',
+      fileName: 'semantic-segmentation-template.zip',
+      format: 'ZIP',
+      description: '原图放 images，语义 mask 放 masks，同名文件一一对应。',
+      files: [
+        { path: 'images/README.txt', content: '原始图片目录，例如 road_001.jpg。' },
+        { path: 'masks/README.txt', content: '语义分割 mask 目录，例如 road_001.png，像素值对应 labels.json 中的类别 id。' },
+        { path: 'labels.json', content: JSON.stringify([{ id: 1, name: 'road_sign' }, { id: 2, name: 'background' }], null, 2) },
+      ],
+    }
+  }
+
+  return {
+    title: '实例分割 ZIP 模板',
+    fileName: 'instance-segmentation-template.zip',
+    format: 'ZIP',
+    description: '实例分割 ZIP 内含两套示例：普通实例分割和回形/带孔实例分割；回形标注仍归属实例分割模板。',
+    files: [
+      { path: '普通实例分割/images/README.txt', content: '普通实例分割图片目录，例如 road_001.jpg。' },
+      {
+        path: '普通实例分割/annotations.json',
+        content: JSON.stringify({
+          images: [{ id: 'img-001', file_name: 'images/road_001.jpg', width: 1280, height: 720 }],
+          annotations: [{ image_id: 'img-001', label: 'road_sign', polygon: [[120, 90], [380, 110], [360, 260], [140, 250]] }],
+        }, null, 2),
+      },
+      { path: '回形带孔实例分割/images/README.txt', content: '回形/带孔实例分割图片目录，例如 ring_001.jpg。' },
+      {
+        path: '回形带孔实例分割/annotations.json',
+        content: JSON.stringify({
+          images: [{ id: 'ring-001', file_name: 'images/ring_001.jpg', width: 640, height: 480 }],
+          annotations: [{
+            image_id: 'ring-001',
+            label: '外壳',
+            outer_polygon: [[80, 80], [560, 80], [560, 400], [80, 400]],
+            holes: [[[240, 180], [400, 180], [400, 300], [240, 300]]],
+            storage: 'mask_rle',
+          }],
+        }, null, 2),
+      },
+    ],
+  }
+}
+
+function makeCrcTable() {
+  return Array.from({ length: 256 }, (_, index) => {
+    let value = index
+    for (let bit = 0; bit < 8; bit += 1) {
+      value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1
+    }
+    return value >>> 0
+  })
+}
+
+const crcTable = makeCrcTable()
+const textEncoder = new TextEncoder()
+
+function crc32(bytes: Uint8Array) {
+  let crc = 0xffffffff
+  bytes.forEach(byte => {
+    crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8)
+  })
+  return (crc ^ 0xffffffff) >>> 0
+}
+
+function pushUint16(target: number[], value: number) {
+  target.push(value & 0xff, (value >>> 8) & 0xff)
+}
+
+function pushUint32(target: number[], value: number) {
+  target.push(value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff)
+}
+
+function createZipBlob(files: TemplateFile[]) {
+  const chunks: Uint8Array[] = []
+  const centralDirectory: Uint8Array[] = []
+  let offset = 0
+
+  files.forEach(file => {
+    const nameBytes = textEncoder.encode(file.path)
+    const dataBytes = textEncoder.encode(file.content)
+    const crc = crc32(dataBytes)
+    const localHeader: number[] = []
+    pushUint32(localHeader, 0x04034b50)
+    pushUint16(localHeader, 20)
+    pushUint16(localHeader, 0)
+    pushUint16(localHeader, 0)
+    pushUint16(localHeader, 0)
+    pushUint16(localHeader, 0)
+    pushUint32(localHeader, crc)
+    pushUint32(localHeader, dataBytes.length)
+    pushUint32(localHeader, dataBytes.length)
+    pushUint16(localHeader, nameBytes.length)
+    pushUint16(localHeader, 0)
+    const localBytes = new Uint8Array([...localHeader, ...nameBytes, ...dataBytes])
+    chunks.push(localBytes)
+
+    const centralHeader: number[] = []
+    pushUint32(centralHeader, 0x02014b50)
+    pushUint16(centralHeader, 20)
+    pushUint16(centralHeader, 20)
+    pushUint16(centralHeader, 0)
+    pushUint16(centralHeader, 0)
+    pushUint16(centralHeader, 0)
+    pushUint16(centralHeader, 0)
+    pushUint32(centralHeader, crc)
+    pushUint32(centralHeader, dataBytes.length)
+    pushUint32(centralHeader, dataBytes.length)
+    pushUint16(centralHeader, nameBytes.length)
+    pushUint16(centralHeader, 0)
+    pushUint16(centralHeader, 0)
+    pushUint16(centralHeader, 0)
+    pushUint16(centralHeader, 0)
+    pushUint32(centralHeader, 0)
+    pushUint32(centralHeader, offset)
+    centralDirectory.push(new Uint8Array([...centralHeader, ...nameBytes]))
+    offset += localBytes.length
+  })
+
+  const centralStart = offset
+  const centralSize = centralDirectory.reduce((sum, item) => sum + item.length, 0)
+  const endHeader: number[] = []
+  pushUint32(endHeader, 0x06054b50)
+  pushUint16(endHeader, 0)
+  pushUint16(endHeader, 0)
+  pushUint16(endHeader, files.length)
+  pushUint16(endHeader, files.length)
+  pushUint32(endHeader, centralSize)
+  pushUint32(endHeader, centralStart)
+  pushUint16(endHeader, 0)
+  const parts: BlobPart[] = [...chunks, ...centralDirectory, new Uint8Array(endHeader)].map(bytes => new Uint8Array(bytes).buffer as ArrayBuffer)
+  return new Blob(parts, { type: 'application/zip' })
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+function downloadDatasetTemplate(config: DatasetTemplateConfig) {
+  if (config.format === 'ZIP') {
+    downloadBlob(createZipBlob(config.files), config.fileName)
+    return
+  }
+
+  const file = config.files[0]
+  downloadBlob(new Blob([file.content], { type: config.format === 'CSV' ? 'text/csv;charset=utf-8' : 'application/jsonlines;charset=utf-8' }), config.fileName)
 }
 
 const initialDatasetRows: MLDatasetRecord[] = [
@@ -136,6 +379,7 @@ const initialDatasetRows: MLDatasetRecord[] = [
   { id: '4', name: '图像分类-多-1', version: 'V3', dataType: '图片', annotationType: '图像分类', annotationTemplate: '单图多标签', labelStatus: '有标注信息', dataSource: '本地上传', publishStatus: '已发布', creator: 'admin', createdAt: '2026-04-14 17:43:06' },
   { id: '5', name: 'basion-文本分类-多标签-无标注', version: 'V2', dataType: '文本', annotationType: '文本分类', annotationTemplate: '文本多标签', labelStatus: '无标注信息', dataSource: '本地上传', publishStatus: '未发布', creator: 'wangwu', createdAt: '2026-04-14 16:33:51' },
   { id: '6', name: 'basion-图像分割-实例分割-无标注', version: 'V1', dataType: '图片', annotationType: '图像分割', annotationTemplate: '实例分割', labelStatus: '无标注信息', dataSource: '本地上传', publishStatus: '已发布', creator: 'lab1', createdAt: '2026-03-01 09:10:00' },
+  { id: '7', name: '回形零件-带孔实例分割', version: 'V1', dataType: '图片', annotationType: '图像分割', annotationTemplate: '实例分割', labelStatus: '有标注信息', dataSource: '本地上传', publishStatus: '已发布', creator: 'lab1', createdAt: '2026-05-29 10:18:00' },
 ]
 
 function buildMLDatasetDetailRows(record: MLDatasetRecord): MLDatasetDetailRow[] {
@@ -164,6 +408,18 @@ function buildMLDatasetDetailRows(record: MLDatasetRecord): MLDatasetDetailRow[]
     segments: record.annotationType === '图像分割'
       ? [
           { id: `${record.id}-seg-${index}-1`, label: ['道路', '建筑', '植被'][index] ?? '区域', points: '28,18 76,22 88,64 34,72' },
+        ]
+      : undefined,
+    rleMasks: record.annotationTemplate === '实例分割' && /回形|回型|带孔/i.test(record.name)
+      ? [
+          {
+            id: `${record.id}-rle-${index}-1`,
+            label: ['外壳', '垫片', '边框'][index] ?? '带孔实例',
+            type: 'rle',
+            size: [480, 640],
+            counts: [0, 1280, 320, 640, 180],
+            holes: index + 1,
+          },
         ]
       : undefined,
   }))
@@ -275,6 +531,22 @@ function renderDatasetLabels(value: MLDatasetDetailRow['label']) {
   return value === '-' ? <Text type="secondary">-</Text> : <Tag color="blue">{value}</Tag>
 }
 
+function renderRleMaskSummary(row: MLDatasetDetailRow) {
+  if (!row.rleMasks?.length) {
+    return null
+  }
+
+  return (
+    <Space direction="vertical" size={4} style={{ marginTop: 8 }}>
+      {row.rleMasks.map(mask => (
+        <Tag key={mask.id} color="purple">
+          {mask.label} · Mask · {mask.size[1]}x{mask.size[0]} · 孔洞 {mask.holes}
+        </Tag>
+      ))}
+    </Space>
+  )
+}
+
 function renderInfoGrid(items: Array<{ label: string; value: React.ReactNode }>) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', columnGap: 48, rowGap: 18 }}>
@@ -328,6 +600,8 @@ const MLDataset: React.FC = () => {
 
   const availableAnnotationTypes = annotationTypesByDataType[selectedDataType]
   const availableTemplates = availableAnnotationTypes.find(item => item.value === selectedAnnotationType)?.templates ?? []
+  const selectedAnnotationTemplate = Form.useWatch('annotationTemplate', form) ?? availableTemplates[0] ?? ''
+  const currentTemplateConfig = getDatasetTemplateConfig(selectedAnnotationType, selectedAnnotationTemplate)
   const selectedDetailRecord = useMemo(
     () => (datasetId ? rows.find(item => item.id === datasetId) ?? null : null),
     [datasetId, rows],
@@ -696,14 +970,33 @@ const MLDataset: React.FC = () => {
                 ]}
               />
             </Form.Item>
-            <Form.Item label="上传数据">
+            <Form.Item label="文件上传">
               <ResumableUpload
                 title="点击或拖拽文件到此区域上传"
-                hint="支持文本、图片等机器学习任务数据格式，文件大小不设前端限制"
+                hint="将合适文件拖到此处，或点击上传。支持文本、图片或 zip 压缩包，文件大小不设前端限制"
                 value={selectedFile}
                 onChange={setSelectedFile}
               />
             </Form.Item>
+            <Card
+              size="small"
+              title="数据模板"
+              style={{ borderRadius: 10, background: '#f8fafc' }}
+              extra={<Tag color="blue">{currentTemplateConfig.format}</Tag>}
+            >
+              <Space direction="vertical" size={10} style={{ width: '100%' }}>
+                <Text strong>{currentTemplateConfig.title}</Text>
+                <Text type="secondary">{currentTemplateConfig.description}</Text>
+                <Space wrap>
+                  {currentTemplateConfig.files.map(file => (
+                    <Tag key={file.path}>{file.path}</Tag>
+                  ))}
+                </Space>
+                <Button icon={<DownloadOutlined />} onClick={() => downloadDatasetTemplate(currentTemplateConfig)}>
+                  {currentTemplateConfig.format === 'ZIP' ? 'ZIP 格式示例' : '下载当前模板'}
+                </Button>
+              </Space>
+            </Card>
           </Card>
 
           <Space>
@@ -843,7 +1136,12 @@ const MLDataset: React.FC = () => {
                   {
                     title: selectedDetailRecord.dataType === '图片' ? '图片' : '数据内容',
                     key: 'content',
-                    render: (_value, row) => renderDatasetSample(selectedDetailRecord, row),
+                    render: (_value, row) => (
+                      <div>
+                        {renderDatasetSample(selectedDetailRecord, row)}
+                        {renderRleMaskSummary(row)}
+                      </div>
+                    ),
                   },
                   { title: '标签', dataIndex: 'label', key: 'label', width: 240, render: renderDatasetLabels },
                   ...(activeDatasetVersion.publishStatus !== '已发布'

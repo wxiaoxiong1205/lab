@@ -411,23 +411,17 @@ export const mockTasks: TrainingTask[] = [
             ...MOCK_SFT_CONFIG,
             grpoTemplateId: 'grpo-lora-default',
             grpoTemplateName: 'GRPO LoRA 轻量模板',
-            grpoTemplateContent: JSON.stringify(
-              {
-                fineTuneType: 'lora',
-                params: {
-                  learningRate: MOCK_SFT_CONFIG.learningRate,
-                  numEpochs: MOCK_SFT_CONFIG.numEpochs,
-                  perDeviceBatchSize: MOCK_SFT_CONFIG.perDeviceBatchSize,
-                  gradientAccumulationSteps: MOCK_SFT_CONFIG.gradientAccumulationSteps,
-                  loraRank: MOCK_SFT_CONFIG.loraRank,
-                  loraTargetModules: ['all'],
-                  loraAlpha: MOCK_SFT_CONFIG.loraAlpha,
-                  loraDropout: MOCK_SFT_CONFIG.loraDropout,
-                },
-              },
-              null,
-              2,
-            ),
+            grpoTemplateContent: `fineTuneType: lora
+params:
+  learningRate: ${MOCK_SFT_CONFIG.learningRate}
+  numEpochs: ${MOCK_SFT_CONFIG.numEpochs}
+  perDeviceBatchSize: ${MOCK_SFT_CONFIG.perDeviceBatchSize}
+  gradientAccumulationSteps: ${MOCK_SFT_CONFIG.gradientAccumulationSteps}
+  loraRank: ${MOCK_SFT_CONFIG.loraRank}
+  loraTargetModules:
+    - all
+  loraAlpha: ${MOCK_SFT_CONFIG.loraAlpha}
+  loraDropout: ${MOCK_SFT_CONFIG.loraDropout}`,
             grpoTemplateSnapshot: {
               fineTuneType: 'lora',
               params: {
@@ -439,6 +433,30 @@ export const mockTasks: TrainingTask[] = [
                 loraTargetModules: ['all'],
                 loraAlpha: MOCK_SFT_CONFIG.loraAlpha,
                 loraDropout: MOCK_SFT_CONFIG.loraDropout,
+              },
+            },
+            grpoResourceConfig: {
+              hand: {
+                gpuType: 'T4',
+                gpuCount: 2,
+                cpuRequest: 8,
+                cpuLimit: 16,
+                memoryRequest: 32,
+                memoryLimit: 64,
+              },
+              work: {
+                gpuType: 'T4',
+                gpuCount: 4,
+                cpuRequest: 16,
+                cpuLimit: 32,
+                memoryRequest: 64,
+                memoryLimit: 128,
+              },
+              submit: {
+                cpuRequest: 4,
+                cpuLimit: 8,
+                memoryRequest: 16,
+                memoryLimit: 32,
               },
             },
           },

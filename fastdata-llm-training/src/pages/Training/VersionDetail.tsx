@@ -50,6 +50,7 @@ import {
   TERMINATE_BLOCKED_MESSAGE,
 } from './trainingVersionActions'
 import { canAccessResourceData, getOperationDeniedMessage } from '../../services/permissionStore'
+import { buildGrpoTemplateYaml, parseGrpoTemplateYaml } from '../../services/grpoTrainingParameterTemplateStore'
 
 const { Title, Text } = Typography
 
@@ -149,18 +150,18 @@ const GRPO_TEMPLATE_DETAIL_KEYS = [
 function buildGrpoTemplateContentFromConfig(versionFineTuneType: string | undefined, cfg: Record<string, unknown> | undefined) {
   if (!cfg) return ''
   if (typeof cfg.grpoTemplateContent === 'string' && cfg.grpoTemplateContent.trim()) {
-    return cfg.grpoTemplateContent
+    try {
+      return buildGrpoTemplateYaml(parseGrpoTemplateYaml(cfg.grpoTemplateContent))
+    } catch {
+      return cfg.grpoTemplateContent
+    }
   }
   const snapshot = cfg.grpoTemplateSnapshot as { fineTuneType?: string; params?: Record<string, unknown> } | undefined
   if (snapshot?.fineTuneType && snapshot.params) {
-    return JSON.stringify(
-      {
-        fineTuneType: snapshot.fineTuneType,
-        params: snapshot.params,
-      },
-      null,
-      2,
-    )
+    return buildGrpoTemplateYaml({
+      fineTuneType: snapshot.fineTuneType as 'full' | 'lora',
+      params: snapshot.params,
+    })
   }
   const params: Record<string, unknown> = {}
   for (const key of GRPO_TEMPLATE_DETAIL_KEYS) {
@@ -170,14 +171,10 @@ function buildGrpoTemplateContentFromConfig(versionFineTuneType: string | undefi
     }
   }
   if (Object.keys(params).length === 0) return ''
-  return JSON.stringify(
-    {
-      fineTuneType: versionFineTuneType ?? 'full',
-      params,
-    },
-    null,
-    2,
-  )
+  return buildGrpoTemplateYaml({
+    fineTuneType: (versionFineTuneType === 'lora' ? 'lora' : 'full'),
+    params,
+  })
 }
 
 /** 训练曲线展示顺序（与参考页一致：loss / eval_loss / epoch / learning_rate 等） */
@@ -474,6 +471,25 @@ const VersionDetail: React.FC = () => {
 
   // 显卡资源配置 Tab：字段口径与创建页保持一致
   const resourceConfig = version.config ?? {}
+  const isGrpoVersion = version.trainingMethod === 'RFT'
+  const legacyResourceConfig = {
+    gpuType: version.gpuConfig?.gpuModel,
+    gpuCount: version.gpuConfig?.gpuCount,
+    cpuRequest: resourceConfig.cpuRequest,
+    cpuLimit: resourceConfig.cpuLimit,
+    memoryRequest: resourceConfig.memoryRequest,
+    memoryLimit: resourceConfig.memoryLimit,
+  }
+  const grpoResourceConfig = resourceConfig.grpoResourceConfig ?? {
+    hand: legacyResourceConfig,
+    work: legacyResourceConfig,
+    submit: {
+      cpuRequest: resourceConfig.cpuRequest,
+      cpuLimit: resourceConfig.cpuLimit,
+      memoryRequest: resourceConfig.memoryRequest,
+      memoryLimit: resourceConfig.memoryLimit,
+    },
+  }
   const hasResourceConfig = Boolean(
     version.gpuConfig ||
       resourceConfig.cpuRequest ||
@@ -481,7 +497,68 @@ const VersionDetail: React.FC = () => {
       resourceConfig.memoryRequest ||
       resourceConfig.memoryLimit,
   )
-  const gpuContent = hasResourceConfig ? (
+
+  const renderResourceDescriptions = (
+    value: {
+      gpuType?: string
+      gpuCount?: number
+      cpuRequest?: number
+      cpuLimit?: number
+      memoryRequest?: number
+      memoryLimit?: number
+    } | undefined,
+    options?: { includeGpu?: boolean },
+  ) => {
+    const includeGpu = options?.includeGpu ?? true
+    return (
+      <Descriptions bordered column={2} size="small" style={{ borderRadius: 12, overflow: 'hidden' }}>
+        {includeGpu && (
+          <>
+            <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>显卡类型及型号</span>}>
+              {formatGpuModel(value?.gpuType)}
+            </Descriptions.Item>
+            <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>显卡卡数配置</span>}>
+              {formatCardCount(value?.gpuCount)}
+            </Descriptions.Item>
+          </>
+        )}
+        <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>CPU请求</span>}>
+          {formatResourceValue(value?.cpuRequest, 'Core')}
+        </Descriptions.Item>
+        <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>CPU限制</span>}>
+          {formatResourceValue(value?.cpuLimit, 'Core')}
+        </Descriptions.Item>
+        <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>内存请求</span>}>
+          {formatResourceValue(value?.memoryRequest, 'GB')}
+        </Descriptions.Item>
+        <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>内存限制</span>}>
+          {formatResourceValue(value?.memoryLimit, 'GB')}
+        </Descriptions.Item>
+      </Descriptions>
+    )
+  }
+
+  const gpuContent = isGrpoVersion ? (
+    <Tabs
+      items={[
+        {
+          key: 'hand',
+          label: 'Hand',
+          children: renderResourceDescriptions(grpoResourceConfig.hand, { includeGpu: true }),
+        },
+        {
+          key: 'work',
+          label: 'Work',
+          children: renderResourceDescriptions(grpoResourceConfig.work, { includeGpu: true }),
+        },
+        {
+          key: 'submit',
+          label: 'Submit',
+          children: renderResourceDescriptions(grpoResourceConfig.submit, { includeGpu: false }),
+        },
+      ]}
+    />
+  ) : hasResourceConfig ? (
     <Descriptions bordered column={2} size="small" style={{ borderRadius: 12, overflow: 'hidden' }}>
       <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '10px 16px', display: 'block' }}>显卡类型及型号</span>}>
         {formatGpuModel(version.gpuConfig?.gpuModel)}
