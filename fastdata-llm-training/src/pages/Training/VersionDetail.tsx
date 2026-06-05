@@ -115,6 +115,71 @@ function getDeepSpeedStageConfig(value?: string) {
   return DEEPSPEED_STAGE_LABELS[value ?? 'off'] ?? DEEPSPEED_STAGE_LABELS.off
 }
 
+const GRPO_TEMPLATE_DETAIL_KEYS = [
+  'learningRate',
+  'numEpochs',
+  'perDeviceBatchSize',
+  'gradientAccumulationSteps',
+  'warmupRatio',
+  'lrSchedulerType',
+  'useBf16',
+  'gradientCheckpointing',
+  'maxGradNorm',
+  'ropeScalingMethod',
+  'randomSeed',
+  'weightDecay',
+  'cutoffLength',
+  'preprocessingNumWorkers',
+  'evalSteps',
+  'evalStrategy',
+  'metricGreaterIsBetter',
+  'loadBestModelAtEnd',
+  'bestModelMetric',
+  'perDeviceEvalBatchSize',
+  'saveSteps',
+  'saveStrategy',
+  'saveTotalLimit',
+  'loggingSteps',
+  'loraAlpha',
+  'loraDropout',
+  'loraRank',
+  'loraTarget',
+] as const
+
+function buildGrpoTemplateContentFromConfig(versionFineTuneType: string | undefined, cfg: Record<string, unknown> | undefined) {
+  if (!cfg) return ''
+  if (typeof cfg.grpoTemplateContent === 'string' && cfg.grpoTemplateContent.trim()) {
+    return cfg.grpoTemplateContent
+  }
+  const snapshot = cfg.grpoTemplateSnapshot as { fineTuneType?: string; params?: Record<string, unknown> } | undefined
+  if (snapshot?.fineTuneType && snapshot.params) {
+    return JSON.stringify(
+      {
+        fineTuneType: snapshot.fineTuneType,
+        params: snapshot.params,
+      },
+      null,
+      2,
+    )
+  }
+  const params: Record<string, unknown> = {}
+  for (const key of GRPO_TEMPLATE_DETAIL_KEYS) {
+    const value = cfg[key]
+    if (value !== undefined) {
+      params[key] = value
+    }
+  }
+  if (Object.keys(params).length === 0) return ''
+  return JSON.stringify(
+    {
+      fineTuneType: versionFineTuneType ?? 'full',
+      params,
+    },
+    null,
+    2,
+  )
+}
+
 /** 训练曲线展示顺序（与参考页一致：loss / eval_loss / epoch / learning_rate 等） */
 const METRIC_CURVE_ORDER = [
   'loss',
@@ -238,7 +303,7 @@ const VersionDetail: React.FC = () => {
         <Result
           status="403"
           title="权限不足"
-          subTitle="当前账号仅可操作个人数据/任务，无法查看其他创建人的训练版本详情。"
+          subTitle="当前账号仅可操作个人资源，无法查看其他创建人的训练版本详情。"
           extra={<Button type="primary" onClick={() => navigate('/training')}>返回列表</Button>}
         />
       </div>
@@ -306,6 +371,9 @@ const VersionDetail: React.FC = () => {
 
   const cfg = version.config
   const deepSpeedStageCfg = getDeepSpeedStageConfig(cfg?.deepspeedStage)
+  const grpoTemplateContent = version.trainingMethod === 'RFT'
+    ? buildGrpoTemplateContentFromConfig(version.fineTuneType, cfg as Record<string, unknown> | undefined)
+    : ''
   const basicRows = [
     { name: 'learning_rate',           label: '学习率',            value: cfg?.learningRate },
     { name: 'num_train_epochs',        label: '训练轮次',          value: cfg?.numEpochs },
@@ -788,7 +856,24 @@ const VersionDetail: React.FC = () => {
           参数配置
         </span>
       ),
-      children: (
+      children: grpoTemplateContent ? (
+        <pre
+          style={{
+            margin: 0,
+            padding: 18,
+            borderRadius: 12,
+            background: '#0f172a',
+            color: '#e2e8f0',
+            fontSize: 12,
+            lineHeight: 1.7,
+            overflow: 'auto',
+            maxHeight: 560,
+            fontFamily: 'Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+          }}
+        >
+          {grpoTemplateContent}
+        </pre>
+      ) : (
         <Tabs
           activeKey={activeParamTab}
           onChange={setActiveParamTab}
@@ -1004,6 +1089,23 @@ const VersionDetail: React.FC = () => {
               {version.fineTuneType === 'lora' ? 'Lora微调' : '全参微调'}
             </span>
           </Descriptions.Item>
+          {cfg?.grpoTemplateName ? (
+            <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '12px 16px', display: 'block' }}>GRPO参数配置</span>}>
+              <Tag
+                style={{
+                  margin: 0,
+                  borderRadius: 6,
+                  fontWeight: 600,
+                  fontSize: 12,
+                  color: '#0891b2',
+                  background: 'rgba(8,145,178,0.08)',
+                  border: '1px solid rgba(8,145,178,0.2)',
+                }}
+              >
+                {cfg.grpoTemplateName}
+              </Tag>
+            </Descriptions.Item>
+          ) : null}
           <Descriptions.Item label={<span style={{ fontWeight: 600, background: '#f8fafc', padding: '12px 16px', display: 'block' }}>训练加速配置</span>}>
             <Tag
               style={{

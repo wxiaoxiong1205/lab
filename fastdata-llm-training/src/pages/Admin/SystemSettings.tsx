@@ -16,6 +16,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, TagsOutlined } from '@ant-design/icons'
 import { useLocation } from 'react-router-dom'
 import DocumentAgentSettings from './DocumentAgentSettings'
+import GrpoTemplateSettings from '../../components/GrpoTemplateSettings'
 
 const { Title, Text } = Typography
 
@@ -64,7 +65,10 @@ const seedLabels: LabelRecord[] = [
 const SystemSettings: React.FC = () => {
   const location = useLocation()
   const [searchValue, setSearchValue] = useState('')
-  const [activeTab, setActiveTab] = useState(() => new URLSearchParams(location.search).get('tab') === 'agent' ? 'agent' : 'attributes')
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = new URLSearchParams(location.search).get('tab')
+    return tab === 'agent' || tab === 'grpoTemplates' ? tab : 'attributes'
+  })
   const [activeGroup, setActiveGroup] = useState('训练数据管理')
   const [attributes, setAttributes] = useState<AttributeRecord[]>(seedAttributeRows)
   const [labels, setLabels] = useState<LabelRecord[]>(seedLabels)
@@ -77,9 +81,10 @@ const SystemSettings: React.FC = () => {
   const [valueForm] = Form.useForm()
 
   useEffect(() => {
-    if (new URLSearchParams(location.search).get('tab') === 'agent') {
-      setActiveTab('agent')
-      setActiveGroup('文档中心')
+    const tab = new URLSearchParams(location.search).get('tab')
+    if (tab === 'agent' || tab === 'grpoTemplates') {
+      setActiveTab(tab)
+      setActiveGroup(tab === 'agent' ? '文档中心' : '模板管理')
       setSearchValue('')
     }
   }, [location.search])
@@ -241,7 +246,9 @@ const SystemSettings: React.FC = () => {
     ? attributeMenu
     : activeTab === 'labels'
       ? labelMenu
-      : [{ group: '', items: ['文档中心'] }]
+      : activeTab === 'grpoTemplates'
+        ? [{ group: '', items: ['模板管理'] }]
+        : [{ group: '', items: ['文档中心'] }]
 
   return (
     <>
@@ -254,18 +261,27 @@ const SystemSettings: React.FC = () => {
             onChange={key => {
               setActiveTab(key)
               setSearchValue('')
-              setActiveGroup(key === 'attributes' ? '训练数据管理' : key === 'labels' ? '自定义镜像' : '文档中心')
+              setActiveGroup(
+                key === 'attributes'
+                  ? '训练数据管理'
+                  : key === 'labels'
+                    ? '自定义镜像'
+                    : key === 'grpoTemplates'
+                      ? '模板管理'
+                      : '文档中心',
+              )
             }}
             items={[
               { key: 'attributes', label: '属性配置' },
               { key: 'labels', label: '标签配置' },
+              { key: 'grpoTemplates', label: 'GRPO训练参数配置' },
               { key: 'agent', label: 'Agent助手' },
             ]}
           />
 
           <div style={{ display: 'grid', gridTemplateColumns: '246px minmax(0,1fr)', gap: 20 }}>
             <Card style={{ borderRadius: 16 }}>
-              {activeTab !== 'agent' && (
+              {activeTab !== 'agent' && activeTab !== 'grpoTemplates' && (
                 <Text type="secondary" style={{ display: 'block', marginBottom: 14 }}>
                   {activeTab === 'attributes' ? '属性配置' : '标签配置'}
                 </Text>
@@ -326,7 +342,7 @@ const SystemSettings: React.FC = () => {
 
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 16, gap: 12 }}>
-                {activeTab === 'agent' ? (
+                {activeTab === 'agent' || activeTab === 'grpoTemplates' ? (
                   <div />
                 ) : (
                   <Input
@@ -368,6 +384,8 @@ const SystemSettings: React.FC = () => {
                 <Table rowKey="id" columns={attributeColumns} dataSource={filteredAttributes} pagination={false} scroll={{ x: 820 }} />
               ) : activeTab === 'labels' ? (
                 <Table rowKey="id" columns={labelColumns} dataSource={filteredLabels} pagination={false} scroll={{ x: 760 }} />
+              ) : activeTab === 'grpoTemplates' ? (
+                <GrpoTemplateSettings />
               ) : (
                 <DocumentAgentSettings />
               )}

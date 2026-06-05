@@ -42,6 +42,12 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { trainedModels } from '../../data/mockData'
 import { getTrainingTypeFromModel, isQwenProvider, loadBaseModelCatalog } from '../../data/modelCatalog'
 import { useTrainingTasks } from '../../services/trainingTaskStore'
+import {
+  GRPO_TEMPLATE_PARAM_KEYS,
+  normalizeGrpoTemplateParams,
+  useGrpoTrainingParameterTemplates,
+  type GrpoTrainingParameterTemplate,
+} from '../../services/grpoTrainingParameterTemplateStore'
 import { createTaskNotification } from '../../services/notificationStore'
 import { resolveDatasetVersionRow } from '../../data/datasetPickerCatalog'
 import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
@@ -137,6 +143,41 @@ function scheduleTimeToPickerValue(raw?: string) {
   return d.isValid() ? d : undefined
 }
 const { TextArea } = Input
+
+function buildGrpoTemplateContent(template: { fineTuneType: FineTuneType; params: Record<string, unknown> }) {
+  return JSON.stringify(
+    {
+      fineTuneType: template.fineTuneType,
+      params: template.params,
+    },
+    null,
+    2,
+  )
+}
+
+function parseGrpoTemplateContent(raw?: string): { fineTuneType: FineTuneType; params: Record<string, unknown> } {
+  const parsed = JSON.parse(raw || '{}') as Record<string, unknown>
+  const invalidRootKeys = Object.keys(parsed).filter(key => key !== 'fineTuneType' && key !== 'params')
+  if (invalidRootKeys.length > 0) {
+    throw new Error(`不支持的根字段：${invalidRootKeys.join('、')}`)
+  }
+  if (parsed.fineTuneType !== 'full' && parsed.fineTuneType !== 'lora') {
+    throw new Error('fineTuneType 仅支持 full 或 lora')
+  }
+  if (!parsed.params || typeof parsed.params !== 'object' || Array.isArray(parsed.params)) {
+    throw new Error('params 必须是对象')
+  }
+  const params = parsed.params as Record<string, unknown>
+  const allowed = new Set<string>(GRPO_TEMPLATE_PARAM_KEYS)
+  const invalidParamKeys = Object.keys(params).filter(key => !allowed.has(key))
+  if (invalidParamKeys.length > 0) {
+    throw new Error(`不支持的训练参数字段：${invalidParamKeys.join('、')}`)
+  }
+  return {
+    fineTuneType: parsed.fineTuneType,
+    params: normalizeGrpoTemplateParams(params),
+  }
+}
 
 /** 微调类型：与 Form 联动，切换时回到基础参数 Tab */
 const FineTuneTypePicker: React.FC<{
@@ -725,6 +766,111 @@ const DeepSpeedStageField: React.FC = () => {
   )
 }
 
+const GrpoTrainingParameterTemplateField: React.FC<{
+  templates: GrpoTrainingParameterTemplate[]
+  onApplied: () => void
+}> = ({ templates, onApplied }) => {
+  const form = Form.useFormInstance()
+  const selectedId = Form.useWatch('grpoTemplateId', form) as string | undefined
+  const selectedTemplate = templates.find(item => item.id === selectedId)
+
+  const applyTemplateContent = (raw?: string) => {
+    const parsed = parseGrpoTemplateContent(raw)
+    form.setFieldsValue({
+      fineTuneType: parsed.fineTuneType,
+      ...parsed.params,
+      grpoTemplateSnapshot: {
+        fineTuneType: parsed.fineTuneType,
+        params: parsed.params,
+      },
+    })
+    return parsed
+  }
+
+  const applyTemplate = (templateId: string) => {
+    const template = templates.find(item => item.id === templateId)
+    if (!template) {
+      return
+    }
+    const content = buildGrpoTemplateContent(template)
+    form.setFieldsValue({
+      grpoTemplateId: template.id,
+      grpoTemplateName: template.name,
+      grpoTemplateContent: content,
+      grpoTemplateSnapshot: {
+        fineTuneType: template.fineTuneType,
+        params: template.params,
+      },
+      fineTuneType: template.fineTuneType,
+      ...template.params,
+    })
+    onApplied()
+    message.success('已应用GRPO训练参数配置，可继续调整本次训练参数')
+  }
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <Form.Item name="grpoTemplateName" hidden>
+        <Input />
+      </Form.Item>
+      <Form.Item
+        label="GRPO训练参数配置"
+        name="grpoTemplateId"
+        rules={[{ required: true, message: '请选择GRPO训练参数配置' }]}
+        tooltip="选择一套 GRPO 训练参数模板，并可在本次任务中继续编辑模板内容。"
+      >
+        <Select
+          placeholder="请选择GRPO训练参数配置"
+          onChange={applyTemplate}
+          options={templates.map(template => ({
+            value: template.id,
+            label: `${template.name}（${template.fineTuneType === 'lora' ? 'LoRA微调' : '全参微调'}）`,
+          }))}
+          notFoundContent="暂无启用模板，请到系统管理-系统配置中启用或新增模板"
+        />
+      </Form.Item>
+
+      {selectedTemplate ? (
+        <Form.Item
+          label="参数模板"
+          name="grpoTemplateContent"
+          rules={[
+            { required: true, message: '请填写GRPO训练参数配置模板' },
+            {
+              validator: async (_, value) => {
+                try {
+                  parseGrpoTemplateContent(value)
+                } catch (error) {
+                  return Promise.reject(error instanceof Error ? error.message : '模板内容不合法')
+                }
+              },
+            },
+          ]}
+        >
+          <Input.TextArea
+            rows={18}
+            onBlur={event => {
+              try {
+                applyTemplateContent(event.target.value)
+              } catch {
+                // Validation message is handled by Form.Item.
+              }
+            }}
+            style={{
+              fontFamily: 'Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+              fontSize: 12,
+              lineHeight: 1.6,
+              background: '#0f172a',
+              color: '#e2e8f0',
+              borderRadius: 12,
+            }}
+          />
+        </Form.Item>
+      ) : null}
+    </div>
+  )
+}
+
 type TrainingDatasetRow = {
   key: string
   name: string
@@ -967,6 +1113,10 @@ function mapVersionToFormValues(
     saveStrategy: c.saveStrategy,
     saveTotalLimit: c.saveTotalLimit,
     loggingSteps: c.loggingSteps,
+    grpoTemplateId: c.grpoTemplateId,
+    grpoTemplateName: c.grpoTemplateName,
+    grpoTemplateContent: c.grpoTemplateContent ?? (c.grpoTemplateSnapshot ? buildGrpoTemplateContent(c.grpoTemplateSnapshot) : undefined),
+    grpoTemplateSnapshot: c.grpoTemplateSnapshot,
     deepspeedStage: c.deepspeedStage ?? 'off',
     loraRank: c.loraRank,
     loraTargetModules: c.loraTarget === 'all' ? ['all'] : (c.loraTarget ? [c.loraTarget] : ['all']),
@@ -989,6 +1139,7 @@ const CreateTraining: React.FC = () => {
   const [activeTab, setActiveTab] = useState('basic')
   const [baseModelCatalog] = useState(() => loadBaseModelCatalog())
   const trainingTasks = useTrainingTasks()
+  const grpoTemplates = useGrpoTrainingParameterTemplates()
 
   // 同一页面路由在「仅 taskId」与「taskId + editVersion」之间切换时组件不卸载，Ant Design Form 的 initialValues 只生效一次；
   // 用完整查询串作为 key，保证从「新增版本 V9」切到「编辑某版本」时表单整表重建并正确回显。
@@ -1071,12 +1222,25 @@ const CreateTraining: React.FC = () => {
   const scheduleEnabled = Form.useWatch('scheduleEnabled', form)
   const rftAlgorithm = Form.useWatch('rftAlgorithm', form) as RFTAlgorithm | 'PPO' | undefined
   const rewardRuleType = Form.useWatch('rewardRuleType', form) as RewardRuleType | undefined
+  const isGrpoTraining = trainingMethod === 'RFT' && rftAlgorithm === 'GRPO'
+  const enabledGrpoTemplates = useMemo(() => grpoTemplates.filter(template => template.enabled), [grpoTemplates])
 
   useEffect(() => {
     if (trainingMethod === 'RFT' && rftAlgorithm === 'PPO') {
       form.setFieldValue('rftAlgorithm', 'GRPO')
     }
   }, [form, trainingMethod, rftAlgorithm])
+
+  useEffect(() => {
+    if (!isGrpoTraining) {
+      form.setFieldsValue({
+        grpoTemplateId: undefined,
+        grpoTemplateName: undefined,
+        grpoTemplateContent: undefined,
+        grpoTemplateSnapshot: undefined,
+      })
+    }
+  }, [form, isGrpoTraining])
 
   const filteredVariants = useMemo<TrainingBaseModelOption[]>(
     () =>
@@ -1148,6 +1312,22 @@ const CreateTraining: React.FC = () => {
 
     if (!values) {
       return
+    }
+
+    if (isGrpoTraining) {
+      try {
+        const parsed = parseGrpoTemplateContent(form.getFieldValue('grpoTemplateContent') as string | undefined)
+        form.setFieldsValue({
+          fineTuneType: parsed.fineTuneType,
+          ...parsed.params,
+          grpoTemplateSnapshot: {
+            fineTuneType: parsed.fineTuneType,
+            params: parsed.params,
+          },
+        })
+      } catch {
+        return
+      }
     }
 
     if (mode === 'editVersion') {
@@ -1631,7 +1811,75 @@ const CreateTraining: React.FC = () => {
           </Form.Item>
         </Card>
 
-        {/* 训练配置（与模型配置互换位置：先选训练方法，再选模型） */}
+        {/* 基础模型配置：先选模型，再配置训练参数 */}
+        <Card
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 4, height: 18, background: 'linear-gradient(180deg, #7c3aed 0%, #a78bfa 100%)', borderRadius: 2 }} />
+              <span style={{ fontWeight: 600, fontSize: 15 }}>基础模型配置</span>
+            </div>
+          }
+          style={{
+            marginBottom: 20,
+            borderRadius: 16,
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+            opacity: 0,
+            animation: 'fadeInUp 0.5s ease 0.15s forwards',
+          }}
+          styles={{ body: { padding: '24px' } }}
+        >
+          {/* 模型来源切换：模型仓库 / 我的模型 */}
+          <Form.Item label="模型来源" name="baseModelSource">
+            <Radio.Group
+              value={baseModelSource}
+              onChange={e => {
+                form.setFieldValue('baseModelSource', e.target.value)
+                form.setFieldValue('baseModel', undefined)
+                form.setFieldValue('trainedModelId', undefined)
+              }}
+            >
+              <Radio.Button value="base">
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <CloudServerOutlined />
+                  模型仓库
+                </span>
+              </Radio.Button>
+              <Radio.Button value="my">
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <ExperimentOutlined />
+                  我的模型
+                </span>
+              </Radio.Button>
+            </Radio.Group>
+          </Form.Item>
+
+          {/* 选择模型仓库选项（模型仓库来源时） */}
+          {baseModelSource === 'base' && (
+            <Form.Item
+              label="模型仓库选项"
+              name="baseModel"
+              rules={[{ required: baseModelSource === 'base', message: '请选择模型仓库选项' }]}
+              tooltip="通过弹窗先选择模型提供商，再选择模型仓库中的具体模型；Qwen 本期标记为已适配，其它提供商可选并标记为未适配"
+            >
+              <BaseModelModalPicker options={filteredVariants} trainingType={trainingType} />
+            </Form.Item>
+          )}
+
+          {/* 选择我的模型（我的模型来源时） */}
+          {baseModelSource === 'my' && (
+            <Form.Item
+              label="我的模型版本"
+              name="trainedModelId"
+              rules={[{ required: baseModelSource === 'my', message: '请选择我的模型版本' }]}
+              tooltip="通过弹窗按训练类型筛选我的模型，并选择具体模型版本作为本次训练的基础模型"
+            >
+              <TrainedModelModalPicker options={trainedModelOptions} />
+            </Form.Item>
+          )}
+        </Card>
+
+        {/* 训练配置 */}
         <Card
           title={
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1645,7 +1893,7 @@ const CreateTraining: React.FC = () => {
             border: '1px solid #e2e8f0',
             boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
             opacity: 0,
-            animation: 'fadeInUp 0.5s ease 0.15s forwards',
+            animation: 'fadeInUp 0.5s ease 0.2s forwards',
           }}
           styles={{ body: { padding: '24px' } }}
         >
@@ -1693,6 +1941,10 @@ const CreateTraining: React.FC = () => {
                   form.setFieldValue('rftAlgorithm', undefined)
                   form.setFieldValue('rewardRuleType', undefined)
                   form.setFieldValue('rewardRuleCustomCodePath', undefined)
+                  form.setFieldValue('grpoTemplateId', undefined)
+                  form.setFieldValue('grpoTemplateName', undefined)
+                  form.setFieldValue('grpoTemplateContent', undefined)
+                  form.setFieldValue('grpoTemplateSnapshot', undefined)
                 }}
               >
                 <Select.Option value="SFT">
@@ -1748,8 +2000,12 @@ const CreateTraining: React.FC = () => {
 
           <DeepSpeedStageField />
 
-          {/* 微调类型：仅 SFT / DPO / RFT 显示，参数 Tabs 紧跟其后 */}
-          {(trainingMethod === 'SFT' || trainingMethod === 'DPO' || trainingMethod === 'RFT') && (
+          {isGrpoTraining ? (
+            <GrpoTrainingParameterTemplateField
+              templates={enabledGrpoTemplates}
+              onApplied={() => setActiveTab('basic')}
+            />
+          ) : (trainingMethod === 'SFT' || trainingMethod === 'DPO' || trainingMethod === 'RFT') && (
             <Form.Item
               label="微调类型"
               name="fineTuneType"
@@ -1759,79 +2015,13 @@ const CreateTraining: React.FC = () => {
             </Form.Item>
           )}
 
-          <Tabs
-            activeKey={activeTab}
-            onChange={setActiveTab}
-            items={computedTabItems}
-            style={{ marginTop: -8 }}
-          />
-        </Card>
-
-        {/* 基础模型配置（互换位置后移至第三） */}
-        <Card
-          title={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 4, height: 18, background: 'linear-gradient(180deg, #7c3aed 0%, #a78bfa 100%)', borderRadius: 2 }} />
-              <span style={{ fontWeight: 600, fontSize: 15 }}>基础模型配置</span>
-            </div>
-          }
-          style={{
-            marginBottom: 20,
-            borderRadius: 16,
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-            opacity: 0,
-            animation: 'fadeInUp 0.5s ease 0.2s forwards',
-          }}
-          styles={{ body: { padding: '24px' } }}
-        >
-          {/* 模型来源切换：模型仓库 / 我的模型 */}
-          <Form.Item label="模型来源" name="baseModelSource">
-            <Radio.Group
-              value={baseModelSource}
-              onChange={e => {
-                form.setFieldValue('baseModelSource', e.target.value)
-                form.setFieldValue('baseModel', undefined)
-                form.setFieldValue('trainedModelId', undefined)
-              }}
-            >
-              <Radio.Button value="base">
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <CloudServerOutlined />
-                  模型仓库
-                </span>
-              </Radio.Button>
-              <Radio.Button value="my">
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <ExperimentOutlined />
-                  我的模型
-                </span>
-              </Radio.Button>
-            </Radio.Group>
-          </Form.Item>
-
-          {/* 选择模型仓库选项（模型仓库来源时） */}
-          {baseModelSource === 'base' && (
-            <Form.Item
-              label="模型仓库选项"
-              name="baseModel"
-              rules={[{ required: baseModelSource === 'base', message: '请选择模型仓库选项' }]}
-              tooltip="通过弹窗先选择模型提供商，再选择模型仓库中的具体模型；Qwen 本期标记为已适配，其它提供商可选并标记为未适配"
-            >
-              <BaseModelModalPicker options={filteredVariants} trainingType={trainingType} />
-            </Form.Item>
-          )}
-
-          {/* 选择我的模型（我的模型来源时） */}
-          {baseModelSource === 'my' && (
-            <Form.Item
-              label="我的模型版本"
-              name="trainedModelId"
-              rules={[{ required: baseModelSource === 'my', message: '请选择我的模型版本' }]}
-              tooltip="通过弹窗按训练类型筛选我的模型，并选择具体模型版本作为本次训练的基础模型"
-            >
-              <TrainedModelModalPicker options={trainedModelOptions} />
-            </Form.Item>
+          {!isGrpoTraining && (
+            <Tabs
+              activeKey={activeTab}
+              onChange={setActiveTab}
+              items={computedTabItems}
+              style={{ marginTop: -8 }}
+            />
           )}
         </Card>
 
