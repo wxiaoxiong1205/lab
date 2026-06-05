@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
-import { Card, Checkbox, Empty, Input, Space, Tabs, Tag, Tree, Typography } from 'antd'
+import { Card, Checkbox, Empty, Input, Space, Tabs, Tag, Tooltip, Tree, Typography } from 'antd'
 import type { DataNode } from 'antd/es/tree'
-import { SearchOutlined } from '@ant-design/icons'
+import { QuestionCircleOutlined, SearchOutlined } from '@ant-design/icons'
 import { OPERATION_PERMISSION_TREE, type PermissionTreeNode } from '../../services/permissionCatalog'
 import {
   BUILT_IN_ROLE_KEYS,
@@ -10,7 +10,7 @@ import {
   updateRole,
   usePermissionStore,
   type PermissionRole,
-  type RoleDataPermissions,
+  type RoleResourceScopes,
 } from '../../services/permissionStore'
 
 const { Title, Text } = Typography
@@ -76,7 +76,7 @@ const PermissionConfig: React.FC = () => {
     updateRole(selectedRole.key, { operationPermissions: nextKeys.map(String) })
   }
 
-  const updateDataPermission = (domain: keyof RoleDataPermissions, all: boolean) => {
+  const updateResourceScope = (domain: keyof RoleResourceScopes, all: boolean) => {
     if (!selectedRole || !editable) {
       return
     }
@@ -97,7 +97,7 @@ const PermissionConfig: React.FC = () => {
               权限配置
             </Title>
             <Text type="secondary">
-              配置角色在 Lab 内的操作权限和数据权限。
+              管理角色在 Lab 内的功能授权与资源归属控制。
             </Text>
           </div>
         </div>
@@ -146,7 +146,7 @@ const PermissionConfig: React.FC = () => {
                       <span style={{ fontSize: 16, fontWeight: 700 }}>{role.name}</span>
                     </div>
                     <div style={{ marginTop: 8, color: '#64748b', fontSize: 12 }}>
-                      全部数据：{DATA_PERMISSION_DOMAINS.filter(item => role.dataPermissions[item.key].all).map(item => item.label).join('、') || '无'}
+                      全部资源：{DATA_PERMISSION_DOMAINS.filter(item => role.dataPermissions[item.key].all).map(item => item.label).join('、') || '无'}
                     </div>
                   </button>
                 )
@@ -179,7 +179,7 @@ const PermissionConfig: React.FC = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                         <Tag color="blue">{selectedRole.name}</Tag>
                         <Text type="secondary">
-                          必须同时具备菜单权限、操作权限、项目权限和数据权限方可执行操作。
+                          必须同时具备菜单权限、操作权限、项目权限和可操作资源范围方可执行操作。
                         </Text>
                       </div>
 
@@ -211,12 +211,12 @@ const PermissionConfig: React.FC = () => {
                   ),
                 },
                 {
-                  key: 'data',
-                  label: '数据权限',
+                  key: 'resource-scope',
+                  label: '可操作资源范围',
                   children: selectedRole ? (
                     <div style={{ display: 'grid', gap: 16 }}>
                       <Text type="secondary">
-                        每个模块默认拥有“个人数据/任务”权限且不可取消；勾选“全部数据”后，可在拥有操作权限的基础上操作其他人的数据和任务。
+                        设置角色可处理的资源归属范围，用于限定用户仅处理本人创建资源或处理项目内全部资源。
                       </Text>
                       {DATA_PERMISSION_DOMAINS.map(domain => (
                         <Card key={domain.key} size="small" style={{ borderRadius: 16, border: '1px solid #e5e7eb' }}>
@@ -225,13 +225,25 @@ const PermissionConfig: React.FC = () => {
                               <div style={{ fontWeight: 800, fontSize: 16 }}>{domain.label}</div>
                             </div>
                             <Space size={24}>
-                              <Checkbox checked disabled>个人数据/任务</Checkbox>
+                              <Checkbox checked disabled>
+                                <Space size={6}>
+                                  <span>个人资源</span>
+                                  <Tooltip title="拥有对应操作权限时，可对本人创建的数据、任务、模型、服务等资源执行该操作。">
+                                    <QuestionCircleOutlined style={{ color: '#94a3b8' }} />
+                                  </Tooltip>
+                                </Space>
+                              </Checkbox>
                               <Checkbox
                                 checked={selectedRole.dataPermissions[domain.key].all}
                                 disabled={!editable}
-                                onChange={event => updateDataPermission(domain.key, event.target.checked)}
+                                onChange={event => updateResourceScope(domain.key, event.target.checked)}
                               >
-                                全部数据
+                                <Space size={6}>
+                                  <span>全部资源</span>
+                                  <Tooltip title="拥有对应操作权限时，可对项目内所有人创建的数据、任务、模型、服务等资源执行该操作。">
+                                    <QuestionCircleOutlined style={{ color: '#94a3b8' }} />
+                                  </Tooltip>
+                                </Space>
                               </Checkbox>
                             </Space>
                           </div>

@@ -256,6 +256,15 @@ export interface TrainingConfig {
   loraRank?: number
   loraTarget?: string
 
+  // GRPO 训练参数模板（仅记录“微调类型 + 训练参数”的来源快照）
+  grpoTemplateId?: string
+  grpoTemplateName?: string
+  grpoTemplateContent?: string
+  grpoTemplateSnapshot?: {
+    fineTuneType: FineTuneType
+    params: Record<string, unknown>
+  }
+
   // RFT奖励规则
   rewardRuleType?: RewardRuleType
   rewardRuleCustomCodePath?: string

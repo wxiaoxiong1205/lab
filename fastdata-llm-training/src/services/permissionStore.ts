@@ -20,7 +20,9 @@ export const DATA_PERMISSION_DOMAINS: Array<{ key: DataPermissionDomain; label: 
   { key: 'system', label: '系统管理' },
 ]
 
-export type RoleDataPermissions = Record<DataPermissionDomain, { all: boolean }>
+export type RoleResourceScopes = Record<DataPermissionDomain, { all: boolean }>
+// 兼容历史字段名：dataPermissions 现在表达“可操作资源范围”，即已授权操作可对个人资源还是全部资源生效。
+export type RoleDataPermissions = RoleResourceScopes
 
 export interface PermissionRole {
   key: RoleKey
@@ -80,6 +82,12 @@ const allDataPermissions: RoleDataPermissions = {
   llm: { all: true },
   machine: { all: true },
   system: { all: true },
+}
+
+const projectAdminDataPermissions: RoleDataPermissions = {
+  llm: { all: true },
+  machine: { all: true },
+  system: { all: false },
 }
 
 const projectAdminMenuPermissions = [
@@ -159,7 +167,7 @@ const seedRoles: PermissionRole[] = [
       'evaluation-indicator.detail',
       'admin.project.members',
     ],
-    dataPermissions: personalOnlyDataPermissions,
+    dataPermissions: projectAdminDataPermissions,
   },
   {
     key: 'training_engineer',
@@ -364,7 +372,9 @@ function loadState(): PermissionState {
         operationPermissions: uniqueValues(
           [...(isBuiltInRole ? seedRole?.operationPermissions ?? [] : []), ...(role.operationPermissions ?? [])].map(key => (key === 'home.view' ? 'task-overview.view' : key)),
         ),
-        dataPermissions: normalizeDataPermissions(isTenantAdmin ? allDataPermissions : role.dataPermissions),
+        dataPermissions: normalizeDataPermissions(
+          isTenantAdmin ? allDataPermissions : role.key === 'project_admin' ? projectAdminDataPermissions : role.dataPermissions,
+        ),
       })
     })
     const migratedRoles = Array.from(migratedRoleMap.values())
@@ -864,6 +874,7 @@ export function normalizeCreatorAccount(creator?: string, sourceState = state): 
   return matchedUser?.account ?? value
 }
 
+// 兼容历史 API 名称：当前用于判断可操作资源范围，不代表字段级数据权限。
 export function canAccessResourceData(
   domain: DataPermissionDomain,
   creator?: string,

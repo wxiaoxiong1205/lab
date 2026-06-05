@@ -177,7 +177,7 @@ const TrainingDetail: React.FC = () => {
         <Result
           status="403"
           title="权限不足"
-          subTitle="当前账号仅可操作个人数据/任务，无法查看其他创建人的训练任务详情。"
+          subTitle="当前账号仅可操作个人资源，无法查看其他创建人的训练任务详情。"
           extra={<Button type="primary" onClick={() => navigate('/training')}>返回列表</Button>}
         />
       </div>

@@ -60,7 +60,7 @@ export function getCreatorDeletePermission(creator?: string, domain: DataPermiss
 
   return {
     allowed: false,
-    reason: `权限不足：当前账号 ${currentUser.account} 仅可操作个人数据/任务，数据创建人：${creator || '-'}`,
+    reason: `权限不足：当前账号 ${currentUser.account} 仅可操作个人资源，资源创建人：${creator || '-'}`,
   }
 }
 

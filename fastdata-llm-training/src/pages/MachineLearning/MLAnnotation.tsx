@@ -2093,7 +2093,7 @@ const MLAnnotation: React.FC = () => {
 	            <Result
 	              status="403"
 	              title="权限不足"
-	              subTitle="当前账号仅可操作个人数据/任务，无法进入其他创建人的在线标注任务。"
+	              subTitle="当前账号仅可操作个人资源，无法进入其他创建人的在线标注任务。"
 	              extra={<Button type="primary" onClick={() => navigate('/machine-annotation')}>返回数据标注</Button>}
 	            />
 	          </Card>
