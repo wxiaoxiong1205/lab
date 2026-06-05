@@ -227,6 +227,10 @@ function getRequirementIdentity(content: string): string {
     || content.trim().slice(0, 80).toLowerCase()
 }
 
+function isLegacyRequirementContent(content: string): boolean {
+  return !content.includes('## 1. 需求描述') || !content.includes('## 2. 涉及模块') || !content.includes('## 3. 验收标准')
+}
+
 export function applyDefaultRequirements(doc: PageDesignDoc, versions: RequirementVersion[]): RequirementVersion[] {
   if (!doc.defaultRequirements?.length && !doc.removedDefaultRequirementTitles?.length) {
     return versions
@@ -269,8 +273,10 @@ export function applyDefaultRequirements(doc: PageDesignDoc, versions: Requireme
         const shouldReplace = (doc.replaceDefaultRequirementTitles ?? [])
           .map(title => getRequirementIdentity(`# ${title}`))
           .includes(seededIdentity)
+        const existingNote = existingNoteIndex >= 0 ? existing.notes[existingNoteIndex] : null
+        const shouldMigrateLegacyContent = Boolean(existingNote && isLegacyRequirementContent(existingNote.content))
 
-        if (existingNoteIndex >= 0 && shouldReplace) {
+        if (existingNoteIndex >= 0 && (shouldReplace || shouldMigrateLegacyContent)) {
           nextVersions[existingIndex] = {
             ...nextVersions[existingIndex],
             notes: nextVersions[existingIndex].notes.map((note, index) =>

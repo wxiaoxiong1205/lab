@@ -191,7 +191,7 @@ body {
 }
 
 .app-shell__doc-rail {
-  width: min(392px, calc(100vw - 24px));
+  width: min(var(--design-doc-panel-width, 460px), calc(100vw - 24px));
   overflow: hidden;
   position: fixed;
   top: 72px;
@@ -212,6 +212,40 @@ body {
 .app-shell__doc-rail--open {
   pointer-events: auto;
   transform: translateX(0);
+}
+
+.app-shell__doc-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -5px;
+  width: 10px;
+  z-index: 3;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.app-shell__doc-resizer::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+  left: 4px;
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(96, 165, 250, 0);
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.app-shell__doc-resizer:hover::before,
+.app-shell--resizing-doc-panel .app-shell__doc-resizer::before {
+  background: rgba(96, 165, 250, 0.75);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
+}
+
+.app-shell--resizing-doc-panel {
+  cursor: col-resize !important;
+  user-select: none;
 }
 
 .app-shell__doc-rail--fullscreen {
@@ -257,20 +291,27 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
-  padding: 20px 20px 14px;
+  padding: 20px 22px 14px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.14);
 }
 
 .design-doc-panel__header-main {
   display: flex;
   align-items: center;
+  flex: 1 1 160px;
   min-width: 0;
 }
 
 .design-doc-panel__title.ant-typography {
   margin: 0 !important;
   color: #fff;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: keep-all;
 }
 
 .design-doc-panel__module {
@@ -291,6 +332,22 @@ body {
 
 .design-doc-panel__header .ant-segmented-item-selected {
   color: #0f172a;
+}
+
+.design-doc-panel__header > .ant-space {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.design-doc-panel__header > .ant-space .ant-space-item {
+  min-width: 0;
+}
+
+.design-doc-panel__header .ant-btn,
+.design-doc-panel__header .ant-segmented {
+  flex-shrink: 0;
 }
 
 .design-doc-panel__tabs {
@@ -634,6 +691,7 @@ body {
 .design-doc-panel--fullscreen .design-doc-panel__header > .ant-space {
   flex: 0 1 auto;
   justify-content: flex-end;
+  flex-wrap: wrap;
   min-width: 0;
 }
 
@@ -980,7 +1038,7 @@ body {
 
 @media (max-width: 1280px) {
   .app-shell__doc-rail {
-    width: min(360px, calc(100vw - 24px));
+    width: min(var(--design-doc-panel-width, 460px), calc(100vw - 24px));
   }
 
   .app-shell__doc-rail--fullscreen {

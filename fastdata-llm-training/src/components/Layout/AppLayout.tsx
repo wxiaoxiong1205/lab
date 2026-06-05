@@ -35,6 +35,9 @@ import {
 import { resolveRouteAccess } from '../../services/permissionCatalog'
 
 const { Header, Sider, Content } = Layout
+const DOC_PANEL_MIN_WIDTH = 420
+const DOC_PANEL_MAX_WIDTH = 760
+const DOC_PANEL_DEFAULT_WIDTH = 460
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -159,6 +162,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     return window.localStorage.getItem('design-doc-panel-open') === 'true'
   })
   const [docPanelDisplayMode, setDocPanelDisplayMode] = useState<'side' | 'fullscreen'>('side')
+  const [docPanelWidth, setDocPanelWidth] = useState(() => {
+    if (typeof window === 'undefined') {
+      return DOC_PANEL_DEFAULT_WIDTH
+    }
+
+    const storedWidth = Number(window.localStorage.getItem('design-doc-panel-width'))
+    if (Number.isFinite(storedWidth) && storedWidth > 0) {
+      const maxWidth = Math.max(320, Math.min(DOC_PANEL_MAX_WIDTH, window.innerWidth - 64))
+      const minWidth = Math.min(DOC_PANEL_MIN_WIDTH, maxWidth)
+      return Math.min(Math.max(storedWidth, minWidth), maxWidth)
+    }
+
+    return DOC_PANEL_DEFAULT_WIDTH
+  })
   const [docScope, setDocScope] = useState<'page' | 'global'>('page')
   const [docTargetVersion, setDocTargetVersion] = useState<string | null>(null)
   const [currentPageHasReviewRequirements, setCurrentPageHasReviewRequirements] = useState(false)
@@ -253,6 +270,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   const showSystemMenus = !isAnnotationWorkbenchRoute && !isDocsRoute && isAdminRoute
   const showMainSider = showProjectMenus || showSystemMenus
+  const reviewCenterRightOffset = docPanelOpen && docPanelDisplayMode === 'side' ? docPanelWidth + 160 : 160
+  const docFabRightOffset = docPanelOpen && docPanelDisplayMode === 'side' ? docPanelWidth + 36 : 28
 
   const getSelectedKeys = () => {
     const selectedKey = resolveRouteAccess(location.pathname)?.menuKey
@@ -298,6 +317,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   }, [docPanelOpen])
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    window.localStorage.setItem('design-doc-panel-width', String(docPanelWidth))
+  }, [docPanelWidth])
+
+  useEffect(() => {
     const params = new URLSearchParams(location.search)
     const shouldOpenDoc = params.get('docOpen') === '1'
     const versionName = params.get('docVersion')
@@ -320,10 +347,42 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       return
     }
 
-    const handleResize = () => setViewportWidth(window.innerWidth)
+    const handleResize = () => {
+      setViewportWidth(window.innerWidth)
+      setDocPanelWidth(previous => {
+        const maxWidth = Math.max(320, Math.min(DOC_PANEL_MAX_WIDTH, window.innerWidth - 64))
+        const minWidth = Math.min(DOC_PANEL_MIN_WIDTH, maxWidth)
+        return Math.min(Math.max(previous, minWidth), maxWidth)
+      })
+    }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  const handleStartDocPanelResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (docPanelDisplayMode === 'fullscreen' || typeof window === 'undefined') {
+      return
+    }
+
+    event.preventDefault()
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const maxWidth = Math.max(320, Math.min(DOC_PANEL_MAX_WIDTH, window.innerWidth - 64))
+      const minWidth = Math.min(DOC_PANEL_MIN_WIDTH, maxWidth)
+      const nextWidth = window.innerWidth - moveEvent.clientX
+      setDocPanelWidth(Math.min(Math.max(nextWidth, minWidth), maxWidth))
+    }
+
+    const handlePointerUp = () => {
+      document.body.classList.remove('app-shell--resizing-doc-panel')
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+    }
+
+    document.body.classList.add('app-shell--resizing-doc-panel')
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp, { once: true })
+  }
 
   useEffect(() => {
     if (isDocsRoute) {
@@ -416,7 +475,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       <div className="app-shell__main">{children}</div>
 
       {!isDocsRoute && !isAnnotationWorkbenchRoute && (
-        <div className={`app-shell__doc-rail ${docPanelOpen ? 'app-shell__doc-rail--open' : ''} ${docPanelDisplayMode === 'fullscreen' ? 'app-shell__doc-rail--fullscreen' : ''}`}>
+        <div
+          className={`app-shell__doc-rail ${docPanelOpen ? 'app-shell__doc-rail--open' : ''} ${docPanelDisplayMode === 'fullscreen' ? 'app-shell__doc-rail--fullscreen' : ''}`}
+          style={{ '--design-doc-panel-width': `${docPanelWidth}px` } as React.CSSProperties}
+        >
+          {docPanelOpen && docPanelDisplayMode === 'side' ? (
+            <div
+              className="app-shell__doc-resizer"
+              role="separator"
+              aria-label="拖拽调整需求文档宽度"
+              aria-orientation="vertical"
+              onPointerDown={handleStartDocPanelResize}
+            />
+          ) : null}
           <DesignDocPanel
             doc={activeDoc}
             open={docPanelOpen}
@@ -802,7 +873,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               <DesignDocReviewCenter
                 selectedVersionName={docTargetVersion}
                 currentPagePath={useGlobalDocOnly ? GLOBAL_DESIGN_DOC_PATH : currentDoc.pagePath}
-                rightOffset={docPanelOpen && docPanelDisplayMode === 'side' ? 552 : 160}
+                rightOffset={reviewCenterRightOffset}
                 onVersionChange={setDocTargetVersion}
                 onOpenPage={openReviewDocPage}
                 onCurrentPageHasRequirementsChange={setCurrentPageHasReviewRequirements}
@@ -810,7 +881,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               <DesignDocFab
                 open={docPanelOpen}
                 onToggle={toggleDocPanel}
-                rightOffset={docPanelOpen && docPanelDisplayMode === 'side' ? 428 : 28}
+                rightOffset={docFabRightOffset}
                 highlighted={currentPageHasReviewRequirements}
               />
             </>
