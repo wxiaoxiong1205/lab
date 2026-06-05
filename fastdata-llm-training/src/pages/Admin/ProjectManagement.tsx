@@ -429,7 +429,7 @@ const ProjectManagement: React.FC = () => {
         }
       >
         <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-          添加成员即表示该用户拥有当前项目访问权限；项目内操作权限和数据范围由此处选择的角色决定。
+          添加成员即表示该用户拥有当前项目访问权限；项目内操作权限和可操作资源范围由此处选择的角色决定。
         </Text>
         <Card
           size="small"

@@ -1959,7 +1959,7 @@ const DataAnnotation: React.FC = () => {
           <Result
             status="403"
             title="权限不足"
-            subTitle="当前账号仅可操作个人数据/任务，无法查看或处理其他创建人的标注任务。"
+            subTitle="当前账号仅可操作个人资源，无法查看或处理其他创建人的标注任务。"
             extra={<Button type="primary" onClick={() => navigate(`/data-annotation?dataset_type=${datasetType}`)}>返回列表</Button>}
           />
         </div>

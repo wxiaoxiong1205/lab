@@ -737,7 +737,7 @@ const InferenceResult: React.FC = () => {
         <Result
           status="403"
           title="权限不足"
-          subTitle="当前账号仅可查看和操作个人推理结果集；如需查看全部数据，请联系管理员授予对应角色的数据权限。"
+          subTitle="当前账号仅可操作个人推理结果集；如需操作全部资源，请联系管理员调整对应角色的可操作资源范围。"
           extra={<Button type="primary" onClick={() => navigate('/inference')}>返回列表</Button>}
         />
       </div>

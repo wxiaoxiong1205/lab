@@ -2208,7 +2208,7 @@ const EffectEvaluation: React.FC = () => {
           <Result
             status="403"
             title="权限不足"
-            subTitle="当前账号仅可操作个人数据/任务，无法进入其他创建人的人工评估任务。"
+            subTitle="当前账号仅可操作个人资源，无法进入其他创建人的人工评估任务。"
             extra={<Button type="primary" onClick={() => navigate(`/effect-evaluation?dataset_type=${backDatasetType}&mode=manual`)}>返回列表</Button>}
           />
         </div>
@@ -2436,7 +2436,7 @@ const EffectEvaluation: React.FC = () => {
           <Result
             status="403"
             title="权限不足"
-            subTitle="当前账号仅可操作个人数据/任务，无法查看其他创建人的评估报告。"
+            subTitle="当前账号仅可操作个人资源，无法查看其他创建人的评估报告。"
             extra={<Button type="primary" onClick={() => navigate(`/effect-evaluation?dataset_type=${backDatasetType}&mode=${backMode}`)}>返回列表</Button>}
           />
         </div>

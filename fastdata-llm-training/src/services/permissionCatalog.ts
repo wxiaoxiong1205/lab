@@ -490,7 +490,7 @@ export const OPERATION_DEFINITION_MAP: Record<string, OperationDefinition> = {
   'admin.project.create': { key: 'admin.project.create', label: '新建项目', menuKey: '/admin/projects', requiresProject: false },
   'admin.project.edit': { key: 'admin.project.edit', label: '编辑项目', menuKey: '/admin/projects', requiresProject: false },
   'admin.project.members': { key: 'admin.project.members', label: '成员管理', menuKey: '/admin/projects', requiresProject: false },
-  'admin.project.data-permission': { key: 'admin.project.data-permission', label: '项目数据权限配置', menuKey: '/admin/projects', requiresProject: false },
+  'admin.project.data-permission': { key: 'admin.project.data-permission', label: '项目可操作资源范围配置', menuKey: '/admin/projects', requiresProject: false },
   'admin.cluster.manage': { key: 'admin.cluster.manage', label: '集群管理', menuKey: '/admin/kubernetes', requiresProject: false },
   'admin.storage.manage': { key: 'admin.storage.manage', label: '存储管理', menuKey: '/admin/storage', requiresProject: false },
   'admin.image-list.manage': { key: 'admin.image-list.manage', label: '镜像列表管理', menuKey: '/admin/image-list', requiresProject: false },
