@@ -54,7 +54,7 @@ const App: React.FC = () => {
               <Route path="/" element={<Navigate to="/workspace" replace />} />
               <Route path="/workspace" element={<ProjectSpace />} />
               <Route path="/task-overview" element={<TaskOverview />} />
-              <Route path="/home" element={<Navigate to="/task-overview" replace />} />
+              <Route path="/home" element={<Navigate to="/workspace" replace />} />
               <Route path="/open-platform/api-keys" element={<OpenPlatformApiKeys />} />
 
               {/* 数据服务 */}

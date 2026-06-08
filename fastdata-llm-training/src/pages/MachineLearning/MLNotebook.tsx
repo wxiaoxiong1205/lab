@@ -3,6 +3,7 @@ import {
   ArrowLeftOutlined,
   CopyOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   EyeOutlined,
   FilterOutlined,
   LinkOutlined,
@@ -135,7 +136,7 @@ type CustomMirrorRecord = {
   namespace: string
   imageName: string
   version: string
-  savedImageType: NotebookSavedImageType
+  savedImageType?: NotebookSavedImageType
   description: string
   status: '已完成' | '生成中' | '失败'
   taskSource: string
@@ -155,8 +156,19 @@ type SaveEnvironmentFormValues = {
 type CustomMirrorFormValues = {
   namespace?: string
   imageName?: string
-  savedImageType?: NotebookSavedImageType
   description?: string
+}
+
+type StandardImageBuildFormValues = {
+  imageName?: string
+  baseImage?: string
+  imageDescription?: string
+}
+
+type StandardImageBuildDraft = {
+  notebook: MLNotebookRecord
+  values: SaveEnvironmentFormValues
+  stopAfterBuild: boolean
 }
 
 type CustomMirrorTagFormValues = {
@@ -512,13 +524,34 @@ const savedImageTypeMeta: Record<NotebookSavedImageType, { label: string; color:
   temporary: { label: '临时镜像', color: 'orange' },
 }
 
+const defaultStandardDockerfile = `RUN pip install annotated-types==0.7.0 \\
+    jiter==0.15.0 \\
+    openai==2.41.0 \\
+    pydantic==2.13.4 \\
+    pydantic_core==2.46.4 \\
+    typing_extensions==4.15.0 \\
+    typing-inspection==0.4.2`
+
+const installedPythonPackages = [
+  'annotated-types==0.7.0',
+  'jiter==0.15.0',
+  'openai==2.41.0',
+  'pydantic==2.13.4',
+  'pydantic_core==2.46.4',
+  'typing_extensions==4.15.0',
+  'typing-inspection==0.4.2',
+]
+
 function statusTag(status: NotebookStatus): React.ReactNode {
   const config = TASK_LIFECYCLE_TAG[status]
   return <Tag color={config.color}>{config.label}</Tag>
 }
 
 function savedImageTypeTag(value?: NotebookSavedImageType): React.ReactNode {
-  const meta = savedImageTypeMeta[value ?? 'temporary']
+  if (!value) {
+    return <Text type="secondary">-</Text>
+  }
+  const meta = savedImageTypeMeta[value]
   return <Tag color={meta.color}>{meta.label}</Tag>
 }
 
@@ -698,6 +731,7 @@ const MLNotebook: React.FC = () => {
   const [portForm] = Form.useForm<OpenPortFormValue>()
   const [sshForm] = Form.useForm<SSHConfigRecord>()
   const [saveEnvForm] = Form.useForm<SaveEnvironmentFormValues>()
+  const [standardImageBuildForm] = Form.useForm<StandardImageBuildFormValues>()
   const [customMirrorForm] = Form.useForm<CustomMirrorFormValues>()
   const [mirrorTagForm] = Form.useForm<CustomMirrorTagFormValues>()
   const [searchValue, setSearchValue] = useState('')
@@ -711,6 +745,8 @@ const MLNotebook: React.FC = () => {
   const [saveEnvModalOpen, setSaveEnvModalOpen] = useState(false)
   const [savingNotebook, setSavingNotebook] = useState<MLNotebookRecord | null>(null)
   const [saveEnvShouldStop, setSaveEnvShouldStop] = useState(false)
+  const [standardImageBuildDraft, setStandardImageBuildDraft] = useState<StandardImageBuildDraft | null>(null)
+  const [dockerfileContent, setDockerfileContent] = useState(defaultStandardDockerfile)
   const [stopModalOpen, setStopModalOpen] = useState(false)
   const [stoppingNotebook, setStoppingNotebook] = useState<MLNotebookRecord | null>(null)
   const [shouldSaveBeforeStop, setShouldSaveBeforeStop] = useState(true)
@@ -1030,6 +1066,50 @@ const MLNotebook: React.FC = () => {
     })
   }
 
+  const openStandardImageBuilder = (record: MLNotebookRecord, values: SaveEnvironmentFormValues, stopAfterBuild: boolean) => {
+    setStandardImageBuildDraft({ notebook: record, values: { ...values, savedImageType: 'standard' }, stopAfterBuild })
+    setDockerfileContent(defaultStandardDockerfile)
+    standardImageBuildForm.setFieldsValue({
+      imageName: values.imageName?.trim() || `${record.name}-env`,
+      baseImage: 'CUDA12.3',
+      imageDescription: values.imageDescription ?? '',
+    })
+    setSaveEnvModalOpen(false)
+    setStopModalOpen(false)
+    setSavingNotebook(null)
+    setStoppingNotebook(null)
+    setSaveEnvShouldStop(false)
+    saveEnvForm.resetFields()
+  }
+
+  const cancelStandardImageBuilder = () => {
+    setStandardImageBuildDraft(null)
+    standardImageBuildForm.resetFields()
+    setDockerfileContent(defaultStandardDockerfile)
+  }
+
+  const submitStandardImageBuild = async () => {
+    if (!standardImageBuildDraft) return
+
+    try {
+      const values = await standardImageBuildForm.validateFields()
+      saveNotebookEnvironment(standardImageBuildDraft.notebook, {
+        ...standardImageBuildDraft.values,
+        savedImageType: 'standard',
+        imageName: values.imageName,
+        imageDescription: values.imageDescription,
+      })
+      if (standardImageBuildDraft.stopAfterBuild) {
+        stopNotebook(standardImageBuildDraft.notebook.id, { silent: true })
+      }
+      const shouldStop = standardImageBuildDraft.stopAfterBuild
+      cancelStandardImageBuilder()
+      message.success(shouldStop ? '标准镜像已构建保存，Notebook 已停止' : '标准镜像已构建并保存')
+    } catch {
+      return
+    }
+  }
+
   const setSaveEnvironmentDefaults = (record: MLNotebookRecord) => {
     saveEnvForm.setFieldsValue({
       savedImageType: 'standard',
@@ -1052,6 +1132,10 @@ const MLNotebook: React.FC = () => {
 
     try {
       const values = await saveEnvForm.validateFields()
+      if (values.savedImageType === 'standard') {
+        openStandardImageBuilder(savingNotebook, values, saveEnvShouldStop)
+        return
+      }
       saveNotebookEnvironment(savingNotebook, values)
       setSaveEnvModalOpen(false)
       if (saveEnvShouldStop) {
@@ -1081,6 +1165,10 @@ const MLNotebook: React.FC = () => {
     if (shouldSaveBeforeStop) {
       try {
         const values = await saveEnvForm.validateFields()
+        if (values.savedImageType === 'standard') {
+          openStandardImageBuilder(targetNotebook, values, true)
+          return
+        }
         saveNotebookEnvironment(targetNotebook, values)
         stopNotebook(targetNotebook.id, { silent: true })
         setStopModalOpen(false)
@@ -1107,7 +1195,6 @@ const MLNotebook: React.FC = () => {
           namespace: values.namespace || 'lab',
           imageName: values.imageName || 'jupyter/ml/deepexi-notebook',
           version: `custom-${Date.now()}`,
-          savedImageType: values.savedImageType ?? 'standard',
           description: values.description?.trim() || '暂无描述',
           status: '已完成',
           taskSource: '-',
@@ -1282,30 +1369,55 @@ const MLNotebook: React.FC = () => {
   }
 
   const renderSavedImageTypeSelector = () => (
-    <Form.Item name="savedImageType" initialValue="standard" style={{ marginBottom: 14 }}>
-      <Radio.Group style={{ width: '100%' }}>
-        <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-            <Radio value="standard" style={{ marginTop: 2 }} />
-            <div>
-              <Text strong>构建为标准镜像</Text>
-              <div style={{ marginTop: 6, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                通过 Dockerfile 构建稳定环境，可作为正式镜像长期复用。
+    <>
+      <Form.Item name="savedImageType" initialValue="standard" hidden>
+        <Input />
+      </Form.Item>
+      <Form.Item noStyle shouldUpdate>
+        {() => {
+          const selectedType = saveEnvForm.getFieldValue('savedImageType') ?? 'standard'
+          const renderOption = (value: NotebookSavedImageType, title: string, description: string) => {
+            const selected = selectedType === value
+            return (
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => saveEnvForm.setFieldValue('savedImageType', value)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    saveEnvForm.setFieldValue('savedImageType', value)
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  gap: 10,
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  border: selected ? '1px solid #1677ff' : '1px solid #e2e8f0',
+                  background: selected ? '#f0f7ff' : '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                <Radio checked={selected} style={{ marginTop: 2 }} />
+                <div>
+                  <Text strong>{title}</Text>
+                  <div style={{ marginTop: 6, color: '#475569', fontSize: 13, lineHeight: 1.6 }}>
+                    {description}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-            <Radio value="temporary" style={{ marginTop: 2 }} />
-            <div>
-              <Text strong>保存为临时镜像</Text>
-              <div style={{ marginTop: 6, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                快速保存当前运行环境，适合临时调试和短期复用。
-              </div>
-            </div>
-          </div>
-        </Space>
-      </Radio.Group>
-    </Form.Item>
+            )
+          }
+
+          return (
+            <Space direction="vertical" size={10} style={{ width: '100%', marginBottom: 14 }}>
+              {renderOption('standard', '构建为标准镜像', '通过 Dockerfile 构建稳定环境，可作为正式镜像长期复用。')}
+              {renderOption('temporary', '保存为临时镜像', '快速保存当前运行环境，适合临时调试和短期复用。')}
+            </Space>
+          )
+        }}
+      </Form.Item>
+    </>
   )
 
   const notebookColumns: ColumnsType<MLNotebookRecord> = [
@@ -2361,6 +2473,143 @@ const MLNotebook: React.FC = () => {
     )
   }
 
+  if (standardImageBuildDraft) {
+    return (
+      <div style={{ minHeight: '100%', background: '#fff', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ height: 56, display: 'flex', alignItems: 'center', borderBottom: '1px solid #e5e7eb', padding: '0 20px' }}>
+          <Button type="text" icon={<ArrowLeftOutlined />} onClick={cancelStandardImageBuilder} style={{ fontWeight: 700 }}>
+            制作镜像
+          </Button>
+        </div>
+        <div
+          style={{
+            flex: 1,
+            display: 'grid',
+            gridTemplateColumns: 'minmax(220px, 30%) minmax(0, 1fr) minmax(180px, 22%)',
+            minHeight: 0,
+          }}
+        >
+          <div style={{ borderRight: '1px solid #e5e7eb', padding: 16, overflow: 'auto' }}>
+            <Form form={standardImageBuildForm} layout="vertical">
+              <Form.Item
+                label="镜像名称"
+                name="imageName"
+                rules={[
+                  { required: true, message: '请输入镜像名称' },
+                  { max: 64, message: '镜像名称不能超过 64 个字符' },
+                ]}
+              >
+                <Input placeholder="请输入镜像名称" />
+              </Form.Item>
+              <Form.Item name="baseImage" hidden rules={[{ required: true, message: '请选择基础镜像' }]}>
+                <Input />
+              </Form.Item>
+              <Form.Item label="基础镜像" required>
+                <div
+                  style={{
+                    minHeight: 34,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '4px 10px',
+                    border: '1px solid #d9d9d9',
+                    borderRadius: 6,
+                    background: '#f8fafc',
+                  }}
+                >
+                  <Tag color="blue" style={{ marginInlineEnd: 0 }}>系统</Tag>
+                  <Text>CUDA12.3</Text>
+                </div>
+              </Form.Item>
+              <Form.Item label="镜像描述" name="imageDescription">
+                <Input.TextArea rows={5} placeholder="请输入镜像描述" maxLength={120} showCount />
+              </Form.Item>
+              <Form.Item label="上传文件">
+                <Button icon={<PlusOutlined />}>点击上传</Button>
+                <div style={{ marginTop: 8, color: '#64748b', fontSize: 12, lineHeight: 1.6 }}>
+                  1. 仅支持上传一个文本文件，大小不超过64K；<br />
+                  2. 文件名称只能由大小写英文字母、数字、和符号_-组成，否则将导致构建失败；<br />
+                  3. 上传后的文件会放在Dockerfile根目录；
+                </div>
+              </Form.Item>
+              <div style={{ marginTop: 36, color: '#334155', fontSize: 13, lineHeight: 1.75 }}>
+                <Text strong>注意事项：</Text>
+                <div style={{ marginTop: 8 }}>
+                  1. 构建成功后，请将相关开发环境的镜像「手动」修改为新构建的镜像；<br />
+                  2. 单次构建，增量大小不允许超过 10 GB；构建超过 24 小时将自动停止。
+                </div>
+              </div>
+            </Form>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div
+              style={{
+                minHeight: 56,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexWrap: 'wrap',
+                padding: '10px 16px',
+                borderBottom: '1px solid #e5e7eb',
+              }}
+            >
+              <Space style={{ flex: '1 1 210px', minWidth: 0, whiteSpace: 'nowrap' }}>
+                <Text strong style={{ fontSize: 18, whiteSpace: 'nowrap' }}>Dockerfile</Text>
+                <Button type="link" size="small" style={{ paddingInline: 0, whiteSpace: 'nowrap' }}>如何编写Dockerfile</Button>
+              </Space>
+              <Space wrap size={8} style={{ justifyContent: 'flex-end' }}>
+                <Button>pip 换源</Button>
+                <Button>apt 换源</Button>
+                <Button>智能生成</Button>
+                <Button icon={<DownloadOutlined />} />
+              </Space>
+            </div>
+            <Input.TextArea
+              value={dockerfileContent}
+              onChange={event => setDockerfileContent(event.target.value)}
+              style={{
+                flex: 1,
+                border: 'none',
+                borderRadius: 0,
+                resize: 'none',
+                minHeight: 520,
+                background: '#020617',
+                color: '#e5e7eb',
+                fontFamily: 'Menlo, Monaco, Consolas, monospace',
+                fontSize: 13,
+                lineHeight: 1.8,
+                padding: '12px 14px',
+              }}
+            />
+          </div>
+          <div style={{ borderLeft: '1px solid #e5e7eb', background: '#f8fafc', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div style={{ minHeight: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', padding: '10px 12px', borderBottom: '1px solid #e5e7eb' }}>
+              <Text strong style={{ whiteSpace: 'nowrap' }}>» 已安装列表</Text>
+              <Input prefix={<SearchOutlined />} placeholder="搜索" style={{ width: 128 }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', padding: '12px 12px 0', borderBottom: '1px solid #e5e7eb', background: '#fff' }}>
+              <Space size={20}>
+                <Text style={{ color: '#2563eb', borderBottom: '2px solid #2563eb', paddingBottom: 10 }}>Python3</Text>
+                <Text>apt</Text>
+              </Space>
+              <Checkbox checked>只显示增量部分</Checkbox>
+            </div>
+            <div style={{ padding: '18px 14px', overflow: 'auto', lineHeight: 2.1, fontSize: 15 }}>
+              {installedPythonPackages.map(item => (
+                <div key={item}>{item}</div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={{ height: 56, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, padding: '0 16px', borderTop: '1px solid #e5e7eb' }}>
+          <Button onClick={cancelStandardImageBuilder}>取消</Button>
+          <Button type="primary" onClick={submitStandardImageBuild}>构建</Button>
+        </div>
+      </div>
+    )
+  }
+
   if (isMirrorRoute) {
     const mirrorColumns: ColumnsType<CustomMirrorRecord> = [
       {
@@ -2498,12 +2747,6 @@ const MLNotebook: React.FC = () => {
                 placeholder={mirrorNamespace ? '请选择镜像名称' : '请先选择命名空间'}
                 options={mirrorNameOptions}
               />
-            </Form.Item>
-            <Form.Item label="镜像类型" name="savedImageType" initialValue="standard" rules={[{ required: true, message: '请选择镜像类型' }]}>
-              <Radio.Group>
-                <Radio value="standard">标准镜像</Radio>
-                <Radio value="temporary">临时镜像</Radio>
-              </Radio.Group>
             </Form.Item>
             <Form.Item label="描述" name="description">
               <Input.TextArea rows={4} placeholder="请输入描述（选填）" />

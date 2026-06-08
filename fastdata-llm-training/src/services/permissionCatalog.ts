@@ -409,7 +409,7 @@ function collectLeafKeys(nodes: PermissionTreeNode[], target: string[] = []): st
 export const ALL_MENU_PERMISSION_KEYS = collectLeafKeys(MENU_PERMISSION_TREE)
 
 export const OPERATION_DEFINITION_MAP: Record<string, OperationDefinition> = {
-  'task-overview.view': { key: 'task-overview.view', label: '查看任务概览', menuKey: '/task-overview', requiresProject: false },
+  'task-overview.view': { key: 'task-overview.view', label: '查看任务概览', menuKey: '/task-overview', requiresProject: true },
   'datasets.training.create': { key: 'datasets.training.create', label: '创建训练数据集', menuKey: '/datasets', requiresProject: true },
   'datasets.training.detail': { key: 'datasets.training.detail', label: '查看训练数据详情', menuKey: '/datasets', requiresProject: true },
   'datasets.training.train': { key: 'datasets.training.train', label: '训练数据去训练', menuKey: '/datasets', requiresProject: true },
@@ -516,7 +516,7 @@ export const ALL_OPERATION_KEYS = ALL_OPERATION_DEFINITIONS.map(item => item.key
 
 export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   { menuKey: '/workspace', requiresProject: false, match: pathname => pathname === '/workspace' },
-  { menuKey: '/task-overview', requiresProject: false, match: pathname => pathname === '/task-overview' },
+  { menuKey: '/task-overview', requiresProject: true, match: pathname => pathname === '/task-overview' },
   { menuKey: '/datasets', requiresProject: true, match: pathname => pathname === '/datasets' || pathname.startsWith('/datasets/') },
   { menuKey: '/measurement', requiresProject: true, match: pathname => pathname === '/measurement' || pathname.startsWith('/measurement/') },
   { menuKey: '/file-management', requiresProject: true, match: pathname => pathname === '/file-management' || pathname.startsWith('/file-management/') },

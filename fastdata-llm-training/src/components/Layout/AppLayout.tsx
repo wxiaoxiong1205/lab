@@ -22,14 +22,12 @@ import DesignDocReviewCenter from '../DesignDoc/DesignDocReviewCenter'
 import { GLOBAL_DESIGN_DOC_PATH, getGlobalDesignDoc, getPageDesignDoc, shouldUseGlobalDesignDocOnly } from '../../docs/pageDocs'
 import {
   canViewCurrentRoute,
-  getAccessibleProjects,
   getCurrentProject,
   getCurrentProjectMode,
   getCurrentUser,
   getOperationDeniedMessage,
   getUserRoleLabels,
   hasMenuPermission,
-  setCurrentProject,
   usePermissionStore,
 } from '../../services/permissionStore'
 import { resolveRouteAccess } from '../../services/permissionCatalog'
@@ -204,7 +202,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       })
       .filter(Boolean) as MenuItemList
 
-  const activeTopTab = isTaskOverviewRoute ? 'task-overview' : isAdminRoute ? 'system' : 'workspace'
+  const activeTopTab = isAdminRoute ? 'system' : 'workspace'
   const showProjectTopNav = !isAnnotationWorkbenchRoute && !isDocsRoute && !isWorkspaceRoute && !isAdminRoute && !isOpenPlatformRoute && Boolean(currentProject)
   const showProjectMenus = showProjectTopNav && !isTaskOverviewRoute
   const projectTopNavItems = showProjectTopNav
@@ -443,13 +441,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   }
 
   const openTaskOverview = () => {
-    if (!currentProject) {
-      const firstProject = getAccessibleProjects(permissionState)[0]
-      if (firstProject) {
-        setCurrentProject(firstProject.id, 'llm')
-      }
-    }
-    navigate('/task-overview')
+    navigate(currentProject ? '/task-overview' : '/workspace')
   }
 
   const compactHeader = viewportWidth < 1280
@@ -621,21 +613,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             </>
           ) : (
             <>
-              <Button
-                type={activeTopTab === 'task-overview' ? 'primary' : 'text'}
-                icon={<HomeOutlined />}
-                onClick={openTaskOverview}
-                style={{
-                  height: navButtonHeight,
-                  paddingInline: ultraCompactHeader ? 12 : 18,
-                  borderRadius: 16,
-                  fontWeight: 700,
-                  flexShrink: 0,
-                  boxShadow: activeTopTab === 'task-overview' ? '0 10px 24px rgba(37, 99, 235, 0.18)' : 'none',
-                }}
-              >
-                任务概览
-              </Button>
               <Button
                 type={activeTopTab === 'workspace' ? 'primary' : 'text'}
                 icon={<FolderOpenOutlined />}

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { Card, Col, Empty, Progress, Row, Select, Space, Tag, Tooltip, Typography, message } from 'antd'
+import React, { useMemo, useState } from 'react'
+import { Button, Card, Col, Empty, Progress, Row, Space, Tag, Tooltip, Typography, message } from 'antd'
 import {
   ArrowRightOutlined,
   AppstoreOutlined,
@@ -9,6 +9,7 @@ import {
   DatabaseOutlined,
   ExperimentOutlined,
   FireOutlined,
+  FolderOpenOutlined,
   PlayCircleOutlined,
   RocketOutlined,
   ThunderboltOutlined,
@@ -20,9 +21,7 @@ import { useMachineDeploymentStore } from '../services/machineDeploymentStore'
 import {
   getAccessibleProjects,
   getCurrentProject,
-  getCurrentProjectMode,
   getCurrentUser,
-  setCurrentProject,
   usePermissionStore,
 } from '../services/permissionStore'
 
@@ -258,18 +257,11 @@ const TaskOverview: React.FC = () => {
   const permissionState = usePermissionStore()
   const currentUser = getCurrentUser(permissionState)
   const currentProject = getCurrentProject(permissionState)
-  const currentProjectMode = getCurrentProjectMode(permissionState)
   const accessibleProjects = getAccessibleProjects(permissionState)
   const trainingTasks = useTrainingTasks()
   const dataServiceState = useDataServiceStore()
   const machineDeploymentState = useMachineDeploymentStore()
   const [taskScope, setTaskScope] = useState<TaskScope>('all')
-
-  useEffect(() => {
-    if (!currentProject && accessibleProjects.length) {
-      setCurrentProject(accessibleProjects[0].id, 'llm')
-    }
-  }, [accessibleProjects, currentProject])
 
   const overviewTasks = useMemo<OverviewTask[]>(() => {
     const trainingOverviewTasks: OverviewTask[] = trainingTasks
@@ -397,10 +389,6 @@ const TaskOverview: React.FC = () => {
     navigate(task.path)
   }
 
-  const projectOptions = accessibleProjects.map(project => ({
-    label: project.name,
-    value: project.id,
-  }))
   const scopeOptions = Object.keys(taskScopeMeta) as TaskScope[]
 
   if (!currentProject && !accessibleProjects.length) {
@@ -419,59 +407,51 @@ const TaskOverview: React.FC = () => {
         <div className="task-overview-hero__copy">
           <Space size={10} wrap style={{ marginBottom: 14 }}>
             <Tag color="blue" style={{ borderRadius: 999, paddingInline: 10, border: 'none' }}>任务概览</Tag>
-            {currentProject?.cluster && (
-              <Tag style={{ borderRadius: 999, paddingInline: 10, background: 'rgba(15, 23, 42, 0.05)', border: '1px solid rgba(148, 163, 184, 0.2)' }}>
-                {currentProject.cluster}
-              </Tag>
-            )}
           </Space>
           <Title level={1} style={{ margin: 0, color: '#0f172a', fontSize: 28, lineHeight: 1.16, letterSpacing: '-0.7px' }}>
             任务概览
           </Title>
+          <div className="task-overview-context-line">
+            <span>当前项目</span>
+            <strong>{currentProject?.name ?? '未选择项目'}</strong>
+            <Button
+              type="link"
+              size="small"
+              icon={<FolderOpenOutlined />}
+              className="task-overview-back-link"
+              onClick={() => navigate('/workspace')}
+            >
+              返回项目空间
+            </Button>
+          </div>
         </div>
 
-        <div className="task-overview-control-card">
-          <div className="task-overview-project-picker">
-            <div>
-              <Text type="secondary" style={{ fontSize: 12 }}>当前项目</Text>
-              <div style={{ marginTop: 4, color: '#0f172a', fontWeight: 700 }}>{currentProject?.name ?? '未选择项目'}</div>
-            </div>
-            <Select
-              value={currentProject?.id ?? accessibleProjects[0]?.id}
-              options={projectOptions}
-              style={{ minWidth: 220 }}
-              popupMatchSelectWidth={false}
-              onChange={projectId => setCurrentProject(projectId, currentProjectMode)}
-            />
-          </div>
-
-          <div className="task-overview-scope-grid" role="tablist" aria-label="任务范围">
-            {scopeOptions.map(scope => {
-              const meta = taskScopeMeta[scope]
-              const active = taskScope === scope
-              return (
-                <button
-                  key={scope}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  className={`task-overview-scope-card${active ? ' task-overview-scope-card--active' : ''}`}
-                  style={{
-                    '--scope-accent': meta.accent,
-                    '--scope-gradient': meta.gradient,
-                  } as React.CSSProperties}
-                  onClick={() => setTaskScope(scope)}
-                >
-                  <span className="task-overview-scope-card__icon">{meta.icon}</span>
-                  <span className="task-overview-scope-card__main">
-                    <span className="task-overview-scope-card__label">{meta.label}</span>
-                    <span className="task-overview-scope-card__hint">{active ? '当前视图' : '筛选视图'}</span>
-                  </span>
-                  <span className="task-overview-scope-card__count">{taskScopeCounts[scope]}</span>
-                </button>
-              )
-            })}
-          </div>
+        <div className="task-overview-scope-grid" role="tablist" aria-label="任务范围">
+          {scopeOptions.map(scope => {
+            const meta = taskScopeMeta[scope]
+            const active = taskScope === scope
+            return (
+              <button
+                key={scope}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={`task-overview-scope-card${active ? ' task-overview-scope-card--active' : ''}`}
+                style={{
+                  '--scope-accent': meta.accent,
+                  '--scope-gradient': meta.gradient,
+                } as React.CSSProperties}
+                onClick={() => setTaskScope(scope)}
+              >
+                <span className="task-overview-scope-card__icon">{meta.icon}</span>
+                <span className="task-overview-scope-card__main">
+                  <span className="task-overview-scope-card__label">{meta.label}</span>
+                  <span className="task-overview-scope-card__hint">{active ? '当前视图' : '筛选视图'}</span>
+                </span>
+                <span className="task-overview-scope-card__count">{taskScopeCounts[scope]}</span>
+              </button>
+            )
+          })}
         </div>
       </section>
 
@@ -621,43 +601,45 @@ const TaskOverview: React.FC = () => {
         .task-overview-hero {
           position: relative;
           display: grid;
-          grid-template-columns: minmax(220px, 0.58fr) minmax(520px, 1fr);
-          align-items: end;
+          grid-template-columns: minmax(320px, 1fr) minmax(540px, 720px);
+          align-items: center;
           gap: 18px;
-          margin-bottom: 14px;
-          padding: 2px 0 4px;
+          margin-bottom: 18px;
+          padding: 2px 0 0;
         }
         .task-overview-hero__copy,
-        .task-overview-control-card {
+        .task-overview-scope-grid {
           position: relative;
           z-index: 1;
         }
-        .task-overview-control-card {
-          display: grid;
-          grid-template-columns: minmax(220px, 0.8fr) minmax(360px, 1.2fr);
-          align-items: stretch;
-          gap: 10px;
-          padding: 10px;
-          border-radius: 18px;
-          background: rgba(255, 255, 255, 0.68);
-          border: 1px solid rgba(226, 232, 240, 0.82);
-          box-shadow: none;
-          backdrop-filter: blur(10px);
-        }
-        .task-overview-project-picker {
-          display: flex;
+        .task-overview-context-line {
+          display: inline-flex;
           align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          padding: 8px 10px;
-          border-radius: 14px;
-          background: rgba(248, 250, 252, 0.72);
-          border: 1px solid rgba(226, 232, 240, 0.72);
+          gap: 8px;
+          margin-top: 12px;
+          color: #64748b;
+          font-size: 13px;
+        }
+        .task-overview-context-line strong {
+          color: #0f172a;
+          font-size: 14px;
+        }
+        .task-overview-back-link.ant-btn {
+          height: 24px;
+          padding: 0 4px;
+          color: #2563eb;
+          font-weight: 700;
         }
         .task-overview-scope-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 6px;
+          gap: 8px;
+          margin: 0;
+          padding: 8px;
+          border-radius: 18px;
+          background: rgba(255, 255, 255, 0.68);
+          border: 1px solid rgba(226, 232, 240, 0.82);
+          backdrop-filter: blur(10px);
         }
         .task-overview-scope-card {
           position: relative;
@@ -820,8 +802,9 @@ const TaskOverview: React.FC = () => {
           .task-overview-hero {
             grid-template-columns: 1fr;
           }
-          .task-overview-control-card {
-            grid-template-columns: 1fr;
+          .task-overview-scope-grid {
+            max-width: none;
+            margin-left: 0;
           }
         }
         @media (max-width: 760px) {
@@ -831,7 +814,14 @@ const TaskOverview: React.FC = () => {
           .task-overview-hero {
             padding: 0;
           }
-          .task-overview-project-picker,
+          .task-overview-context-line {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 4px;
+          }
+          .task-overview-scope-grid {
+            grid-template-columns: 1fr;
+          }
           .task-overview-section-head,
           .task-overview-compute-head {
             align-items: stretch;
