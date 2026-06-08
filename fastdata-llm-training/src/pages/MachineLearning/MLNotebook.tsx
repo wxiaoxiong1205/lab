@@ -161,7 +161,6 @@ type CustomMirrorFormValues = {
 
 type StandardImageBuildFormValues = {
   imageName?: string
-  baseImage?: string
   imageDescription?: string
 }
 
@@ -734,6 +733,7 @@ const MLNotebook: React.FC = () => {
   const [standardImageBuildForm] = Form.useForm<StandardImageBuildFormValues>()
   const [customMirrorForm] = Form.useForm<CustomMirrorFormValues>()
   const [mirrorTagForm] = Form.useForm<CustomMirrorTagFormValues>()
+  const selectedSaveImageType = Form.useWatch('savedImageType', saveEnvForm) ?? 'standard'
   const [searchValue, setSearchValue] = useState('')
   const [notebookTableResetKey, setNotebookTableResetKey] = useState(0)
   const [activeTab, setActiveTab] = useState<'mine' | 'square'>('mine')
@@ -1071,7 +1071,6 @@ const MLNotebook: React.FC = () => {
     setDockerfileContent(defaultStandardDockerfile)
     standardImageBuildForm.setFieldsValue({
       imageName: values.imageName?.trim() || `${record.name}-env`,
-      baseImage: 'CUDA12.3',
       imageDescription: values.imageDescription ?? '',
     })
     setSaveEnvModalOpen(false)
@@ -1418,6 +1417,34 @@ const MLNotebook: React.FC = () => {
         }}
       </Form.Item>
     </>
+  )
+
+  const renderSaveEnvironmentMirrorInfo = () => (
+    <Form.Item noStyle shouldUpdate>
+      {() => {
+        const selectedType = saveEnvForm.getFieldValue('savedImageType') ?? 'standard'
+        if (selectedType === 'standard') {
+          return null
+        }
+        return (
+          <>
+            <Form.Item
+              label="镜像名称"
+              name="imageName"
+              rules={[
+                { required: true, message: '请输入镜像名称' },
+                { max: 64, message: '镜像名称不能超过 64 个字符' },
+              ]}
+            >
+              <Input placeholder="请输入镜像名称" />
+            </Form.Item>
+            <Form.Item label="镜像描述" name="imageDescription">
+              <Input.TextArea rows={4} placeholder="请输入镜像描述" maxLength={300} showCount />
+            </Form.Item>
+          </>
+        )
+      }}
+    </Form.Item>
   )
 
   const notebookColumns: ColumnsType<MLNotebookRecord> = [
@@ -1861,7 +1888,7 @@ const MLNotebook: React.FC = () => {
       <Modal
         title="停止 Notebook"
         open={stopModalOpen}
-        okText="确定"
+        okText={shouldSaveBeforeStop && selectedSaveImageType === 'standard' ? '下一步' : '确定'}
         cancelText="取消"
         onOk={submitStopNotebook}
         onCancel={() => {
@@ -1884,7 +1911,7 @@ const MLNotebook: React.FC = () => {
           {shouldSaveBeforeStop && (
             <Form form={saveEnvForm} layout="vertical" style={{ width: '100%', paddingTop: 8 }}>
               <div style={{ marginBottom: 16 }}>
-                <Text type="secondary">选择需要保存到自定义镜像的内容，并填写镜像信息。</Text>
+                <Text type="secondary">选择环境保存方式；临时镜像直接保存，标准镜像进入制作镜像页后再填写镜像信息。</Text>
               </div>
               {renderSavedImageTypeSelector()}
               <Form.Item name="includePackages" valuePropName="checked" style={{ marginBottom: 8 }}>
@@ -1893,19 +1920,7 @@ const MLNotebook: React.FC = () => {
               <Form.Item name="includeWorkspace" valuePropName="checked">
                 <Checkbox>工作目录（/lab/work）</Checkbox>
               </Form.Item>
-              <Form.Item
-                label="镜像名称"
-                name="imageName"
-                rules={[
-                  { required: true, message: '请输入镜像名称' },
-                  { max: 64, message: '镜像名称不能超过 64 个字符' },
-                ]}
-              >
-                <Input placeholder="请输入镜像名称" />
-              </Form.Item>
-              <Form.Item label="镜像描述" name="imageDescription">
-                <Input.TextArea rows={4} placeholder="请输入镜像描述" maxLength={300} showCount />
-              </Form.Item>
+              {renderSaveEnvironmentMirrorInfo()}
             </Form>
           )}
         </Space>
@@ -1914,7 +1929,7 @@ const MLNotebook: React.FC = () => {
       <Modal
         title="保存环境"
         open={saveEnvModalOpen}
-        okText="保存"
+        okText={selectedSaveImageType === 'standard' ? '下一步' : '保存'}
         cancelText="取消"
         onOk={submitSaveEnvironment}
         onCancel={() => {
@@ -1926,7 +1941,7 @@ const MLNotebook: React.FC = () => {
       >
         <Form form={saveEnvForm} layout="vertical">
           <div style={{ marginBottom: 16 }}>
-            <Text type="secondary">选择需要保存到自定义镜像的内容，并填写镜像信息。</Text>
+            <Text type="secondary">选择环境保存方式；临时镜像直接保存，标准镜像进入制作镜像页后再填写镜像信息。</Text>
           </div>
           {renderSavedImageTypeSelector()}
           <Form.Item name="includePackages" valuePropName="checked" style={{ marginBottom: 8 }}>
@@ -1935,19 +1950,7 @@ const MLNotebook: React.FC = () => {
           <Form.Item name="includeWorkspace" valuePropName="checked">
             <Checkbox>工作目录（/lab/work）</Checkbox>
           </Form.Item>
-          <Form.Item
-            label="镜像名称"
-            name="imageName"
-            rules={[
-              { required: true, message: '请输入镜像名称' },
-              { max: 64, message: '镜像名称不能超过 64 个字符' },
-            ]}
-          >
-            <Input placeholder="请输入镜像名称" />
-          </Form.Item>
-          <Form.Item label="镜像描述" name="imageDescription">
-            <Input.TextArea rows={4} placeholder="请输入镜像描述" maxLength={300} showCount />
-          </Form.Item>
+          {renderSaveEnvironmentMirrorInfo()}
         </Form>
       </Modal>
     </>
@@ -2501,36 +2504,8 @@ const MLNotebook: React.FC = () => {
               >
                 <Input placeholder="请输入镜像名称" />
               </Form.Item>
-              <Form.Item name="baseImage" hidden rules={[{ required: true, message: '请选择基础镜像' }]}>
-                <Input />
-              </Form.Item>
-              <Form.Item label="基础镜像" required>
-                <div
-                  style={{
-                    minHeight: 34,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '4px 10px',
-                    border: '1px solid #d9d9d9',
-                    borderRadius: 6,
-                    background: '#f8fafc',
-                  }}
-                >
-                  <Tag color="blue" style={{ marginInlineEnd: 0 }}>系统</Tag>
-                  <Text>CUDA12.3</Text>
-                </div>
-              </Form.Item>
               <Form.Item label="镜像描述" name="imageDescription">
                 <Input.TextArea rows={5} placeholder="请输入镜像描述" maxLength={120} showCount />
-              </Form.Item>
-              <Form.Item label="上传文件">
-                <Button icon={<PlusOutlined />}>点击上传</Button>
-                <div style={{ marginTop: 8, color: '#64748b', fontSize: 12, lineHeight: 1.6 }}>
-                  1. 仅支持上传一个文本文件，大小不超过64K；<br />
-                  2. 文件名称只能由大小写英文字母、数字、和符号_-组成，否则将导致构建失败；<br />
-                  3. 上传后的文件会放在Dockerfile根目录；
-                </div>
               </Form.Item>
               <div style={{ marginTop: 36, color: '#334155', fontSize: 13, lineHeight: 1.75 }}>
                 <Text strong>注意事项：</Text>
