@@ -42,9 +42,13 @@ function resolveVersionPublishStatus(
   if (version?.processStatus === '处理失败' || fallbackProcessStatus === '处理失败') {
     return '处理失败'
   }
-  if (version?.publishStatus === '已发布' || fallbackPublishStatus === '已发布') {
+  if (version?.publishStatus === '已发布') {
     return '已发布'
   }
+  if (version?.publishStatus === '未发布') {
+    return '未发布'
+  }
+  if (fallbackPublishStatus === '已发布') return '已发布'
   return '未发布'
 }
 
@@ -917,15 +921,6 @@ const TrainingDataset: React.FC = () => {
           >
             查看详情
           </Button>
-          {(() => {
-            const latestVersion = record.versions.find(item => item.version === record.latestVersion) ?? record.versions[0]
-            if (!latestVersion || latestVersion.publishStatus === '已发布') return null
-            return (
-              <Button type="link" size="small" onClick={() => handlePublishVersion(record, latestVersion)}>
-                发布
-              </Button>
-            )
-          })()}
           <Button
             type="link"
             size="small"

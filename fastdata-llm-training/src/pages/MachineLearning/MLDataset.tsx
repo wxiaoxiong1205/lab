@@ -875,15 +875,6 @@ const MLDataset: React.FC = () => {
           >
             查看详情
           </Button>
-          {record.publishStatus !== '已发布' && (
-            <Button
-              type="link"
-              size="small"
-              onClick={() => publishDatasetVersion(record, getActiveDatasetVersion(record, record.version))}
-            >
-              发布
-            </Button>
-          )}
           <Popconfirm title="确认删除该数据集？" okText="删除" cancelText="取消" onConfirm={() => deleteRecord(record.id)}>
             <Button type="link" size="small" icon={<DeleteOutlined />} danger>删除</Button>
           </Popconfirm>
