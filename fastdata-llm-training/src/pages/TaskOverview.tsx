@@ -10,7 +10,9 @@ import {
   ExperimentOutlined,
   FireOutlined,
   FolderOpenOutlined,
+  LeftOutlined,
   PlayCircleOutlined,
+  RightOutlined,
   RocketOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons'
@@ -57,6 +59,7 @@ interface CapacitySnapshot extends ResourceSnapshot {
 
 const statusOrder: TaskLifecycleStatus[] = ['已创建', '定时待启动', '启动中', '排队中', '运行中', '已终止', '已完成', '失败']
 const latestStatusOrder: TaskLifecycleStatus[] = ['定时待启动', '启动中', '排队中', '运行中', '失败']
+const latestGroupPageSize = 4
 const taskScopeMeta: Record<TaskScope, { label: string; title: string; description: string; latestLabel: string; icon: React.ReactNode; accent: string; gradient: string }> = {
   all: {
     label: '全部任务',
@@ -140,6 +143,50 @@ const overviewSeedTasks: OverviewTask[] = [
     createdAt: '2026/05/20 15:08:36',
     path: '/service/inference/hosted',
     resource: makeResource(['GPU A100'], 2, 160, 24, 128),
+  },
+  {
+    id: 'training-overview-boot-1',
+    name: 'Qwen2.5-客服助手-SFT 启动',
+    module: '大模型训练',
+    status: '启动中',
+    creator: 'zhangsan',
+    creatorName: '张三',
+    createdAt: '2026/05/20 14:52:12',
+    path: '/training/detail/1/version/v3',
+    resource: makeResource(['GPU T4'], 2, 32, 16, 64),
+  },
+  {
+    id: 'cleaning-overview-boot-1',
+    name: 'DPO-Role-Based-客服质检清洗',
+    module: '数据清洗',
+    status: '启动中',
+    creator: 'lab1',
+    creatorName: 'lab1',
+    createdAt: '2026/05/20 14:36:45',
+    path: '/data-cleaning',
+    resource: makeResource(['CPU'], 0, 0, 10, 24),
+  },
+  {
+    id: 'notebook-overview-boot-1',
+    name: '评测脚本调试 Notebook',
+    module: '在线Notebook',
+    status: '启动中',
+    creator: 'lisi',
+    creatorName: '李四',
+    createdAt: '2026/05/20 14:18:03',
+    path: '/finetune/notebooks/notebook-overview-boot-1',
+    resource: makeResource(['GPU T4'], 1, 16, 8, 32),
+  },
+  {
+    id: 'inference-overview-boot-1',
+    name: '批量推理结果集-灰度启动',
+    module: '推理结果集',
+    status: '启动中',
+    creator: 'zhangsan',
+    creatorName: '张三',
+    createdAt: '2026/05/20 14:03:27',
+    path: '/inference/inference-overview-boot-1',
+    resource: makeResource(['GPU T4'], 1, 16, 8, 32),
   },
   {
     id: 'eval-overview-2',
@@ -262,6 +309,7 @@ const TaskOverview: React.FC = () => {
   const dataServiceState = useDataServiceStore()
   const machineDeploymentState = useMachineDeploymentStore()
   const [taskScope, setTaskScope] = useState<TaskScope>('all')
+  const [latestGroupPages, setLatestGroupPages] = useState<Partial<Record<TaskLifecycleStatus, number>>>({})
 
   const overviewTasks = useMemo<OverviewTask[]>(() => {
     const trainingOverviewTasks: OverviewTask[] = trainingTasks
@@ -373,7 +421,7 @@ const TaskOverview: React.FC = () => {
 
   const latestGroups = latestStatusOrder.map(status => ({
     status,
-    tasks: filteredOverviewTasks.filter(task => task.status === status).slice(0, 4),
+    tasks: filteredOverviewTasks.filter(task => task.status === status),
   }))
 
   const canOpenTask = (task: OverviewTask) =>
@@ -387,6 +435,10 @@ const TaskOverview: React.FC = () => {
       return
     }
     navigate(task.path)
+  }
+
+  const handleLatestGroupPageChange = (status: TaskLifecycleStatus, page: number) => {
+    setLatestGroupPages(prev => ({ ...prev, [status]: page }))
   }
 
   const scopeOptions = Object.keys(taskScopeMeta) as TaskScope[]
@@ -521,74 +573,103 @@ const TaskOverview: React.FC = () => {
         </div>
 
         <Row gutter={[16, 16]}>
-          {latestGroups.map(group => (
-            <Col xs={24} lg={12} xxl={group.status === '失败' ? 24 : 12} key={group.status}>
-              <div
-                style={{
-                  height: '100%',
-                  borderRadius: 18,
-                  border: `1px solid ${statusVisual[group.status].color}22`,
-                  background: '#fff',
-                  overflow: 'hidden',
-                }}
-              >
+          {latestGroups.map(group => {
+            const totalPages = Math.max(1, Math.ceil(group.tasks.length / latestGroupPageSize))
+            const currentPage = Math.min(latestGroupPages[group.status] ?? 1, totalPages)
+            const pageTasks = group.tasks.slice((currentPage - 1) * latestGroupPageSize, currentPage * latestGroupPageSize)
+
+            return (
+              <Col xs={24} lg={12} xxl={group.status === '失败' ? 24 : 12} key={group.status}>
                 <div
+                  className="task-overview-latest-group"
                   style={{
-                    padding: '14px 16px',
-                    background: statusVisual[group.status].bg,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
+                    '--latest-status-color': statusVisual[group.status].color,
+                    '--latest-status-bg': statusVisual[group.status].bg,
+                  } as React.CSSProperties}
                 >
-                  <Space>
-                    <FireOutlined style={{ color: statusVisual[group.status].color }} />
-                    <Text strong>{group.status}</Text>
-                  </Space>
-                  <Tag color={statusVisual[group.status].tag}>{group.tasks.length}</Tag>
-                </div>
-                <div style={{ padding: 12, display: 'grid', gap: 10 }}>
-                  {group.tasks.length ? group.tasks.map(task => (
-                    <button
-                      key={task.id}
-                      type="button"
-                      onClick={() => handleOpenTask(task)}
-                      style={{
-                        width: '100%',
-                        textAlign: 'left',
-                        border: '1px solid #eef2f7',
-                        background: '#ffffff',
-                        borderRadius: 14,
-                        padding: '13px 14px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                      }}
-                      className="task-overview-item"
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                            <span style={{ color: moduleVisual[task.module].color }}>{moduleVisual[task.module].icon}</span>
-                            <Text strong ellipsis style={{ maxWidth: 360 }}>{task.name}</Text>
-                          </div>
-                          <Space size={8} wrap>
-                            <Tag style={{ margin: 0 }}>{task.module}</Tag>
-                            <Text type="secondary" style={{ fontSize: 12 }}>创建人：{task.creatorName ?? task.creator}</Text>
-                            <Text type="secondary" style={{ fontSize: 12 }}>创建时间：{task.createdAt}</Text>
-                          </Space>
-                        </div>
-                        <Tooltip title={canOpenTask(task) ? '进入任务详情' : '暂无权限'}>
-                          <ArrowRightOutlined style={{ color: canOpenTask(task) ? '#2563eb' : '#cbd5e1', marginTop: 3 }} />
-                        </Tooltip>
+                  <div className="task-overview-latest-group__head">
+                    <Space>
+                      <FireOutlined style={{ color: statusVisual[group.status].color }} />
+                      <Text strong>{group.status}</Text>
+                    </Space>
+                    <Tag color={statusVisual[group.status].tag}>{group.tasks.length}</Tag>
+                  </div>
+                  <div className="task-overview-latest-group__body">
+                    {pageTasks.length ? (
+                      <div className="task-overview-latest-grid">
+                        {pageTasks.map(task => (
+                          <button
+                            key={task.id}
+                            type="button"
+                            onClick={() => handleOpenTask(task)}
+                            className="task-overview-item"
+                          >
+                            <div className="task-overview-item__content">
+                              <div className="task-overview-item__main">
+                                <div className="task-overview-item__title">
+                                  <span style={{ color: moduleVisual[task.module].color }}>{moduleVisual[task.module].icon}</span>
+                                  <Text strong ellipsis className="task-overview-item__name">{task.name}</Text>
+                                </div>
+                                <Space size={8} wrap>
+                                  <Tag style={{ margin: 0 }}>{task.module}</Tag>
+                                  <Text type="secondary" style={{ fontSize: 12 }}>创建人：{task.creatorName ?? task.creator}</Text>
+                                  <Text type="secondary" style={{ fontSize: 12 }}>创建时间：{task.createdAt}</Text>
+                                </Space>
+                              </div>
+                              <Tooltip title={canOpenTask(task) ? '进入任务详情' : '暂无权限'}>
+                                <ArrowRightOutlined style={{ color: canOpenTask(task) ? '#2563eb' : '#cbd5e1', marginTop: 3 }} />
+                              </Tooltip>
+                            </div>
+                          </button>
+                        ))}
                       </div>
-                    </button>
-                  )) : (
-                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={`当前范围暂无${group.status}任务`} style={{ marginBlock: 18 }} />
+                    ) : (
+                      <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={`当前范围暂无${group.status}任务`} style={{ marginBlock: 18 }} />
+                    )}
+                  </div>
+                  {group.tasks.length > latestGroupPageSize && (
+                    <div className="task-overview-latest-pagination" aria-label={`${group.status}任务分页`}>
+                      <button
+                        type="button"
+                        className="task-overview-latest-pagination__arrow"
+                        disabled={currentPage <= 1}
+                        aria-label="上一页"
+                        onClick={() => handleLatestGroupPageChange(group.status, currentPage - 1)}
+                      >
+                        <LeftOutlined />
+                      </button>
+                      <div className="task-overview-latest-pagination__pages">
+                        {Array.from({ length: totalPages }, (_, index) => {
+                          const page = index + 1
+                          return (
+                            <button
+                              key={page}
+                              type="button"
+                              className={`task-overview-latest-pagination__page${page === currentPage ? ' task-overview-latest-pagination__page--active' : ''}`}
+                              aria-label={`第 ${page} 页`}
+                              aria-current={page === currentPage ? 'page' : undefined}
+                              onClick={() => handleLatestGroupPageChange(group.status, page)}
+                            >
+                              {page}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        className="task-overview-latest-pagination__arrow"
+                        disabled={currentPage >= totalPages}
+                        aria-label="下一页"
+                        onClick={() => handleLatestGroupPageChange(group.status, currentPage + 1)}
+                      >
+                        <RightOutlined />
+                      </button>
+                    </div>
                   )}
                 </div>
-              </div>
-            </Col>
-          ))}
+              </Col>
+            )
+          })}
         </Row>
       </Card>
 
@@ -793,10 +874,119 @@ const TaskOverview: React.FC = () => {
           border-radius: 999px;
           box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.13);
         }
+        .task-overview-latest-group {
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          min-height: 400px;
+          max-height: 400px;
+          border-radius: 18px;
+          border: 1px solid color-mix(in srgb, var(--latest-status-color) 13%, #e2e8f0);
+          background: #fff;
+          overflow: hidden;
+        }
+        .task-overview-latest-group__head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 14px 16px;
+          background: var(--latest-status-bg);
+        }
+        .task-overview-latest-group__body {
+          flex: 1;
+          padding: 12px;
+          overflow: hidden;
+        }
+        .task-overview-latest-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+        .task-overview-item {
+          width: 100%;
+          min-height: 112px;
+          text-align: left;
+          border: 1px solid #eef2f7;
+          background: #ffffff;
+          border-radius: 14px;
+          padding: 13px 14px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .task-overview-item__content {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          align-items: flex-start;
+        }
+        .task-overview-item__main {
+          min-width: 0;
+        }
+        .task-overview-item__title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+          min-width: 0;
+        }
+        .task-overview-item__name {
+          max-width: 100%;
+        }
         .task-overview-item:hover {
           border-color: #bfdbfe !important;
           box-shadow: 0 10px 26px rgba(37, 99, 235, 0.09);
           transform: translateY(-1px);
+        }
+        .task-overview-latest-pagination {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          height: 44px;
+          padding: 0 12px 14px;
+        }
+        .task-overview-latest-pagination__pages {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+        }
+        .task-overview-latest-pagination__arrow,
+        .task-overview-latest-pagination__page {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 24px;
+          height: 24px;
+          padding: 0;
+          border: none;
+          background: transparent;
+          color: var(--latest-status-color);
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 700;
+          line-height: 1;
+          transition: color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+        }
+        .task-overview-latest-pagination__arrow {
+          font-size: 15px;
+        }
+        .task-overview-latest-pagination__arrow:disabled {
+          cursor: not-allowed;
+          opacity: 0.28;
+        }
+        .task-overview-latest-pagination__page {
+          color: color-mix(in srgb, var(--latest-status-color) 78%, #64748b);
+        }
+        .task-overview-latest-pagination__page--active {
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--latest-status-color) 12%, #ffffff);
+          color: var(--latest-status-color);
+        }
+        .task-overview-latest-pagination__arrow:not(:disabled):hover,
+        .task-overview-latest-pagination__page:hover {
+          transform: translateY(-1px);
+          color: color-mix(in srgb, var(--latest-status-color) 88%, #0f172a);
         }
         @media (max-width: 1180px) {
           .task-overview-hero {
@@ -833,6 +1023,13 @@ const TaskOverview: React.FC = () => {
           .task-overview-resource-panel + .task-overview-resource-panel {
             border-left: none;
             border-top: 1px solid rgba(226, 232, 240, 0.9);
+          }
+          .task-overview-latest-grid {
+            grid-template-columns: 1fr;
+          }
+          .task-overview-latest-group {
+            min-height: 660px;
+            max-height: 660px;
           }
         }
       `}</style>
