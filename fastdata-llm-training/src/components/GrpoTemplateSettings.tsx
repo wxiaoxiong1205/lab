@@ -6,9 +6,11 @@ import {
   Input,
   Modal,
   Popconfirm,
+  Select,
   Space,
   Switch,
   Table,
+  Tabs,
   Tag,
   Typography,
   message,
@@ -20,15 +22,18 @@ import {
   grpoTrainingParameterTemplateActions,
   parseGrpoTemplateYaml,
   type GrpoTrainingParameterTemplate,
+  type GrpoTemplateTrainingMethod,
   useGrpoTrainingParameterTemplates,
 } from '../services/grpoTrainingParameterTemplateStore'
 import type { FineTuneType } from '../types/training'
+import GrpoTrainingParameterFormPreview from './GrpoTrainingParameterFormPreview'
 
 const { Text } = Typography
 
 type TemplateMetaFormValues = {
   name: string
   description?: string
+  trainingMethod: GrpoTemplateTrainingMethod
   enabled: boolean
 }
 
@@ -59,6 +64,18 @@ const defaultTemplate: { fineTuneType: FineTuneType; params: Record<string, unkn
     saveStrategy: 'STEPS',
     saveTotalLimit: 3,
     loggingSteps: 5,
+    numGenerations: 8,
+    maxPromptLength: 1024,
+    maxCompletionLength: 1024,
+    temperature: 0.9,
+    topP: 0.95,
+    topK: 50,
+    repetitionPenalty: 1.05,
+    klCoefficient: 0.04,
+    clipRange: 0.2,
+    advantageEstimator: 'GRPO',
+    rewardNormalization: true,
+    rewardScale: 1,
     loraRank: 16,
     loraTargetModules: ['all'],
     loraAlpha: 32,
@@ -88,6 +105,7 @@ const GrpoTemplateSettings: React.FC = () => {
     form.setFieldsValue({
       name: template?.name ?? '',
       description: template?.description ?? '',
+      trainingMethod: template?.trainingMethod ?? 'GRPO',
       enabled: template?.enabled ?? true,
     })
     setTemplateDraft(buildTemplateDraft(template))
@@ -110,6 +128,7 @@ const GrpoTemplateSettings: React.FC = () => {
         name: values.name,
         description: values.description ?? '',
         enabled: values.enabled,
+        trainingMethod: values.trainingMethod,
         fineTuneType: parsed.fineTuneType,
         params: parsed.params,
         createdAt: editingTemplate?.createdAt,
@@ -136,11 +155,11 @@ const GrpoTemplateSettings: React.FC = () => {
       ),
     },
     {
-      title: '微调类型',
-      dataIndex: 'fineTuneType',
-      key: 'fineTuneType',
+      title: '训练方法',
+      dataIndex: 'trainingMethod',
+      key: 'trainingMethod',
       width: 120,
-      render: (value: FineTuneType) => <Tag color={value === 'lora' ? 'purple' : 'blue'}>{value === 'lora' ? 'LoRA微调' : '全参微调'}</Tag>,
+      render: (value: GrpoTemplateTrainingMethod) => <Tag color="cyan">{value}</Tag>,
     },
     {
       title: '状态',
@@ -203,9 +222,9 @@ const GrpoTemplateSettings: React.FC = () => {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 16 }}>
           <Space direction="vertical" size={4}>
-            <Text strong style={{ fontSize: 16 }}>GRPO训练参数配置</Text>
+            <Text strong style={{ fontSize: 16 }}>大模型训练参数配置</Text>
             <Text type="secondary">
-              将 GRPO 常用训练参数沉淀为可复用配置，创建训练任务时可快速带出参数模板，并在本次任务中继续调整。
+              统一维护训练任务中可复用的参数口径，创建任务时带出配置并支持按本次训练目标继续调整。
             </Text>
           </Space>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor()}>
@@ -222,7 +241,7 @@ const GrpoTemplateSettings: React.FC = () => {
       </Card>
 
       <Modal
-        title={editingTemplate ? '编辑GRPO训练参数配置' : '新增GRPO训练参数配置'}
+        title={editingTemplate ? '编辑大模型训练参数配置' : '新增大模型训练参数配置'}
         open={modalOpen}
         width={920}
         onCancel={closeEditor}
@@ -233,10 +252,13 @@ const GrpoTemplateSettings: React.FC = () => {
           </Space>
         }
       >
-        <Form form={form} layout="vertical" initialValues={{ enabled: true }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 16 }}>
+        <Form form={form} layout="vertical" initialValues={{ enabled: true, trainingMethod: 'GRPO' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px 160px', gap: 16 }}>
             <Form.Item label="模板名称" name="name" rules={[{ required: true, message: '请输入模板名称' }]}>
               <Input placeholder="请输入模板名称" />
+            </Form.Item>
+            <Form.Item label="训练方法" name="trainingMethod" rules={[{ required: true, message: '请选择训练方法' }]}>
+              <Select options={[{ value: 'GRPO', label: 'GRPO' }]} />
             </Form.Item>
             <Form.Item label="启用状态" name="enabled" valuePropName="checked">
               <Switch checkedChildren="启用" unCheckedChildren="停用" />
@@ -247,26 +269,41 @@ const GrpoTemplateSettings: React.FC = () => {
           </div>
         </Form>
 
-        <Space direction="vertical" size={8} style={{ width: '100%' }}>
-          <Text strong>参数模板</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            在下方直接维护 YAML 模板。只允许 fineTuneType 与 params；params 只支持当前产品已有训练参数字段。
-          </Text>
-          <Input.TextArea
-            rows={22}
-            value={templateDraft}
-            onChange={event => setTemplateDraft(event.target.value)}
-            placeholder={buildGrpoTemplateYaml(defaultTemplate)}
-            style={{
-              fontFamily: 'Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-              fontSize: 12,
-              lineHeight: 1.6,
-              background: '#0f172a',
-              color: '#e2e8f0',
-              borderRadius: 12,
-            }}
-          />
-        </Space>
+        <Tabs
+          defaultActiveKey="yaml"
+          items={[
+            {
+              key: 'yaml',
+              label: 'YAML模板',
+              children: (
+                <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    在下方维护 YAML 模板。fineTuneType 定义参数类型，params 定义对应训练参数；不支持写入非参数配置。
+                  </Text>
+                  <Input.TextArea
+                    rows={22}
+                    value={templateDraft}
+                    onChange={event => setTemplateDraft(event.target.value)}
+                    placeholder={buildGrpoTemplateYaml(defaultTemplate)}
+                    style={{
+                      fontFamily: 'Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+                      fontSize: 12,
+                      lineHeight: 1.6,
+                      background: '#0f172a',
+                      color: '#e2e8f0',
+                      borderRadius: 12,
+                    }}
+                  />
+                </Space>
+              ),
+            },
+            {
+              key: 'preview',
+              label: '表单预览',
+              children: <GrpoTrainingParameterFormPreview rawContent={templateDraft} />,
+            },
+          ]}
+        />
       </Modal>
     </>
   )

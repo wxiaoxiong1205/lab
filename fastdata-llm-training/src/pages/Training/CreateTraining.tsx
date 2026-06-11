@@ -44,14 +44,17 @@ import { getTrainingTypeFromModel, isQwenProvider, loadBaseModelCatalog } from '
 import { useTrainingTasks } from '../../services/trainingTaskStore'
 import {
   buildGrpoTemplateYaml,
+  GRPO_TEMPLATE_PARAM_KEYS,
   parseGrpoTemplateYaml,
   useGrpoTrainingParameterTemplates,
+  type GrpoTrainingParameterValues,
   type GrpoTrainingParameterTemplate,
 } from '../../services/grpoTrainingParameterTemplateStore'
 import { createTaskNotification } from '../../services/notificationStore'
 import { resolveDatasetVersionRow } from '../../data/datasetPickerCatalog'
 import DatasetSelectModal, { type SelectedDatasetVersionRow } from '../../components/DatasetSelectModal'
 import RewardRulesConfig from '../../components/RewardRulesConfig'
+import GrpoTrainingParameterFormPreview from '../../components/GrpoTrainingParameterFormPreview'
 import { validateFieldsAndScroll } from '../../utils/formValidation'
 import {
   TRAINING_METHOD_LABELS,
@@ -72,6 +75,7 @@ dayjs.extend(customParseFormat)
 const { Title, Text, Paragraph } = Typography
 
 type DeepSpeedStage = 'off' | 'z0' | 'z2' | 'z3'
+type GrpoParameterMode = 'template' | 'custom'
 
 const deepspeedStageOptions: Array<{
   value: DeepSpeedStage
@@ -152,44 +156,39 @@ function parseGrpoTemplateContent(raw?: string): { fineTuneType: FineTuneType; p
   return parseGrpoTemplateYaml(raw)
 }
 
-/** 微调类型：与 Form 联动，切换时回到基础参数 Tab */
+function collectGrpoTemplateParams(getFieldValue: (name: string) => unknown): GrpoTrainingParameterValues {
+  const params: Record<string, unknown> = {}
+  const fineTuneType = (getFieldValue('fineTuneType') as FineTuneType | undefined) ?? 'full'
+  GRPO_TEMPLATE_PARAM_KEYS.forEach(key => {
+    if (fineTuneType !== 'lora' && String(key).startsWith('lora')) {
+      return
+    }
+    const value = getFieldValue(key)
+    if (value !== undefined) {
+      params[key] = value
+    }
+  })
+  return params as GrpoTrainingParameterValues
+}
+
+/** 参数类型：与 Form 联动，切换后回到训练控制 Tab */
 const FineTuneTypePicker: React.FC<{
   value?: FineTuneType
   onChange?: (v: FineTuneType) => void
   onAfterChange?: () => void
 }> = ({ value, onChange, onAfterChange }) => (
-  <Space size={12}>
-    <Button
-      type={value === 'full' ? 'primary' : 'default'}
-      onClick={() => {
-        onChange?.('full')
-        onAfterChange?.()
-      }}
-      style={{
-        borderRadius: 8,
-        height: 36,
-        padding: '0 20px',
-        fontWeight: 500,
-      }}
-    >
-      全参微调
-    </Button>
-    <Button
-      type={value === 'lora' ? 'primary' : 'default'}
-      onClick={() => {
-        onChange?.('lora')
-        onAfterChange?.()
-      }}
-      style={{
-        borderRadius: 8,
-        height: 36,
-        padding: '0 20px',
-        fontWeight: 500,
-      }}
-    >
-      LoRA微调
-    </Button>
-  </Space>
+  <Select
+    value={value}
+    placeholder="请选择参数类型"
+    onChange={(nextValue: FineTuneType) => {
+      onChange?.(nextValue)
+      onAfterChange?.()
+    }}
+    options={[
+      { value: 'full', label: '全参微调' },
+      { value: 'lora', label: 'LoRA微调' },
+    ]}
+  />
 )
 
 const BaseModelModalPicker: React.FC<{
@@ -634,6 +633,18 @@ const FULL_FINETUNE_DEFAULTS = {
   saveStrategy: 'STEPS',
   saveTotalLimit: 3,
   loggingSteps: 5,
+  numGenerations: 8,
+  maxPromptLength: 1024,
+  maxCompletionLength: 1024,
+  temperature: 0.9,
+  topP: 0.95,
+  topK: 50,
+  repetitionPenalty: 1.05,
+  klCoefficient: 0.04,
+  clipRange: 0.2,
+  advantageEstimator: 'GRPO',
+  rewardNormalization: true,
+  rewardScale: 1,
   deepspeedStage: 'off' as DeepSpeedStage,
 } as const
 
@@ -742,9 +753,11 @@ const DeepSpeedStageField: React.FC = () => {
 const GrpoTrainingParameterTemplateField: React.FC<{
   templates: GrpoTrainingParameterTemplate[]
   onApplied: () => void
-}> = ({ templates, onApplied }) => {
+  mode?: GrpoParameterMode
+}> = ({ templates, onApplied, mode = 'template' }) => {
   const form = Form.useFormInstance()
   const selectedId = Form.useWatch('grpoTemplateId', form) as string | undefined
+  const customContent = Form.useWatch('grpoTemplateContent', form) as string | undefined
   const selectedTemplate = templates.find(item => item.id === selectedId)
 
   const applyTemplateContent = (raw?: string) => {
@@ -767,6 +780,7 @@ const GrpoTrainingParameterTemplateField: React.FC<{
     }
     const content = buildGrpoTemplateContent(template)
     form.setFieldsValue({
+      grpoParameterMode: 'template',
       grpoTemplateId: template.id,
       grpoTemplateName: template.name,
       grpoTemplateContent: content,
@@ -781,16 +795,89 @@ const GrpoTrainingParameterTemplateField: React.FC<{
     message.success('已应用模板管理，可继续调整本次训练参数')
   }
 
+  const switchMode = (nextMode: GrpoParameterMode) => {
+    form.setFieldValue('grpoParameterMode', nextMode)
+    if (nextMode === 'custom') {
+      const fineTuneType = (form.getFieldValue('fineTuneType') as FineTuneType | undefined) ?? 'full'
+      const params = collectGrpoTemplateParams(form.getFieldValue)
+      form.setFieldsValue({
+        grpoTemplateId: undefined,
+        grpoTemplateName: '自定义参数',
+        grpoTemplateContent: customContent?.trim() ? customContent : buildGrpoTemplateContent({ fineTuneType, params }),
+        grpoTemplateSnapshot: {
+          fineTuneType,
+          params,
+        },
+      })
+      return
+    }
+
+    form.setFieldsValue({
+      grpoTemplateName: selectedTemplate?.name,
+    })
+  }
+
   return (
     <div style={{ marginBottom: 20 }}>
       <Form.Item name="grpoTemplateName" hidden>
         <Input />
       </Form.Item>
+
+      <Form.Item label="训练参数配置" name="grpoParameterMode" rules={[{ required: true, message: '请选择训练参数配置' }]}>
+        <Radio.Group
+          buttonStyle="solid"
+          onChange={event => switchMode(event.target.value as GrpoParameterMode)}
+        >
+          <Radio.Button value="template">模板管理</Radio.Button>
+          <Radio.Button value="custom">自定义参数</Radio.Button>
+        </Radio.Group>
+      </Form.Item>
+
+      {mode === 'custom' ? (
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Form.Item
+            label="参数模板"
+            name="grpoTemplateContent"
+            rules={[
+              { required: true, message: '请填写 YAML 参数模板' },
+              {
+                validator: async (_, value) => {
+                  try {
+                    parseGrpoTemplateContent(value)
+                  } catch (error) {
+                    return Promise.reject(error instanceof Error ? error.message : 'YAML 模板不合法')
+                  }
+                },
+              },
+            ]}
+          >
+            <Input.TextArea
+              rows={18}
+              onBlur={event => {
+                try {
+                  applyTemplateContent(event.target.value)
+                } catch {
+                  // Validation message is handled by Form.Item.
+                }
+              }}
+              style={{
+                fontFamily: 'Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+                fontSize: 12,
+                lineHeight: 1.6,
+                background: '#0f172a',
+                color: '#e2e8f0',
+                borderRadius: 12,
+              }}
+            />
+          </Form.Item>
+        </Space>
+      ) : (
+        <>
       <Form.Item
         label="模板管理"
         name="grpoTemplateId"
         rules={[{ required: true, message: '请选择模板管理' }]}
-        tooltip="选择一套 GRPO 训练参数模板，并可在本次任务中继续编辑模板内容。"
+        tooltip="选择一套 GRPO 训练参数模板，系统会回填为可编辑表单参数。"
       >
         <Select
           placeholder="请选择模板管理"
@@ -803,43 +890,8 @@ const GrpoTrainingParameterTemplateField: React.FC<{
         />
       </Form.Item>
 
-      {selectedTemplate ? (
-        <Form.Item
-          label="参数模板"
-          name="grpoTemplateContent"
-          rules={[
-            { required: true, message: '请填写模板内容' },
-            {
-              validator: async (_, value) => {
-                try {
-                  parseGrpoTemplateContent(value)
-                } catch (error) {
-                  return Promise.reject(error instanceof Error ? error.message : '模板内容不合法')
-                }
-              },
-            },
-          ]}
-        >
-          <Input.TextArea
-            rows={18}
-            onBlur={event => {
-              try {
-                applyTemplateContent(event.target.value)
-              } catch {
-                // Validation message is handled by Form.Item.
-              }
-            }}
-            style={{
-              fontFamily: 'Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-              fontSize: 12,
-              lineHeight: 1.6,
-              background: '#0f172a',
-              color: '#e2e8f0',
-              borderRadius: 12,
-            }}
-          />
-        </Form.Item>
-      ) : null}
+        </>
+      )}
     </div>
   )
 }
@@ -1169,10 +1221,23 @@ function mapVersionToFormValues(
     saveStrategy: c.saveStrategy,
     saveTotalLimit: c.saveTotalLimit,
     loggingSteps: c.loggingSteps,
+    numGenerations: c.numGenerations,
+    maxPromptLength: c.maxPromptLength,
+    maxCompletionLength: c.maxCompletionLength,
+    temperature: c.temperature,
+    topP: c.topP,
+    topK: c.topK,
+    repetitionPenalty: c.repetitionPenalty,
+    klCoefficient: c.klCoefficient,
+    clipRange: c.clipRange,
+    advantageEstimator: c.advantageEstimator,
+    rewardNormalization: c.rewardNormalization,
+    rewardScale: c.rewardScale,
     grpoTemplateId: c.grpoTemplateId,
     grpoTemplateName: c.grpoTemplateName,
     grpoTemplateContent: c.grpoTemplateContent ?? (c.grpoTemplateSnapshot ? buildGrpoTemplateContent(c.grpoTemplateSnapshot) : undefined),
     grpoTemplateSnapshot: c.grpoTemplateSnapshot,
+    grpoParameterMode: c.grpoTemplateId ? 'template' : 'custom',
     deepspeedStage: c.deepspeedStage ?? 'off',
     loraRank: c.loraRank,
     loraTargetModules: c.loraTarget === 'all' ? ['all'] : (c.loraTarget ? [c.loraTarget] : ['all']),
@@ -1243,6 +1308,7 @@ const CreateTraining: React.FC = () => {
       trainingMethod: parentTask?.trainingMethod || 'SFT',
       baseModelSource: 'base',
       fineTuneType: 'full' as FineTuneType,
+      grpoParameterMode: 'template' as GrpoParameterMode,
       splitRatio: 15,
       validationSplitMode: 'split' as const,
       trainingDatasets: [] as TrainingDatasetRow[],
@@ -1280,6 +1346,8 @@ const CreateTraining: React.FC = () => {
   const scheduleEnabled = Form.useWatch('scheduleEnabled', form)
   const rftAlgorithm = Form.useWatch('rftAlgorithm', form) as RFTAlgorithm | 'PPO' | undefined
   const rewardRuleType = Form.useWatch('rewardRuleType', form) as RewardRuleType | undefined
+  const grpoParameterMode = (Form.useWatch('grpoParameterMode', form) as GrpoParameterMode | undefined) ?? 'template'
+  const selectedGrpoTemplateId = Form.useWatch('grpoTemplateId', form) as string | undefined
   const isGrpoTraining = trainingMethod === 'RFT' && rftAlgorithm === 'GRPO'
   const enabledGrpoTemplates = useMemo(() => grpoTemplates.filter(template => template.enabled), [grpoTemplates])
 
@@ -1296,6 +1364,7 @@ const CreateTraining: React.FC = () => {
         grpoTemplateName: undefined,
         grpoTemplateContent: undefined,
         grpoTemplateSnapshot: undefined,
+        grpoParameterMode: 'template',
       })
     }
   }, [form, isGrpoTraining])
@@ -1374,15 +1443,35 @@ const CreateTraining: React.FC = () => {
 
     if (isGrpoTraining) {
       try {
-        const parsed = parseGrpoTemplateContent(form.getFieldValue('grpoTemplateContent') as string | undefined)
-        form.setFieldsValue({
-          fineTuneType: parsed.fineTuneType,
-          ...parsed.params,
-          grpoTemplateSnapshot: {
+        const mode = (form.getFieldValue('grpoParameterMode') as GrpoParameterMode | undefined) ?? 'template'
+        if (mode === 'custom') {
+          const parsed = parseGrpoTemplateContent(form.getFieldValue('grpoTemplateContent') as string | undefined)
+          const content = buildGrpoTemplateContent(parsed)
+          form.setFieldsValue({
             fineTuneType: parsed.fineTuneType,
-            params: parsed.params,
-          },
-        })
+            ...parsed.params,
+            grpoTemplateId: undefined,
+            grpoTemplateName: '自定义参数',
+            grpoParameterMode: 'custom',
+            grpoTemplateContent: content,
+            grpoTemplateSnapshot: {
+              fineTuneType: parsed.fineTuneType,
+              params: parsed.params,
+            },
+          })
+        } else {
+          const fineTuneType = (form.getFieldValue('fineTuneType') as FineTuneType | undefined) ?? 'full'
+          const params = collectGrpoTemplateParams(form.getFieldValue)
+          const content = buildGrpoTemplateContent({ fineTuneType, params })
+          form.setFieldsValue({
+            grpoParameterMode: 'template',
+            grpoTemplateContent: content,
+            grpoTemplateSnapshot: {
+              fineTuneType,
+              params,
+            },
+          })
+        }
       } catch {
         return
       }
@@ -1742,6 +1831,205 @@ const CreateTraining: React.FC = () => {
     ? [...tabItems.slice(0, -1), loraTabItem, tabItems[tabItems.length - 1]]
     : tabItems
 
+  const grpoTabItems = [
+    {
+      key: 'fineTuneType',
+      label: (
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ExperimentOutlined />
+          参数类型
+        </span>
+      ),
+      children: (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px 24px' }}>
+          <Form.Item
+            label="参数类型"
+            name="fineTuneType"
+            rules={[{ required: true, message: '请选择参数类型' }]}
+            tooltip="来自参数模板中的 fineTuneType 定义，决定本次 GRPO 训练使用全参参数还是 LoRA 参数。"
+          >
+            <FineTuneTypePicker onAfterChange={() => setActiveTab('grpoTrain')} />
+          </Form.Item>
+        </div>
+      ),
+    },
+    {
+      key: 'grpoTrain',
+      label: (
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SettingOutlined />
+          训练控制
+        </span>
+      ),
+      children: (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px 24px' }}>
+          <Form.Item label="学习率" name="learningRate" tooltip="GRPO 更新策略模型时使用的学习率。">
+            <InputNumber style={{ width: '100%' }} min={0} step={0.000001} precision={6} placeholder="如: 0.000050" />
+          </Form.Item>
+          <Form.Item label="训练轮次" name="numEpochs" tooltip="训练数据被完整遍历的次数。">
+            <InputNumber style={{ width: '100%' }} min={1} max={100} placeholder="如: 3" />
+          </Form.Item>
+          <Form.Item label="每设备训练 Batch" name="perDeviceBatchSize" tooltip="每张卡单步处理的 prompt 数量。">
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="如: 2" />
+          </Form.Item>
+          <Form.Item label="梯度累积步数" name="gradientAccumulationSteps" tooltip="累积多步梯度后再做一次参数更新，用于提升等效 batch。">
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="如: 1" />
+          </Form.Item>
+          <Form.Item label="预热比例" name="warmupRatio" tooltip="训练初期学习率从低到高预热的步数比例。">
+            <InputNumber style={{ width: '100%' }} min={0} max={1} step={0.01} placeholder="0.0-1.0" />
+          </Form.Item>
+          <Form.Item label="bf16 精度" name="useBf16" valuePropName="checked" tooltip="开启 bf16 以降低显存占用并提升训练吞吐。">
+            <Switch checkedChildren="是" unCheckedChildren="否" />
+          </Form.Item>
+          <Form.Item label="梯度检查点" name="gradientCheckpointing" valuePropName="checked" tooltip="通过重算中间激活降低显存占用，适合长上下文或大模型训练。">
+            <Switch checkedChildren="是" unCheckedChildren="否" />
+          </Form.Item>
+          <Form.Item label="随机种子" name="randomSeed" tooltip="固定随机种子用于复现实验。">
+            <InputNumber style={{ width: '100%' }} min={0} placeholder="如: 42" />
+          </Form.Item>
+          <Form.Item label="最大梯度范数" name="maxGradNorm" tooltip="用于梯度裁剪，降低训练发散风险。">
+            <InputNumber style={{ width: '100%' }} min={0} step={0.1} placeholder="如: 1.0" />
+          </Form.Item>
+          <Form.Item label="权重衰减" name="weightDecay" tooltip="对模型权重增加正则约束，降低过拟合风险。">
+            <InputNumber style={{ width: '100%' }} min={0} step={0.000001} precision={6} placeholder="如: 0" />
+          </Form.Item>
+        </div>
+      ),
+    },
+    {
+      key: 'grpoGeneration',
+      label: (
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <RocketOutlined />
+          生成采样
+        </span>
+      ),
+      children: (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px 24px' }}>
+          <Form.Item label="每题生成数量" name="numGenerations" tooltip="每个 prompt 采样生成的候选回答数量，GRPO 会在同组回答内做相对优势估计。">
+            <InputNumber style={{ width: '100%' }} min={2} max={64} placeholder="如: 8" />
+          </Form.Item>
+          <Form.Item label="Prompt 最大长度" name="maxPromptLength" tooltip="输入 prompt 的最大 token 长度，超出后按训练侧策略截断。">
+            <InputNumber style={{ width: '100%' }} min={64} max={32768} placeholder="如: 1024" />
+          </Form.Item>
+          <Form.Item label="Completion 最大长度" name="maxCompletionLength" tooltip="模型单次生成回答的最大 token 长度。">
+            <InputNumber style={{ width: '100%' }} min={16} max={32768} placeholder="如: 1024" />
+          </Form.Item>
+          <Form.Item label="采样温度" name="temperature" tooltip="控制生成随机性，值越高回答越发散。">
+            <InputNumber style={{ width: '100%' }} min={0} max={2} step={0.01} placeholder="如: 0.9" />
+          </Form.Item>
+          <Form.Item label="Top-p" name="topP" tooltip="核采样概率阈值，仅从累计概率达到该值的候选词中采样。">
+            <InputNumber style={{ width: '100%' }} min={0} max={1} step={0.01} placeholder="如: 0.95" />
+          </Form.Item>
+          <Form.Item label="Top-k" name="topK" tooltip="每步生成只保留概率最高的 k 个候选词参与采样。">
+            <InputNumber style={{ width: '100%' }} min={0} max={200} placeholder="如: 50" />
+          </Form.Item>
+          <Form.Item label="重复惩罚" name="repetitionPenalty" tooltip="抑制重复生成，通常略大于 1。">
+            <InputNumber style={{ width: '100%' }} min={0} max={3} step={0.01} placeholder="如: 1.05" />
+          </Form.Item>
+        </div>
+      ),
+    },
+    {
+      key: 'grpoPolicy',
+      label: (
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ThunderboltOutlined />
+          策略优化
+        </span>
+      ),
+      children: (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px 24px' }}>
+          <Form.Item label="KL 系数" name="klCoefficient" tooltip="约束策略模型相对参考模型的偏移，值越大越保守。">
+            <InputNumber style={{ width: '100%' }} min={0} max={1} step={0.001} placeholder="如: 0.04" />
+          </Form.Item>
+          <Form.Item label="裁剪范围" name="clipRange" tooltip="策略比率裁剪范围，用于稳定策略更新。">
+            <InputNumber style={{ width: '100%' }} min={0} max={1} step={0.01} placeholder="如: 0.2" />
+          </Form.Item>
+          <Form.Item label="优势估计方式" name="advantageEstimator" tooltip="GRPO 默认使用组内相对奖励估计优势。">
+            <Select placeholder="请选择">
+              <Select.Option value="GRPO">GRPO 组内相对优势</Select.Option>
+              <Select.Option value="LEAVE_ONE_OUT">Leave-one-out</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item label="奖励归一化" name="rewardNormalization" valuePropName="checked" tooltip="对同组奖励做归一化，降低不同样本奖励尺度差异。">
+            <Switch checkedChildren="是" unCheckedChildren="否" />
+          </Form.Item>
+          <Form.Item label="奖励缩放系数" name="rewardScale" tooltip="对奖励值进行整体缩放，影响策略更新强度。">
+            <InputNumber style={{ width: '100%' }} min={0} step={0.1} placeholder="如: 1" />
+          </Form.Item>
+        </div>
+      ),
+    },
+    {
+      key: 'grpoData',
+      label: (
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <DatabaseOutlined />
+          数据处理
+        </span>
+      ),
+      children: (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px 24px' }}>
+          <Form.Item label="训练样本最大 Token" name="cutoffLength" tooltip="单条训练样本拼接后的最大 token 长度。">
+            <InputNumber style={{ width: '100%' }} min={64} max={32768} placeholder="如: 4096" />
+          </Form.Item>
+          <Form.Item label="预处理进程数" name="preprocessingNumWorkers" tooltip="数据预处理使用的并行进程数。">
+            <InputNumber style={{ width: '100%' }} min={1} max={64} placeholder="如: 16" />
+          </Form.Item>
+        </div>
+      ),
+    },
+    {
+      key: 'grpoEvalSave',
+      label: (
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SaveOutlined />
+          评估保存
+        </span>
+      ),
+      children: (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px 24px' }}>
+          <Form.Item label="评估策略" name="evalStrategy" tooltip="按步数或轮次触发评估。">
+            <Select placeholder="请选择">
+              <Select.Option value="STEPS">STEPS</Select.Option>
+              <Select.Option value="EPOCHS">EPOCHS</Select.Option>
+              <Select.Option value="NO">不评估</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item label="评估间隔步数" name="evalSteps" tooltip="评估策略为 STEPS 时，每隔多少步执行评估。">
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="如: 20" />
+          </Form.Item>
+          <Form.Item label="保存策略" name="saveStrategy" tooltip="按步数或轮次保存训练产物。">
+            <Select placeholder="请选择">
+              <Select.Option value="STEPS">STEPS</Select.Option>
+              <Select.Option value="EPOCHS">EPOCHS</Select.Option>
+              <Select.Option value="NO">不保存中间产物</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item label="保存间隔步数" name="saveSteps" tooltip="保存策略为 STEPS 时，每隔多少步保存一次。">
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="如: 20" />
+          </Form.Item>
+          <Form.Item label="最多保留数量" name="saveTotalLimit" tooltip="最多保留的 checkpoint 数量。">
+            <InputNumber style={{ width: '100%' }} min={1} max={100} placeholder="如: 3" />
+          </Form.Item>
+          <Form.Item label="日志间隔步数" name="loggingSteps" tooltip="训练日志输出间隔。">
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="如: 5" />
+          </Form.Item>
+        </div>
+      ),
+    },
+  ]
+
+  const grpoLoraTabItem = {
+    ...loraTabItem,
+    key: 'grpoLora',
+  }
+
+  const grpoComputedTabItems = fineTuneType === 'lora'
+    ? [...grpoTabItems, grpoLoraTabItem]
+    : grpoTabItems
+
   return (
     <div style={{ padding: '28px 32px', minHeight: '100%' }}>
       {/* 页面标题 + 返回按钮（新增版本时） */}
@@ -2003,6 +2291,7 @@ const CreateTraining: React.FC = () => {
                   form.setFieldValue('grpoTemplateName', undefined)
                   form.setFieldValue('grpoTemplateContent', undefined)
                   form.setFieldValue('grpoTemplateSnapshot', undefined)
+                  form.setFieldValue('grpoParameterMode', 'template')
                 }}
               >
                 <Select.Option value="SFT">
@@ -2061,7 +2350,8 @@ const CreateTraining: React.FC = () => {
           {isGrpoTraining ? (
             <GrpoTrainingParameterTemplateField
               templates={enabledGrpoTemplates}
-              onApplied={() => setActiveTab('basic')}
+              onApplied={() => setActiveTab('fineTuneType')}
+              mode={grpoParameterMode}
             />
           ) : (trainingMethod === 'SFT' || trainingMethod === 'DPO' || trainingMethod === 'RFT') && (
             <Form.Item
@@ -2073,14 +2363,16 @@ const CreateTraining: React.FC = () => {
             </Form.Item>
           )}
 
-          {!isGrpoTraining && (
+          {(!isGrpoTraining || (grpoParameterMode === 'template' && selectedGrpoTemplateId)) ? (
             <Tabs
-              activeKey={activeTab}
+              activeKey={(isGrpoTraining ? grpoComputedTabItems : computedTabItems).some(item => item.key === activeTab)
+                ? activeTab
+                : (isGrpoTraining ? grpoComputedTabItems[0]?.key : computedTabItems[0]?.key)}
               onChange={setActiveTab}
-              items={computedTabItems}
+              items={isGrpoTraining ? grpoComputedTabItems : computedTabItems}
               style={{ marginTop: -8 }}
             />
-          )}
+          ) : null}
         </Card>
 
         {/* 数据配置 */}

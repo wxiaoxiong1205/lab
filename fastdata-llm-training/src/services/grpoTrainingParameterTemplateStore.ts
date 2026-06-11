@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react'
 import type { FineTuneType, TrainingConfig } from '../types/training'
 
+export type GrpoTemplateTrainingMethod = 'GRPO'
+
 export type GrpoTrainingParameterValues = Pick<
   TrainingConfig,
   | 'learningRate'
@@ -27,6 +29,18 @@ export type GrpoTrainingParameterValues = Pick<
   | 'saveStrategy'
   | 'saveTotalLimit'
   | 'loggingSteps'
+  | 'numGenerations'
+  | 'maxPromptLength'
+  | 'maxCompletionLength'
+  | 'temperature'
+  | 'topP'
+  | 'topK'
+  | 'repetitionPenalty'
+  | 'klCoefficient'
+  | 'clipRange'
+  | 'advantageEstimator'
+  | 'rewardNormalization'
+  | 'rewardScale'
   | 'loraAlpha'
   | 'loraDropout'
   | 'loraRank'
@@ -39,6 +53,7 @@ export interface GrpoTrainingParameterTemplate {
   name: string
   description?: string
   enabled: boolean
+  trainingMethod: GrpoTemplateTrainingMethod
   fineTuneType: FineTuneType
   params: GrpoTrainingParameterValues
   createdAt: string
@@ -70,6 +85,18 @@ export const GRPO_TEMPLATE_PARAM_KEYS = [
   'saveStrategy',
   'saveTotalLimit',
   'loggingSteps',
+  'numGenerations',
+  'maxPromptLength',
+  'maxCompletionLength',
+  'temperature',
+  'topP',
+  'topK',
+  'repetitionPenalty',
+  'klCoefficient',
+  'clipRange',
+  'advantageEstimator',
+  'rewardNormalization',
+  'rewardScale',
   'loraRank',
   'loraTargetModules',
   'loraAlpha',
@@ -240,6 +267,18 @@ const commonParams: GrpoTrainingParameterValues = {
   saveStrategy: 'STEPS',
   saveTotalLimit: 3,
   loggingSteps: 5,
+  numGenerations: 8,
+  maxPromptLength: 1024,
+  maxCompletionLength: 1024,
+  temperature: 0.9,
+  topP: 0.95,
+  topK: 50,
+  repetitionPenalty: 1.05,
+  klCoefficient: 0.04,
+  clipRange: 0.2,
+  advantageEstimator: 'GRPO',
+  rewardNormalization: true,
+  rewardScale: 1,
 }
 
 const seedTemplates: GrpoTrainingParameterTemplate[] = [
@@ -248,6 +287,7 @@ const seedTemplates: GrpoTrainingParameterTemplate[] = [
     name: 'GRPO 全参通用模板',
     description: '适用于常规 GRPO 全参训练，参数口径与创建页默认训练参数保持一致。',
     enabled: true,
+    trainingMethod: 'GRPO',
     fineTuneType: 'full',
     params: { ...commonParams },
     createdAt: '2026/06/05 10:00:00',
@@ -258,6 +298,7 @@ const seedTemplates: GrpoTrainingParameterTemplate[] = [
     name: 'GRPO LoRA 轻量模板',
     description: '适用于先用 LoRA 快速验证 GRPO 训练效果的场景。',
     enabled: true,
+    trainingMethod: 'GRPO',
     fineTuneType: 'lora',
     params: {
       ...commonParams,
@@ -277,6 +318,36 @@ function cloneTemplates(value: GrpoTrainingParameterTemplate[]): GrpoTrainingPar
   return JSON.parse(JSON.stringify(value)) as GrpoTrainingParameterTemplate[]
 }
 
+function normalizeTemplateRecord(value: Partial<GrpoTrainingParameterTemplate>): GrpoTrainingParameterTemplate {
+  const fineTuneType = value.fineTuneType === 'full' || value.fineTuneType === 'lora' ? value.fineTuneType : 'lora'
+  const defaultParams = fineTuneType === 'lora'
+    ? {
+        ...commonParams,
+        learningRate: 0.00002,
+        gradientCheckpointing: true,
+        loraRank: 16,
+        loraTargetModules: ['all'],
+        loraAlpha: 32,
+        loraDropout: 0,
+      }
+    : commonParams
+
+  return {
+    id: value.id ?? `grpo-template-${Date.now()}`,
+    name: value.name ?? '未命名模板',
+    description: value.description ?? '',
+    enabled: value.enabled ?? true,
+    trainingMethod: 'GRPO',
+    fineTuneType,
+    params: normalizeGrpoTemplateParams({
+      ...defaultParams,
+      ...((value.params ?? {}) as Record<string, unknown>),
+    }),
+    createdAt: value.createdAt ?? '2026/06/05 10:00:00',
+    updatedAt: value.updatedAt ?? value.createdAt ?? '2026/06/05 10:00:00',
+  }
+}
+
 function readTemplates(): GrpoTrainingParameterTemplate[] {
   if (typeof window === 'undefined') {
     return cloneTemplates(seedTemplates)
@@ -284,7 +355,7 @@ function readTemplates(): GrpoTrainingParameterTemplate[] {
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as GrpoTrainingParameterTemplate[]) : cloneTemplates(seedTemplates)
+    return raw ? (JSON.parse(raw) as Partial<GrpoTrainingParameterTemplate>[]).map(normalizeTemplateRecord) : cloneTemplates(seedTemplates)
   } catch {
     return cloneTemplates(seedTemplates)
   }
@@ -346,12 +417,14 @@ export const grpoTrainingParameterTemplateActions = {
         draft[index] = {
           ...draft[index],
           ...value,
+          trainingMethod: 'GRPO',
           params: normalizeGrpoTemplateParams(value.params as Record<string, unknown>),
           updatedAt: now,
         }
       } else {
         draft.unshift({
           ...value,
+          trainingMethod: 'GRPO',
           params: normalizeGrpoTemplateParams(value.params as Record<string, unknown>),
           createdAt: value.createdAt ?? now,
           updatedAt: value.updatedAt ?? now,

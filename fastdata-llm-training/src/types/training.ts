@@ -247,6 +247,20 @@ export interface TrainingConfig {
   // 监控配置
   loggingSteps?: number
 
+  // GRPO 生成采样与策略优化配置
+  numGenerations?: number
+  maxPromptLength?: number
+  maxCompletionLength?: number
+  temperature?: number
+  topP?: number
+  topK?: number
+  repetitionPenalty?: number
+  klCoefficient?: number
+  clipRange?: number
+  advantageEstimator?: string
+  rewardNormalization?: boolean
+  rewardScale?: number
+
   // DeepSpeed 训练加速配置
   deepspeedStage?: 'off' | 'z0' | 'z2' | 'z3'
 
@@ -260,6 +274,7 @@ export interface TrainingConfig {
   grpoTemplateId?: string
   grpoTemplateName?: string
   grpoTemplateContent?: string
+  grpoParameterMode?: 'template' | 'custom'
   grpoTemplateSnapshot?: {
     fineTuneType: FineTuneType
     params: Record<string, unknown>
