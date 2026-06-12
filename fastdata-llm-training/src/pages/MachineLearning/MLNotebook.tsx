@@ -702,6 +702,13 @@ function getNotebookInstanceId(id: string): string {
   return numericPart || '530'
 }
 
+function getNotebookSSHCommand(notebook: Pick<MLNotebookRecord, 'id' | 'sshConfig'>): string {
+  const instanceNumber = Number(getNotebookInstanceId(notebook.id))
+  const sshPort = 32000 + (Number.isFinite(instanceNumber) ? instanceNumber : 530)
+  const username = notebook.sshConfig?.username?.trim()
+  return `ssh ${username ? `${username}@` : ''}180.184.81.11 -p ${sshPort}`
+}
+
 function getExternalAccess(port: number): string {
   return `http://180.184.81.11:${30000 + Number(port)}`
 }
@@ -2981,6 +2988,17 @@ const MLNotebook: React.FC = () => {
                           }
                           handleCopy(value, '密码')
                         }}
+                      />
+                    </div>
+                  </Form.Item>
+                  <Form.Item label="SSH">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 40px', gap: 8, width: '100%' }}>
+                      <Input value={getNotebookSSHCommand(notebookDetail)} disabled />
+                      <Button
+                        type="text"
+                        aria-label="复制 SSH"
+                        icon={<CopyOutlined />}
+                        onClick={() => handleCopy(getNotebookSSHCommand(notebookDetail), 'SSH')}
                       />
                     </div>
                   </Form.Item>
