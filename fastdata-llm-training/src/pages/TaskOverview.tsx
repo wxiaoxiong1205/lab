@@ -298,7 +298,7 @@ function formatResourceSpec(resource: ResourceSnapshot): string {
   return `显卡：${gpuLabel} · ${resource.cards}卡 · 显存：${resource.vramGb}GB · CPU：${resource.cpu}核 · 内存：${resource.memoryGb}GB`
 }
 
-function getResourceOccupancyHint(status: TaskLifecycleStatus): { keyword: string; tone: 'pending' | 'using' } | null {
+function getResourceOccupancyHint(status: TaskLifecycleStatus): { keyword: string; tone: 'pending' | 'using' | 'released' } | null {
   if (status === '运行中') {
     return {
       keyword: '资源正在使用中',
@@ -321,6 +321,12 @@ function getResourceOccupancyHint(status: TaskLifecycleStatus): { keyword: strin
     return {
       keyword: '资源即将被占用',
       tone: 'pending',
+    }
+  }
+  if (status === '失败') {
+    return {
+      keyword: '资源已释放',
+      tone: 'released',
     }
   }
   return null
@@ -995,6 +1001,9 @@ const TaskOverview: React.FC = () => {
         }
         .task-overview-latest-group__hint--using {
           color: #059669;
+        }
+        .task-overview-latest-group__hint--released {
+          color: #b91c1c;
         }
         .task-overview-latest-group__body {
           flex: 1;
