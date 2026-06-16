@@ -12,6 +12,7 @@ import {
   FolderOpenOutlined,
   LeftOutlined,
   PlayCircleOutlined,
+  ReloadOutlined,
   RightOutlined,
   RocketOutlined,
   ThunderboltOutlined,
@@ -291,6 +292,40 @@ function resourceFromTrainingVersion(version: ReturnType<typeof useTrainingTasks
   )
 }
 
+function formatResourceSpec(resource: ResourceSnapshot): string {
+  const gpuTypes = resource.computeTypes.filter(type => type !== 'CPU')
+  const gpuLabel = gpuTypes.length ? gpuTypes.join('/') : '无'
+  return `显卡：${gpuLabel} · ${resource.cards}卡 · 显存：${resource.vramGb}GB · CPU：${resource.cpu}核 · 内存：${resource.memoryGb}GB`
+}
+
+function getResourceOccupancyHint(status: TaskLifecycleStatus): { keyword: string; tone: 'pending' | 'using' } | null {
+  if (status === '运行中') {
+    return {
+      keyword: '资源正在使用中',
+      tone: 'using',
+    }
+  }
+  if (status === '定时待启动') {
+    return {
+      keyword: '资源即将被占用',
+      tone: 'pending',
+    }
+  }
+  if (status === '启动中') {
+    return {
+      keyword: '资源即将被占用',
+      tone: 'pending',
+    }
+  }
+  if (status === '排队中') {
+    return {
+      keyword: '资源即将被占用',
+      tone: 'pending',
+    }
+  }
+  return null
+}
+
 function getCreatorName(account: string, users: ReturnType<typeof usePermissionStore>['users']): string {
   return users.find(user => user.account === account)?.username ?? account
 }
@@ -310,6 +345,8 @@ const TaskOverview: React.FC = () => {
   const machineDeploymentState = useMachineDeploymentStore()
   const [taskScope, setTaskScope] = useState<TaskScope>('all')
   const [latestGroupPages, setLatestGroupPages] = useState<Partial<Record<TaskLifecycleStatus, number>>>({})
+  const [refreshTick, setRefreshTick] = useState(0)
+  const [lastRefreshedAt, setLastRefreshedAt] = useState(() => new Date())
 
   const overviewTasks = useMemo<OverviewTask[]>(() => {
     const trainingOverviewTasks: OverviewTask[] = trainingTasks
@@ -389,7 +426,7 @@ const TaskOverview: React.FC = () => {
       ...cleaningOverviewTasks,
       ...machineDeploymentOverviewTasks,
     ].sort((a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt))
-  }, [dataServiceState, machineDeploymentState.deployments, permissionState.users, trainingTasks])
+  }, [dataServiceState, machineDeploymentState.deployments, permissionState.users, refreshTick, trainingTasks])
 
   const taskScopeCounts = useMemo<Record<TaskScope, number>>(() => ({
     all: overviewTasks.length,
@@ -403,7 +440,7 @@ const TaskOverview: React.FC = () => {
   )
 
   const currentScopeMeta = taskScopeMeta[taskScope]
-  const runningTasks = filteredOverviewTasks.filter(task => task.status === '运行中' || task.status === '启动中')
+  const runningTasks = filteredOverviewTasks.filter(task => task.status === '运行中')
   const projectUsed = sumResource(runningTasks)
   const capacity = getClusterCapacity(currentProject?.cluster)
   const clusterUsed = {
@@ -441,6 +478,13 @@ const TaskOverview: React.FC = () => {
     setLatestGroupPages(prev => ({ ...prev, [status]: page }))
   }
 
+  const handleRefreshOverview = () => {
+    setRefreshTick(value => value + 1)
+    setLatestGroupPages({})
+    setLastRefreshedAt(new Date())
+    message.success('任务概览已刷新')
+  }
+
   const scopeOptions = Object.keys(taskScopeMeta) as TaskScope[]
 
   if (!currentProject && !accessibleProjects.length) {
@@ -467,6 +511,14 @@ const TaskOverview: React.FC = () => {
             <span>当前项目</span>
             <strong>{currentProject?.name ?? '未选择项目'}</strong>
             <Button
+              size="small"
+              icon={<ReloadOutlined />}
+              className="task-overview-refresh-button"
+              onClick={handleRefreshOverview}
+            >
+              刷新
+            </Button>
+            <Button
               type="link"
               size="small"
               icon={<FolderOpenOutlined />}
@@ -475,6 +527,7 @@ const TaskOverview: React.FC = () => {
             >
               返回项目空间
             </Button>
+            <span className="task-overview-refresh-time">最近刷新 {lastRefreshedAt.toLocaleTimeString('zh-CN', { hour12: false })}</span>
           </div>
         </div>
 
@@ -577,6 +630,7 @@ const TaskOverview: React.FC = () => {
             const totalPages = Math.max(1, Math.ceil(group.tasks.length / latestGroupPageSize))
             const currentPage = Math.min(latestGroupPages[group.status] ?? 1, totalPages)
             const pageTasks = group.tasks.slice((currentPage - 1) * latestGroupPageSize, currentPage * latestGroupPageSize)
+            const groupOccupancyHint = getResourceOccupancyHint(group.status)
 
             return (
               <Col xs={24} lg={12} xxl={group.status === '失败' ? 24 : 12} key={group.status}>
@@ -588,40 +642,54 @@ const TaskOverview: React.FC = () => {
                   } as React.CSSProperties}
                 >
                   <div className="task-overview-latest-group__head">
-                    <Space>
-                      <FireOutlined style={{ color: statusVisual[group.status].color }} />
-                      <Text strong>{group.status}</Text>
-                    </Space>
+                    <div className="task-overview-latest-group__title">
+                      <Space size={8}>
+                        <FireOutlined style={{ color: statusVisual[group.status].color }} />
+                        <Text strong>{group.status}</Text>
+                      </Space>
+                      {groupOccupancyHint && (
+                        <span className={`task-overview-latest-group__hint task-overview-latest-group__hint--${groupOccupancyHint.tone}`}>
+                          （{groupOccupancyHint.keyword}）
+                        </span>
+                      )}
+                    </div>
                     <Tag color={statusVisual[group.status].tag}>{group.tasks.length}</Tag>
                   </div>
                   <div className="task-overview-latest-group__body">
                     {pageTasks.length ? (
                       <div className="task-overview-latest-grid">
-                        {pageTasks.map(task => (
-                          <button
-                            key={task.id}
-                            type="button"
-                            onClick={() => handleOpenTask(task)}
-                            className="task-overview-item"
-                          >
-                            <div className="task-overview-item__content">
-                              <div className="task-overview-item__main">
-                                <div className="task-overview-item__title">
-                                  <span style={{ color: moduleVisual[task.module].color }}>{moduleVisual[task.module].icon}</span>
-                                  <Text strong ellipsis className="task-overview-item__name">{task.name}</Text>
+                        {pageTasks.map(task => {
+                            return (
+                              <button
+                                key={task.id}
+                                type="button"
+                                onClick={() => handleOpenTask(task)}
+                                className="task-overview-item"
+                              >
+                                <div className="task-overview-item__content">
+                                  <div className="task-overview-item__main">
+                                    <div className="task-overview-item__title">
+                                      <span style={{ color: moduleVisual[task.module].color }}>{moduleVisual[task.module].icon}</span>
+                                      <Text strong ellipsis className="task-overview-item__name">{task.name}</Text>
+                                    </div>
+                                    <Space size={8} wrap>
+                                      <Tag style={{ margin: 0 }}>{task.module}</Tag>
+                                      <Text type="secondary" style={{ fontSize: 12 }}>创建人：{task.creatorName ?? task.creator}</Text>
+                                      <Text type="secondary" style={{ fontSize: 12 }}>创建时间：{task.createdAt}</Text>
+                                    </Space>
+                                    <div className="task-overview-item__resource">
+                                      <Text type="secondary" ellipsis={{ tooltip: formatResourceSpec(task.resource) }}>
+                                        {formatResourceSpec(task.resource)}
+                                      </Text>
+                                    </div>
+                                  </div>
+                                  <Tooltip title={canOpenTask(task) ? '进入任务详情' : '暂无权限'}>
+                                    <ArrowRightOutlined style={{ color: canOpenTask(task) ? '#2563eb' : '#cbd5e1', marginTop: 3 }} />
+                                  </Tooltip>
                                 </div>
-                                <Space size={8} wrap>
-                                  <Tag style={{ margin: 0 }}>{task.module}</Tag>
-                                  <Text type="secondary" style={{ fontSize: 12 }}>创建人：{task.creatorName ?? task.creator}</Text>
-                                  <Text type="secondary" style={{ fontSize: 12 }}>创建时间：{task.createdAt}</Text>
-                                </Space>
-                              </div>
-                              <Tooltip title={canOpenTask(task) ? '进入任务详情' : '暂无权限'}>
-                                <ArrowRightOutlined style={{ color: canOpenTask(task) ? '#2563eb' : '#cbd5e1', marginTop: 3 }} />
-                              </Tooltip>
-                            </div>
-                          </button>
-                        ))}
+                              </button>
+                            )
+                          })}
                       </div>
                     ) : (
                       <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={`当前范围暂无${group.status}任务`} style={{ marginBlock: 18 }} />
@@ -704,6 +772,24 @@ const TaskOverview: React.FC = () => {
         .task-overview-context-line strong {
           color: #0f172a;
           font-size: 14px;
+        }
+        .task-overview-refresh-button.ant-btn {
+          height: 24px;
+          border-radius: 999px;
+          border-color: rgba(37, 99, 235, 0.2);
+          color: #2563eb;
+          background: rgba(37, 99, 235, 0.06);
+          font-size: 12px;
+          font-weight: 700;
+        }
+        .task-overview-refresh-button.ant-btn:hover {
+          border-color: rgba(37, 99, 235, 0.36) !important;
+          color: #1d4ed8 !important;
+          background: rgba(37, 99, 235, 0.1) !important;
+        }
+        .task-overview-refresh-time {
+          color: #94a3b8;
+          font-size: 12px;
         }
         .task-overview-back-link.ant-btn {
           height: 24px;
@@ -878,8 +964,8 @@ const TaskOverview: React.FC = () => {
           display: flex;
           flex-direction: column;
           height: 100%;
-          min-height: 400px;
-          max-height: 400px;
+          min-height: 430px;
+          max-height: 430px;
           border-radius: 18px;
           border: 1px solid color-mix(in srgb, var(--latest-status-color) 13%, #e2e8f0);
           background: #fff;
@@ -891,6 +977,24 @@ const TaskOverview: React.FC = () => {
           justify-content: space-between;
           padding: 14px 16px;
           background: var(--latest-status-bg);
+        }
+        .task-overview-latest-group__title {
+          display: inline-flex;
+          align-items: center;
+          gap: 14px;
+          min-width: 0;
+        }
+        .task-overview-latest-group__hint {
+          font-size: 14px;
+          font-weight: 800;
+          line-height: 1;
+          white-space: nowrap;
+        }
+        .task-overview-latest-group__hint--pending {
+          color: #ef4444;
+        }
+        .task-overview-latest-group__hint--using {
+          color: #059669;
         }
         .task-overview-latest-group__body {
           flex: 1;
@@ -904,7 +1008,7 @@ const TaskOverview: React.FC = () => {
         }
         .task-overview-item {
           width: 100%;
-          min-height: 112px;
+          min-height: 128px;
           text-align: left;
           border: 1px solid #eef2f7;
           background: #ffffff;
@@ -921,6 +1025,7 @@ const TaskOverview: React.FC = () => {
         }
         .task-overview-item__main {
           min-width: 0;
+          flex: 1;
         }
         .task-overview-item__title {
           display: flex;
@@ -931,6 +1036,18 @@ const TaskOverview: React.FC = () => {
         }
         .task-overview-item__name {
           max-width: 100%;
+        }
+        .task-overview-item__resource {
+          display: block;
+          max-width: 100%;
+          margin-top: 10px;
+          font-size: 12px;
+          line-height: 1.55;
+        }
+        .task-overview-item__resource .ant-typography {
+          display: block;
+          max-width: 100%;
+          font-size: 12px;
         }
         .task-overview-item:hover {
           border-color: #bfdbfe !important;
@@ -1028,8 +1145,8 @@ const TaskOverview: React.FC = () => {
             grid-template-columns: 1fr;
           }
           .task-overview-latest-group {
-            min-height: 660px;
-            max-height: 660px;
+            min-height: 740px;
+            max-height: 740px;
           }
         }
       `}</style>
@@ -1065,7 +1182,7 @@ const ComputeOverviewCard: React.FC<ComputeOverviewCardProps> = ({ scopeLabel, c
     <div className="task-overview-compute-grid">
       <ResourcePanel
         title="当前项目算力"
-        subtitle="当前范围内运行/启动中任务占用，分母为绑定集群总量"
+        subtitle="仅统计当前范围内运行中任务占用，分母为绑定集群总量"
         capacity={capacity}
         used={projectUsed}
         accent="#2563eb"
@@ -1073,7 +1190,7 @@ const ComputeOverviewCard: React.FC<ComputeOverviewCardProps> = ({ scopeLabel, c
       />
       <ResourcePanel
         title="对应集群算力"
-        subtitle={clusterName ? `集群整体资源使用：${clusterName}，不受任务范围筛选影响` : '当前项目绑定集群整体资源使用，不受任务范围筛选影响'}
+        subtitle={clusterName ? `集群整体运行占用：${clusterName}，包含平台基础占用，不受任务范围筛选影响` : '当前项目绑定集群整体运行占用，包含平台基础占用，不受任务范围筛选影响'}
         capacity={capacity}
         used={clusterUsed}
         accent="#059669"

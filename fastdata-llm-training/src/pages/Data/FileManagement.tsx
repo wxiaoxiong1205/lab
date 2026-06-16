@@ -4,52 +4,22 @@ import type { ColumnsType } from 'antd/es/table'
 import { ArrowLeftOutlined, DeleteOutlined, DownloadOutlined, FolderAddOutlined, SearchOutlined, UploadOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getCurrentUser, usePermissionStore } from '../../services/permissionStore'
+import {
+  loadFileManagementFiles,
+  loadFileManagementFolders,
+  saveFileManagementFiles,
+  saveFileManagementFolders,
+  type FileFolderRecord,
+  type FolderFileRecord,
+} from '../../services/fileManagementStore'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
-
-type FileFolderRecord = {
-  id: string
-  name: string
-  description: string
-  creator: string
-  createdAt: string
-}
 
 type CreateFolderFormValues = {
   name?: string
   description?: string
 }
-
-type FolderFileRecord = {
-  id: string
-  name: string
-  size: string
-  type: string
-}
-
-const STORAGE_KEY = 'fastdata-file-management-folders'
-
-const seedFolders: FileFolderRecord[] = [
-  { id: 'folder-size-check', name: '文件大小校验', description: '-', creator: 'lab1', createdAt: '2026-05-21 15:46:23' },
-  { id: 'folder-retry', name: '失败重试', description: '-', creator: 'deepexilab', createdAt: '2026-05-21 15:31:10' },
-  { id: 'folder-cancel-upload', name: '取消上传验证', description: '-', creator: 'lab1', createdAt: '2026-05-21 14:58:42' },
-  { id: 'folder-description', name: '描述测试', description: '# 推理结果集 |--...', creator: 'lab1', createdAt: '2026-05-20 19:22:16' },
-  { id: 'folder-demo-111', name: '测试111', description: '-', creator: 'lab1', createdAt: '2026-05-20 18:40:03' },
-  { id: 'folder-test7', name: 'test7', description: '-', creator: 'lab1', createdAt: '2026-05-20 17:26:38' },
-]
-
-const seedFolderFiles: FolderFileRecord[] = [
-  { id: 'file-1', name: '文本生成偏好样例(alpaca)-制表符.xlsx', size: '24.43 KB', type: '.xlsx' },
-  { id: 'file-2', name: '文本生成偏好样例(alpaca)-制表符.jsonl', size: '11.61 KB', type: '.jsonl' },
-  { id: 'file-3', name: '文本生成偏好样例(alpaca)-制表符.json', size: '11.91 KB', type: '.json' },
-  { id: 'file-4', name: '文本生成偏好样例(alpaca)-空格.xlsx', size: '24.43 KB', type: '.xlsx' },
-  { id: 'file-5', name: '文本生成偏好样例(alpaca)-换行符.xlsx', size: '24.43 KB', type: '.xlsx' },
-  { id: 'file-6', name: '文本生成偏好样例(alpaca)-空格.jsonl', size: '11.61 KB', type: '.jsonl' },
-  { id: 'file-7', name: '文本生成偏好样例(alpaca)-空格.json', size: '11.91 KB', type: '.json' },
-  { id: 'file-8', name: '文本生成偏好样例(alpaca)-换行符.jsonl', size: '11.61 KB', type: '.jsonl' },
-  { id: 'file-9', name: '文本生成偏好样例(alpaca)-换行符.xlsx', size: '24.43 KB', type: '.xlsx' },
-]
 
 const pageCardStyle: React.CSSProperties = {
   borderRadius: 12,
@@ -63,43 +33,26 @@ function nowText() {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
 }
 
-function loadFolders(): FileFolderRecord[] {
-  if (typeof window === 'undefined') {
-    return []
-  }
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) as FileFolderRecord[] : seedFolders
-  } catch {
-    return []
-  }
-}
-
-function saveFolders(folders: FileFolderRecord[]) {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(folders))
-}
-
 const FileManagement: React.FC = () => {
   const navigate = useNavigate()
   const { folderId } = useParams()
   const permissionState = usePermissionStore()
   const currentUser = getCurrentUser(permissionState)
   const [form] = Form.useForm<CreateFolderFormValues>()
-  const [folders, setFolders] = useState<FileFolderRecord[]>(() => loadFolders())
-  const [files, setFiles] = useState<FolderFileRecord[]>(seedFolderFiles)
+  const [folders, setFolders] = useState<FileFolderRecord[]>(() => loadFileManagementFolders())
+  const [filesByFolder, setFilesByFolder] = useState<Record<string, FolderFileRecord[]>>(() => loadFileManagementFiles())
   const [selectedFileIds, setSelectedFileIds] = useState<React.Key[]>([])
   const [searchDraft, setSearchDraft] = useState('')
   const [searchValue, setSearchValue] = useState('')
   const [createModalOpen, setCreateModalOpen] = useState(false)
 
   useEffect(() => {
-    saveFolders(folders)
+    saveFileManagementFolders(folders)
   }, [folders])
+
+  useEffect(() => {
+    saveFileManagementFiles(filesByFolder)
+  }, [filesByFolder])
 
   const filteredFolders = useMemo(() => {
     const keyword = searchValue.trim().toLowerCase()
@@ -143,6 +96,11 @@ const FileManagement: React.FC = () => {
       cancelText: '取消',
       onOk: () => {
         setFolders(previous => previous.filter(item => item.id !== record.id))
+        setFilesByFolder(previous => {
+          const next = { ...previous }
+          delete next[record.id]
+          return next
+        })
         if (folderId === record.id) {
           navigate('/file-management')
         }
@@ -159,23 +117,37 @@ const FileManagement: React.FC = () => {
       okButtonProps: { danger: true },
       cancelText: '取消',
       onOk: () => {
-        setFiles(previous => previous.filter(item => item.id !== record.id))
+        if (!folderId) {
+          return
+        }
+        setFilesByFolder(previous => ({
+          ...previous,
+          [folderId]: (previous[folderId] ?? []).filter(item => item.id !== record.id),
+        }))
         message.success('文件已删除')
       },
     })
   }
 
   const uploadFile = () => {
-    const nextIndex = files.length + 1
-    setFiles(previous => [
-      {
-        id: `file-${Date.now()}`,
-        name: `上传文件-${nextIndex}.jsonl`,
-        size: '10.24 KB',
-        type: '.jsonl',
-      },
+    if (!folderId) {
+      return
+    }
+
+    const currentFiles = filesByFolder[folderId] ?? []
+    const nextIndex = currentFiles.length + 1
+    setFilesByFolder(previous => ({
       ...previous,
-    ])
+      [folderId]: [
+        {
+          id: `file-${Date.now()}`,
+          name: `上传文件-${nextIndex}.jsonl`,
+          size: '10.24 KB',
+          type: '.jsonl',
+        },
+        ...(previous[folderId] ?? []),
+      ],
+    }))
     message.success('文件上传成功')
   }
 
@@ -199,7 +171,12 @@ const FileManagement: React.FC = () => {
       cancelText: '取消',
       onOk: () => {
         const selectedSet = new Set(selectedFileIds)
-        setFiles(previous => previous.filter(item => !selectedSet.has(item.id)))
+        if (folderId) {
+          setFilesByFolder(previous => ({
+            ...previous,
+            [folderId]: (previous[folderId] ?? []).filter(item => !selectedSet.has(item.id)),
+          }))
+        }
         setSelectedFileIds([])
         message.success('文件已批量删除')
       },
@@ -255,6 +232,7 @@ const FileManagement: React.FC = () => {
     () => (folderId ? folders.find(item => item.id === folderId) ?? null : null),
     [folderId, folders],
   )
+  const files = folderId ? filesByFolder[folderId] ?? [] : []
 
   const fileColumns: ColumnsType<FolderFileRecord> = [
     {

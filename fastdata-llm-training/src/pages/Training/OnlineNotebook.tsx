@@ -49,6 +49,7 @@ import {
 import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage, usePermissionStore } from '../../services/permissionStore'
 import { useOnlineInferenceServices } from '../../services/onlineInferenceServiceStore'
 import { createTaskNotification } from '../../services/notificationStore'
+import { useFileManagementNotebookMounts, type NotebookFileMountRecord } from '../../services/fileManagementStore'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import TableColumnFilterDropdown, { type TableColumnFilterOption } from '../../components/TableColumnFilterDropdown'
 import { PUBLISH_CASE_NOTICE } from '../notebookCaseNotice'
@@ -203,11 +204,9 @@ interface CreateFormValues {
 const datasetOptions = [
   { value: '训练数据集/roleBased-V5', label: '训练数据集/roleBased-V5' },
   { value: '训练数据集/小量训练数据-xjh-test-V3', label: '训练数据集/小量训练数据-xjh-test-V3' },
-  { value: '文件管理/默认文件夹/llm_sft_sample.jsonl', label: '文件管理/默认文件夹/llm_sft_sample.jsonl' },
-  { value: '文件管理/Notebook示例/knowledge_base.zip', label: '文件管理/Notebook示例/knowledge_base.zip' },
 ]
 
-type NotebookDatasetSourceType = '训练数据集' | '验证数据集' | '测试数据集' | '文件管理'
+type NotebookDatasetSourceType = '训练数据集' | '验证数据集' | '测试数据集'
 
 type NotebookDatasetSourceOption = {
   key: string
@@ -224,15 +223,10 @@ const notebookDatasetSourceOptions: NotebookDatasetSourceOption[] = [
   { key: 'train-small-v3', type: '训练数据集', name: '小量训练数据-xjh-test', version: 'V3', format: 'PROMPT_RESPONSE', size: '320 条', updatedAt: '2026/05/26 11:08:32' },
   { key: 'val-dpo-v2', type: '验证数据集', name: 'DPO-Role-Based-验证集', version: 'V2', format: 'ROLE_BASED', size: '180 条', updatedAt: '2026/05/25 18:42:03' },
   { key: 'test-mm-v1', type: '测试数据集', name: '图像理解测试集', version: 'V1', format: 'image_text_pair', size: '86 条', updatedAt: '2026/05/24 10:16:55' },
-  { key: 'file-sft-sample', type: '文件管理', name: '默认文件夹/llm_sft_sample.jsonl', format: 'JSONL', size: '18.4 MB', updatedAt: '2026/05/28 09:34:18' },
-  { key: 'file-rag-zip', type: '文件管理', name: 'Notebook示例/knowledge_base.zip', format: 'ZIP', size: '412 MB', updatedAt: '2026/05/28 14:02:41' },
-  { key: 'file-image-pack', type: '文件管理', name: '图像理解/vision_demo_images.zip', format: 'ZIP', size: '268 MB', updatedAt: '2026/05/27 19:20:36' },
 ]
 
 function formatNotebookDatasetValue(option: NotebookDatasetSourceOption) {
-  return option.type === '文件管理'
-    ? `文件管理/${option.name}`
-    : `${option.type}/${option.name}-${option.version}`
+  return `${option.type}/${option.name}-${option.version}`
 }
 
 const modelOptions = [
@@ -745,6 +739,7 @@ const OnlineNotebook: React.FC = () => {
   const permissionState = usePermissionStore()
   const currentUser = getCurrentUser(permissionState)
   const onlineInferenceServices = useOnlineInferenceServices()
+  const fileManagementMounts = useFileManagementNotebookMounts()
   const location = useLocation()
   const navigate = useNavigate()
   const { id, notebookId, caseId } = useParams()
@@ -850,7 +845,7 @@ const OnlineNotebook: React.FC = () => {
   )
   const datasetSourceTypeOptions = useMemo(
     () =>
-      (['训练数据集', '验证数据集', '测试数据集', '文件管理'] as NotebookDatasetSourceType[]).map(type => ({
+      (['训练数据集', '验证数据集', '测试数据集'] as NotebookDatasetSourceType[]).map(type => ({
         value: type,
         label: `${type}（${notebookDatasetSourceOptions.filter(item => item.type === type).length}）`,
       })),
@@ -1771,21 +1766,21 @@ const OnlineNotebook: React.FC = () => {
 
   const notebookDatasetColumns: ColumnsType<NotebookDatasetSourceOption> = [
     {
-      title: datasetSourceType === '文件管理' ? '文件路径' : '数据集名称',
+      title: '数据集名称',
       dataIndex: 'name',
       key: 'name',
       render: (value, record) => (
         <Space direction="vertical" size={2}>
           <Text strong>{value}</Text>
           <Space size={6}>
-            <Tag color={record.type === '文件管理' ? 'cyan' : 'blue'}>{record.type}</Tag>
+            <Tag color="blue">{record.type}</Tag>
             {record.version ? <Tag>{record.version}</Tag> : null}
           </Space>
         </Space>
       ),
     },
     { title: '格式', dataIndex: 'format', key: 'format', width: 140 },
-    { title: datasetSourceType === '文件管理' ? '文件大小' : '数据量', dataIndex: 'size', key: 'size', width: 140 },
+    { title: '数据量', dataIndex: 'size', key: 'size', width: 140 },
     { title: '更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 180 },
     {
       title: '操作',
@@ -1796,6 +1791,30 @@ const OnlineNotebook: React.FC = () => {
           选择
         </Button>
       ),
+    },
+  ]
+  const fileManagementMountColumns: ColumnsType<NotebookFileMountRecord> = [
+    {
+      title: '文件夹',
+      dataIndex: 'folderName',
+      key: 'folderName',
+      width: 180,
+      render: value => <Tag color="geekblue">{value}</Tag>,
+    },
+    {
+      title: '文件名称',
+      dataIndex: 'fileName',
+      key: 'fileName',
+      render: value => <Text>{value}</Text>,
+    },
+    { title: '文件类型', dataIndex: 'type', key: 'type', width: 120 },
+    { title: '文件大小', dataIndex: 'size', key: 'size', width: 140 },
+    {
+      title: '挂载路径',
+      dataIndex: 'mountPath',
+      key: 'mountPath',
+      ellipsis: true,
+      render: value => <Text type="secondary">{value}</Text>,
     },
   ]
 
@@ -2112,6 +2131,25 @@ const OnlineNotebook: React.FC = () => {
                 <Form.Item label="模型" name="model">
                   <Select allowClear placeholder="请输入模型" options={modelOptions} />
                 </Form.Item>
+                <div
+                  style={{
+                    border: '1px solid #dbeafe',
+                    background: '#f8fbff',
+                    borderRadius: 12,
+                    padding: '12px 14px',
+                    display: 'grid',
+                    gap: 6,
+                  }}
+                >
+                  <Space size={8} wrap>
+                    <Text strong>文件管理同步</Text>
+                    <Tag color="blue">自动同步</Tag>
+                    <Text type="secondary">{fileManagementMounts.length} 个文件</Text>
+                  </Space>
+                  <Text type="secondary" style={{ fontSize: 13 }}>
+                    创建 Notebook 后自动挂载文件管理中的全部文件，文件管理更新后同步到 Notebook 工作目录。
+                  </Text>
+                </div>
               </Card>
 
               <Card size="small" style={sectionCardStyle}>
@@ -2384,12 +2422,10 @@ const OnlineNotebook: React.FC = () => {
                 <Space direction="vertical" size={2}>
                   <Text strong>{datasetSourceType}</Text>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    {datasetSourceType === '文件管理'
-                      ? '从文件管理选择项目文件，适合 Notebook 直接挂载或读取。'
-                      : '从已管理的数据集版本中选择 Notebook 输入数据。'}
+                    从已管理的数据集版本中选择 Notebook 输入数据。
                   </Text>
                 </Space>
-                <Tag color={datasetSourceType === '文件管理' ? 'cyan' : 'blue'}>{datasetPickerRows.length} 项</Tag>
+                <Tag color="blue">{datasetPickerRows.length} 项</Tag>
               </div>
               <Table
                 rowKey="key"
@@ -3027,6 +3063,13 @@ const OnlineNotebook: React.FC = () => {
                 </div>
                 <div><Text strong>数据集：</Text>{notebookDetail.dataset || '-'}</div>
                 <div><Text strong>模型：</Text>{notebookDetail.model || '-'}</div>
+                <div>
+                  <Text strong>文件管理同步：</Text>
+                  <Space size={8} wrap>
+                    <Tag color="blue">自动同步</Tag>
+                    <Text>{fileManagementMounts.length} 个文件</Text>
+                  </Space>
+                </div>
                 <div><Text strong>AI服务：</Text>{notebookDetail.aiService || '-'}</div>
                 <div><Text strong>运行时长：</Text>-</div>
                 <div><Text strong>最大运行时长：</Text>{notebookDetail.runtimeLimit}</div>
@@ -3115,6 +3158,25 @@ const OnlineNotebook: React.FC = () => {
               </Card>
             </div>
           </div>
+
+          <Card
+            title="文件管理同步"
+            size="small"
+            style={{ ...sectionCardStyle, marginBottom: 24 }}
+            extra={<Text type="secondary">文件管理更新后自动同步</Text>}
+          >
+            <Table
+              rowKey="key"
+              size="small"
+              columns={fileManagementMountColumns}
+              dataSource={fileManagementMounts}
+              pagination={fileManagementMounts.length > 5 ? { pageSize: 5, showSizeChanger: false } : false}
+              scroll={{ x: 760 }}
+              locale={{
+                emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无文件管理文件" />,
+              }}
+            />
+          </Card>
 
           <Card
             title="开放端口"
