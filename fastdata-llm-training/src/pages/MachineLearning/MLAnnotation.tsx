@@ -4,6 +4,7 @@ import {
   Breadcrumb,
   Button,
   Card,
+  Cascader,
   DatePicker,
   Descriptions,
   Empty,
@@ -51,6 +52,13 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { canAccessResourceData, getCurrentProjectMember, getCurrentUser, getOperationDeniedMessage, usePermissionStore } from '../../services/permissionStore'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import { validateFieldsAndScroll } from '../../utils/formValidation'
+import {
+  ML_ANNOTATION_TYPES_BY_DATA_TYPE,
+  getMLAnnotationPathLabel,
+  getMLWorkbenchKind,
+  normalizeMLAnnotationTemplate,
+  type MLWorkbenchKind,
+} from '../../services/mlAnnotationTypes'
 
 const { Title, Text } = Typography
 
@@ -60,6 +68,7 @@ type MLAnnotationRecord = {
   description?: string
   dataType: '文本' | '图片'
   annotationType: string
+  annotationTemplate?: string
   count: number
   progress: number | null
   preDataset: string
@@ -74,6 +83,7 @@ type MultiAnnotationRecord = {
   name: string
   description?: string
   annotationType: string
+  annotationTemplate?: string
   count: number
   status: '未发布' | '已完成'
   annotationProgress: number
@@ -91,6 +101,7 @@ type AssignmentRecord = {
   taskName: string
   member: string
   annotationType: string
+  annotationTemplate?: string
   amount: number
   completed: number
   preDataset: string
@@ -529,7 +540,7 @@ const workbenchSamples: WorkbenchSample[] = [
   { id: 'sample-3', title: '样本 003', content: '图片主体存在遮挡，建议审核时重点检查标注边界和标签一致性。', label: '待复核', status: '已完成' },
 ]
 
-type WorkbenchKind = 'text-classification' | 'entity' | 'image-classification' | 'object-detection' | 'image-segmentation' | 'ring-segmentation'
+type WorkbenchKind = MLWorkbenchKind
 
 type DetectionBox = { id: string; label: string; x: number; y: number; width: number; height: number }
 
@@ -549,21 +560,87 @@ type LabelItem = { name: string; color: string; classId?: string }
 type EntityMark = { id: string; text: string; label: string; range: string; color: string }
 type CanvasTool = 'select' | 'rect' | 'polygon' | 'drag'
 
-const datasetOptions = [
-  { value: 'image-multi-v2', label: '图像分类/Phoena-图像分类-单图多标签-有标注-V2', dataType: '图片', annotationType: '图像分类', count: 13, output: '图像分类/Phoena-图像分类-单图多标签-有标注-V3', publishStatus: '已发布' },
-  { value: 'image-single-v1', label: '图像分类/Phoena-图像分类-单图单标签-无标注-V1', dataType: '图片', annotationType: '图像分类', count: 21, output: '图像分类/Phoena-图像分类-单图单标签-有标注-V2', publishStatus: '未发布' },
-  { value: 'object-detection-v1', label: '物体检测/货架商品框选-无标注-V1', dataType: '图片', annotationType: '物体检测', count: 48, output: '物体检测/货架商品框选-有标注-V2', publishStatus: '已发布' },
-  { value: 'ring-segmentation-v1', label: '图像分割/回形零件-带孔实例分割-V1', dataType: '图片', annotationType: '图像分割', count: 12, output: '图像分割/回形零件-带孔实例分割-V2', publishStatus: '已发布' },
-  { value: 'defect-image-v1', label: '图像分类/设备缺陷多标签-无标注-V1', dataType: '图片', annotationType: '图像分类', count: 52, output: '图像分类/设备缺陷多标签-有标注-V2', publishStatus: '已发布' },
-  { value: 'text-single-v1', label: '文本分类/Phoena-文本分类-文本单标签-无标注-V1', dataType: '文本', annotationType: '文本分类', count: 10, output: '文本分类/Phoena-文本分类-文本单标签-有标注-V2', publishStatus: '已发布' },
-  { value: 'text-multi-v1', label: '文本分类/Phoena-文本分类-文本多标签-无标注-V1', dataType: '文本', annotationType: '文本分类', count: 10, output: '文本分类/Phoena-文本分类-文本多标签-有标注-V2', publishStatus: '已发布' },
-  { value: 'entity-v1', label: '实体识别/实体识别---123-V1', dataType: '文本', annotationType: '实体识别', count: 30, output: '实体识别/实体识别---123-V2', publishStatus: '已发布' },
-  { value: 'intent-v1', label: '文本分类/客服意图单标签-无标注-V1', dataType: '文本', annotationType: '文本分类', count: 36, output: '文本分类/客服意图单标签-有标注-V2', publishStatus: '已发布' },
+type MachineAnnotationDatasetOption = {
+  value: string
+  label: string
+  dataType: '文本' | '图片'
+  annotationType: string
+  annotationTemplate: string
+  datasetName: string
+  version: string
+  count: number
+  output: string
+  publishStatus: '已发布' | '未发布'
+}
+
+const datasetOptions: MachineAnnotationDatasetOption[] = [
+  { value: 'image-multi-v2', label: '图像分类/Phoena-图像分类-单图多标签-有标注-V2', dataType: '图片', annotationType: '图像分类', annotationTemplate: '单图多标签', datasetName: 'Phoena-图像分类-单图多标签-有标注', version: 'V2', count: 13, output: '图像分类/Phoena-图像分类-单图多标签-有标注-V3', publishStatus: '已发布' },
+  { value: 'image-single-v1', label: '图像分类/Phoena-图像分类-单图单标签-无标注-V1', dataType: '图片', annotationType: '图像分类', annotationTemplate: '单图单标签', datasetName: 'Phoena-图像分类-单图单标签-无标注', version: 'V1', count: 21, output: '图像分类/Phoena-图像分类-单图单标签-有标注-V2', publishStatus: '未发布' },
+  { value: 'object-detection-v1', label: '物体检测/货架商品框选-无标注-V1', dataType: '图片', annotationType: '物体检测', annotationTemplate: '矩形框标注', datasetName: '货架商品框选-无标注', version: 'V1', count: 48, output: '物体检测/货架商品框选-有标注-V2', publishStatus: '已发布' },
+  { value: 'instance-segmentation-v1', label: '图像分割/道路场景实例分割-无标注-V1', dataType: '图片', annotationType: '图像分割', annotationTemplate: '实例分割（标准）', datasetName: '道路场景实例分割-无标注', version: 'V1', count: 18, output: '图像分割/道路场景实例分割-有标注-V2', publishStatus: '已发布' },
+  { value: 'ring-segmentation-v1', label: '图像分割/回形零件-带孔实例分割-V1', dataType: '图片', annotationType: '图像分割', annotationTemplate: '实例分割（孔洞）', datasetName: '回形零件-带孔实例分割', version: 'V1', count: 12, output: '图像分割/回形零件-带孔实例分割-V2', publishStatus: '已发布' },
+  { value: 'semantic-segmentation-v1', label: '图像分割/道路语义分割-无标注-V1', dataType: '图片', annotationType: '图像分割', annotationTemplate: '语义分割', datasetName: '道路语义分割-无标注', version: 'V1', count: 24, output: '图像分割/道路语义分割-有标注-V2', publishStatus: '已发布' },
+  { value: 'defect-image-v1', label: '图像分类/设备缺陷多标签-无标注-V1', dataType: '图片', annotationType: '图像分类', annotationTemplate: '单图多标签', datasetName: '设备缺陷多标签-无标注', version: 'V1', count: 52, output: '图像分类/设备缺陷多标签-有标注-V2', publishStatus: '已发布' },
+  { value: 'text-single-v1', label: '文本分类/Phoena-文本分类-文本单标签-无标注-V1', dataType: '文本', annotationType: '文本分类', annotationTemplate: '文本单标签', datasetName: 'Phoena-文本分类-文本单标签-无标注', version: 'V1', count: 10, output: '文本分类/Phoena-文本分类-文本单标签-有标注-V2', publishStatus: '已发布' },
+  { value: 'text-multi-v1', label: '文本分类/Phoena-文本分类-文本多标签-无标注-V1', dataType: '文本', annotationType: '文本分类', annotationTemplate: '文本多标签', datasetName: 'Phoena-文本分类-文本多标签-无标注', version: 'V1', count: 10, output: '文本分类/Phoena-文本分类-文本多标签-有标注-V2', publishStatus: '已发布' },
+  { value: 'entity-v1', label: '实体识别/实体识别---123-V1', dataType: '文本', annotationType: '实体识别', annotationTemplate: '文本实体识别', datasetName: '实体识别---123', version: 'V1', count: 30, output: '实体识别/实体识别---123-V2', publishStatus: '已发布' },
+  { value: 'intent-v1', label: '文本分类/客服意图单标签-无标注-V1', dataType: '文本', annotationType: '文本分类', annotationTemplate: '文本单标签', datasetName: '客服意图单标签-无标注', version: 'V1', count: 36, output: '文本分类/客服意图单标签-有标注-V2', publishStatus: '已发布' },
 ]
 
-type MachineAnnotationDatasetOption = (typeof datasetOptions)[number]
-
 const publishedDatasetOptions = datasetOptions.filter(item => item.publishStatus === '已发布')
+
+type MachineDatasetCascaderOption = {
+  value: string
+  label: string
+  disabled?: boolean
+  children?: MachineDatasetCascaderOption[]
+}
+
+function buildMachineDatasetCascaderOptions(options: MachineAnnotationDatasetOption[]): MachineDatasetCascaderOption[] {
+  const annotationTypeOptions: MachineDatasetCascaderOption[] = []
+
+  Object.values(ML_ANNOTATION_TYPES_BY_DATA_TYPE).flat().forEach(annotationType => {
+    const templateChildren: MachineDatasetCascaderOption[] = []
+
+    annotationType.templates.forEach(template => {
+      const datasets = options.filter(item => (
+        item.annotationType === annotationType.value &&
+        normalizeMLAnnotationTemplate(item.annotationTemplate) === template.value
+      ))
+      if (!datasets.length) return
+
+      templateChildren.push({
+        value: `${annotationType.value}::${template.value}`,
+        label: template.label,
+        children: datasets.map(dataset => ({
+          value: dataset.datasetName,
+          label: dataset.datasetName,
+          children: [{
+            value: dataset.value,
+            label: dataset.version,
+            disabled: dataset.publishStatus !== '已发布',
+          }],
+        })),
+      })
+    })
+
+    if (templateChildren.length) {
+      annotationTypeOptions.push({
+        value: annotationType.value,
+        label: annotationType.label,
+        children: templateChildren,
+      })
+    }
+  })
+
+  return annotationTypeOptions
+}
+
+function getMachineDatasetCascaderValue(option?: MachineAnnotationDatasetOption) {
+  return option
+    ? [option.annotationType, `${option.annotationType}::${normalizeMLAnnotationTemplate(option.annotationTemplate)}`, option.datasetName, option.value]
+    : undefined
+}
 
 const memberOptions = [
   { value: 'lab1', label: 'lab1' },
@@ -647,28 +724,46 @@ const segmentationLabelItems: LabelItem[] = [
   { name: 'road_sign', color: '#84cc16', classId: 'class_id=3' },
   { name: 'background', color: '#2f7fd8', classId: 'class_id=4' },
 ]
+const semanticSegmentationLabelItems: LabelItem[] = [
+  { name: 'road', color: '#84cc16', classId: 'class_id=1' },
+  { name: 'building', color: '#2f7fd8', classId: 'class_id=2' },
+  { name: 'sky', color: '#f97316', classId: 'class_id=3' },
+]
 const ringSegmentationLabelItems: LabelItem[] = [
   { name: '外壳', color: '#2dd4a3', classId: 'class_id=1' },
   { name: '垫片', color: '#d63ae0', classId: 'class_id=2' },
   { name: '边框', color: '#f97316', classId: 'class_id=3' },
 ]
 
-function getAnnotationWorkbenchKind(record: { annotationType: string; name?: string; taskName?: string }): WorkbenchKind {
-  const keyword = `${record.name ?? ''}${record.taskName ?? ''}`
-  if (record.annotationType === '图像分割' && /回形|回型|带孔|RLE/i.test(keyword)) return 'ring-segmentation'
-  if (record.annotationType === '实体识别') return 'entity'
-  if (record.annotationType === '图像分类') return 'image-classification'
-  if (record.annotationType === '物体检测') return 'object-detection'
-  if (record.annotationType === '图像分割') return 'image-segmentation'
-  return 'text-classification'
+function inferAnnotationTemplate(record: { annotationType: string; annotationTemplate?: string; name?: string; taskName?: string; preDataset?: string; dataset?: string }) {
+  if (record.annotationTemplate) {
+    return normalizeMLAnnotationTemplate(record.annotationTemplate)
+  }
+
+  const keyword = `${record.name ?? ''}${record.taskName ?? ''}${record.preDataset ?? ''}${record.dataset ?? ''}`
+  if (record.annotationType === '图像分割' && /孔洞|带孔|回形|回型|RLE/i.test(keyword)) return '实例分割（孔洞）'
+  if (record.annotationType === '图像分割' && /语义分割/i.test(keyword)) return '语义分割'
+  if (record.annotationType === '图像分割') return '实例分割（标准）'
+  if (record.annotationType === '图像分类' && /多标签|多/i.test(keyword)) return '单图多标签'
+  if (record.annotationType === '图像分类') return '单图单标签'
+  if (record.annotationType === '文本分类' && /多标签|多/i.test(keyword)) return '文本多标签'
+  if (record.annotationType === '文本分类') return '文本单标签'
+  if (record.annotationType === '实体识别') return '文本实体识别'
+  if (record.annotationType === '物体检测') return '矩形框标注'
+  return undefined
+}
+
+function getAnnotationWorkbenchKind(record: { annotationType: string; annotationTemplate?: string; name?: string; taskName?: string; preDataset?: string; dataset?: string }): WorkbenchKind {
+  return getMLWorkbenchKind(record.annotationType, inferAnnotationTemplate(record))
 }
 
 function getDefaultWorkbenchLabels(kind: WorkbenchKind): LabelItem[] {
   if (kind === 'entity') return entityLabelItems
   if (kind === 'image-classification') return imageClassificationLabels
   if (kind === 'object-detection') return detectionLabelItems
-  if (kind === 'image-segmentation') return segmentationLabelItems
-  if (kind === 'ring-segmentation') return ringSegmentationLabelItems
+  if (kind === 'image-segmentation-standard') return segmentationLabelItems
+  if (kind === 'semantic-segmentation') return semanticSegmentationLabelItems
+  if (kind === 'image-segmentation-hole') return ringSegmentationLabelItems
   return textClassificationLabels
 }
 
@@ -700,12 +795,17 @@ function buildWorkbenchSamples(kind: WorkbenchKind, total: number, progress = 0,
       '画面中存在人物和手持物体，需要区分不同目标类别。',
       '动物主体位于画面中央，需框选头部和躯干整体。',
     ],
-    'image-segmentation': [
+    'image-segmentation-standard': [
       '道路场景需要区分 road_sign 与 background，并保留实例边界。',
       '建筑与路面交界较清晰，适合多边形区域标注。',
       '天空、道路和标识牌需要分别形成分割区域。',
     ],
-    'ring-segmentation': [
+    'semantic-segmentation': [
+      '道路、天空和建筑需要按语义类别填充，不区分同类目标的不同实例。',
+      '画面中同一类别区域可以合并为同一个语义 mask。',
+      '语义分割标注关注像素类别归属，需要避免类别边界混淆。',
+    ],
+    'image-segmentation-hole': [
       '回形零件需要先框选外圈，再扣除中间孔洞，最终保留外圈实例区域。',
       '垫片样本包含多个内孔，需要通过减区域形成带孔 mask。',
       '金属边框中间区域是背景，不应计入实例 mask 面积。',
@@ -716,8 +816,9 @@ function buildWorkbenchSamples(kind: WorkbenchKind, total: number, progress = 0,
     entity: ['LOC', '企业', '人名'],
     'image-classification': ['Build_Your_Dream', 'SUV', 'Audi'],
     'object-detection': ['食品', '人物', '动物'],
-    'image-segmentation': ['road_sign', 'background', 'road_sign'],
-    'ring-segmentation': ['外壳', '垫片', '边框'],
+    'image-segmentation-standard': ['road_sign', 'background', 'road_sign'],
+    'semantic-segmentation': ['road', 'building', 'sky'],
+    'image-segmentation-hole': ['外壳', '垫片', '边框'],
   }
 
   return Array.from({ length: safeTotal }, (_, index) => {
@@ -771,8 +872,6 @@ const MLAnnotation: React.FC = () => {
   const [onlineCreateOpen, setOnlineCreateOpen] = useState(false)
   const [onlineRows, setOnlineRows] = useState<MLAnnotationRecord[]>(onlineRecords)
   const [multiRows, setMultiRows] = useState<MultiAnnotationRecord[]>(multiRecords)
-  const [onlineDatasetType, setOnlineDatasetType] = useState<'文本' | '图片'>('图片')
-  const [onlineDatasetPickerOpen, setOnlineDatasetPickerOpen] = useState(false)
   const [onlineSelectedDatasetValue, setOnlineSelectedDatasetValue] = useState<string>()
   const [detailRecord, setDetailRecord] = useState<MLAnnotationRecord | MultiAnnotationRecord | null>(null)
   const [memberRecord, setMemberRecord] = useState<MultiAnnotationRecord | null>(null)
@@ -780,7 +879,7 @@ const MLAnnotation: React.FC = () => {
   const [annotatorDrafts, setAnnotatorDrafts] = useState<MemberDraft[]>([])
   const [reviewerDrafts, setReviewerDrafts] = useState<MemberDraft[]>([])
   const [selectedDataset, setSelectedDataset] = useState(publishedDatasetOptions[0])
-  const onlineDatasetOptions = datasetOptions.filter(item => item.dataType === onlineDatasetType)
+  const onlineDatasetCascaderOptions = buildMachineDatasetCascaderOptions(datasetOptions)
   const onlineSelectedDataset = datasetOptions.find(item => item.value === onlineSelectedDatasetValue)
   const [workbenchSampleRows, setWorkbenchSampleRows] = useState(workbenchSamples)
   const [activeSampleId, setActiveSampleId] = useState(workbenchSamples[0].id)
@@ -909,7 +1008,7 @@ const MLAnnotation: React.FC = () => {
       setRingDraftHoles([])
       setEntityMarks(defaultEntityMarks)
       setActiveEntityId(defaultEntityMarks[2].id)
-      setActiveCanvasTool(kind === 'object-detection' ? 'rect' : kind === 'image-segmentation' || kind === 'ring-segmentation' ? 'polygon' : 'select')
+      setActiveCanvasTool(kind === 'object-detection' ? 'rect' : kind === 'image-segmentation-standard' || kind === 'semantic-segmentation' || kind === 'image-segmentation-hole' ? 'polygon' : 'select')
       setImageZoom(100)
       setSelectedLabelName(getDefaultWorkbenchLabels(kind)[0]?.name ?? '')
     }
@@ -960,7 +1059,13 @@ const MLAnnotation: React.FC = () => {
       ),
     },
     { title: '数据类型', dataIndex: 'dataType', key: 'dataType', width: 96 },
-    { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 120 },
+    {
+      title: '标注类型',
+      dataIndex: 'annotationType',
+      key: 'annotationType',
+      width: 170,
+      render: (_value, record) => getMLAnnotationPathLabel(record.annotationType, inferAnnotationTemplate(record)),
+    },
     { title: '数据量', dataIndex: 'count', key: 'count', width: 90 },
     { title: '标注进度', dataIndex: 'progress', key: 'progress', width: 180, render: progressCell },
     { title: '标注前数据集', dataIndex: 'preDataset', key: 'preDataset', width: 280, ellipsis: true },
@@ -1053,7 +1158,13 @@ const MLAnnotation: React.FC = () => {
         />
       ),
     },
-    { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 120 },
+    {
+      title: '标注类型',
+      dataIndex: 'annotationType',
+      key: 'annotationType',
+      width: 170,
+      render: (_value, record) => getMLAnnotationPathLabel(record.annotationType, inferAnnotationTemplate(record)),
+    },
     { title: '数据量', dataIndex: 'count', key: 'count', width: 90 },
     { title: '状态', dataIndex: 'status', key: 'status', width: 90, render: statusTag },
     { title: '标注进度', dataIndex: 'annotationProgress', key: 'annotationProgress', width: 150, render: progressCell },
@@ -1128,7 +1239,13 @@ const MLAnnotation: React.FC = () => {
 
   const annotationAssignmentColumns: ColumnsType<AssignmentRecord> = [
     { title: '任务名称', dataIndex: 'taskName', key: 'taskName', width: 240, ellipsis: true },
-    { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 120 },
+    {
+      title: '标注类型',
+      dataIndex: 'annotationType',
+      key: 'annotationType',
+      width: 170,
+      render: (_value, record) => getMLAnnotationPathLabel(record.annotationType, inferAnnotationTemplate(record)),
+    },
     { title: '数据量', dataIndex: 'amount', key: 'amount', width: 90 },
     {
       title: '标注进度',
@@ -1152,7 +1269,13 @@ const MLAnnotation: React.FC = () => {
 
   const reviewAssignmentColumns: ColumnsType<AssignmentRecord> = [
     { title: '标注任务', dataIndex: 'taskName', key: 'taskName', width: 240, ellipsis: true },
-    { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 120 },
+    {
+      title: '标注类型',
+      dataIndex: 'annotationType',
+      key: 'annotationType',
+      width: 170,
+      render: (_value, record) => getMLAnnotationPathLabel(record.annotationType, inferAnnotationTemplate(record)),
+    },
     { title: '数据量', dataIndex: 'amount', key: 'amount', width: 90 },
     {
       title: '审核进度',
@@ -1492,11 +1615,11 @@ const MLAnnotation: React.FC = () => {
       updateActiveDetectionLabel(label.name)
       return
     }
-    if (kind === 'image-segmentation' && activeSegmentationRegionId) {
+    if ((kind === 'image-segmentation-standard' || kind === 'semantic-segmentation') && activeSegmentationRegionId) {
       updateActiveSegmentationLabel(label.name)
       return
     }
-    if (kind === 'ring-segmentation' && activeRingMaskId) {
+    if (kind === 'image-segmentation-hole' && activeRingMaskId) {
       updateActiveRingMaskLabel(label.name)
       return
     }
@@ -1509,7 +1632,7 @@ const MLAnnotation: React.FC = () => {
 
   function openOnlineCreate() {
     onlineForm.resetFields()
-    onlineForm.setFieldsValue({ dataType: onlineDatasetType, sourceType: '已有数据集', outputMode: '新增版本' })
+    onlineForm.setFieldsValue({ sourceType: '已有数据集', outputMode: '新增版本' })
     setOnlineCreateOpen(true)
   }
 
@@ -1523,53 +1646,6 @@ const MLAnnotation: React.FC = () => {
     message.success('在线标注任务已创建')
     setOnlineCreateOpen(false)
     setOnlineSelectedDatasetValue(undefined)
-  }
-
-  function renderOnlineDatasetPickerModal() {
-    return (
-      <Modal
-        title="选择数据集"
-        open={onlineDatasetPickerOpen}
-        onCancel={() => setOnlineDatasetPickerOpen(false)}
-        footer={null}
-        width={820}
-        destroyOnClose
-      >
-        <Table<MachineAnnotationDatasetOption>
-          rowKey="value"
-          size="small"
-          columns={[
-            { title: '数据集名称', dataIndex: 'label', key: 'label', ellipsis: true },
-            { title: '数据类型', dataIndex: 'dataType', key: 'dataType', width: 100 },
-            { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 120 },
-            { title: '数据量', dataIndex: 'count', key: 'count', width: 100 },
-            { title: '发布状态', dataIndex: 'publishStatus', key: 'publishStatus', width: 100, render: value => <Tag color={value === '已发布' ? 'green' : 'default'}>{value}</Tag> },
-            {
-              title: '操作',
-              key: 'action',
-              width: 96,
-              render: (_, record) => (
-                <Button
-                  type="link"
-                  disabled={record.publishStatus !== '已发布'}
-                  onClick={() => {
-                    setOnlineSelectedDatasetValue(record.value)
-                    onlineForm.setFieldValue('dataset', record.value)
-                    setOnlineDatasetPickerOpen(false)
-                  }}
-                >
-                  选择
-                </Button>
-              ),
-            },
-          ]}
-          dataSource={onlineDatasetOptions}
-          pagination={false}
-          scroll={{ x: 760 }}
-          locale={{ emptyText: '当前类型下暂无可用数据集' }}
-        />
-      </Modal>
-    )
   }
 
   function renderStepCards() {
@@ -1610,7 +1686,7 @@ const MLAnnotation: React.FC = () => {
       const labels = previous[kind] ?? getDefaultLabels(kind)
       const nextLabels = editingLabel
         ? labels.map(label => label.name === editingLabel.name ? { ...label, name } : label)
-        : [...labels, { name, color: palette[labels.length % palette.length], classId: kind === 'object-detection' || kind === 'image-segmentation' ? `class_id=${labels.length + 1}` : undefined }]
+        : [...labels, { name, color: palette[labels.length % palette.length], classId: kind === 'object-detection' || kind === 'image-segmentation-standard' || kind === 'semantic-segmentation' ? `class_id=${labels.length + 1}` : undefined }]
       return { ...previous, [kind]: nextLabels }
     })
     setSelectedLabelName(name)
@@ -1699,9 +1775,9 @@ const MLAnnotation: React.FC = () => {
         ? entityMarks.map(entity => entity.label).filter(Boolean)
         : kind === 'object-detection'
           ? detectionBoxes.map(box => box.label).filter(Boolean)
-          : kind === 'image-segmentation'
+          : kind === 'image-segmentation-standard' || kind === 'semantic-segmentation'
             ? segmentationRegions.map(region => region.label).filter(Boolean)
-            : kind === 'ring-segmentation'
+            : kind === 'image-segmentation-hole'
               ? ringMaskInstances.map(instance => instance.label).filter(Boolean)
               : (sampleLabelResults[activeSample.id] ?? [])
     const nextLabels = Array.from(new Set(labelsByKind))
@@ -2235,8 +2311,8 @@ const MLAnnotation: React.FC = () => {
     return renderAnnotationFrame('object-detection', locked, content)
   }
 
-  function renderImageSegmentationWorkbench(locked: boolean) {
-    const labels = getCurrentLabels('image-segmentation')
+  function renderImageSegmentationWorkbench(locked: boolean, kind: Extract<WorkbenchKind, 'image-segmentation-standard' | 'semantic-segmentation'> = 'image-segmentation-standard') {
+    const labels = getCurrentLabels(kind)
     const activeRegion = segmentationRegions.find(region => region.id === activeSegmentationRegionId) ?? segmentationRegions[0]
     const content = (
       <main style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 14, padding: 14, overflow: 'auto' }}>
@@ -2293,11 +2369,11 @@ const MLAnnotation: React.FC = () => {
         </aside>
       </main>
     )
-    return renderAnnotationFrame('image-segmentation', locked, content)
+    return renderAnnotationFrame(kind, locked, content)
   }
 
   function renderRingSegmentationWorkbench(locked: boolean) {
-    const labels = getCurrentLabels('ring-segmentation')
+    const labels = getCurrentLabels('image-segmentation-hole')
     const activeInstance = ringMaskInstances.find(instance => instance.id === activeRingMaskId) ?? ringMaskInstances[0]
     const renderMaskShape = (instance: Pick<RingMaskInstance, 'id' | 'outer' | 'holes' | 'color'>, active = false) => {
       const path = [
@@ -2405,7 +2481,7 @@ const MLAnnotation: React.FC = () => {
         </aside>
       </main>
     )
-    return renderAnnotationFrame('ring-segmentation', locked, content)
+    return renderAnnotationFrame('image-segmentation-hole', locked, content)
   }
 
   function renderOnlineWorkbench() {
@@ -2448,9 +2524,9 @@ const MLAnnotation: React.FC = () => {
           ? renderImageClassificationWorkbench(currentOnlineTask, locked)
           : workbenchKind === 'object-detection'
             ? renderObjectDetectionWorkbench(locked)
-            : workbenchKind === 'ring-segmentation'
+            : workbenchKind === 'image-segmentation-hole'
               ? renderRingSegmentationWorkbench(locked)
-              : renderImageSegmentationWorkbench(locked)
+              : renderImageSegmentationWorkbench(locked, workbenchKind === 'semantic-segmentation' ? 'semantic-segmentation' : 'image-segmentation-standard')
     return (
       <div style={{ padding: 0, minHeight: '100%', background: '#f7f8fa' }}>
         {workbench}
@@ -2487,9 +2563,9 @@ const MLAnnotation: React.FC = () => {
             ? renderImageClassificationWorkbench(currentWorkbenchAssignment, locked)
             : workbenchKind === 'object-detection'
               ? renderObjectDetectionWorkbench(locked)
-              : workbenchKind === 'ring-segmentation'
+              : workbenchKind === 'image-segmentation-hole'
                 ? renderRingSegmentationWorkbench(locked)
-                : renderImageSegmentationWorkbench(locked)
+                : renderImageSegmentationWorkbench(locked, workbenchKind === 'semantic-segmentation' ? 'semantic-segmentation' : 'image-segmentation-standard')
     }
 
     const locked = workbenchSubmitted || currentWorkbenchAssignment.status === '已完成'
@@ -2668,7 +2744,7 @@ const MLAnnotation: React.FC = () => {
           <Form
             form={form}
             layout="vertical"
-            initialValues={{ datasetSource: 'existing', dataset: selectedDataset.value, outputMode: 'newVersion', sampleRatio: 100 }}
+            initialValues={{ datasetSource: 'existing', dataset: getMachineDatasetCascaderValue(selectedDataset), outputMode: 'newVersion', sampleRatio: 100 }}
             scrollToFirstError={{ behavior: 'smooth', block: 'center' }}
           >
             <Title level={4}>基本信息</Title>
@@ -2686,13 +2762,24 @@ const MLAnnotation: React.FC = () => {
               </Radio.Group>
             </Form.Item>
             <Form.Item name="dataset" rules={[{ required: true, message: '请选择需要标注的数据集版本' }]}>
-              <Select
-                placeholder="请选择需要标注的数据集版本"
-                options={datasetOptions.map(item => ({ value: item.value, label: item.label, disabled: item.publishStatus !== '已发布' }))}
-                onChange={value => setSelectedDataset(datasetOptions.find(item => item.value === value) ?? publishedDatasetOptions[0])}
+              <Cascader
+                options={onlineDatasetCascaderOptions}
+                placeholder="请选择标注类型 / 标注模板 / 数据集 / 版本"
+                expandTrigger="hover"
+                changeOnSelect={false}
+                displayRender={labels => labels.join(' / ')}
+                style={{ width: '100%' }}
+                onChange={value => {
+                  const selectedValue = value[value.length - 1]
+                  const datasetValue = typeof selectedValue === 'string' ? selectedValue : undefined
+                  setSelectedDataset(datasetOptions.find(item => item.value === datasetValue) ?? publishedDatasetOptions[0])
+                }}
               />
             </Form.Item>
-            <Text type="secondary">数据量：{selectedDataset.count} 条</Text>
+            <Space size={18} wrap>
+              <Text type="secondary">数据量：{selectedDataset.count} 条</Text>
+              <Text type="secondary">标注路径：{getMLAnnotationPathLabel(selectedDataset.annotationType, selectedDataset.annotationTemplate)}</Text>
+            </Space>
 
             <Title level={4} style={{ marginTop: 24 }}>处理后数据集</Title>
             <Form.Item name="outputMode">
@@ -2851,25 +2938,11 @@ const MLAnnotation: React.FC = () => {
         <Form
           form={onlineForm}
           layout="vertical"
-          initialValues={{ dataType: onlineDatasetType, sourceType: '已有数据集', outputMode: '新增版本' }}
+          initialValues={{ sourceType: '已有数据集', outputMode: '新增版本' }}
           scrollToFirstError={{ behavior: 'smooth', block: 'center' }}
         >
           <Form.Item label="任务名称" name="name" rules={[{ required: true, message: '请输入任务名称' }]}>
             <Input placeholder="请输入任务名称" />
-          </Form.Item>
-
-          <Form.Item label="数据类型" name="dataType" rules={[{ required: true, message: '请选择数据类型' }]}>
-            <Radio.Group
-              onChange={event => {
-                const nextType = event.target.value as '文本' | '图片'
-                setOnlineDatasetType(nextType)
-                setOnlineSelectedDatasetValue(undefined)
-                onlineForm.setFieldsValue({ dataType: nextType, dataset: undefined })
-              }}
-            >
-              <Radio.Button value="文本">文本</Radio.Button>
-              <Radio.Button value="图片">图片</Radio.Button>
-            </Radio.Group>
           </Form.Item>
 
           <Form.Item label="数据选择" name="sourceType">
@@ -2879,22 +2952,19 @@ const MLAnnotation: React.FC = () => {
           </Form.Item>
 
           <Form.Item label="选择数据集" name="dataset" rules={[{ required: true, message: '请选择数据集' }]}>
-            <Input.Group compact>
-              <Input
-                readOnly
-                placeholder="请选择需要标注的数据集"
-                value={onlineSelectedDataset?.label}
-                style={{ width: 'calc(100% - 88px)' }}
-              />
-              <Button
-                type="primary"
-                disabled={!onlineDatasetOptions.length}
-                onClick={() => setOnlineDatasetPickerOpen(true)}
-                style={{ width: 88 }}
-              >
-                选择
-              </Button>
-            </Input.Group>
+            <Cascader
+              options={onlineDatasetCascaderOptions}
+              placeholder="请选择标注类型 / 标注模板 / 数据集 / 版本"
+              expandTrigger="hover"
+              changeOnSelect={false}
+              displayRender={labels => labels.join(' / ')}
+              style={{ width: '100%' }}
+              onChange={value => {
+                const selectedValue = value[value.length - 1]
+                const datasetValue = typeof selectedValue === 'string' ? selectedValue : undefined
+                setOnlineSelectedDatasetValue(datasetValue)
+              }}
+            />
           </Form.Item>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginTop: -6, marginBottom: 16 }}>
@@ -2903,8 +2973,8 @@ const MLAnnotation: React.FC = () => {
               <Text>{onlineSelectedDataset?.count ?? 0} 条</Text>
             </div>
             <div>
-              <Text type="secondary">标注类型：</Text>
-              <Text>{onlineSelectedDataset?.annotationType ?? '-'}</Text>
+              <Text type="secondary">标注路径：</Text>
+              <Text>{onlineSelectedDataset ? getMLAnnotationPathLabel(onlineSelectedDataset.annotationType, onlineSelectedDataset.annotationTemplate) : '-'}</Text>
             </div>
           </div>
 
@@ -2917,8 +2987,6 @@ const MLAnnotation: React.FC = () => {
           <Text type="secondary">数据集名称：{onlineSelectedDataset?.output ?? '-'}</Text>
         </Form>
       </Modal>
-
-      {renderOnlineDatasetPickerModal()}
 
       <Modal
         title="标注任务详情"
@@ -2933,6 +3001,7 @@ const MLAnnotation: React.FC = () => {
             <Descriptions.Item label="数据量">{detailRecord.count}</Descriptions.Item>
             <Descriptions.Item label="状态">{statusTag(detailRecord.status)}</Descriptions.Item>
             <Descriptions.Item label="标注类型">{detailRecord.annotationType}</Descriptions.Item>
+            <Descriptions.Item label="标注模板">{inferAnnotationTemplate(detailRecord) ?? '-'}</Descriptions.Item>
             {'dataset' in detailRecord ? (
               <>
                 <Descriptions.Item label="标注进度">{progressCell(detailRecord.annotationProgress)}</Descriptions.Item>

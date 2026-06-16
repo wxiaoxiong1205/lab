@@ -22,15 +22,21 @@ const TEST_DATA_USAGE_OPTIONS = [
 ] as const
 
 const statusMap: Record<string, { color: string; label: string }> = {
-  '处理完成': { color: 'success', label: '处理完成' },
-  '处理中': { color: 'processing', label: '处理中' },
-  '处理失败': { color: 'error', label: '处理失败' },
+  处理完成: { color: 'success', label: '处理成功' },
+  处理成功: { color: 'success', label: '处理成功' },
+  处理中: { color: 'processing', label: '处理中' },
+  处理失败: { color: 'error', label: '处理失败' },
 }
 
 const versionStatusMap: Record<string, { color: string; label: string }> = {
   已发布: { color: 'green', label: '已发布' },
   未发布: { color: 'default', label: '未发布' },
+  处理中: { color: 'processing', label: '处理中' },
   处理失败: { color: 'error', label: '处理失败' },
+}
+
+function isProcessSucceeded(status?: string): boolean {
+  return status === '处理成功' || status === '处理完成'
 }
 
 function resolveVersionPublishStatus(
@@ -41,6 +47,12 @@ function resolveVersionPublishStatus(
   if (version?.processStatus === '处理失败' || fallbackProcessStatus === '处理失败') {
     return '处理失败'
   }
+  if (version?.processStatus === '处理中' || fallbackProcessStatus === '处理中') {
+    return '处理中'
+  }
+  if (!isProcessSucceeded(version?.processStatus ?? fallbackProcessStatus)) {
+    return '处理中'
+  }
   if (version?.publishStatus === '已发布') {
     return '已发布'
   }
@@ -49,6 +61,33 @@ function resolveVersionPublishStatus(
   }
   if (fallbackPublishStatus === '已发布') return '已发布'
   return '未发布'
+}
+
+function renderProcessStatusTag(status?: string): React.ReactNode {
+  const s = statusMap[status ?? ''] || { color: 'default', label: status || '-' }
+  return <Tag color={s.color}>{s.label}</Tag>
+}
+
+function renderVersionStateTag(
+  version?: { processStatus?: string; publishStatus?: string },
+  fallbackPublishStatus?: string,
+  fallbackProcessStatus?: string,
+  style?: React.CSSProperties,
+): React.ReactNode {
+  const status = resolveVersionPublishStatus(version, fallbackPublishStatus, fallbackProcessStatus)
+  const s = versionStatusMap[status]
+  return <Tag color={s.color} style={style}>{s.label}</Tag>
+}
+
+function renderVersionPublishStatusField(version?: { processStatus?: string; publishStatus?: string }, fallbackPublishStatus?: string, fallbackProcessStatus?: string): React.ReactNode {
+  const processStatus = version?.processStatus ?? fallbackProcessStatus
+  if (!isProcessSucceeded(processStatus)) {
+    return <Text strong>-</Text>
+  }
+  const publishStatus = version?.publishStatus ?? fallbackPublishStatus
+  const status = publishStatus === '已发布' ? '已发布' : '未发布'
+  const s = versionStatusMap[status]
+  return <Tag color={s.color}>{s.label}</Tag>
 }
 
 type TestVersionRow = {
@@ -129,11 +168,23 @@ function buildTestVersions(row: Omit<TestDatasetRecord, 'versions'>): TestVersio
     const i = n - k
     const isLatest = k === 0
     const scale = isLatest ? 1 : 0.82 - k * 0.08
+    const processStatus = isLatest && ['处理中', '处理失败'].includes(row.versionStatus)
+      ? row.versionStatus
+      : '处理完成'
+    const publishStatus = isProcessSucceeded(processStatus)
+      ? isLatest
+        ? row.status === '已发布'
+          ? '已发布'
+          : '未发布'
+        : row.status === '已发布'
+          ? '已发布'
+          : '未发布'
+      : '-'
     list.push({
       id: `${row.id}-v${i}`,
       version: `V${i}`,
-      processStatus: '处理完成',
-      publishStatus: isLatest ? row.status : row.status === '已发布' ? '已发布' : '未发布',
+      processStatus,
+      publishStatus,
       sampleCount: Math.max(10, Math.floor(500 * scale)),
       description: isLatest ? row.description : '',
       createdAt: row.createdAt,
@@ -256,6 +307,7 @@ const TestDataset: React.FC = () => {
   const activeVersion = selectedRecord?.versions.find(item => item.id === activeVersionId) ?? selectedRecord?.versions[0]
   const detailRows = selectedRecord ? buildDetailRows(selectedRecord, activeVersion ?? selectedRecord.versions[0]) : []
   const isActiveVersionPublished = activeVersion?.publishStatus === '已发布'
+  const canPublishActiveVersion = Boolean(activeVersion && !isActiveVersionPublished && isProcessSucceeded(activeVersion.processStatus))
 
   const handleDeleteDetailRow = (row: DatasetDetailRow) => {
     if (!selectedRecord || !activeVersion) return
@@ -288,21 +340,14 @@ const TestDataset: React.FC = () => {
       dataIndex: 'processStatus',
       key: 'processStatus',
       width: 100,
-      render: (v: string) => {
-        const s = statusMap[v] || { color: 'default', label: v }
-        return <Tag color={s.color}>{s.label}</Tag>
-      },
+      render: (v: string) => renderProcessStatusTag(v),
     },
     {
       title: '发布状态',
       dataIndex: 'publishStatus',
       key: 'publishStatus',
       width: 88,
-      render: (_v: string, version: TestVersionRow) => {
-        const status = resolveVersionPublishStatus(version)
-        const s = versionStatusMap[status]
-        return <Tag color={s.color}>{s.label}</Tag>
-      },
+      render: (_v: string, version: TestVersionRow) => renderVersionStateTag(version),
     },
     { title: '样本数', dataIndex: 'sampleCount', key: 'sampleCount', width: 96, render: (v: number) => v?.toLocaleString() },
     { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', ellipsis: true },
@@ -741,7 +786,7 @@ const TestDataset: React.FC = () => {
         <Descriptions.Item label="数据集名称" span={2}>{selectedRecord.name}</Descriptions.Item>
         <Descriptions.Item label="当前最新版本">{selectedRecord.latestVersion}</Descriptions.Item>
         <Descriptions.Item label="最新处理状态">
-          <Tag color={(statusMap[selectedRecord.versionStatus] || { color: 'default' }).color}>{selectedRecord.versionStatus}</Tag>
+          {renderProcessStatusTag(selectedRecord.versionStatus)}
         </Descriptions.Item>
         <Descriptions.Item label="数据用途">{resolveTestUsageLabel(selectedRecord.dataUsage)}</Descriptions.Item>
         <Descriptions.Item label="数据格式">{resolveFormatLabel(selectedRecord.dataUsage, selectedRecord.dataFormat)}</Descriptions.Item>
@@ -855,7 +900,7 @@ const TestDataset: React.FC = () => {
             </div>
           </div>
           <Space size={16}>
-            {activeVersion && activeVersion.processStatus === '处理完成' && (
+            {activeVersion && (
               <Button
                 type="primary"
                 icon={isActiveVersionPublished ? <PlayCircleOutlined /> : undefined}
@@ -863,11 +908,12 @@ const TestDataset: React.FC = () => {
                   if (!isActiveVersionPublished) {
                     handlePublishVersion(selectedRecord, activeVersion)
                     return
-                  }
-                  const datasetType = resolveTestUsageLabel(selectedRecord.dataUsage) === '图像理解' ? 'image-understanding' : 'text-generation'
-                  navigate(`/effect-evaluation/create?dataset_type=${datasetType}&mode=auto`)
-                }}
-              >
+	                  }
+	                  const datasetType = resolveTestUsageLabel(selectedRecord.dataUsage) === '图像理解' ? 'image-understanding' : 'text-generation'
+	                  navigate(`/effect-evaluation/create?dataset_type=${datasetType}&mode=auto`)
+	                }}
+	                disabled={!isActiveVersionPublished && !canPublishActiveVersion}
+	              >
                 {isActiveVersionPublished ? '去评估' : '发布'}
               </Button>
             )}
@@ -928,7 +974,7 @@ const TestDataset: React.FC = () => {
                 block
                 className="dataset-version-action-secondary"
                 onClick={() => setMergeVersionOpen(true)}
-                disabled={selectedRecord.versions.filter(version => version.processStatus === '处理完成').length < 2}
+                disabled={selectedRecord.versions.filter(version => isProcessSucceeded(version.processStatus)).length < 2}
               >
                 合并版本
               </Button>
@@ -945,11 +991,7 @@ const TestDataset: React.FC = () => {
                     >
                       <div className="dataset-version-card__header">
                         <span className="dataset-version-card__name">{version.version}</span>
-                        {(() => {
-                          const status = resolveVersionPublishStatus(version)
-                          const s = versionStatusMap[status]
-                          return <Tag color={s.color} style={{ marginInlineEnd: 0 }}>{s.label}</Tag>
-                        })()}
+                        {renderVersionStateTag(version, selectedRecord.status, selectedRecord.versionStatus, { marginInlineEnd: 0 })}
                       </div>
                       <div className="dataset-version-card__meta">
                         {version.sampleCount.toLocaleString()} 条样本
@@ -985,14 +1027,10 @@ const TestDataset: React.FC = () => {
                 <div><Text type="secondary">数据量：</Text><Text strong>{activeVersion?.sampleCount ?? 0} 条</Text></div>
                 <div><Text type="secondary">数据用途：</Text><Text strong>{resolveTestUsageLabel(selectedRecord.dataUsage)}</Text></div>
                 <div><Text type="secondary">数据格式：</Text><Tag>{resolveFormatLabel(selectedRecord.dataUsage, selectedRecord.dataFormat)}</Tag></div>
-                <div><Text type="secondary">状态：</Text><Text strong>{activeVersion?.processStatus ?? selectedRecord.versionStatus}</Text></div>
+                <div><Text type="secondary">状态：</Text>{renderProcessStatusTag(activeVersion?.processStatus ?? selectedRecord.versionStatus)}</div>
                 <div>
                   <Text type="secondary">发布状态：</Text>
-                  {(() => {
-                    const status = resolveVersionPublishStatus(activeVersion, selectedRecord.status, selectedRecord.versionStatus)
-                    const s = versionStatusMap[status]
-                    return <Tag color={s.color}>{s.label}</Tag>
-                  })()}
+                  {renderVersionPublishStatusField(activeVersion, selectedRecord.status, selectedRecord.versionStatus)}
                 </div>
                 <div><Text type="secondary">文件大小：</Text><Text strong>{formatFileSizeMB(activeVersion?.sampleCount ?? 0)}</Text></div>
                 <div>

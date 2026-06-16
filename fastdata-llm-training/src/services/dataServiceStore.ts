@@ -67,6 +67,10 @@ export function isDatasetVersionPublished(version?: Pick<DatasetVersionRecord, '
   return version?.publishStatus === '已发布'
 }
 
+function isDatasetVersionProcessSucceeded(status?: string): boolean {
+  return status === '处理完成' || status === '处理成功'
+}
+
 export function getLatestDatasetVersion(record?: Pick<DatasetRecord, 'latestVersion' | 'versions'> | null): DatasetVersionRecord | null {
   if (!record) return null
   return record.versions.find(item => item.version === record.latestVersion) ?? record.versions[0] ?? null
@@ -323,18 +327,20 @@ function makeDataset(params: {
     description,
     status = '已发布',
   } = params
+  const processStatus = status === '处理失败' || status === '处理中' ? status : '处理完成'
+  const publishStatus = isDatasetVersionProcessSucceeded(processStatus) ? status : '-'
 
   return {
     id,
     name,
     description,
-    versionStatus: '处理完成',
+    versionStatus: processStatus,
     latestVersion,
     dataUsage,
     dataFormat,
     creator,
     createdAt,
-    status,
+    status: publishStatus,
     sampleCount,
     charCount,
     trainRatio,
@@ -342,8 +348,8 @@ function makeDataset(params: {
       {
         id: `${id}-${latestVersion}`,
         version: latestVersion,
-        processStatus: '处理完成',
-        publishStatus: status,
+        processStatus,
+        publishStatus,
         creator,
         createdAt,
         sampleCount,
@@ -359,36 +365,36 @@ function makeDataset(params: {
 const seedState: DataServiceState = {
   trainingDatasets: [
     makeDataset({ id: 'train-1', name: 'roleBased', latestVersion: 'V5', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'deepexilab', createdAt: '2026/03/11 14:43:09', sampleCount: 2, charCount: 3200, trainRatio: 80 }),
-    makeDataset({ id: 'train-2', name: '训练测试-1', latestVersion: 'V8', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/08 14:30:00', sampleCount: 40, charCount: 125000, trainRatio: 80 }),
-    makeDataset({ id: 'train-6', name: 'DPO-Alpaca-通用偏好训练集', latestVersion: 'V2', dataUsage: 'DPO-文本生成', dataFormat: 'alpaca', creator: 'lab1', createdAt: '2026/03/04 14:00:00', sampleCount: 18, charCount: 42000, trainRatio: 80 }),
-    makeDataset({ id: 'train-7', name: 'DPO-Role-Based-视觉偏好训练集', latestVersion: 'V1', dataUsage: 'DPO-图像理解', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/03/03 18:20:00', sampleCount: 12, charCount: 18000, trainRatio: 80 }),
-    makeDataset({ id: 'train-14', name: '图像理解-SFT-商品图文问答', latestVersion: 'V2', dataUsage: 'SFT-图像理解', dataFormat: 'role-based', creator: 'deepexilab', createdAt: '2026/05/10 10:12:00', sampleCount: 640, charCount: 96000, trainRatio: 80 }),
-    makeDataset({ id: 'train-15', name: '图像理解-SFT-文档截图解析', latestVersion: 'V1', dataUsage: 'SFT-图像理解', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/05/10 11:24:00', sampleCount: 420, charCount: 78000, trainRatio: 80 }),
-    makeDataset({ id: 'train-16', name: '图像理解-SFT-质检缺陷识别', latestVersion: 'V3', dataUsage: 'SFT-图像理解', dataFormat: 'role-based', creator: 'lab1', createdAt: '2026/05/09 16:38:00', sampleCount: 1280, charCount: 156000, trainRatio: 85 }),
-    makeDataset({ id: 'train-17', name: '图像理解-DPO-多模态偏好对', latestVersion: 'V1', dataUsage: 'DPO-图像理解', dataFormat: 'role-based', creator: 'deepexilab', createdAt: '2026/05/09 15:18:00', sampleCount: 360, charCount: 72000, trainRatio: 80 }),
-    makeDataset({ id: 'train-19', name: '图像理解-RFT-GRPO-图表推理集', latestVersion: 'V1', dataUsage: 'RFT-GRPO-图像理解', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/05/08 17:20:00', sampleCount: 300, charCount: 62000, trainRatio: 80 }),
-    makeDataset({ id: 'train-9', name: '群组反馈训练集-RFT-GRPO', latestVersion: 'V1', dataUsage: 'RFT-GRPO-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/01 16:10:00', sampleCount: 16, charCount: 36000, trainRatio: 80 }),
+    makeDataset({ id: 'train-2', name: '训练测试-1', latestVersion: 'V8', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/08 14:30:00', sampleCount: 40, charCount: 125000, trainRatio: 80, status: '处理中' }),
+    makeDataset({ id: 'train-6', name: 'DPO-Alpaca-通用偏好训练集', latestVersion: 'V2', dataUsage: 'DPO-文本生成', dataFormat: 'alpaca', creator: 'lab1', createdAt: '2026/03/04 14:00:00', sampleCount: 18, charCount: 42000, trainRatio: 80, status: '处理失败' }),
+    makeDataset({ id: 'train-7', name: 'DPO-Role-Based-视觉偏好训练集', latestVersion: 'V1', dataUsage: 'DPO-图像理解', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/03/03 18:20:00', sampleCount: 12, charCount: 18000, trainRatio: 80, status: '处理中' }),
+    makeDataset({ id: 'train-14', name: '图像理解-SFT-商品图文问答', latestVersion: 'V2', dataUsage: 'SFT-图像理解', dataFormat: 'role-based', creator: 'deepexilab', createdAt: '2026/05/10 10:12:00', sampleCount: 640, charCount: 96000, trainRatio: 80, status: '处理失败' }),
+    makeDataset({ id: 'train-15', name: '图像理解-SFT-文档截图解析', latestVersion: 'V1', dataUsage: 'SFT-图像理解', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/05/10 11:24:00', sampleCount: 420, charCount: 78000, trainRatio: 80, status: '处理中' }),
+    makeDataset({ id: 'train-16', name: '图像理解-SFT-质检缺陷识别', latestVersion: 'V3', dataUsage: 'SFT-图像理解', dataFormat: 'role-based', creator: 'lab1', createdAt: '2026/05/09 16:38:00', sampleCount: 1280, charCount: 156000, trainRatio: 85, status: '处理失败' }),
+    makeDataset({ id: 'train-17', name: '图像理解-DPO-多模态偏好对', latestVersion: 'V1', dataUsage: 'DPO-图像理解', dataFormat: 'role-based', creator: 'deepexilab', createdAt: '2026/05/09 15:18:00', sampleCount: 360, charCount: 72000, trainRatio: 80, status: '处理中' }),
+    makeDataset({ id: 'train-19', name: '图像理解-RFT-GRPO-图表推理集', latestVersion: 'V1', dataUsage: 'RFT-GRPO-图像理解', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/05/08 17:20:00', sampleCount: 300, charCount: 62000, trainRatio: 80, status: '处理中' }),
+    makeDataset({ id: 'train-9', name: '群组反馈训练集-RFT-GRPO', latestVersion: 'V1', dataUsage: 'RFT-GRPO-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/01 16:10:00', sampleCount: 16, charCount: 36000, trainRatio: 80, status: '处理失败' }),
     makeDataset({ id: 'train-10', name: 'DPO-Role-Based-客服质检训练集', latestVersion: 'V4', dataUsage: 'DPO-文本生成', dataFormat: 'role-based', creator: 'deepexilab', createdAt: '2026/03/10 10:16:00', sampleCount: 96, charCount: 268000, trainRatio: 80 }),
     makeDataset({ id: 'train-11', name: '多轮指令精调-SFT-财税问答', latestVersion: 'V3', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'lab1', createdAt: '2026/03/09 19:20:00', sampleCount: 128, charCount: 312000, trainRatio: 80 }),
     makeDataset({ id: 'train-12', name: 'DPO-Role-Based-电商图文偏好训练集', latestVersion: 'V2', dataUsage: 'DPO-图像理解', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/03/07 13:42:00', sampleCount: 64, charCount: 91000, trainRatio: 80 }),
-    makeDataset({ id: 'train-3', name: '222222222222222', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/07 09:15:00', sampleCount: 20, charCount: 56000, trainRatio: 80 }),
+    makeDataset({ id: 'train-3', name: '222222222222222', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/07 09:15:00', sampleCount: 20, charCount: 56000, trainRatio: 80, status: '处理失败' }),
     makeDataset({ id: 'train-4', name: 'role_base', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/06 09:15:00', sampleCount: 12, charCount: 32000, trainRatio: 80, status: '处理失败' }),
     makeDataset({ id: 'train-5', name: '小量训练数据-xjh-test', latestVersion: 'V3', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/05 15:45:00', sampleCount: 28, charCount: 83000, trainRatio: 80 }),
   ],
   validationDatasets: [
-    makeDataset({ id: 'val-1', name: '多轮---1', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/02/27 14:00:00', sampleCount: 20, charCount: 36000, trainRatio: 20 }),
-    makeDataset({ id: 'val-2', name: '正常-2', latestVersion: 'V2', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/02/26 14:00:00', sampleCount: 16, charCount: 24000, trainRatio: 20 }),
-    makeDataset({ id: 'val-5', name: 'DPO-Alpaca-偏好验证集', latestVersion: 'V1', dataUsage: 'DPO-文本生成', dataFormat: 'alpaca', creator: 'admin', createdAt: '2026/02/26 10:10:00', sampleCount: 18, charCount: 26000, trainRatio: 20 }),
-    makeDataset({ id: 'val-6', name: 'DPO-Role-Based-质量验证集', latestVersion: 'V1', dataUsage: 'DPO-文本生成', dataFormat: 'role-based', creator: 'lab1', createdAt: '2026/02/26 09:30:00', sampleCount: 14, charCount: 21000, trainRatio: 20 }),
+    makeDataset({ id: 'val-1', name: '多轮---1', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/02/27 14:00:00', sampleCount: 20, charCount: 36000, trainRatio: 20, status: '处理中' }),
+    makeDataset({ id: 'val-2', name: '正常-2', latestVersion: 'V2', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'admin', createdAt: '2026/02/26 14:00:00', sampleCount: 16, charCount: 24000, trainRatio: 20, status: '处理中' }),
+    makeDataset({ id: 'val-5', name: 'DPO-Alpaca-偏好验证集', latestVersion: 'V1', dataUsage: 'DPO-文本生成', dataFormat: 'alpaca', creator: 'admin', createdAt: '2026/02/26 10:10:00', sampleCount: 18, charCount: 26000, trainRatio: 20, status: '处理失败' }),
+    makeDataset({ id: 'val-6', name: 'DPO-Role-Based-质量验证集', latestVersion: 'V1', dataUsage: 'DPO-文本生成', dataFormat: 'role-based', creator: 'lab1', createdAt: '2026/02/26 09:30:00', sampleCount: 14, charCount: 21000, trainRatio: 20, status: '处理失败' }),
     makeDataset({ id: 'val-3', name: '验证-xlsx-0001', latestVersion: 'V15', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/02/25 15:00:00', sampleCount: 40, charCount: 68000, trainRatio: 20 }),
   ],
   testDatasets: [
-    makeDataset({ id: 'test-1', name: '多文件-10', latestVersion: 'V2', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/03/03 17:04:19', sampleCount: 40 }),
-    makeDataset({ id: 'test-5', name: 'DPO-Alpaca-偏好测试集', latestVersion: 'V1', dataUsage: 'DPO-文本生成', dataFormat: 'alpaca', creator: 'lab1', createdAt: '2026/03/03 08:10:00', sampleCount: 22 }),
-    makeDataset({ id: 'test-6', name: '强化评测集-RFT-GRPO', latestVersion: 'V2', dataUsage: 'RFT-GRPO-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/03/02 18:30:00', sampleCount: 18 }),
-    makeDataset({ id: 'test-2', name: '乱码测试4', latestVersion: 'V7', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/02 14:30:00', sampleCount: 50 }),
+    makeDataset({ id: 'test-1', name: '多文件-10', latestVersion: 'V2', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/03/03 17:04:19', sampleCount: 40, status: '处理中' }),
+    makeDataset({ id: 'test-5', name: 'DPO-Alpaca-偏好测试集', latestVersion: 'V1', dataUsage: 'DPO-文本生成', dataFormat: 'alpaca', creator: 'lab1', createdAt: '2026/03/03 08:10:00', sampleCount: 22, status: '处理中' }),
+    makeDataset({ id: 'test-6', name: '强化评测集-RFT-GRPO', latestVersion: 'V2', dataUsage: 'RFT-GRPO-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/03/02 18:30:00', sampleCount: 18, status: '处理失败' }),
+    makeDataset({ id: 'test-2', name: '乱码测试4', latestVersion: 'V7', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'lab1', createdAt: '2026/03/02 14:30:00', sampleCount: 50, status: '处理中' }),
     makeDataset({ id: 'test-3', name: '333333333', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'role-based', creator: 'lab1', createdAt: '2026/03/01 11:00:00', sampleCount: 10, status: '处理失败' }),
-    makeDataset({ id: 'test-4', name: '属性回归测试-22-333-444', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/04/09 10:00:00', sampleCount: 5 }),
+    makeDataset({ id: 'test-4', name: '属性回归测试-22-333-444', latestVersion: 'V1', dataUsage: 'SFT-文本生成', dataFormat: 'prompt-response', creator: 'admin', createdAt: '2026/04/09 10:00:00', sampleCount: 5, status: '处理中' }),
   ],
   inferenceResults: [
     { id: 'inf-1', name: '推理结果集_2026_03_26_09_34_47', description: '', progress: '已完成', dataUsage: '文本生成', inferenceMode: '离线推理', pendingData: '验证数据集/验证-示例-1-json>V6', pendingModel: '123123', dataVolume: 20, createdAt: '2026/03/26 09:36:42' },
@@ -468,12 +474,12 @@ function enrichStateWithTrainingSeeds(nextState: DataServiceState): DataServiceS
   })
 
   const normalizeDatasetList = (items: DatasetRecord[]) => items.filter(item => !isPpoDataset(item)).map(rawItem => {
-    const item = ensureDatasetVersionHistory(rawItem)
+    const seedDataset = seedDatasetById.get(rawItem.id)
+    const item = normalizeDatasetProcessAndPublishState(ensureDatasetVersionHistory(rawItem), seedDataset)
     if (!isDpoUsage(item.dataUsage)) {
       return item
     }
 
-    const seedDataset = seedDatasetById.get(item.id)
     const nextFormat = seedFormatById.get(item.id) ?? normalizeDatasetFormat(item.dataFormat, item.dataUsage)
     return {
       ...item,
@@ -635,6 +641,38 @@ function ensureDatasetVersionHistory(record: DatasetRecord): DatasetRecord {
   return { ...record, versions: nextVersions }
 }
 
+function normalizeDatasetProcessAndPublishState(record: DatasetRecord, seedDataset?: DatasetRecord): DatasetRecord {
+  const seedLatestVersion = seedDataset ? getLatestDatasetVersion(seedDataset) : null
+  const versions = (record.versions ?? []).map(version => {
+    const seedProcessStatus = seedLatestVersion?.version === version.version ? seedLatestVersion.processStatus : undefined
+    if (version.processStatus === '处理失败' || version.publishStatus === '处理失败' || seedProcessStatus === '处理失败') {
+      return { ...version, processStatus: '处理失败', publishStatus: '-' }
+    }
+    if (version.processStatus === '处理中' || seedProcessStatus === '处理中') {
+      return { ...version, publishStatus: '-' }
+    }
+    return {
+      ...version,
+      processStatus: isDatasetVersionProcessSucceeded(version.processStatus) ? version.processStatus : '处理完成',
+      publishStatus: version.publishStatus === '已发布' ? '已发布' : '未发布',
+    }
+  })
+  const latestVersion = versions.find(version => version.version === record.latestVersion) ?? versions[0]
+  const versionStatus = latestVersion?.processStatus ?? record.versionStatus
+  const status = isDatasetVersionProcessSucceeded(versionStatus)
+    ? latestVersion?.publishStatus === '已发布'
+      ? '已发布'
+      : '未发布'
+    : '-'
+
+  return {
+    ...record,
+    versionStatus,
+    status,
+    versions,
+  }
+}
+
 export const dataServiceActions = {
   createDataset(
     kind: 'training' | 'validation' | 'test',
@@ -746,7 +784,7 @@ export const dataServiceActions = {
           return target.versions.find(version => version.id === normalizedId) ??
             (versionLabel ? target.versions.find(version => version.version.toLowerCase() === `v${versionLabel}`.toLowerCase()) : undefined)
         })
-        .filter((version): version is DatasetVersionRecord => Boolean(version) && version?.processStatus === '处理完成')
+        .filter((version): version is DatasetVersionRecord => Boolean(version) && isDatasetVersionProcessSucceeded(version?.processStatus))
 
       if (sourceVersions.length < 2) return
 
@@ -801,6 +839,7 @@ export const dataServiceActions = {
       const target = list.find(item => item.id === id)
       const version = target?.versions.find(item => item.id === versionId)
       if (!target || !version) return
+      if (!isDatasetVersionProcessSucceeded(version.processStatus)) return
 
       target.versions = target.versions.map(item => {
         if (item.id === versionId) {

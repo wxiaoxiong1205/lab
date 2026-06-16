@@ -8,13 +8,21 @@ import ResumableUpload from '../../components/ResumableUpload'
 import TaskMetadataEditor from '../../components/TaskMetadataEditor'
 import { canAccessResourceData, getCurrentUser, getOperationDeniedMessage } from '../../services/permissionStore'
 import { validateFieldsAndScroll } from '../../utils/formValidation'
+import {
+  getDefaultMLAnnotationTemplate,
+  getDefaultMLAnnotationType,
+  getMLAnnotationTemplates,
+  getMLAnnotationTypes,
+  normalizeMLAnnotationTemplate,
+  type MLDataTypeValue,
+} from '../../services/mlAnnotationTypes'
 
 const { Title, Text } = Typography
 
 type MLModelFormValues = {
   name: string
   description?: string
-  modelType: 'text' | 'image'
+  modelType: MLDataTypeValue
   annotationType: string
   taskType: string
   source: 'local' | 'notebook'
@@ -40,24 +48,13 @@ type MLModelRecord = {
   createdAt: string
 }
 
-const modelOptionsByType: Record<string, Array<{ value: string; label: string; taskTypes: string[] }>> = {
-  text: [
-    { value: '文本分类', label: '文本分类', taskTypes: ['文本单标签', '文本多标签'] },
-    { value: '实体识别', label: '实体识别', taskTypes: ['文本实体识别'] },
-  ],
-  image: [
-    { value: '图像分类', label: '图像分类', taskTypes: ['单图单标签', '单图多标签'] },
-    { value: '图像分割', label: '图像分割', taskTypes: ['实例分割'] },
-    { value: '物体检测', label: '物体检测', taskTypes: ['矩阵框标注'] },
-  ],
-}
-
 const initialModels: MLModelRecord[] = [
   { id: '1', name: '111', version: 'V1', versionCount: 1, modelType: '文本', annotationType: '文本分类', taskType: '文本单标签', source: 'Notebook 获取', weightFile: 'notebook://ml-nb-1/model.pt', tokenizer: 'notebook://ml-nb-1/tokenizer.json', network: 'TextClassifier', creator: 'zhangsan', createdAt: '2026-04-22 15:11:38' },
   { id: '2', name: 'basion-文本分类-单标签', version: 'V1', versionCount: 1, modelType: '文本', annotationType: '文本分类', taskType: '文本单标签', source: 'Notebook 获取', weightFile: 'notebook://ml-nb-2/model.pt', tokenizer: 'notebook://ml-nb-2/tokenizer.json', network: 'BertClassifier', creator: 'lab1', createdAt: '2026-04-15 09:35:59' },
   { id: '3', name: '测试数据001_hzj', version: 'V1', versionCount: 1, modelType: '文本', annotationType: '实体识别', taskType: '文本实体识别', source: '本地上传', weightFile: 'ner-model.pt', tokenizer: 'tokenizer.json', network: 'CRF-NER', creator: 'wangwu', createdAt: '2026-04-14 17:43:06' },
   { id: '4', name: 'hzj_图片分类多标签', version: 'V1', versionCount: 1, modelType: '图片', annotationType: '图像分类', taskType: '单图多标签', source: 'Notebook 获取', weightFile: 'notebook://vision-lab/resnet.pt', network: 'ResNet50', creator: 'admin', createdAt: '2026-04-13 15:17:32' },
   { id: '5', name: 'basion-图像分类-单标签', version: 'V1', versionCount: 1, modelType: '图片', annotationType: '图像分类', taskType: '单图单标签', source: '本地上传', weightFile: 'image-classifier.pt', network: 'ConvNeXt-Tiny', creator: 'lab1', createdAt: '2026-04-10 10:00:00' },
+  { id: '6', name: '回形零件-孔洞实例分割模型', version: 'V1', versionCount: 1, modelType: '图片', annotationType: '图像分割', taskType: '实例分割（孔洞）', source: 'Notebook 获取', weightFile: 'notebook://vision-lab/ring-mask.pt', network: 'MaskRCNN-Hole', creator: 'lab1', createdAt: '2026-05-29 11:20:00' },
 ]
 
 function normalizeUploadFileName(value: unknown): string | undefined {
@@ -81,7 +78,7 @@ const MLModelManagement: React.FC = () => {
   const [models, setModels] = useState<MLModelRecord[]>(initialModels)
   const [searchValue, setSearchValue] = useState('')
   const [detailRecord, setDetailRecord] = useState<MLModelRecord | null>(null)
-  const [selectedModelType, setSelectedModelType] = useState<'text' | 'image'>('text')
+  const [selectedModelType, setSelectedModelType] = useState<MLDataTypeValue>('text')
   const [selectedAnnotationType, setSelectedAnnotationType] = useState('文本分类')
   const [selectedSource, setSelectedSource] = useState<'local' | 'notebook'>('notebook')
 
@@ -99,8 +96,8 @@ const MLModelManagement: React.FC = () => {
     message.warning(getOperationDeniedMessage(permission.reason))
     return false
   }
-  const annotationOptions = modelOptionsByType[selectedModelType]
-  const taskTypeOptions = annotationOptions.find(item => item.value === selectedAnnotationType)?.taskTypes ?? []
+  const annotationOptions = getMLAnnotationTypes(selectedModelType)
+  const taskTypeOptions = getMLAnnotationTemplates(selectedAnnotationType, selectedModelType)
 
   const resetCreateState = () => {
     form.resetFields()
@@ -125,7 +122,7 @@ const MLModelManagement: React.FC = () => {
         versionCount: 1,
         modelType: values.modelType === 'image' ? '图片' : '文本',
         annotationType: values.annotationType,
-        taskType: values.taskType,
+        taskType: normalizeMLAnnotationTemplate(values.taskType),
         source: values.source === 'local' ? '本地上传' : 'Notebook 获取',
         weightFile: normalizeUploadFileName(values.weightFile) || (values.source === 'local' ? 'model.pt' : 'notebook://请选择 Notebook/model.pt'),
         tokenizer: normalizeUploadFileName(values.tokenizer),
@@ -263,13 +260,14 @@ const MLModelManagement: React.FC = () => {
                   { value: 'image', label: '图片' },
                 ]}
                 onChange={event => {
-                  const nextType = event.target.value as 'text' | 'image'
-                  const nextAnnotationType = modelOptionsByType[nextType][0]
+                  const nextType = event.target.value as MLDataTypeValue
+                  const nextAnnotationType = getDefaultMLAnnotationType(nextType)
+                  const nextTaskType = getDefaultMLAnnotationTemplate(nextAnnotationType.value, nextType)
                   setSelectedModelType(nextType)
                   setSelectedAnnotationType(nextAnnotationType.value)
                   form.setFieldsValue({
                     annotationType: nextAnnotationType.value,
-                    taskType: nextAnnotationType.taskTypes[0],
+                    taskType: nextTaskType?.value,
                   })
                 }}
               />
@@ -279,13 +277,14 @@ const MLModelManagement: React.FC = () => {
                 options={annotationOptions.map(item => ({ value: item.value, label: item.label }))}
                 onChange={event => {
                   const nextAnnotationType = event.target.value
+                  const nextTaskType = getDefaultMLAnnotationTemplate(nextAnnotationType, selectedModelType)
                   setSelectedAnnotationType(nextAnnotationType)
-                  form.setFieldValue('taskType', annotationOptions.find(item => item.value === nextAnnotationType)?.taskTypes[0])
+                  form.setFieldValue('taskType', nextTaskType?.value)
                 }}
               />
             </Form.Item>
             <Form.Item label="任务类型" name="taskType" rules={[{ required: true, message: '请选择任务类型' }]}>
-              <Radio.Group options={taskTypeOptions.map(item => ({ value: item, label: item }))} />
+              <Radio.Group options={taskTypeOptions.map(item => ({ value: item.value, label: item.label }))} />
             </Form.Item>
             <Form.Item label="模型来源" name="source" rules={[{ required: true, message: '请选择模型来源' }]}>
               <Radio.Group
@@ -376,7 +375,7 @@ const MLModelManagement: React.FC = () => {
             <Descriptions.Item label="版本数量">{detailRecord.versionCount}</Descriptions.Item>
             <Descriptions.Item label="模型类型">{detailRecord.modelType}</Descriptions.Item>
             <Descriptions.Item label="标注类型">{detailRecord.annotationType}</Descriptions.Item>
-            <Descriptions.Item label="任务类型">{detailRecord.taskType}</Descriptions.Item>
+            <Descriptions.Item label="任务类型">{normalizeMLAnnotationTemplate(detailRecord.taskType)}</Descriptions.Item>
             <Descriptions.Item label="模型来源">{detailRecord.source}</Descriptions.Item>
             <Descriptions.Item label="权重文件" span={2}>{detailRecord.weightFile}</Descriptions.Item>
             <Descriptions.Item label="分词器" span={2}>{detailRecord.tokenizer || '-'}</Descriptions.Item>

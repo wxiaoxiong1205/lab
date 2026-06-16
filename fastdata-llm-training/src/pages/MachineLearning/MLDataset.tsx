@@ -25,6 +25,15 @@ import { formatResourceLockMessage, getCreatorDeletePermission, getOnlineAnnotat
 import ResumableUpload from '../../components/ResumableUpload'
 import DatasetVersionMergeModal from '../../components/DatasetVersionMergeModal'
 import { validateFieldsAndScroll } from '../../utils/formValidation'
+import {
+  getDefaultMLAnnotationType,
+  getDefaultMLAnnotationTemplate,
+  getMLAnnotationTypes,
+  getMLAnnotationTemplates,
+  getMLDataTypeLabel,
+  normalizeMLAnnotationTemplate,
+  type MLDataTypeValue,
+} from '../../services/mlAnnotationTypes'
 
 const { Title, Text } = Typography
 
@@ -32,7 +41,7 @@ type MLDatasetFormValues = {
   name: string
   description?: string
   version: string
-  dataType: 'text' | 'image'
+  dataType: MLDataTypeValue
   annotationType: string
   annotationTemplate: string
   labelStatus: 'none' | 'with-label'
@@ -125,18 +134,6 @@ const dataTypes = [
   { value: 'image', label: '图片' },
 ]
 
-const annotationTypesByDataType: Record<string, Array<{ value: string; label: string; templates: string[] }>> = {
-  text: [
-    { value: '文本分类', label: '文本分类', templates: ['文本单标签', '文本多标签'] },
-    { value: '实体识别', label: '实体识别', templates: ['文本实体识别'] },
-  ],
-  image: [
-    { value: '图像分类', label: '图像分类', templates: ['单图单标签', '单图多标签'] },
-    { value: '图像分割', label: '图像分割', templates: ['实例分割', '语义分割'] },
-    { value: '物体检测', label: '物体检测', templates: ['矩阵框标注'] },
-  ],
-}
-
 type TemplateFile = {
   path: string
   content: string
@@ -151,15 +148,17 @@ type DatasetTemplateConfig = {
 }
 
 function getDatasetTemplateConfig(annotationType: string, annotationTemplate: string): DatasetTemplateConfig {
+  const normalizedTemplate = normalizeMLAnnotationTemplate(annotationTemplate)
+
   if (annotationType === '文本分类') {
     return {
-      title: annotationTemplate === '文本多标签' ? '文本多标签分类模板' : '文本单标签分类模板',
-      fileName: annotationTemplate === '文本多标签' ? 'text-multi-label-template.csv' : 'text-single-label-template.csv',
+      title: normalizedTemplate === '文本多标签' ? '文本多标签分类模板' : '文本单标签分类模板',
+      fileName: normalizedTemplate === '文本多标签' ? 'text-multi-label-template.csv' : 'text-single-label-template.csv',
       format: 'CSV',
       description: '每行一条文本样本，label 为单标签或英文逗号分隔的多标签。',
       files: [{
         path: 'template.csv',
-        content: annotationTemplate === '文本多标签'
+        content: normalizedTemplate === '文本多标签'
           ? 'id,text,label\n1,这是一条售后咨询文本,售后,物流\n2,这是一条产品评价文本,质量,包装\n'
           : 'id,text,label\n1,这是一条售后咨询文本,售后\n2,这是一条产品评价文本,质量\n',
       }],
@@ -185,13 +184,13 @@ function getDatasetTemplateConfig(annotationType: string, annotationTemplate: st
 
   if (annotationType === '图像分类') {
     return {
-      title: annotationTemplate === '单图多标签' ? '图像多标签分类 ZIP 模板' : '图像单标签分类 ZIP 模板',
-      fileName: annotationTemplate === '单图多标签' ? 'image-multi-label-template.zip' : 'image-single-label-template.zip',
+      title: normalizedTemplate === '单图多标签' ? '图像多标签分类 ZIP 模板' : '图像单标签分类 ZIP 模板',
+      fileName: normalizedTemplate === '单图多标签' ? 'image-multi-label-template.zip' : 'image-single-label-template.zip',
       format: 'ZIP',
       description: '图片放在 images 目录，annotations.csv 记录图片文件与标签。',
       files: [
         { path: 'images/README.txt', content: '将 jpg/png 图片放在该目录下，例如 image_001.jpg。' },
-        { path: 'annotations.csv', content: annotationTemplate === '单图多标签' ? 'file_name,labels\nimages/image_001.jpg,SUV|缺陷\n' : 'file_name,label\nimages/image_001.jpg,SUV\n' },
+        { path: 'annotations.csv', content: normalizedTemplate === '单图多标签' ? 'file_name,labels\nimages/image_001.jpg,SUV|缺陷\n' : 'file_name,label\nimages/image_001.jpg,SUV\n' },
       ],
     }
   }
@@ -215,7 +214,7 @@ function getDatasetTemplateConfig(annotationType: string, annotationTemplate: st
     }
   }
 
-  if (annotationType === '图像分割' && annotationTemplate === '语义分割') {
+  if (annotationType === '图像分割' && normalizedTemplate === '语义分割') {
     return {
       title: '语义分割 ZIP 模板',
       fileName: 'semantic-segmentation-template.zip',
@@ -229,32 +228,43 @@ function getDatasetTemplateConfig(annotationType: string, annotationTemplate: st
     }
   }
 
+  if (annotationType === '图像分割' && normalizedTemplate === '实例分割（孔洞）') {
+    return {
+      title: '实例分割（孔洞）ZIP 模板',
+      fileName: 'instance-segmentation-hole-template.zip',
+      format: 'ZIP',
+      description: '用于回形、垫片等带孔目标。外圈与孔洞分别记录，后端按 mask/RLE 保留扣洞关系。',
+      files: [
+        { path: 'images/README.txt', content: '回形/带孔实例分割图片目录，例如 ring_001.jpg。' },
+        {
+          path: 'annotations.json',
+          content: JSON.stringify({
+            images: [{ id: 'ring-001', file_name: 'images/ring_001.jpg', width: 640, height: 480 }],
+            annotations: [{
+              image_id: 'ring-001',
+              label: '外壳',
+              outer_polygon: [[80, 80], [560, 80], [560, 400], [80, 400]],
+              holes: [[[240, 180], [400, 180], [400, 300], [240, 300]]],
+              storage: 'mask_rle',
+            }],
+          }, null, 2),
+        },
+      ],
+    }
+  }
+
   return {
-    title: '实例分割 ZIP 模板',
-    fileName: 'instance-segmentation-template.zip',
+    title: '实例分割（标准）ZIP 模板',
+    fileName: 'instance-segmentation-standard-template.zip',
     format: 'ZIP',
-    description: '实例分割 ZIP 内含两套示例：普通实例分割和回形/带孔实例分割；回形标注仍归属实例分割模板。',
+    description: '用于普通实例分割。每个目标实例记录一个闭合多边形，不包含孔洞扣除关系。',
     files: [
-      { path: '普通实例分割/images/README.txt', content: '普通实例分割图片目录，例如 road_001.jpg。' },
+      { path: 'images/README.txt', content: '普通实例分割图片目录，例如 road_001.jpg。' },
       {
-        path: '普通实例分割/annotations.json',
+        path: 'annotations.json',
         content: JSON.stringify({
           images: [{ id: 'img-001', file_name: 'images/road_001.jpg', width: 1280, height: 720 }],
           annotations: [{ image_id: 'img-001', label: 'road_sign', polygon: [[120, 90], [380, 110], [360, 260], [140, 250]] }],
-        }, null, 2),
-      },
-      { path: '回形带孔实例分割/images/README.txt', content: '回形/带孔实例分割图片目录，例如 ring_001.jpg。' },
-      {
-        path: '回形带孔实例分割/annotations.json',
-        content: JSON.stringify({
-          images: [{ id: 'ring-001', file_name: 'images/ring_001.jpg', width: 640, height: 480 }],
-          annotations: [{
-            image_id: 'ring-001',
-            label: '外壳',
-            outer_polygon: [[80, 80], [560, 80], [560, 400], [80, 400]],
-            holes: [[[240, 180], [400, 180], [400, 300], [240, 300]]],
-            storage: 'mask_rle',
-          }],
         }, null, 2),
       },
     ],
@@ -373,13 +383,13 @@ function downloadDatasetTemplate(config: DatasetTemplateConfig) {
 }
 
 const initialDatasetRows: MLDatasetRecord[] = [
-  { id: '1', name: 'basion-物体检测', version: 'V1', dataType: '图片', annotationType: '物体检测', annotationTemplate: '矩阵框标注', labelStatus: '有标注信息', dataSource: '本地上传', publishStatus: '已发布', creator: 'lab1', createdAt: '2026-04-24 14:13:09' },
+  { id: '1', name: 'basion-物体检测', version: 'V1', dataType: '图片', annotationType: '物体检测', annotationTemplate: '矩形框标注', labelStatus: '有标注信息', dataSource: '本地上传', publishStatus: '已发布', creator: 'lab1', createdAt: '2026-04-24 14:13:09' },
   { id: '2', name: 'qeqwe', version: 'V1', dataType: '文本', annotationType: '实体识别', annotationTemplate: '文本实体识别', labelStatus: '无标注信息', dataSource: 'Notebook 获取', publishStatus: '未发布', creator: 'lisi', createdAt: '2026-04-22 15:11:38' },
   { id: '3', name: 'basion-文本实体识别', version: 'V3', dataType: '文本', annotationType: '实体识别', annotationTemplate: '文本实体识别', labelStatus: '有标注信息', dataSource: '本地上传', publishStatus: '已发布', creator: 'lab1', createdAt: '2026-04-15 09:35:59' },
   { id: '4', name: '图像分类-多-1', version: 'V3', dataType: '图片', annotationType: '图像分类', annotationTemplate: '单图多标签', labelStatus: '有标注信息', dataSource: '本地上传', publishStatus: '已发布', creator: 'admin', createdAt: '2026-04-14 17:43:06' },
   { id: '5', name: 'basion-文本分类-多标签-无标注', version: 'V2', dataType: '文本', annotationType: '文本分类', annotationTemplate: '文本多标签', labelStatus: '无标注信息', dataSource: '本地上传', publishStatus: '未发布', creator: 'wangwu', createdAt: '2026-04-14 16:33:51' },
-  { id: '6', name: 'basion-图像分割-实例分割-无标注', version: 'V1', dataType: '图片', annotationType: '图像分割', annotationTemplate: '实例分割', labelStatus: '无标注信息', dataSource: '本地上传', publishStatus: '已发布', creator: 'lab1', createdAt: '2026-03-01 09:10:00' },
-  { id: '7', name: '回形零件-带孔实例分割', version: 'V1', dataType: '图片', annotationType: '图像分割', annotationTemplate: '实例分割', labelStatus: '有标注信息', dataSource: '本地上传', publishStatus: '已发布', creator: 'lab1', createdAt: '2026-05-29 10:18:00' },
+  { id: '6', name: 'basion-图像分割-实例分割-无标注', version: 'V1', dataType: '图片', annotationType: '图像分割', annotationTemplate: '实例分割（标准）', labelStatus: '无标注信息', dataSource: '本地上传', publishStatus: '已发布', creator: 'lab1', createdAt: '2026-03-01 09:10:00' },
+  { id: '7', name: '回形零件-带孔实例分割', version: 'V1', dataType: '图片', annotationType: '图像分割', annotationTemplate: '实例分割（孔洞）', labelStatus: '有标注信息', dataSource: '本地上传', publishStatus: '已发布', creator: 'lab1', createdAt: '2026-05-29 10:18:00' },
 ]
 
 function buildMLDatasetDetailRows(record: MLDatasetRecord): MLDatasetDetailRow[] {
@@ -410,7 +420,7 @@ function buildMLDatasetDetailRows(record: MLDatasetRecord): MLDatasetDetailRow[]
           { id: `${record.id}-seg-${index}-1`, label: ['道路', '建筑', '植被'][index] ?? '区域', points: '28,18 76,22 88,64 34,72' },
         ]
       : undefined,
-    rleMasks: record.annotationTemplate === '实例分割' && /回形|回型|带孔/i.test(record.name)
+    rleMasks: normalizeMLAnnotationTemplate(record.annotationTemplate) === '实例分割（孔洞）'
       ? [
           {
             id: `${record.id}-rle-${index}-1`,
@@ -580,7 +590,7 @@ const MLDataset: React.FC = () => {
   const [activeVersion, setActiveVersion] = useState<string>()
   const [annotationTypeFilter, setAnnotationTypeFilter] = useState<string>('全部')
   const [searchValue, setSearchValue] = useState('')
-  const [selectedDataType, setSelectedDataType] = useState<'text' | 'image'>('text')
+  const [selectedDataType, setSelectedDataType] = useState<MLDataTypeValue>('text')
   const [selectedAnnotationType, setSelectedAnnotationType] = useState('文本分类')
   const [selectedFile, setSelectedFile] = useState<UploadFile | null>(null)
   const [addVersionOpen, setAddVersionOpen] = useState(false)
@@ -598,9 +608,9 @@ const MLDataset: React.FC = () => {
     [annotationTypeFilter, searchValue, rows],
   )
 
-  const availableAnnotationTypes = annotationTypesByDataType[selectedDataType]
-  const availableTemplates = availableAnnotationTypes.find(item => item.value === selectedAnnotationType)?.templates ?? []
-  const selectedAnnotationTemplate = Form.useWatch('annotationTemplate', form) ?? availableTemplates[0] ?? ''
+  const availableAnnotationTypes = getMLAnnotationTypes(selectedDataType)
+  const availableTemplates = getMLAnnotationTemplates(selectedAnnotationType, selectedDataType)
+  const selectedAnnotationTemplate = Form.useWatch('annotationTemplate', form) ?? availableTemplates[0]?.value ?? ''
   const currentTemplateConfig = getDatasetTemplateConfig(selectedAnnotationType, selectedAnnotationTemplate)
   const selectedDetailRecord = useMemo(
     () => (datasetId ? rows.find(item => item.id === datasetId) ?? null : null),
@@ -733,9 +743,9 @@ const MLDataset: React.FC = () => {
           id: `ml-dataset-${Date.now()}`,
           name: values.name,
           version: 'V1',
-          dataType: values.dataType === 'image' ? '图片' : '文本',
+          dataType: getMLDataTypeLabel(values.dataType),
           annotationType: values.annotationType,
-          annotationTemplate: values.annotationTemplate,
+          annotationTemplate: normalizeMLAnnotationTemplate(values.annotationTemplate),
           description: values.description,
           labelStatus: values.labelStatus === 'with-label' ? '有标注信息' : '无标注信息',
           dataSource: values.dataSource === 'notebook' ? 'Notebook 获取' : '本地上传',
@@ -844,7 +854,7 @@ const MLDataset: React.FC = () => {
     { title: '最新版本', dataIndex: 'version', key: 'version', width: 110 },
     { title: '数据类型', dataIndex: 'dataType', key: 'dataType', width: 110 },
     { title: '标注类型', dataIndex: 'annotationType', key: 'annotationType', width: 130 },
-    { title: '标注模板', dataIndex: 'annotationTemplate', key: 'annotationTemplate', width: 150 },
+    { title: '标注模板', dataIndex: 'annotationTemplate', key: 'annotationTemplate', width: 170, render: value => normalizeMLAnnotationTemplate(value) },
     {
       title: '发布状态',
       dataIndex: 'publishStatus',
@@ -921,13 +931,14 @@ const MLDataset: React.FC = () => {
               <Radio.Group
                 options={dataTypes}
                 onChange={event => {
-                  const nextType = event.target.value as 'text' | 'image'
-                  const nextAnnotationType = annotationTypesByDataType[nextType][0]
+                  const nextType = event.target.value as MLDataTypeValue
+                  const nextAnnotationType = getDefaultMLAnnotationType(nextType)
+                  const nextTemplate = getDefaultMLAnnotationTemplate(nextAnnotationType.value, nextType)
                   setSelectedDataType(nextType)
                   setSelectedAnnotationType(nextAnnotationType.value)
                   form.setFieldsValue({
                     annotationType: nextAnnotationType.value,
-                    annotationTemplate: nextAnnotationType.templates[0],
+                    annotationTemplate: nextTemplate?.value,
                   })
                 }}
               />
@@ -937,13 +948,14 @@ const MLDataset: React.FC = () => {
                 options={availableAnnotationTypes.map(item => ({ label: item.label, value: item.value }))}
                 onChange={event => {
                   const nextAnnotationType = event.target.value
+                  const nextTemplate = getDefaultMLAnnotationTemplate(nextAnnotationType, selectedDataType)
                   setSelectedAnnotationType(nextAnnotationType)
-                  form.setFieldValue('annotationTemplate', annotationTypesByDataType[selectedDataType].find(item => item.value === nextAnnotationType)?.templates[0])
+                  form.setFieldValue('annotationTemplate', nextTemplate?.value)
                 }}
               />
             </Form.Item>
             <Form.Item label="标注模板" name="annotationTemplate" rules={[{ required: true, message: '请选择标注模板' }]}>
-              <Radio.Group options={availableTemplates.map(item => ({ label: item, value: item }))} />
+              <Radio.Group options={availableTemplates.map(item => ({ label: item.label, value: item.value }))} />
             </Form.Item>
             <Form.Item label="数据标注状态" name="labelStatus" rules={[{ required: true, message: '请选择数据标注状态' }]}>
               <Radio.Group
@@ -1107,7 +1119,7 @@ const MLDataset: React.FC = () => {
                 { label: '数据量', value: `${detailRows.length} 条` },
                 { label: '数据类型', value: selectedDetailRecord.dataType },
                 { label: '标注类型', value: selectedDetailRecord.annotationType },
-                { label: '标注模板', value: selectedDetailRecord.annotationTemplate },
+                { label: '标注模板', value: normalizeMLAnnotationTemplate(selectedDetailRecord.annotationTemplate) },
                 { label: '数据标注状态', value: <Tag color={activeDatasetVersion.labelStatus === '有标注信息' ? 'green' : 'default'}>{activeDatasetVersion.labelStatus}</Tag> },
                 { label: '发布状态', value: renderMLPublishStatus(activeDatasetVersion.publishStatus) },
                 { label: '数据来源', value: renderMLVersionDataSource(activeDatasetVersion) },
