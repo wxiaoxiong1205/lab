@@ -78,10 +78,10 @@ Status: `partial-conflict`.
 Done:
 
 - First GRPO production adaptation is complete for training method enum, frontend display, GRPO parameter fields, dataset filtering, and `additional_params.grpo_config` persistence.
+- Production backend has a dedicated `training_parameter_templates` ORM model, Alembic migration, and `/api/v1/training-parameter-templates` CRUD surface prepared for template persistence.
 
 Not done:
 
-- Production writable template-management API.
 - System settings template-management tab.
 - Training creation template selection and YAML snapshot payload.
 - Reward-function `.py` upload and template download.

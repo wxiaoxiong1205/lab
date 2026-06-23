@@ -12,6 +12,7 @@ from .evaluation_task_manager import EvaluationTask, EvaluationTaskDatasetModelR
 from .basic_metric_manager import EvaluationMetrics
 from .evaluation_metric_metadata_relation import EvaluationMetricMetadataRelation
 from .common_config import CommonConfig
+from .training_parameter_template import TrainingParameterTemplate
 from .models import ChunkUploadSession, ChunkUploadRecord, FileFolder, FileManagementFile, MachineLearningDataset, \
     OpenAPIApplicationModel
 
