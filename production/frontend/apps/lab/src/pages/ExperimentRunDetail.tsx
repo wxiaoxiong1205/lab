@@ -455,7 +455,7 @@ const ExperimentRunDetail: React.FC = () => {
   const renderAdditionalParams = () => {
     const additionalParams = Object.fromEntries(
       Object.entries(runDetail.additional_params || {}).filter(([key]) =>
-        !['grpo_config', 'grpo_template_snapshot'].includes(key),
+        !['grpo_config', 'grpo_template_snapshot', 'grpo_resource_config'].includes(key),
       ),
     )
 
@@ -476,39 +476,43 @@ const ExperimentRunDetail: React.FC = () => {
       return unit ? `${value}${unit}` : value
     }
 
-    const resourceData = [
-      {
-        key: 'gpu_type_model',
-        label: '显卡类型及型号',
-        value: [
-          graphicsCardResource.card_type,
-          graphicsCardResource.card_model,
-        ].filter(Boolean).join(' / ') || '-',
-      },
-      {
-        key: 'count',
-        label: '显卡卡数配置',
-        value: formatValue(graphicsCardResource.count, '张'),
-      },
+    const buildResourceData = (resource: any, includeGpu = true) => [
+      ...(includeGpu
+        ? [
+            {
+              key: 'gpu_type_model',
+              label: '显卡类型及型号',
+              value: [
+                resource.card_type ?? (Array.isArray(resource.gpu_type) ? resource.gpu_type[0] : resource.gpu_type),
+                resource.card_model ?? resource.gpu_model,
+              ].filter(Boolean).join(' / ') || '-',
+            },
+            {
+              key: 'count',
+              label: '显卡卡数配置',
+              value: formatValue(resource.count ?? resource.gpu_count, '张'),
+            },
+          ]
+        : []),
       {
         key: 'cpu_request',
         label: 'CPU 请求',
-        value: formatValue(graphicsCardResource.cpu_request, ' Core'),
+        value: formatValue(resource.cpu_request, ' Core'),
       },
       {
         key: 'cpu_limit',
         label: 'CPU 限制',
-        value: formatValue(graphicsCardResource.cpu_limit, ' Core'),
+        value: formatValue(resource.cpu_limit, ' Core'),
       },
       {
         key: 'memory_request',
         label: '内存请求',
-        value: formatValue(graphicsCardResource.memory_request, ' GB'),
+        value: formatValue(resource.memory_request, ' GB'),
       },
       {
         key: 'memory_limit',
         label: '内存限制',
-        value: formatValue(graphicsCardResource.memory_limit, ' GB'),
+        value: formatValue(resource.memory_limit, ' GB'),
       },
     ].filter(Boolean) as Array<{
       key: string
@@ -537,7 +541,49 @@ const ExperimentRunDetail: React.FC = () => {
         ),
       },
     ]
-    return (<Table columns={resourceColumns} dataSource={resourceData} rowKey="key" pagination={false} size="small" className="mb-4" />)
+    const renderResourceTable = (resource: any, includeGpu = true) => (
+      <Table
+        columns={resourceColumns}
+        dataSource={buildResourceData(resource, includeGpu)}
+        rowKey="key"
+        pagination={false}
+        size="small"
+        className="mb-4"
+      />
+    )
+
+    const grpoResourceConfig = runDetail?.additional_params?.grpo_resource_config
+    if (isRftGrpoRun() && grpoResourceConfig) {
+      const legacySubmit = {
+        cpu_request: graphicsCardResource.cpu_request,
+        cpu_limit: graphicsCardResource.cpu_limit,
+        memory_request: graphicsCardResource.memory_request,
+        memory_limit: graphicsCardResource.memory_limit,
+      }
+      return (
+        <Tabs
+          items={[
+            {
+              key: 'hand',
+              label: 'Hand',
+              children: renderResourceTable(grpoResourceConfig.hand || graphicsCardResource, true),
+            },
+            {
+              key: 'work',
+              label: 'Work',
+              children: renderResourceTable(grpoResourceConfig.work || graphicsCardResource, true),
+            },
+            {
+              key: 'submit',
+              label: 'Submit',
+              children: renderResourceTable(grpoResourceConfig.submit || legacySubmit, false),
+            },
+          ]}
+        />
+      )
+    }
+
+    return renderResourceTable(graphicsCardResource)
   }
   // 渲染数据集表格
   const renderDatasetTable = (datasets?: Array<{

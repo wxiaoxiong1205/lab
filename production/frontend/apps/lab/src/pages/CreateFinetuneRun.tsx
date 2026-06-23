@@ -17,6 +17,7 @@ import BasicConfig from '@/components/finetune/BasicConfig'
 import ModelConfig from '@/components/finetune/ModelConfig'
 import TrainingConfig from '@/components/finetune/TrainingConfig'
 import ResourceConfig from '@/components/finetune/ResourceConfig'
+import GrpoStageResourceConfig from '@/components/finetune/GrpoStageResourceConfig'
 import { finetuneTaskService } from '@/services/FinetuneTrainingServices'
 import { getProjectEnum } from '@/services/api'
 import { useConfigStore } from '@/stores/configStore'
@@ -139,6 +140,38 @@ const parseGrpoTemplateParams = (value?: string) => {
   }
 }
 
+const normalizeGrpoResourceConfig = (value?: any) => {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+
+  const normalizeStage = (stage: any, includeGpu: boolean) => {
+    if (!stage || typeof stage !== 'object') {
+      return undefined
+    }
+
+    return {
+      ...(includeGpu && {
+        gpu_type: stage.gpu_type,
+        gpu_model: stage.gpu_model,
+        gpu_memory: stage.gpu_memory,
+        gpu_count: stage.gpu_count,
+        k8s_resource_type: stage.k8s_resource_type,
+      }),
+      cpu_request: stage.cpu_request,
+      cpu_limit: stage.cpu_limit,
+      memory_request: stage.memory_request,
+      memory_limit: stage.memory_limit,
+    }
+  }
+
+  return {
+    hand: normalizeStage(value.hand, true),
+    work: normalizeStage(value.work, true),
+    submit: normalizeStage(value.submit, false),
+  }
+}
+
 const CreateFinetuneRun: React.FC = () => {
   const navigate = useNavigate()
   const { projectId, experimentId } = useParams<{ projectId: string, experimentId: string }>()
@@ -182,6 +215,8 @@ const CreateFinetuneRun: React.FC = () => {
   const [allocatableResources, setAllocatableResources] = useState<any>(undefined)
   const { config, providerType } = useConfigStore()
   const submitDisabled = submitting || resourceConfigLoading
+  const watchedTrainingMethod = Form.useWatch('training_type', form)
+  const currentTrainingMethodType = forcedTrainingMethodType || normalizeTrainingMethodType(watchedTrainingMethod) || getTrainingMethodType(taskInfo?.training_type)
   useEffect(() => {
     const fetchProjectEnumValues = async () => {
       let cachedEnumValues = JSON.parse(localStorage.getItem('projectEnumValues') || '{}')
@@ -344,6 +379,9 @@ const CreateFinetuneRun: React.FC = () => {
           grpo_reward_function_upload_id: taskInfo.additional_params.grpo_reward_function.upload_id,
           grpo_reward_function_file_name: taskInfo.additional_params.grpo_reward_function.file_name,
           grpo_reward_function_file_url: taskInfo.additional_params.grpo_reward_function.file_url,
+        }),
+        ...(taskInfo?.additional_params?.grpo_resource_config && {
+          grpo_resource_config: taskInfo.additional_params.grpo_resource_config,
         }),
 
         // 数据处理参数
@@ -515,12 +553,16 @@ const CreateFinetuneRun: React.FC = () => {
             reward_scale: values.reward_scale,
           }
         : undefined
+      const grpoResourceConfig = trainMethodType === 'rft-grpo'
+        ? normalizeGrpoResourceConfig(values.grpo_resource_config)
+        : undefined
+      const grpoWorkResource = grpoResourceConfig?.work
 
       const backendData = {
         name: values.name,
         description: values.description,
         project_id: Number(projectId),
-        gpu_count: values.gpu_count,
+        gpu_count: grpoWorkResource?.gpu_count ?? values.gpu_count,
         ...(values.deepspeed_enabled && values.deepspeed ? { deepspeed: values.deepspeed } : {}),
         template: values.template,
         ...(scheduleAt && { schedule_at: scheduleAt }),
@@ -627,6 +669,9 @@ const CreateFinetuneRun: React.FC = () => {
                 template_name: 'grpo-custom-reward-template.py',
               },
             }),
+            ...(grpoResourceConfig && {
+              grpo_resource_config: grpoResourceConfig,
+            }),
           }),
         },
         ...(trainMethodType === 'dpo' && {
@@ -637,18 +682,18 @@ const CreateFinetuneRun: React.FC = () => {
         graphics_card_resource: {
           card_type: values.gpu_type[0],
           card_model: isBelleProvider ? allocatableResources?.gpu_model : values.gpu_model,
-          count: values.gpu_count,
+          count: grpoWorkResource?.gpu_count ?? values.gpu_count,
           card_memory: values.gpu_memory,
           k8s_resource_type: isBelleProvider ? values.gpu_type[0] : values.k8s_resource_type,
           ...(isBelleProvider && allocatableResources && {
-            cpu: values.graphics_card_resource?.cpu_limit,
-            memory: values.graphics_card_resource?.memory_limit,
+            cpu: grpoWorkResource?.cpu_limit ?? values.graphics_card_resource?.cpu_limit,
+            memory: grpoWorkResource?.memory_limit ?? values.graphics_card_resource?.memory_limit,
             queue_group_id: allocatableResources.queue_group_id,
           }),
-          cpu_request: values.graphics_card_resource?.cpu_request,
-          cpu_limit: values.graphics_card_resource?.cpu_limit,
-          memory_request: values.graphics_card_resource?.memory_request,
-          memory_limit: values.graphics_card_resource?.memory_limit,
+          cpu_request: grpoWorkResource?.cpu_request ?? values.graphics_card_resource?.cpu_request,
+          cpu_limit: grpoWorkResource?.cpu_limit ?? values.graphics_card_resource?.cpu_limit,
+          memory_request: grpoWorkResource?.memory_request ?? values.graphics_card_resource?.memory_request,
+          memory_limit: grpoWorkResource?.memory_limit ?? values.graphics_card_resource?.memory_limit,
         },
         // 数据集配置
         dataset_items: datasetItems,
@@ -808,6 +853,9 @@ const CreateFinetuneRun: React.FC = () => {
                 onResourceLoadingChange={setResourceConfigLoading}
                 preserveResourceValuesOnAllocatableChange={isEditMode || !!taskName}
               />
+              {currentTrainingMethodType === 'rft-grpo' && (
+                <GrpoStageResourceConfig />
+              )}
             </Form>
           </Row>
         </div>

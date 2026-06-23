@@ -112,6 +112,7 @@ export interface FormValues {
   grpo_reward_function_upload_id?: string
   grpo_reward_function_file_name?: string
   grpo_reward_function_file_url?: string
+  grpo_resource_config?: any
   preference_prompt: string
   remove_unused_columns: boolean
   gradient_checkpointing_kwargs: string
