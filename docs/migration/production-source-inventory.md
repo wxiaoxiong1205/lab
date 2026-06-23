@@ -11,6 +11,8 @@
 - Original commit: `1629242bc168a42610173859c0146f77e5277333`
 - Main app: `production/frontend/apps/lab`
 - Stack: pnpm workspace, Vite, React 18, TypeScript, Ant Design 5, Zustand, React Router.
+- Imported large-model modules include training task pages, fine-tune task pages, base model management, LLM model management, hosted/external inference service pages, API service pages, OpenAPI access key pages, Notebook pages, and evaluation pages.
+- Imported admin/system modules include platform administrator management, project/user/member management, Kubernetes/storage/registry configuration, base model logs, and system settings for business attributes and tags.
 
 ## Backend
 
@@ -21,6 +23,8 @@
 - Original commit: `e6e548732212b5b61db0f90a58a7244415f09768`
 - Main app: `production/backend/app`
 - Stack: FastAPI, SQLAlchemy-style model/repository/service layering, Celery tasks, scheduled managers, Kubernetes task executors.
+- Imported large-model APIs include `training_task.py`, `model.py`, `inference_task.py`, `online_inference_service.py`, `evaluation_task.py`, `manual_evaluation_task.py`, `benchmark_task.py`, `notebook.py`, `openapi_application.py`, and related schema/service/repository modules.
+- Imported admin/system APIs include `admin_permissions.py`, `user.py`, `menu.py`, `project.py`, `storage.py`, `k8s.py`, `repository.py`, `repository_image.py`, `business_attr.py`, `tag.py`, `operator_log.py`, and permission/user/menu service modules.
 
 ## Import Notes
 
