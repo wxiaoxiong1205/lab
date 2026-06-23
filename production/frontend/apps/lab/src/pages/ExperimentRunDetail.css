@@ -46,3 +46,18 @@
 .experiment-run-empty-text {
   color: var(--lab-color-text-muted);
 }
+
+.experiment-run-yaml-snapshot {
+  max-height: 520px;
+  padding: 12px;
+  margin: 0;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--lab-color-text-primary);
+  white-space: pre;
+  background-color: var(--lab-color-surface-subtle);
+  border: var(--lab-border-subtle);
+  border-radius: var(--lab-radius-sm);
+}

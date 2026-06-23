@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Alert, Button, Card, Col, Descriptions, Input, Row, Spin, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd'
-import { ArrowLeftOutlined, ClearOutlined, CodeOutlined, DatabaseOutlined, DownloadOutlined, HistoryOutlined, PauseOutlined, PlayCircleOutlined, ReloadOutlined, SearchOutlined, SettingOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, ClearOutlined, CodeOutlined, CopyOutlined, DatabaseOutlined, DownloadOutlined, HistoryOutlined, PauseOutlined, PlayCircleOutlined, ReloadOutlined, SearchOutlined, SettingOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { finetuneTaskService } from '@/services/FinetuneTrainingServices'
@@ -121,6 +121,71 @@ const ExperimentRunDetail: React.FC = () => {
       return '-'
     const matchedOption = fineTuningType.find((item: any) => item.value === value)
     return matchedOption?.name || value
+  }
+  const isRftGrpoRun = () => {
+    const method = runDetail?.training_type?.train_method_type || runDetail?.training_type?.training_method_type
+    return typeof method === 'string' && method.toLowerCase().includes('grpo')
+  }
+  const formatYamlValue = (value: any, indent = 0): string => {
+    const prefix = ' '.repeat(indent)
+    if (Array.isArray(value)) {
+      return value.length > 0
+        ? value.map(item => `${prefix}- ${typeof item === 'object' && item !== null ? JSON.stringify(item) : String(item)}`).join('\n')
+        : `${prefix}[]`
+    }
+    if (value && typeof value === 'object') {
+      const entries = Object.entries(value)
+      if (entries.length === 0)
+        return `${prefix}{}`
+      return entries.map(([key, item]) => {
+        if (item && typeof item === 'object') {
+          return `${prefix}${key}:\n${formatYamlValue(item, indent + 2)}`
+        }
+        return `${prefix}${key}: ${String(item)}`
+      }).join('\n')
+    }
+    return `${prefix}${String(value ?? '')}`
+  }
+  const buildLegacyGrpoTemplateContent = () => {
+    const grpoConfig = runDetail?.additional_params?.grpo_config
+    if (!grpoConfig || Object.keys(grpoConfig).length === 0)
+      return ''
+    return [
+      `fineTuneType: ${runDetail?.training_type?.fine_tuning_type || 'full'}`,
+      'params:',
+      formatYamlValue(grpoConfig, 2),
+    ].join('\n')
+  }
+  const getGrpoTemplateSnapshot = () => {
+    const snapshot = runDetail?.additional_params?.grpo_template_snapshot
+    if (snapshot?.template_content) {
+      return {
+        templateName: snapshot.template_name || '-',
+        fineTuneType: snapshot.fine_tune_type || runDetail?.training_type?.fine_tuning_type || '-',
+        templateContent: snapshot.template_content,
+        appliedParams: snapshot.applied_params,
+      }
+    }
+
+    const fallbackContent = buildLegacyGrpoTemplateContent()
+    if (!fallbackContent)
+      return null
+
+    return {
+      templateName: '旧版本参数快照',
+      fineTuneType: runDetail?.training_type?.fine_tuning_type || '-',
+      templateContent: fallbackContent,
+      appliedParams: runDetail?.additional_params?.grpo_config,
+    }
+  }
+  const copyText = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      message.success('复制成功')
+    }
+    catch {
+      message.error('复制失败')
+    }
   }
   // GPU使用率
   // 格式化时间
@@ -345,6 +410,60 @@ const ExperimentRunDetail: React.FC = () => {
       },
     ]
     return (<Table columns={parameterColumns} dataSource={parameterData} rowKey="key" pagination={false} size="small" className="mb-4" />)
+  }
+  const renderGrpoTemplateSnapshot = () => {
+    const snapshot = getGrpoTemplateSnapshot()
+    if (!snapshot) {
+      return <Alert message="暂无 GRPO 参数模板快照" type="info" showIcon />
+    }
+
+    return (
+      <div>
+        <Descriptions column={2} size="small" className="mb-4">
+          <Descriptions.Item label="模板名称">
+            {snapshot.templateName}
+          </Descriptions.Item>
+          <Descriptions.Item label="参数类型">
+            {getFineTuningTypeName(snapshot.fineTuneType)}
+          </Descriptions.Item>
+        </Descriptions>
+        <Card
+          size="small"
+          title="YAML 快照"
+          extra={(
+            <Button
+              size="small"
+              icon={<CopyOutlined />}
+              onClick={() => copyText(snapshot.templateContent)}
+            >
+              复制
+            </Button>
+          )}
+        >
+          <pre className="experiment-run-yaml-snapshot">
+            {snapshot.templateContent}
+          </pre>
+        </Card>
+        {snapshot.appliedParams && (
+          <Card size="small" title="本次应用参数" className="mt-4">
+            {renderParamTable(snapshot.appliedParams)}
+          </Card>
+        )}
+      </div>
+    )
+  }
+  const renderAdditionalParams = () => {
+    const additionalParams = Object.fromEntries(
+      Object.entries(runDetail.additional_params || {}).filter(([key]) =>
+        !['grpo_config', 'grpo_template_snapshot'].includes(key),
+      ),
+    )
+
+    if (Object.keys(additionalParams).length === 0) {
+      return <Alert message="暂无其它额外参数" type="info" showIcon />
+    }
+
+    return renderParamTable(additionalParams)
   }
   // 渲染显卡资源配置
   const renderGraphicsCardResource = (graphicsCardResource?: any) => {
@@ -646,9 +765,14 @@ const ExperimentRunDetail: React.FC = () => {
                 ),
                 children: (
                   <Tabs
-                    defaultActiveKey="basic"
+                    defaultActiveKey={isRftGrpoRun() ? 'grpo-template' : 'basic'}
                     size="small"
                     items={[
+                      isRftGrpoRun() && {
+                        key: 'grpo-template',
+                        label: 'GRPO模板',
+                        children: renderGrpoTemplateSnapshot(),
+                      },
                       runDetail.basic && {
                         key: 'basic',
                         label: '基础参数',
@@ -692,7 +816,7 @@ const ExperimentRunDetail: React.FC = () => {
                       runDetail.additional_params && Object.keys(runDetail.additional_params).length > 0 && {
                         key: 'additional',
                         label: '额外参数',
-                        children: renderParamTable(runDetail.additional_params),
+                        children: renderAdditionalParams(),
                       },
                     ].filter(Boolean)} // 过滤掉false值
                   />
