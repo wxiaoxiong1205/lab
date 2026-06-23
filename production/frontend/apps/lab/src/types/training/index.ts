@@ -125,6 +125,12 @@ export interface UploadDatasetVersionResponse {
   created_at: string
 }
 
+export interface MergeDatasetVersionsRequest {
+  new_version: string
+  source_version_ids: number[]
+  description?: string
+}
+
 /**
  * 大模型训练模块
  * 训练任务搜索参数接口

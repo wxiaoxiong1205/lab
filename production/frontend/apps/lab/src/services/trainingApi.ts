@@ -2,6 +2,7 @@ import { message } from 'antd'
 import apiClient from './apiClient'
 import type {
   DatasetPreview,
+  MergeDatasetVersionsRequest,
   TrainingDatasetListResponse,
   UploadDatasetVersionRequest,
   UploadDatasetVersionResponse,
@@ -198,6 +199,18 @@ export const trainingDatasetService = {
         usage,
       },
     })
+    return response.data
+  },
+  mergeVersions: async (projectId: number, datasetName: string, usage: string, requestData: MergeDatasetVersionsRequest) => {
+    const response = await apiClient.post<any>(
+      `/training-datasets/project/${projectId}/dataset/${datasetName}/merge-versions`,
+      requestData,
+      {
+        params: {
+          usage,
+        },
+      },
+    )
     return response.data
   },
 

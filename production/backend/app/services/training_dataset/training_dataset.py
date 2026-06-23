@@ -36,7 +36,7 @@ from app.schemas.training_dataset import (
     DatasetSampleResponse, DatasetSamplePageResponse, DatasetFormat, DatasetUsage,
     TrainingDatasetUploadTypeCategory, DatasetProcessingStatus,
     TrainingDatasetExportTypeCategory, TrainingDatasetAggregationResponse, CountByValueItem,
-    AttrOptionGroupItem, TrainingDatasetBasicInfoUpdate,
+    AttrOptionGroupItem, TrainingDatasetBasicInfoUpdate, DatasetVersionMergeRequest,
 )
 from app.schemas.training_task import TrainingTypeCategory, TrainingMethodType
 from app.utils.business_attr_utils import BusinessAttrValueHelper
@@ -1769,6 +1769,122 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 logger.error(f"更新数据集版本状态失败: dataset_id={new_dataset.id}, error={str(update_error)}")
 
             raise HTTPException(status_code=500, detail=f"创建数据集版本失败: {str(e)}")
+
+    async def merge_dataset_versions(
+            self,
+            current_user: JwtUserInfo,
+            project_id: int,
+            dataset_name: str,
+            usage: DatasetUsage,
+            request: DatasetVersionMergeRequest,
+    ) -> TrainingDatasetResponse:
+        """合并同一数据集下多个已完成版本，生成一个新的异步处理版本。"""
+        project = await validate_project_exists(await self.training_dataset_mapper.get_session(), project_id)
+        await validate_training_dataset_by_name_version_usage_not_exists(
+            await self.training_dataset_mapper.get_session(),
+            project.id,
+            dataset_name,
+            request.new_version,
+            usage,
+        )
+
+        source_datasets = await self.training_dataset_mapper.query(
+            select(TrainingDataset).filter(
+                TrainingDataset.id.in_(request.source_version_ids),
+                TrainingDataset.project_id == project_id,
+                TrainingDataset.name == dataset_name,
+                TrainingDataset.usage == usage,
+            )
+        )
+        source_by_id = {item.id: item for item in source_datasets}
+        ordered_sources = [source_by_id.get(source_id) for source_id in request.source_version_ids]
+        missing_ids = [source_id for source_id, item in zip(request.source_version_ids, ordered_sources) if item is None]
+        if missing_ids:
+            raise HTTPException(status_code=404, detail=f"源版本不存在或不属于当前数据集: {missing_ids}")
+
+        first_source = ordered_sources[0]
+        if first_source.dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING.value:
+            raise HTTPException(status_code=400, detail="图像理解数据集暂不支持多版本合并，请使用新增版本继承能力")
+
+        for source in ordered_sources:
+            if source.processing_status != DatasetProcessingStatus.COMPLETED.value:
+                raise HTTPException(status_code=400, detail=f"版本 {source.version} 尚未处理完成，不允许合并")
+            if not source.dataset_path:
+                raise HTTPException(status_code=400, detail=f"版本 {source.version} 原始文件不存在，不允许合并")
+            if (
+                source.dataset_type != first_source.dataset_type
+                or source.training_method_type != first_source.training_method_type
+                or source.dataset_format != first_source.dataset_format
+            ):
+                raise HTTPException(status_code=400, detail="仅支持同一类型、训练方法和数据格式的版本合并")
+
+        namespace = f"{os.getenv('KUBERNETES_NAMESPACE_PREFIX', 'deepexilab')}-{project.id}"
+        new_dataset_path = generate_dataset_path_util(
+            namespace,
+            dataset_name,
+            request.new_version,
+            "jsonl",
+            usage,
+            first_source.dataset_type,
+        )
+
+        new_dataset = TrainingDataset(
+            name=dataset_name,
+            description=request.description,
+            project_id=project_id,
+            version=request.new_version,
+            dataset_type=first_source.dataset_type,
+            training_method_type=first_source.training_method_type,
+            dataset_format=first_source.dataset_format,
+            usage=usage,
+            dataset_config=first_source.dataset_config,
+            metadata_fields=list(first_source.metadata_fields or []),
+            total_samples=sum((source.total_samples or 0) for source in ordered_sources),
+            total_characters=sum((source.total_characters or 0) for source in ordered_sources),
+            file_size=sum((source.file_size or 0) for source in ordered_sources),
+            dataset_path=new_dataset_path,
+            processing_status=DatasetProcessingStatus.PENDING.value,
+            temp_file_path=None,
+            created_id=current_user.userId,
+            created_by=current_user.username,
+        )
+
+        try:
+            await self.training_dataset_mapper.insert(new_dataset)
+            await self.training_dataset_mapper.flush()
+            await self.training_dataset_mapper.commit()
+            await self.training_dataset_mapper.refresh(new_dataset)
+
+            from app.tasks.dataset_processing_tasks import process_dataset_version_merge
+            from app.tasks.celery_app import celery_app
+
+            task_name = 'app.tasks.dataset_processing_tasks.process_dataset_version_merge'
+            if task_name not in celery_app.tasks.keys():
+                error_msg = f"Celery任务未注册: {task_name}。请检查Celery worker是否正常运行，任务模块是否正确导入。"
+                new_dataset.processing_status = DatasetProcessingStatus.FAILED.value
+                new_dataset.processing_error = error_msg
+                await self.training_dataset_mapper.commit()
+                raise HTTPException(status_code=500, detail=error_msg)
+
+            celery_result = process_dataset_version_merge.apply_async(
+                args=[new_dataset.id, request.source_version_ids, new_dataset_path],
+                countdown=1,
+            )
+            if not celery_result.id:
+                raise ValueError("Celery任务ID为空，任务可能未成功提交")
+
+            return TrainingDatasetResponse.model_validate(new_dataset)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"创建合并版本失败: {str(e)}", exc_info=True)
+            try:
+                new_dataset.processing_status = DatasetProcessingStatus.FAILED.value
+                new_dataset.processing_error = f"创建合并版本失败: {str(e)}"
+                await self.training_dataset_mapper.commit()
+            except Exception:
+                await self.training_dataset_mapper.rollback()
+            raise HTTPException(status_code=500, detail=f"创建合并版本失败: {str(e)}")
 
     async def delete_dataset_all_versions(
             self,

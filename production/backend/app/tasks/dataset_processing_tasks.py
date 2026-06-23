@@ -74,6 +74,33 @@ async def _cleanup_temp_files_wrapper(chunk_upload_ids: Optional[List[str]], sto
     jfs = await storage_service.JUICEFS_CLIENT()
     await cleanup_temp_files_async(jfs, chunk_upload_ids, chunk_upload_service)
 
+
+def _merge_jsonl_files(jfs, source_paths: List[str], target_path: str) -> Dict[str, int]:
+    """按行合并多个 JSONL 文件，保留源版本全部样本。"""
+    JFSUtils.ensure_parent_dir(jfs, target_path)
+    total_samples = 0
+    total_characters = 0
+
+    with jfs.open(target_path, "w", encoding="utf-8") as target_file:
+        for source_path in source_paths:
+            if not jfs.exists(source_path):
+                raise FileNotFoundError(f"源版本文件不存在: {source_path}")
+
+            with jfs.open(source_path, "r", encoding="utf-8") as source_file:
+                for raw_line in source_file:
+                    line = raw_line.rstrip("\r\n")
+                    if not line:
+                        continue
+                    target_file.write(line)
+                    target_file.write("\n")
+                    total_samples += 1
+                    total_characters += len(line)
+
+    return {
+        "total_samples": total_samples,
+        "total_characters": total_characters,
+    }
+
 # ========== Celery 任务 ==========
 
 
@@ -429,6 +456,110 @@ async def _process_dataset_version_inheritance_async_impl(
                 await training_dataset_mapper.close()
         except Exception as close_error:
             logger.error(f"关闭数据库会话失败: {str(close_error)}")
+
+
+@celery_app.task(base=TaskBase, bind=True)
+def process_dataset_version_merge(
+    self: TaskBase,
+    dataset_id: int,
+    source_dataset_ids: List[int],
+    target_dataset_path: str,
+) -> Dict:
+    """异步合并多个训练/测试数据集版本为一个新版本。"""
+    return run_async_in_celery(
+        _process_dataset_version_merge_async_impl(
+            self,
+            dataset_id=dataset_id,
+            source_dataset_ids=source_dataset_ids,
+            target_dataset_path=target_dataset_path,
+        )
+    )
+
+
+async def _process_dataset_version_merge_async_impl(
+    self: TaskBase,
+    dataset_id: int,
+    source_dataset_ids: List[int],
+    target_dataset_path: str,
+) -> Dict:
+    from app.core.depend_manager import AutoContainer
+
+    container = AutoContainer()
+    storage_service: StorageService = container.storage_service()
+    training_dataset_mapper: TrainingDatasetMapper = container.training_dataset_mapper()
+    tenant_id = None
+    jfs = None
+
+    try:
+        dataset = await training_dataset_mapper.query_one(
+            select(TrainingDataset).filter(TrainingDataset.id == dataset_id)
+        )
+        if not dataset:
+            raise ValueError(f"数据集不存在: dataset_id={dataset_id}")
+
+        tenant_id = dataset.tenant_id
+        if not tenant_id:
+            raise ValueError(f"数据集没有租户ID: dataset_id={dataset_id}")
+
+        app_runtime_context.set_tenant_id(tenant_id)
+        if dataset.processing_status != DatasetProcessingStatus.PENDING.value:
+            raise ValueError(f"数据集当前状态不允许处理: dataset_id={dataset_id}, status={dataset.processing_status}")
+
+        source_datasets = await training_dataset_mapper.query(
+            select(TrainingDataset).filter(TrainingDataset.id.in_(source_dataset_ids))
+        )
+        source_by_id = {item.id: item for item in source_datasets}
+        ordered_sources = [source_by_id.get(source_id) for source_id in source_dataset_ids]
+        missing_ids = [source_id for source_id, item in zip(source_dataset_ids, ordered_sources) if item is None]
+        if missing_ids:
+            raise ValueError(f"源版本不存在: {missing_ids}")
+
+        source_paths = [item.dataset_path for item in ordered_sources if item and item.dataset_path]
+        if len(source_paths) != len(source_dataset_ids):
+            raise ValueError("源版本原始文件不完整，不允许合并")
+
+        jfs = await storage_service.JUICEFS_CLIENT()
+        merge_result = await asyncio.to_thread(_merge_jsonl_files, jfs, source_paths, target_dataset_path)
+
+        dataset.total_samples = merge_result["total_samples"]
+        dataset.total_characters = merge_result["total_characters"]
+        try:
+            dataset.file_size = jfs.stat(target_dataset_path).st_size / (1024 * 1024)
+        except Exception:
+            dataset.file_size = sum((item.file_size or 0) for item in ordered_sources if item)
+        dataset.dataset_path = target_dataset_path
+        metadata_fields = []
+        for source in ordered_sources:
+            for field in (source.metadata_fields or []):
+                if field not in metadata_fields:
+                    metadata_fields.append(field)
+        dataset.metadata_fields = metadata_fields
+        dataset.processing_status = DatasetProcessingStatus.COMPLETED.value
+        dataset.processing_error = None
+        dataset.temp_file_path = None
+        await training_dataset_mapper.commit()
+
+        logger.info(f"合并版本异步处理完成: dataset_id={dataset_id}, sources={source_dataset_ids}")
+        return {"success": True, "dataset_id": dataset_id}
+
+    except Exception as e:
+        logger.error(f"合并版本异步处理失败: dataset_id={dataset_id}, error={str(e)}", exc_info=True)
+        try:
+            await update_status_async(training_dataset_mapper, dataset_id, DatasetProcessingStatus.FAILED.value, str(e))
+        except Exception as update_error:
+            logger.error(f"更新合并版本失败状态失败: {str(update_error)}")
+
+        if jfs is not None:
+            await asyncio.to_thread(JFSUtils.cleanup_path, jfs, target_dataset_path)
+
+        raise
+    finally:
+        try:
+            if training_dataset_mapper is not None:
+                await training_dataset_mapper.close()
+        except Exception as close_error:
+            logger.error(f"关闭数据库会话失败: {str(close_error)}")
+
 
 @celery_app.task(base=TaskBase, bind=True)
 def process_dataset_file(

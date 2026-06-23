@@ -11,7 +11,7 @@ from app.schemas.training_dataset import (
     TrainingDatasetResponse, TrainingDatasetSummaryResponse,
     DatasetSamplePageResponse, DatasetFormat, DatasetUsage, TrainingDatasetUploadTypeCategory,
     DatasetProcessingStatus, TrainingDatasetExportTypeCategory, TrainingDatasetAggregationResponse,
-    TrainingDatasetBasicInfoUpdate
+    TrainingDatasetBasicInfoUpdate, DatasetVersionMergeRequest
 )
 from app.schemas.training_task import TrainingTypeCategory, TrainingMethodType
 from app.services.chunk_upload.interface import ChunkUploadService
@@ -209,6 +209,18 @@ class TrainingDatasetService(ABC):
         attr_values: Optional[List[Any]] = None,
     ) -> TrainingDatasetResponse:
         """基于现有数据集创建新版本（继承/上传模式，支持单文件直接上传或多文件分片上传）"""
+        pass
+
+    @abstractmethod
+    async def merge_dataset_versions(
+        self,
+        current_user: JwtUserInfo,
+        project_id: int,
+        dataset_name: str,
+        usage: DatasetUsage,
+        request: DatasetVersionMergeRequest,
+    ) -> TrainingDatasetResponse:
+        """合并同一数据集下多个已完成版本，生成新版本"""
         pass
 
     @abstractmethod

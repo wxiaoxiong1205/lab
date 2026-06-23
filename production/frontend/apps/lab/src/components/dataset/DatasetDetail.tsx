@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import React, { useCallback, useEffect, useState } from 'react'
 import BasicView from './DatasetDetailBasicView'
 import { useDatasetDetailDpoColumns } from './DatasetDetailDpoColumns'
+import DatasetVersionMergeModal from './DatasetVersionMergeModal'
 import { formatDatasetPreviewItems, getBusinessTestKeys, isDpoAlpacaPreview, isDpoRoleBasedPreview } from './datasetPreviewFormat'
 import { trainingDatasetService } from '@/services/trainingApi.ts'
 import ExpandableCell from '@/components/common/ExpandableCell.tsx'
@@ -42,6 +43,8 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
   const [previewTotal, setPreviewTotal] = useState(0)
   // 添加正在删除的版本状态
   const [deletingVersion, setDeletingVersion] = useState<string | null>(null)
+  const [mergeVersionOpen, setMergeVersionOpen] = useState(false)
+  const [mergeVersionLoading, setMergeVersionLoading] = useState(false)
   // 添加展开状态管理，key格式: `${rowKey}-${columnKey}`
   const [expandedCells, setExpandedCells] = useState<Set<string>>(new Set())
   // 添加单元格高度跟踪，key格式: `${rowKey}-${columnKey}`
@@ -172,6 +175,50 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
       || detail.find((item: any) => item.version === currentVersion?.version)
       || detail[detail.length - 1]
       || currentVersion
+  }
+
+  const buildNextVersion = (versions: any[]) => {
+    const maxVersionNumber = versions.reduce((max, versionItem) => {
+      const match = String(versionItem?.version || '').match(/^V?(\d+)$/i)
+      return Math.max(max, match ? Number(match[1]) : 0)
+    }, 0)
+    return `V${maxVersionNumber + 1}`
+  }
+
+  const mergeableVersions = Array.isArray(dataset) ? dataset : selectedVersion ? [selectedVersion] : []
+  const nextMergeVersion = buildNextVersion(mergeableVersions)
+
+  const handleMergeVersions = async (sourceVersionIds: number[], description?: string) => {
+    if (!projectId || !datasetId) return
+    setMergeVersionLoading(true)
+    try {
+      const createdVersion = await trainingDatasetService.mergeVersions(Number(projectId), datasetId, usage, {
+        new_version: nextMergeVersion,
+        source_version_ids: sourceVersionIds,
+        description,
+      })
+      message.success('已提交版本合并任务')
+      setMergeVersionOpen(false)
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const queryKey = query.queryKey
+          return Array.isArray(queryKey)
+            && queryKey.length > 0
+            && (queryKey[0] === 'training-datasets' || queryKey[0] === `${type}-dataset-detail`)
+        },
+      })
+      const result = await refetch()
+      if (result.data) {
+        setSelectedVersion(pickSelectedVersionFromDetail(result.data, createdVersion))
+      }
+    }
+    catch (error) {
+      console.error('合并数据集版本失败:', error)
+      message.error('合并数据集版本失败')
+    }
+    finally {
+      setMergeVersionLoading(false)
+    }
   }
 
   const handleEditBasicInfo = async (values: { name?: string, description?: string }) => {
@@ -953,6 +1000,14 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
             >
               新增版本
             </Button>
+            <Button
+              className="mt-2"
+              block
+              disabled={mergeableVersions.length < 2 || selectedVersion?.dataset_type === 'image-understanding'}
+              onClick={() => setMergeVersionOpen(true)}
+            >
+              合并版本
+            </Button>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             {Array.isArray(dataset) ? dataset.map((item) => (
@@ -1100,6 +1155,15 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
           </div>
         </Col>
       </Row>
+      <DatasetVersionMergeModal
+        open={mergeVersionOpen}
+        loading={mergeVersionLoading}
+        datasetName={selectedVersion?.name || datasetId || ''}
+        nextVersion={nextMergeVersion}
+        versions={mergeableVersions}
+        onCancel={() => setMergeVersionOpen(false)}
+        onSubmit={handleMergeVersions}
+      />
     </Card>
   )
 }

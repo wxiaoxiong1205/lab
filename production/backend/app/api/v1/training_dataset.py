@@ -25,6 +25,7 @@ from app.schemas.training_dataset import (
     DatasetProcessingStatus, TrainingDatasetExportTypeCategory,
     TrainingDatasetAggregationResponse,
     TrainingDatasetBasicInfoUpdate,
+    DatasetVersionMergeRequest,
 )
 from app.schemas.training_task import TrainingTypeCategory, TrainingMethodType
 from app.services.training_dataset.interface import TrainingDatasetService
@@ -631,6 +632,43 @@ async def create_dataset_version(
         usage=usage,
         attr_values=attr_values_list,
     )
+
+
+@router.post(
+    "/project/{project_id}/dataset/{dataset_name}/merge-versions",
+    response_model=TrainingDatasetResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+@inject
+@OperatorLogsAnnotation(function_name=FunctionType.DATA_MANAGER_TRAINING_DATASET, table_name="training_dataset",
+                        operator_type=OperatorType.ADD, operator_content_key=["dataset_name（new_version）"],
+                        self_service_field_mapping=None,
+                        scope_service_field_mapping={
+                            "service_name": "project_service",
+                            "field_name": "project_id",
+                            "tag_field_name": "name"})
+async def merge_dataset_versions(
+    project_id: int = Path(..., description="项目ID"),
+    dataset_name: str = Path(..., description="数据集名称"),
+    usage: DatasetUsage = Depends(validate_dataset_usage),
+    request: DatasetVersionMergeRequest = Body(..., description="数据集版本合并请求"),
+    deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
+    training_dataset_service: TrainingDatasetService = Depends(Provide[AutoContainer.training_dataset_service]),
+) -> TrainingDatasetResponse:
+    """合并同一数据集下多个已完成版本，生成新版本。
+
+    当前支持文本/业务类 JSONL 数据集；图像理解数据集仍使用新增版本继承链路。
+    源版本不会被修改，合并任务通过 Celery 异步处理，新版本先以 pending 状态返回。
+    """
+    db, current_user = deps
+    return await training_dataset_service.merge_dataset_versions(
+        current_user=current_user,
+        project_id=project_id,
+        dataset_name=dataset_name,
+        usage=usage,
+        request=request,
+    )
+
 
 @router.delete("/project/{project_id}/dataset/{dataset_name}", status_code=status.HTTP_204_NO_CONTENT)
 @inject

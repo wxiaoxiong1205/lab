@@ -143,6 +143,13 @@ class TrainingDatasetBasicInfoUpdate(BaseModel):
         return self
 
 
+class DatasetVersionMergeRequest(BaseModel):
+    """数据集版本合并请求模型"""
+    new_version: str = Field(..., min_length=1, max_length=50, description="合并后生成的新版本号")
+    source_version_ids: List[int] = Field(..., min_length=2, description="参与合并的数据集版本ID列表，至少选择两个")
+    description: Optional[str] = Field(None, max_length=1000, description="合并版本描述")
+
+
 class TrainingDatasetSummaryResponse(BaseModel):
     """训练数据集汇总响应模型"""
     id: int = Field(..., description="数据集id")
