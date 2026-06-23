@@ -36,6 +36,14 @@ export interface TrainingDatasetListResponse {
   pages: number
 }
 
+export interface DatasetInUseResponse {
+  in_use: boolean
+  task_type?: string | null
+  task_id?: number | null
+  task_name?: string | null
+  version: string
+}
+
 // 数据集类型枚举
 export enum DatasetType {
   TEXT_GENERATION = 'text-generation',

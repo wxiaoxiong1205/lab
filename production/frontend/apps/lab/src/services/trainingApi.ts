@@ -1,6 +1,7 @@
 import { message } from 'antd'
 import apiClient from './apiClient'
 import type {
+  DatasetInUseResponse,
   DatasetPreview,
   MergeDatasetVersionsRequest,
   TrainingDatasetListResponse,
@@ -199,6 +200,17 @@ export const trainingDatasetService = {
         usage,
       },
     })
+    return response.data
+  },
+  checkInUse: async (projectId: number, datasetName: string, version: string, usage?: string): Promise<DatasetInUseResponse> => {
+    const response = await apiClient.get<DatasetInUseResponse>(
+      `/training-datasets/project/${projectId}/dataset/${datasetName}/version/${version}/in-use`,
+      {
+        params: {
+          usage,
+        },
+      },
+    )
     return response.data
   },
   mergeVersions: async (projectId: number, datasetName: string, usage: string, requestData: MergeDatasetVersionsRequest) => {

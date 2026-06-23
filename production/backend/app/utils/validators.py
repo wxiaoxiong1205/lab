@@ -635,7 +635,8 @@ async def query_dataset_in_use(
     db: AsyncSession,
     dataset_name: str,
     project_id: int,
-    version: str
+    version: str,
+    usage: Optional[DatasetUsage] = None,
 ) -> dict:
     """查询数据集是否正在被标注或清洗任务使用
     
@@ -647,6 +648,7 @@ async def query_dataset_in_use(
         dataset_name: 数据集名称
         project_id: 项目ID
         version: 数据集版本
+        usage: 数据集用途；传入后按训练/验证/测试等用途精确匹配
         
     Returns:
         dict: 包含以下字段
@@ -659,13 +661,17 @@ async def query_dataset_in_use(
     from sqlalchemy import and_
     
     # 查询指定版本的数据集ID
+    filters = [
+        TrainingDataset.project_id == project_id,
+        TrainingDataset.name == dataset_name,
+        TrainingDataset.version == version,
+    ]
+    if usage is not None:
+        filters.append(TrainingDataset.usage == usage.value)
+
     result = await db.execute(
         select(TrainingDataset.id).filter(
-            and_(
-                TrainingDataset.project_id == project_id,
-                TrainingDataset.name == dataset_name,
-                TrainingDataset.version == version
-            )
+            and_(*filters)
         )
     )
     dataset_id = result.scalar_one_or_none()

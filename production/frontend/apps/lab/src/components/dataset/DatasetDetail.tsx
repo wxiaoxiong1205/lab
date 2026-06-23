@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import BasicView from './DatasetDetailBasicView'
 import { useDatasetDetailDpoColumns } from './DatasetDetailDpoColumns'
 import DatasetVersionMergeModal from './DatasetVersionMergeModal'
+import { getDatasetDeleteErrorMessage, getDatasetVersionDeleteBlockReason } from './datasetDeleteGuard'
 import { formatDatasetPreviewItems, getBusinessTestKeys, isDpoAlpacaPreview, isDpoRoleBasedPreview } from './datasetPreviewFormat'
 import { trainingDatasetService } from '@/services/trainingApi.ts'
 import ExpandableCell from '@/components/common/ExpandableCell.tsx'
@@ -284,6 +285,12 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
         onOk: async () => {
           setDeletingVersion(version)
           try {
+            const blockReason = await getDatasetVersionDeleteBlockReason(Number(projectId), datasetName, version, usage)
+            if (blockReason) {
+              message.warning(blockReason)
+              return
+            }
+
             // 删除整个数据集
             await trainingDatasetService.delete(Number(projectId), datasetName, usage)
             message.success('数据集删除成功')
@@ -324,7 +331,10 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
           }
           catch (error) {
             console.error('删除数据集失败:', error)
-            message.error('删除数据集失败')
+            message.error(getDatasetDeleteErrorMessage(error, '删除数据集失败'))
+            setDeletingVersion(null)
+          }
+          finally {
             setDeletingVersion(null)
           }
         },
@@ -335,6 +345,12 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
     // 如果不是最后一个版本，正常删除版本
     setDeletingVersion(version)
     try {
+      const blockReason = await getDatasetVersionDeleteBlockReason(Number(projectId), datasetId, version, usage)
+      if (blockReason) {
+        message.warning(blockReason)
+        return
+      }
+
       await trainingDatasetService.deleteVersion(Number(projectId), datasetId, version, usage)
       message.success('数据集版本删除成功')
 
@@ -382,7 +398,7 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
     }
     catch (error) {
       console.error('删除数据集版本失败:', error)
-      message.error('删除数据集版本失败')
+      message.error(getDatasetDeleteErrorMessage(error, '删除数据集版本失败'))
     }
     finally {
       setDeletingVersion(null)

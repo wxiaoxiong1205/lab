@@ -292,6 +292,7 @@ async def check_dataset_in_use_status(
     project_id: int = Path(..., description="项目ID"),
     dataset_name: str = Path(..., description="数据集名称"),
     version: str = Path(..., description="数据集版本"),
+    usage: Optional[DatasetUsage] = Query(None, description="数据集用途"),
     deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user)
 ) -> DatasetInUseResponse:
     """查询数据集是否正在被标注或清洗任务使用
@@ -324,7 +325,7 @@ async def check_dataset_in_use_status(
     """
     db, current_user = deps
     
-    result = await query_dataset_in_use(db, dataset_name, project_id, version)
+    result = await query_dataset_in_use(db, dataset_name, project_id, version, usage)
     
     return DatasetInUseResponse(**result)
     

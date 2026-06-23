@@ -7,6 +7,7 @@ import dayjs from 'dayjs'
 import debounce from 'lodash-es/debounce'
 import type { TrainingDatasetSearchParams } from '../../types'
 import TableToolbar from '@/components/common/TableToolbar'
+import { getDatasetDeleteErrorMessage, getDatasetVersionDeleteBlockReason } from '@/components/dataset/datasetDeleteGuard'
 import type { ProjectEnumValuesResponse } from '@/services/api.ts'
 import { trainingDatasetService } from '@/services/trainingApi.ts'
 import { calculatePageAfterDelete } from '@/utils/paginationUtils.ts'
@@ -178,13 +179,23 @@ const DatasetTab: React.FC<DatasetTabProps> = ({ projectId, type, basePath, data
       return 'directory-dataset-status-normal'
     return ''
   }
-  const handleDelete = (id: number, datasetName: string) => {
+  const handleDelete = async (record: any) => {
+    const id = record.id
+    const datasetName = record.dataset_name
     const rowKey = id?.toString() || datasetName
     const currentPage = trainingSearchParams.page
     const currentPageSize = trainingSearchParams.size
     const currentTotal = trainingTotal
     setLoadingRows((prev) => ({ ...prev, [rowKey]: true }))
-    trainingDatasetService.delete(projectId, datasetName, usage).then(async () => {
+
+    try {
+      const blockReason = await getDatasetVersionDeleteBlockReason(projectId, datasetName, record.latest_version, usage)
+      if (blockReason) {
+        message.warning(blockReason)
+        return
+      }
+
+      await trainingDatasetService.delete(projectId, datasetName, usage)
       message.success('删除成功')
       const targetPage = calculatePageAfterDelete(currentPage, currentPageSize, currentTotal, 1)
       if (targetPage !== currentPage) {
@@ -196,15 +207,17 @@ const DatasetTab: React.FC<DatasetTabProps> = ({ projectId, type, basePath, data
       await queryClient.refetchQueries({
         queryKey: ['training-datasets', projectId],
       })
-    }).catch(() => {
-      message.error('删除失败')
-    }).finally(() => {
+    }
+    catch (error) {
+      message.error(getDatasetDeleteErrorMessage(error, '删除失败'))
+    }
+    finally {
       setLoadingRows((prev) => {
         const newState = { ...prev }
         delete newState[rowKey]
         return newState
       })
-    })
+    }
   }
   const navigateToDetail = (id: number, name: string) => {
     navigate(`${basePath}/${name || id}`)
@@ -357,7 +370,7 @@ const DatasetTab: React.FC<DatasetTabProps> = ({ projectId, type, basePath, data
             <Button type="link" icon={<InfoCircleOutlined />} className="directory-dataset-action" onClick={() => navigateToDetail(record.id, record.dataset_name)}>
               详情
             </Button>
-            <Popconfirm title="确认删除" description={`确定要删除数据集 ${record.dataset_name} 吗？删除后将无法恢复。`} onConfirm={() => handleDelete(record.id, record.dataset_name)} okText="确认删除" cancelText="取消">
+            <Popconfirm title="确认删除" description={`确定要删除数据集 ${record.dataset_name} 吗？删除后将无法恢复。`} onConfirm={() => handleDelete(record)} okText="确认删除" cancelText="取消">
               <Button type="link" icon={<DeleteOutlined />} loading={isLoading} disabled={isLoading} className="directory-dataset-action directory-dataset-delete-action">
                 删除
               </Button>
