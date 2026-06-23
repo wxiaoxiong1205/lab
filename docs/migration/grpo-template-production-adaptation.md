@@ -4,16 +4,18 @@
 
 This note records how the V1.14 GRPO training-parameter template requirement should be adapted after the production source replacement.
 
-The 1.0 Demo contains a localStorage-based GRPO template center. Production code does not yet contain the equivalent writable template-management surface, so this requirement must not be migrated by copying Demo storage or mock state into production.
+The 1.0 Demo contains a localStorage-based GRPO template center. This requirement must not be migrated by copying Demo storage or mock state into production. The production baseline now has a dedicated writable template-management surface, and the remaining work is to consume those templates from training creation and version detail pages.
 
 ## Current Production Evidence
 
 - Production training creation already accepts and persists the first GRPO parameter slice through `additional_params.grpo_config`.
 - Production frontend already shows GRPO-specific fields in `production/frontend/apps/lab/src/components/finetune/ParamTabs.tsx`.
 - Production backend has `TrainingMethodType.RFT_GRPO` and related enum mapping.
-- Production system settings currently expose only:
+- Production system settings now expose:
   - `属性配置`
   - `标签配置`
+  - `训练参数模板`
+- Production template persistence uses dedicated `training_parameter_templates` APIs instead of Demo localStorage.
 - Production `common_config` currently provides read-only APIs:
   - `GET /api/v1/common-config`
   - `GET /api/v1/common-config/key/{key}`
@@ -79,10 +81,10 @@ Done:
 
 - First GRPO production adaptation is complete for training method enum, frontend display, GRPO parameter fields, dataset filtering, and `additional_params.grpo_config` persistence.
 - Production backend has a dedicated `training_parameter_templates` ORM model, Alembic migration, and `/api/v1/training-parameter-templates` CRUD surface prepared for template persistence.
+- Production frontend system settings has a training-parameter-template tab wired to the production CRUD surface.
 
 Not done:
 
-- System settings template-management tab.
 - Training creation template selection and YAML snapshot payload.
 - Reward-function `.py` upload and template download.
 - GRPO version detail YAML display.

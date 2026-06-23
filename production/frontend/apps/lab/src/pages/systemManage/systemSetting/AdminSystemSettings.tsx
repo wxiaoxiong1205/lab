@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Tabs } from 'antd'
 import AttributeSetting from './AttributeSetting'
 import { TagsSetting } from './TagsSetting'
+import TrainingParameterTemplateSetting from './TrainingParameterTemplateSetting'
 import { useSystemSetting } from '@/hooks/system/systemSetting'
 
 const AdminSystemSettings: React.FC = () => {
@@ -29,6 +30,11 @@ const AdminSystemSettings: React.FC = () => {
             key: 'tags',
             label: '标签配置',
             children: <TagsSetting />,
+          },
+          {
+            key: 'training-template',
+            label: '训练参数模板',
+            children: <TrainingParameterTemplateSetting />,
           },
         ].filter((item) => canViewTabs.includes(item.key))}
       />
