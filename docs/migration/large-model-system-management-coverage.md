@@ -164,8 +164,8 @@ Main route evidence:
 
 Open V1.14 checks:
 
-- `partial-conflict`: production supports platform admin, project admin, menu visibility, URL permission matching, and project scope checks, but Demo had a local dynamic role/data-scope model. Do not copy the Demo model; check only whether V1.14 acceptance explicitly requires dynamic role configuration beyond production IAM.
-- `partial-conflict`: permission rejection UX and resource-scope hints need route-level smoke checks.
+- `partial-conflict`: production supports tenant-admin bypass, platform admin, project admin, menu visibility, URL/API permission matching, project scope checks, and a unified `{msg, request_id}` 403 response. Demo had a local dynamic role/data-scope model with operation trees, personal/all resource scopes, and creator-based resource checks. Do not copy the Demo model into production.
+- `partial-conflict`: V1.14 personal/all resource scope remains a product/backend IAM design gap, not a safe direct migration. It should be implemented only after production has a formal role/resource-scope source of truth and resource owner fields for the protected operations.
 - `partial-conflict`: the GRPO template-management tab now belongs under production system settings and has been adapted to the production `training_parameter_templates` backend instead of the Demo localStorage template center.
 
 ## Current Handling Decision
@@ -173,4 +173,4 @@ Open V1.14 checks:
 - Large-model and system-management production code is present and should remain the baseline.
 - Machine-learning work received more early migration activity because concrete V1.14 gaps were found there first; large-model and system-management gaps are now being migrated module by module on the same branch.
 - Completed V1.14 large-model/system-management migrations include GRPO training parameter templates under system settings, inference import usage split, and model/service deletion reference guards.
-- Remaining migration work should focus on permission resource scope against production IAM and only migrate missing V1.14 behavior.
+- Permission resource scope conclusion: keep production IAM/permission middleware as the baseline; preserve the V1.14 right-bottom documentation for personal/all resource scope, but do not add a Demo-style local role store or localStorage authorization path to production. If this becomes a hard V1.14 acceptance item, migrate it as a formal production IAM/resource-owner feature with backend enforcement, API contracts, and frontend operation-state feedback.
