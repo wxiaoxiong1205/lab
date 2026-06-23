@@ -4,7 +4,7 @@
 
 This note records how the V1.14 GRPO training-parameter template requirement should be adapted after the production source replacement.
 
-The 1.0 Demo contains a localStorage-based GRPO template center. This requirement must not be migrated by copying Demo storage or mock state into production. The production baseline now has a dedicated writable template-management surface, and the remaining work is to consume those templates from training creation and version detail pages.
+The 1.0 Demo contains a localStorage-based GRPO template center. This requirement must not be migrated by copying Demo storage or mock state into production. The production baseline now has a dedicated writable template-management surface. Training creation consumes enabled templates, version detail shows saved template snapshots, and reward-function upload is handled separately through the production chunk-upload path.
 
 ## Current Production Evidence
 
@@ -16,6 +16,7 @@ The 1.0 Demo contains a localStorage-based GRPO template center. This requiremen
   - `标签配置`
   - `训练参数模板`
 - Production template persistence uses dedicated `training_parameter_templates` APIs instead of Demo localStorage.
+- Production training creation uses the shared chunk uploader for RFT-GRPO custom reward `.py` files and saves the upload reference in `additional_params.grpo_reward_function`.
 - Production `common_config` currently provides read-only APIs:
   - `GET /api/v1/common-config`
   - `GET /api/v1/common-config/key/{key}`
@@ -72,6 +73,7 @@ The production-safe implementation should be split into independent steps:
 6. Add reward-rule upload separately.
    - Reward-function file upload is not the same as parameter-template management.
    - It should follow production file/upload service conventions.
+   - Store only the production upload reference on the training task payload; do not inline Python code into the parameter template.
 
 ## Current Status
 
@@ -83,11 +85,11 @@ Done:
 - Production backend has a dedicated `training_parameter_templates` ORM model, Alembic migration, and `/api/v1/training-parameter-templates` CRUD surface prepared for template persistence.
 - Production frontend system settings has a training-parameter-template tab wired to the production CRUD surface.
 - Production training creation now loads enabled RFT-GRPO templates, applies selected template parameters into the existing form, and submits a stable `additional_params.grpo_template_snapshot` with template id, name, YAML content, source params, and final applied GRPO params.
+- Production training creation now supports a single RFT-GRPO custom reward `.py` upload through `ChunkFileUploader`, validates the file suffix, provides a Python reference-template download, and submits `additional_params.grpo_reward_function` with `upload_id`, `file_name`, `file_url`, `source`, and `template_name`.
 - Production training version detail now shows the saved GRPO YAML snapshot from `additional_params.grpo_template_snapshot`, with a legacy fallback generated from `additional_params.grpo_config`.
 
 Not done:
 
-- Reward-function `.py` upload and template download.
 - GRPO three-stage Hand/Work/Submit resource config.
 
 ## Guardrails

@@ -17,6 +17,7 @@ interface TrainingConfigProps {
   SaveStrategyCategory: any
   taskName: string
   type: string
+  projectId?: string
   trainingMethodType?: string
   onTrainingMethodChange?: () => void
 }
@@ -46,6 +47,7 @@ const TrainingConfig: React.FC<TrainingConfigProps> = ({
   SaveStrategyCategory,
   type,
   taskName,
+  projectId,
   trainingMethodType,
   onTrainingMethodChange,
 }) => {
@@ -217,6 +219,7 @@ const TrainingConfig: React.FC<TrainingConfigProps> = ({
         trainingType={trainingType}
         trainingMethod={effectiveTrainingMethod}
         SaveStrategyCategory={SaveStrategyCategory}
+        projectId={projectId}
       />
     </Card>
   )

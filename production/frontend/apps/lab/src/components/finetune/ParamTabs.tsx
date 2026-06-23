@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, Button, Col, Form, Input, InputNumber, Row, Select, Space, Switch, Tabs, message } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
+import { DownloadOutlined, ExclamationCircleOutlined, ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import {
   trainingParameterTemplateService,
   type TrainingParameterTemplate,
 } from '@/services/trainingParameterTemplateService'
+import ChunkFileUploader from '@/components/common/ChunkFileUploader'
 
 const { Option } = Select
 
@@ -92,6 +93,50 @@ const normalizeTemplateParams = (template: TrainingParameterTemplate) => {
   return nextValues
 }
 
+const CUSTOM_REWARD_TEMPLATE = `import os
+
+import torch
+
+
+def reward_func(queries, prompts, labels):
+    """
+    Calculate rewards based on model outputs and labels.
+
+    Args:
+        queries (list[str]): prompts + model responses.
+        prompts (list[str]): original model prompts.
+        labels (list[str]): reference answers or labels.
+
+    Returns:
+        torch.Tensor: float reward tensor, one value per sample.
+    """
+    outputs = []
+    max_prompt_len = int(os.environ.get("MAX_PROMPT_LEN", "1024"))
+
+    for query, prompt in zip(queries, prompts):
+        max_len = min(len(prompt), max_prompt_len)
+        outputs.append(query[max_len:].strip())
+
+    rewards = process(outputs, labels)
+    return torch.tensor(rewards, dtype=torch.float)
+`
+
+const downloadRewardTemplate = () => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const blob = new Blob([CUSTOM_REWARD_TEMPLATE], { type: 'text/x-python;charset=utf-8' })
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'grpo-custom-reward-template.py'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
+}
+
 interface ParamTabsProps {
   MonitoringConfigCategory: any
   EvalStrategyCategory: any
@@ -99,6 +144,7 @@ interface ParamTabsProps {
   trainingType: any
   trainingMethod?: string
   SaveStrategyCategory: any
+  projectId?: string
 }
 
 const ParamTabs: React.FC<ParamTabsProps> = ({
@@ -108,6 +154,7 @@ const ParamTabs: React.FC<ParamTabsProps> = ({
   trainingType,
   trainingMethod,
   SaveStrategyCategory,
+  projectId,
 }) => {
   const form = Form.useFormInstance()
   const effectiveTrainingMethod = normalizeTrainingMethodType(trainingMethod)
@@ -150,6 +197,9 @@ const ParamTabs: React.FC<ParamTabsProps> = ({
       grpo_template_name: undefined,
       grpo_template_content: undefined,
       grpo_template_params_json: undefined,
+      grpo_reward_function_upload_id: undefined,
+      grpo_reward_function_file_name: undefined,
+      grpo_reward_function_file_url: undefined,
     })
   }, [effectiveTrainingMethod])
 
@@ -172,6 +222,100 @@ const ParamTabs: React.FC<ParamTabsProps> = ({
     form.setFieldsValue(normalizeTemplateParams(template))
     message.success('已应用训练参数模板')
   }
+
+  const rewardFunctionSection = effectiveTrainingMethod === 'rft-grpo' && (
+    <div className="param-config-container mb-4">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+        <SafetyCertificateOutlined style={{ color: 'var(--lab-color-primary)' }} />
+        <span className="param-name">奖励规则配置</span>
+      </div>
+      <Space direction="vertical" size={12} style={{ width: '100%' }}>
+        <Alert
+          type="info"
+          showIcon
+          icon={<ExclamationCircleOutlined />}
+          message="自定义奖励函数要求"
+          description={(
+            <ul style={{ margin: '4px 0 0', paddingLeft: 16, fontSize: 12, color: '#64748b', lineHeight: 1.8 }}>
+              <li>
+                函数名必须为
+                {' '}
+                <code>reward_func(queries, prompts, labels)</code>
+              </li>
+              <li>
+                返回类型必须为
+                {' '}
+                <code>torch.Tensor</code>
+                ，且每条样本对应一个奖励值
+              </li>
+              <li>当前只支持单个 Python .py 文件</li>
+            </ul>
+          )}
+        />
+        <Form.Item name="grpo_reward_function_upload_id" hidden>
+          <Input />
+        </Form.Item>
+        <Form.Item name="grpo_reward_function_file_name" hidden>
+          <Input />
+        </Form.Item>
+        <Form.Item name="grpo_reward_function_file_url" hidden>
+          <Input />
+        </Form.Item>
+        <ChunkFileUploader
+          accept=".py"
+          maxCount={1}
+          projectId={projectId}
+          usage="training-reward-function"
+          hintText="仅支持上传单个 .py 文件；上传完成后会随本次 RFT-GRPO 训练任务保存引用"
+          beforeUpload={(file) => {
+            if (!file.name.toLowerCase().endsWith('.py')) {
+              message.error('请上传 .py 格式的奖励函数文件')
+              return false
+            }
+            return true
+          }}
+          onSuccess={({ fileUrl, uploadId, file }) => {
+            form.setFieldsValue({
+              grpo_reward_function_upload_id: uploadId,
+              grpo_reward_function_file_name: file?.name,
+              grpo_reward_function_file_url: fileUrl,
+            })
+          }}
+          onFileChange={(file) => {
+            if (!file) {
+              form.setFieldsValue({
+                grpo_reward_function_upload_id: undefined,
+                grpo_reward_function_file_name: undefined,
+                grpo_reward_function_file_url: undefined,
+              })
+            }
+          }}
+        />
+        <div
+          style={{
+            padding: '12px 14px',
+            borderRadius: 8,
+            border: '1px solid var(--lab-color-border)',
+            background: 'var(--lab-color-bg-container)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 16,
+          }}
+        >
+          <Space direction="vertical" size={2}>
+            <span style={{ fontWeight: 600 }}>参考模板</span>
+            <span style={{ fontSize: 12, color: 'var(--lab-color-text-secondary)' }}>
+              下载 Python 模板后补充奖励逻辑，再上传为本次任务的自定义奖励函数。
+            </span>
+          </Space>
+          <Button icon={<DownloadOutlined />} onClick={downloadRewardTemplate}>
+            下载模板
+          </Button>
+        </div>
+      </Space>
+    </div>
+  )
 
   const items = [
     {
@@ -945,12 +1089,15 @@ const ParamTabs: React.FC<ParamTabsProps> = ({
   ]
 
   return (
-    <Tabs
-      defaultActiveKey="basic"
-      type="card"
-      size="small"
-      items={items}
-    />
+    <>
+      {rewardFunctionSection}
+      <Tabs
+        defaultActiveKey="basic"
+        type="card"
+        size="small"
+        items={items}
+      />
+    </>
   )
 }
 

@@ -340,6 +340,11 @@ const CreateFinetuneRun: React.FC = () => {
           grpo_template_content: taskInfo.additional_params.grpo_template_snapshot.template_content,
           grpo_template_params_json: JSON.stringify(taskInfo.additional_params.grpo_template_snapshot.params || {}),
         }),
+        ...(taskInfo?.additional_params?.grpo_reward_function && {
+          grpo_reward_function_upload_id: taskInfo.additional_params.grpo_reward_function.upload_id,
+          grpo_reward_function_file_name: taskInfo.additional_params.grpo_reward_function.file_name,
+          grpo_reward_function_file_url: taskInfo.additional_params.grpo_reward_function.file_url,
+        }),
 
         // 数据处理参数
         cutoff_len: taskInfo?.data_processing.cutoff_len,
@@ -613,6 +618,15 @@ const CreateFinetuneRun: React.FC = () => {
                 applied_params: grpoConfig,
               },
             }),
+            ...(values.grpo_reward_function_upload_id && {
+              grpo_reward_function: {
+                upload_id: values.grpo_reward_function_upload_id,
+                file_name: values.grpo_reward_function_file_name,
+                file_url: values.grpo_reward_function_file_url,
+                source: 'custom-python',
+                template_name: 'grpo-custom-reward-template.py',
+              },
+            }),
           }),
         },
         ...(trainMethodType === 'dpo' && {
@@ -725,6 +739,7 @@ const CreateFinetuneRun: React.FC = () => {
                 LrSchedulerTypeCategory={LrSchedulerTypeCategory}
                 SaveStrategyCategory={SaveStrategyCategory}
                 taskName={taskName}
+                projectId={projectId}
                 trainingMethodType={forcedTrainingMethodType || getTrainingMethodType(taskInfo?.training_type)}
                 onTrainingMethodChange={resetSelectedDatasets}
               />
