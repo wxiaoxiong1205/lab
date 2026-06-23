@@ -1,5 +1,5 @@
 import React from 'react'
-import { Col, Form, Input, InputNumber, Row, Select, Tabs } from 'antd'
+import { Col, Form, Input, InputNumber, Row, Select, Switch, Tabs } from 'antd'
 
 const { Option } = Select
 
@@ -10,6 +10,8 @@ const normalizeTrainingMethodType = (value?: string) => {
   const normalized = value.toLowerCase()
   if (normalized.includes('dpo'))
     return 'dpo'
+  if (normalized.includes('grpo'))
+    return 'rft-grpo'
   if (normalized.includes('sft'))
     return 'sft'
 
@@ -600,6 +602,62 @@ const ParamTabs: React.FC<ParamTabsProps> = ({
               </div>
             </Col>
           </Row>
+        </div>
+      ),
+    }] : []),
+    ...(effectiveTrainingMethod === 'rft-grpo' ? [{
+      key: 'grpo',
+      label: 'GRPO配置',
+      forceRender: true,
+      children: (
+        <div className="param-config-container">
+          <Row gutter={[16, 16]}>
+            {[
+              ['num_generations', '每题生成数量', '每个Prompt生成多个候选答案后参与奖励评分，数量越大训练开销越高。', { min: 1, max: 64, placeholder: '8' }],
+              ['max_completion_length', 'Completion最大长度', '限制模型生成答案的最大长度，避免单次采样占用过多上下文和显存。', { min: 1, max: 32768, placeholder: '1024' }],
+              ['temperature', '采样温度', '温度越高生成越发散，温度越低生成越稳定。', { min: 0, max: 2, step: 0.01, placeholder: '0.9' }],
+              ['top_p', 'Top-p', '仅在累计概率范围内采样候选Token，通常与温度一起控制探索范围。', { min: 0, max: 1, step: 0.01, placeholder: '0.95' }],
+              ['top_k', 'Top-k', '仅从概率最高的Top-k个Token中采样，0表示不限制。', { min: 0, max: 1000, placeholder: '50' }],
+              ['repetition_penalty', '重复惩罚', '用于减少重复生成，值越大惩罚越强。', { min: 0.1, max: 5, step: 0.01, placeholder: '1.05' }],
+              ['kl_coefficient', 'KL系数', 'KL系数越高，训练越倾向保持原模型分布。', { min: 0, max: 10, step: 0.01, placeholder: '0.04' }],
+              ['clip_range', '裁剪范围', '限制单次策略更新幅度，降低强化训练震荡风险。', { min: 0, max: 1, step: 0.01, placeholder: '0.2' }],
+              ['reward_scale', '奖励缩放系数', '用于统一调整奖励信号强度。', { min: 0, max: 100, step: 0.1, placeholder: '1' }],
+            ].map(([name, label, description, inputProps]) => (
+              <Col span={12} key={name as string}>
+                <div className="param-item">
+                  <div className="param-header">
+                    <span className="param-name">{label as string}</span>
+                  </div>
+                  <div className="param-content">
+                    <div className="param-control">
+                      <Form.Item name={name as string} className="m-0">
+                        <InputNumber {...(inputProps as Record<string, number | string>)} className="w-full" />
+                      </Form.Item>
+                    </div>
+                    <div className="param-description">{description as string}</div>
+                  </div>
+                </div>
+              </Col>
+            ))}
+            <Col span={12}>
+              <div className="param-item">
+                <div className="param-header">
+                  <span className="param-name">奖励归一化</span>
+                </div>
+                <div className="param-content">
+                  <div className="param-control">
+                    <Form.Item name="reward_normalization" className="m-0" valuePropName="checked">
+                      <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                    </Form.Item>
+                  </div>
+                  <div className="param-description">对奖励分数做归一化处理，减少不同样本间奖励尺度差异。</div>
+                </div>
+              </div>
+            </Col>
+          </Row>
+          <Form.Item name="advantage_estimator" hidden initialValue="grpo">
+            <Input />
+          </Form.Item>
         </div>
       ),
     }] : []),

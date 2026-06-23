@@ -30,6 +30,8 @@ export const TrainingMethodTypeMapping = (key: string) => {
       return { text: 'SFT', disabled: false, disabledTooltip: '基于有监督数据进行指令跟随训练' }
     case 'rft':
       return { text: 'RFT', disabled: true, disabledTooltip: 'RFT' }
+    case 'rft-grpo':
+      return { text: 'RFT-GRPO', disabled: false, disabledTooltip: '基于奖励规则进行GRPO强化微调' }
     case 'dpo':
       return { text: 'DPO', disabled: false, disabledTooltip: '基于人类偏好数据进行模型优化(即将上线)' }
     case 'kto':

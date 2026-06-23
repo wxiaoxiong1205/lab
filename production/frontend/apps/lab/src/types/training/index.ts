@@ -46,6 +46,7 @@ export enum DatasetType {
 // 训练方法类型枚举
 export enum TrainingMethodType {
   SFT = 'sft',
+  RFT_GRPO = 'rft-grpo',
   RFT = 'rft',
   DPO = 'dpo',
   KTO = 'kto',
@@ -262,6 +263,20 @@ export interface SaveConfig {
 // 额外参数
 export interface AdditionalParams {
   dataloader_num_workers: number
+  grpo_config?: {
+    num_generations?: number
+    max_prompt_length?: number
+    max_completion_length?: number
+    temperature?: number
+    top_p?: number
+    top_k?: number
+    repetition_penalty?: number
+    kl_coefficient?: number
+    clip_range?: number
+    advantage_estimator?: string
+    reward_normalization?: boolean
+    reward_scale?: number
+  }
 }
 
 export interface GPUConfig {

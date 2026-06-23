@@ -24,6 +24,7 @@ class TrainingMethodType(str, Enum):
     """训练方法枚举，用于定义不同的训练方法"""
     SFT = "sft"  # Supervised Fine-Tuning
     DPO = "dpo"  # Direct Preference Optimization
+    RFT_GRPO = "rft-grpo"  # Reinforcement Fine-Tuning with GRPO
     # 添加了业务数据集的特殊训练类型business
     BUSINESS = "business" # 业务训练类型
     
@@ -33,6 +34,7 @@ class TrainingMethodType(str, Enum):
         descriptions = {
             cls.SFT: "监督微调 - 使用标注数据进行有监督的模型微调",
             cls.DPO: "直接偏好优化 - 基于人类偏好数据进行模型优化",
+            cls.RFT_GRPO: "强化微调 - 基于GRPO奖励规则进行模型优化",
             cls.BUSINESS: "业务数据集训练"
         }
         return descriptions.get(method_type, "未知训练方法")

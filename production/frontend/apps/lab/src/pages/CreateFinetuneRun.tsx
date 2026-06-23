@@ -51,6 +51,17 @@ const defaultValues = {
   loss_type: 'mse',
   label_smoothing: 0.1,
   max_prompt_length: 4096,
+  max_completion_length: 1024,
+  num_generations: 8,
+  temperature: 0.9,
+  top_p: 0.95,
+  top_k: 50,
+  repetition_penalty: 1.05,
+  kl_coefficient: 0.04,
+  clip_range: 0.2,
+  advantage_estimator: 'grpo',
+  reward_normalization: true,
+  reward_scale: 1,
   max_length: 4096,
   remove_unused_columns: false,
   cutoff_len: 4096,
@@ -103,6 +114,8 @@ const normalizeTrainingMethodType = (value?: unknown) => {
   const normalized = value.toLowerCase()
   if (normalized.includes('dpo'))
     return 'dpo'
+  if (normalized.includes('grpo'))
+    return 'rft-grpo'
   if (normalized.includes('sft'))
     return 'sft'
 
@@ -293,6 +306,20 @@ const CreateFinetuneRun: React.FC = () => {
         }),
         ...(taskInfo?.dpo_config && {
           beta: taskInfo.dpo_config.pref_beta,
+        }),
+        ...(taskInfo?.additional_params?.grpo_config && {
+          num_generations: taskInfo.additional_params.grpo_config.num_generations,
+          max_prompt_length: taskInfo.additional_params.grpo_config.max_prompt_length,
+          max_completion_length: taskInfo.additional_params.grpo_config.max_completion_length,
+          temperature: taskInfo.additional_params.grpo_config.temperature,
+          top_p: taskInfo.additional_params.grpo_config.top_p,
+          top_k: taskInfo.additional_params.grpo_config.top_k,
+          repetition_penalty: taskInfo.additional_params.grpo_config.repetition_penalty,
+          kl_coefficient: taskInfo.additional_params.grpo_config.kl_coefficient,
+          clip_range: taskInfo.additional_params.grpo_config.clip_range,
+          advantage_estimator: taskInfo.additional_params.grpo_config.advantage_estimator,
+          reward_normalization: taskInfo.additional_params.grpo_config.reward_normalization,
+          reward_scale: taskInfo.additional_params.grpo_config.reward_scale,
         }),
 
         // 数据处理参数
@@ -538,6 +565,22 @@ const CreateFinetuneRun: React.FC = () => {
         // 额外参数
         additional_params: {
           dataloader_num_workers: values.dataloader_num_workers,
+          ...(trainMethodType === 'rft-grpo' && {
+            grpo_config: {
+              num_generations: values.num_generations,
+              max_prompt_length: values.max_prompt_length,
+              max_completion_length: values.max_completion_length,
+              temperature: values.temperature,
+              top_p: values.top_p,
+              top_k: values.top_k,
+              repetition_penalty: values.repetition_penalty,
+              kl_coefficient: values.kl_coefficient,
+              clip_range: values.clip_range,
+              advantage_estimator: values.advantage_estimator,
+              reward_normalization: values.reward_normalization,
+              reward_scale: values.reward_scale,
+            },
+          }),
         },
         ...(trainMethodType === 'dpo' && {
           dpo_config: {

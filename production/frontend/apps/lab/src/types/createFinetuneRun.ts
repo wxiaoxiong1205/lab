@@ -94,6 +94,17 @@ export interface FormValues {
   loss_type: string
   label_smoothing: number
   max_prompt_length: number
+  max_completion_length: number
+  num_generations: number
+  temperature: number
+  top_p: number
+  top_k: number
+  repetition_penalty: number
+  kl_coefficient: number
+  clip_range: number
+  advantage_estimator: string
+  reward_normalization: boolean
+  reward_scale: number
   preference_prompt: string
   remove_unused_columns: boolean
   gradient_checkpointing_kwargs: string
