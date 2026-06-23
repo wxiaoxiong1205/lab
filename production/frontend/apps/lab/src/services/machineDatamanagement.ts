@@ -8,6 +8,7 @@ import type {
   DownloadDatasetRequest,
   ItemList,
   MachineLearnListModel,
+  MergeMachineDatasetVersionsRequest,
 } from '@/services/machineLearnModel.ts'
 
 export const machineDatamanagement = {
@@ -51,6 +52,15 @@ export const machineDatamanagement = {
       `machine-learning-datasets/dataset/${projectId}/upload`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    return response.data
+  },
+
+  // 合并同一机器学习数据集下多个版本
+  mergeMachineDatasetVersions: async (projectId: number, datasetId: number, params: MergeMachineDatasetVersionsRequest) => {
+    const response = await apiClient.post(
+      `machine-learning-datasets/dataset/${projectId}/${datasetId}/merge-versions`,
+      params,
     )
     return response.data
   },

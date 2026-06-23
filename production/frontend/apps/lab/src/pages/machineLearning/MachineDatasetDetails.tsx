@@ -9,6 +9,7 @@ import TextTabDetails from './TextTabDetails'
 import ImageTabDetails from './ImageTabDetails'
 import AddVersionModal from './AddVersionModal'
 import type { AddVersionFormValues } from './AddVersionModal'
+import DatasetVersionMergeModal from '@/components/dataset/DatasetVersionMergeModal'
 import { machineDatamanagement } from '@/services/machineDatamanagement'
 import { downloadBlobFile, extractFilenameFromHeaders, getContentType, processFilenameExtension } from '@/utils/download'
 import type { CreateDatasetRequest, DatasetAsyncExportResponse, DatasetDetailsResponse, ItemList } from '@/services/machineLearnModel'
@@ -28,6 +29,7 @@ const MachineDatasetDetails: React.FC = () => {
   const [selectedVersionId, setSelectedVersionId] = useState<number>(datasetIdNum)
   const [page, setPage] = useState<number>(1)
   const [addVersionModalOpen, setAddVersionModalOpen] = useState(false)
+  const [mergeVersionModalOpen, setMergeVersionModalOpen] = useState(false)
   const [editingBasicField, setEditingBasicField] = useState<'name' | 'description' | null>(null)
   // 拉取版本列表时使用的 id（删除当前版本后改为剩余版本 id，避免用已删除 id 请求报错）
   const [versionListKeyId, setVersionListKeyId] = useState<number>(datasetIdNum)
@@ -260,6 +262,28 @@ const MachineDatasetDetails: React.FC = () => {
     },
   })
 
+  const mergeVersionMutation = useMutation({
+    mutationFn: (params: { sourceVersionIds: number[], description?: string }) =>
+      machineDatamanagement.mergeMachineDatasetVersions(projectIdNum, selectedVersionId, {
+        version: nextVersionLabel,
+        source_version_ids: params.sourceVersionIds,
+        description: params.description,
+      }),
+    onSuccess: (createdVersion: ItemList) => {
+      message.success('版本合并成功')
+      setMergeVersionModalOpen(false)
+      setSelectedVersionId(createdVersion.id)
+      setVersionListKeyId(createdVersion.id)
+      setPage(1)
+      queryClient.invalidateQueries({ queryKey: ['machine-dataset-list'] })
+      queryClient.invalidateQueries({ queryKey: ['machine-dataset-versions', projectIdNum, versionListKeyId] })
+      queryClient.invalidateQueries({ queryKey: ['machine-dataset-details', projectIdNum] })
+    },
+    onError: (e: Error) => {
+      message.error(e?.message || '版本合并失败')
+    },
+  })
+
   const handleAddVersionConfirm = async (values: AddVersionFormValues) => {
     const datasetName = datasetDetail?.name
     if (!datasetName) {
@@ -348,6 +372,14 @@ const MachineDatasetDetails: React.FC = () => {
               onClick={() => setAddVersionModalOpen(true)}
             >
               新增版本
+            </Button>
+            <Button
+              className="mt-2"
+              block
+              disabled={!versions || versions.length < 2}
+              onClick={() => setMergeVersionModalOpen(true)}
+            >
+              合并版本
             </Button>
           </div>
           {/* <Card loading={versionsLoading}> */}
@@ -490,6 +522,24 @@ const MachineDatasetDetails: React.FC = () => {
         historyVersions={versions ?? []}
         onCancel={() => setAddVersionModalOpen(false)}
         onConfirm={handleAddVersionConfirm}
+      />
+      <DatasetVersionMergeModal
+        open={mergeVersionModalOpen}
+        loading={mergeVersionMutation.isPending}
+        datasetName={datasetDetail?.name || ''}
+        nextVersion={nextVersionLabel}
+        versions={(versions ?? []).map(version => ({
+          id: version.id,
+          version: version.version,
+          processing_status: 'completed',
+          processing_status_display: '处理完成',
+          total_samples: version.sample_count,
+          created_by: version.created_by,
+          created_at: version.created_at,
+          dataset_type: version.data_type,
+        }))}
+        onCancel={() => setMergeVersionModalOpen(false)}
+        onSubmit={(sourceVersionIds, description) => mergeVersionMutation.mutate({ sourceVersionIds, description })}
       />
     </div>
   )

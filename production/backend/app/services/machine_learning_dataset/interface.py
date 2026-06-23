@@ -16,7 +16,7 @@ from app.schemas.machine_learning_dataset import (
     MachineLearningDatasetResponse,
     MachineLearningDatasetSampleFileType,
     MachineLearningDatasetTaskType,
-    MachineLearningDatasetTemplateType, ExportFormat,
+    MachineLearningDatasetTemplateType, ExportFormat, MachineLearningDatasetVersionMergeRequest,
 )
 from app.services.chunk_upload.interface import ChunkUploadService
 from app.services.storage.interface import StorageService
@@ -75,6 +75,17 @@ class MachineLearningDatasetService(ABC):
         update_data: MachineLearningDatasetBasicInfoUpdate,
     ) -> bool:
         """编辑机器学习数据集名称和描述。"""
+        pass
+
+    @abstractmethod
+    async def merge_dataset_versions(
+        self,
+        current_user: JwtUserInfo,
+        project_id: int,
+        dataset_id: int,
+        request: MachineLearningDatasetVersionMergeRequest,
+    ) -> MachineLearningDatasetCreateResponse:
+        """合并同一机器学习数据集下多个版本，生成新版本。"""
         pass
 
     @abstractmethod

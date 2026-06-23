@@ -20,6 +20,7 @@ from app.schemas.machine_learning_dataset import (
     MachineLearningDatasetSampleFileType,
     MachineLearningDatasetTaskType,
     MachineLearningDatasetTemplateType, ExportFormat, TASK_EXPORT_FORMATS,
+    MachineLearningDatasetVersionMergeRequest,
 )
 from app.services.machine_learning_dataset.interface import MachineLearningDatasetService
 from app.utils.dataset_metadata_repair_status import (
@@ -213,6 +214,35 @@ async def update_machine_learning_dataset_basic_info(
         project_id=project_id,
         dataset_id=dataset_id,
         update_data=update_data,
+    )
+
+
+@router.post(
+    "/dataset/{project_id}/{dataset_id}/merge-versions",
+    response_model=MachineLearningDatasetCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+@inject
+async def merge_machine_learning_dataset_versions(
+    project_id: int = Path(..., description="项目ID", gt=0),
+    dataset_id: int = Path(..., description="数据集ID，用于定位同名版本组", gt=0),
+    request: MachineLearningDatasetVersionMergeRequest = Body(..., description="机器学习数据集版本合并请求"),
+    deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
+    machine_learning_dataset_service: MachineLearningDatasetService = Depends(
+        Provide[AutoContainer.machine_learning_dataset_service]
+    ),
+) -> MachineLearningDatasetCreateResponse:
+    """合并同一机器学习数据集下多个版本，生成新版本。
+
+    源版本不变；合并版本会重排 sample_id 并写入 source_version，避免多源版本样本 ID 冲突。
+    图片资产同名但内容不同会阻止合并。
+    """
+    _, current_user = deps
+    return await machine_learning_dataset_service.merge_dataset_versions(
+        current_user=current_user,
+        project_id=project_id,
+        dataset_id=dataset_id,
+        request=request,
     )
 
 

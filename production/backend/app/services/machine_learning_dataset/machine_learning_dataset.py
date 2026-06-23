@@ -33,6 +33,7 @@ from app.schemas.machine_learning_dataset import (
     MachineLearningDatasetSourceType,
     MachineLearningDatasetTaskType,
     MachineLearningDatasetTemplateType, TASK_EXPORT_FORMATS, ExportFormat,
+    MachineLearningDatasetVersionMergeRequest,
 )
 from app.schemas.notebook import NotebookExtDatasetType, NotebookExtKey
 from app.utils.dataset_file_parser import (
@@ -385,6 +386,163 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
         response.updated_at = to_local_tz(dataset.updated_at)
         return response
 
+    async def merge_dataset_versions(
+        self,
+        current_user: JwtUserInfo,
+        project_id: int,
+        dataset_id: int,
+        request: MachineLearningDatasetVersionMergeRequest,
+    ) -> MachineLearningDatasetCreateResponse:
+        """合并同一机器学习数据集下多个版本，生成一个新版本。"""
+        session = await self.machine_learning_dataset_mapper.get_session()
+        await validate_project_exists(session, project_id)
+
+        base_dataset = await self.machine_learning_dataset_mapper.query_one(
+            select(MachineLearningDataset).filter(
+                MachineLearningDataset.id == dataset_id,
+                MachineLearningDataset.project_id == project_id,
+            )
+        )
+        if not base_dataset:
+            raise HTTPException(status_code=404, detail="机器学习数据集不存在")
+
+        existing = await self.machine_learning_dataset_mapper.query_one(
+            select(MachineLearningDataset).filter(
+                MachineLearningDataset.project_id == project_id,
+                MachineLearningDataset.name == base_dataset.name,
+                MachineLearningDataset.version == request.version,
+            )
+        )
+        if existing:
+            raise HTTPException(status_code=400, detail="同项目下已存在同名同版本的机器学习数据集")
+
+        source_datasets = await self.machine_learning_dataset_mapper.query(
+            select(MachineLearningDataset).filter(
+                MachineLearningDataset.id.in_(request.source_version_ids),
+                MachineLearningDataset.project_id == project_id,
+                MachineLearningDataset.name == base_dataset.name,
+            )
+        )
+        source_by_id = {item.id: item for item in source_datasets}
+        ordered_sources = [source_by_id.get(source_id) for source_id in request.source_version_ids]
+        missing_ids = [source_id for source_id, source in zip(request.source_version_ids, ordered_sources) if source is None]
+        if missing_ids:
+            raise HTTPException(status_code=404, detail=f"源版本不存在或不属于当前数据集: {missing_ids}")
+
+        first_source = ordered_sources[0]
+        for source in ordered_sources:
+            if (
+                source.data_type != first_source.data_type
+                or source.annotation_type != first_source.annotation_type
+                or source.template_type != first_source.template_type
+                or source.is_annotated != first_source.is_annotated
+            ):
+                raise HTTPException(status_code=400, detail="仅支持同一数据类型、标注类型、模板和标注状态的版本合并")
+            if not source.dataset_path or not source.storage_path:
+                raise HTTPException(status_code=400, detail=f"版本 {source.version} 存储路径无效，不允许合并")
+
+        jfs = await self.storage.JUICEFS_CLIENT()
+        for source in ordered_sources:
+            if not jfs.exists(source.dataset_path):
+                raise HTTPException(status_code=404, detail=f"版本 {source.version} dataset.jsonl 不存在，无法合并")
+
+        merged_lines: List[str] = []
+        next_sample_id = 1
+        for source in ordered_sources:
+            with jfs.open(source.dataset_path, "r", encoding="utf-8") as f:
+                for raw_line in f:
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    try:
+                        sample = json.loads(line)
+                    except json.JSONDecodeError as exc:
+                        raise HTTPException(status_code=400, detail=f"版本 {source.version} dataset.jsonl 存在无效 JSON") from exc
+                    if not isinstance(sample, dict):
+                        raise HTTPException(status_code=400, detail=f"版本 {source.version} dataset.jsonl 样本格式错误")
+                    sample["source_version"] = source.version
+                    sample["sample_id"] = next_sample_id
+                    next_sample_id += 1
+                    merged_lines.append(json.dumps(sample, ensure_ascii=False))
+
+        merged_dataset_jsonl_content = ("\n".join(merged_lines) + "\n").encode("utf-8") if merged_lines else b""
+        effective_label_schema: Optional[Dict[str, str]] = None
+        for source in ordered_sources:
+            effective_label_schema = self._merge_inherited_label_schema(
+                effective_label_schema,
+                self._read_label_schema(jfs, source),
+            )
+
+        metadata_fields = _collect_metadata_fields_from_jsonl_bytes(merged_dataset_jsonl_content) if merged_dataset_jsonl_content else None
+        dataset = MachineLearningDataset(
+            name=base_dataset.name,
+            description=request.description if request.description is not None else first_source.description,
+            project_id=project_id,
+            version=request.version,
+            dataset_category=first_source.dataset_category,
+            task_type=first_source.task_type,
+            data_type=first_source.data_type,
+            data_source=MachineLearningDatasetDataSource.LOCAL_UPLOAD.value,
+            annotation_type=first_source.annotation_type,
+            template_type=first_source.template_type,
+            is_annotated=first_source.is_annotated,
+            source_type=MachineLearningDatasetSourceType.MIXED.value,
+            storage_path="",
+            dataset_path="",
+            label_schema_path=None,
+            metadata_fields=metadata_fields,
+            sample_count=len(merged_lines),
+            file_size=len(merged_dataset_jsonl_content) / (1024 * 1024),
+            created_id=current_user.userId,
+            created_by=current_user.username,
+        )
+        new_storage = ""
+        try:
+            await self.machine_learning_dataset_mapper.insert(dataset)
+            await self.machine_learning_dataset_mapper.flush()
+            await self.machine_learning_dataset_mapper.refresh(dataset)
+
+            namespace = f"{os.getenv('KUBERNETES_NAMESPACE_PREFIX', 'deepexilab')}-{project_id}"
+            new_storage = StoragePath.REGISTERED_MACHINE_LEARNING_DATASETS.format_storage_path(namespace=namespace, dataset_id=dataset.id)
+            new_storage = new_storage.rstrip("/") + "/"
+            if not jfs.exists(new_storage):
+                jfs.makedirs(new_storage, exist_ok=True)
+
+            assets_seen: Dict[str, bytes] = {}
+            for source in ordered_sources:
+                self._copy_ml_assets_with_conflict_guard(jfs, source.storage_path.rstrip("/") + "/assets/", new_storage + "assets/", assets_seen)
+            with jfs.open(new_storage + "dataset.jsonl", "wb") as f:
+                _write_jsonl_bytes_in_batches(f, merged_dataset_jsonl_content)
+            if effective_label_schema is not None:
+                with jfs.open(new_storage + "classname.json", "w", encoding="utf-8") as f:
+                    f.write(json.dumps(effective_label_schema, ensure_ascii=False, indent=2))
+                dataset.label_schema_path = new_storage + "classname.json"
+            dataset.storage_path = new_storage
+            dataset.dataset_path = new_storage + "dataset.jsonl"
+            await self.machine_learning_dataset_mapper.commit()
+            await self.machine_learning_dataset_mapper.refresh(dataset)
+        except HTTPException:
+            await self.machine_learning_dataset_mapper.rollback()
+            if new_storage and jfs.exists(new_storage):
+                try:
+                    jfs.rmr(new_storage)
+                except Exception:
+                    pass
+            raise
+        except Exception as exc:
+            await self.machine_learning_dataset_mapper.rollback()
+            if new_storage and jfs.exists(new_storage):
+                try:
+                    jfs.rmr(new_storage)
+                except Exception:
+                    pass
+            raise HTTPException(status_code=500, detail=f"合并机器学习数据集版本失败: {str(exc)}") from exc
+
+        response = MachineLearningDatasetCreateResponse.model_validate(dataset)
+        response.created_at = to_local_tz(dataset.created_at)
+        response.updated_at = to_local_tz(dataset.updated_at)
+        return response
+
     def _read_jfs_bytes(self, jfs, path: str) -> bytes:
         with jfs.open(path, "rb") as f:
             return f.read()
@@ -478,6 +636,36 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
                 content = f.read()
             with jfs.open(target_dir + "classname.json", "wb") as f:
                 f.write(content)
+
+    def _copy_ml_assets_with_conflict_guard(
+        self,
+        jfs,
+        source_assets_dir: str,
+        target_assets_dir: str,
+        assets_seen: Dict[str, bytes],
+        root_assets_dir: Optional[str] = None,
+    ) -> None:
+        """复制 ML 图片资产；同名不同内容视为冲突。"""
+        if not jfs.exists(source_assets_dir):
+            return
+        root_assets_dir = (root_assets_dir or source_assets_dir).rstrip("/") + "/"
+        if not jfs.exists(target_assets_dir):
+            jfs.makedirs(target_assets_dir, exist_ok=True)
+        for item in jfs.listdir(source_assets_dir):
+            source_path = (source_assets_dir.rstrip("/") + "/" + item).replace("\\", "/")
+            target_path = (target_assets_dir.rstrip("/") + "/" + item).replace("\\", "/")
+            try:
+                jfs.listdir(source_path)
+                self._copy_ml_assets_with_conflict_guard(jfs, source_path + "/", target_path + "/", assets_seen, root_assets_dir)
+            except Exception:
+                with jfs.open(source_path, "rb") as f:
+                    data = f.read()
+                relative_name = source_path[len(root_assets_dir):] if source_path.startswith(root_assets_dir) else item
+                if relative_name in assets_seen and assets_seen[relative_name] != data:
+                    raise HTTPException(status_code=400, detail=f"合并版本中存在同名但内容不同的图片资产: {relative_name}")
+                assets_seen[relative_name] = data
+                with jfs.open(target_path, "wb") as f:
+                    f.write(data)
 
     def _jfs_copy_dir(self, jfs, src_dir: str, target_dir: str) -> None:
         """递归复制 JuiceFS 目录。"""
