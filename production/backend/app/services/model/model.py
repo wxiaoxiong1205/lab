@@ -14,7 +14,7 @@ from fastapi import HTTPException, status
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlalchemy import apaginate
 from kubernetes import client
-from sqlalchemy import select, delete, and_, func, join, cast, String, literal, update
+from sqlalchemy import select, delete, and_, or_, func, join, cast, String, literal, update
 from modelscope.hub.api import HubApi
 from modelscope.hub.errors import NotExistError
 
@@ -22,6 +22,10 @@ from app.utils.log_service import log_service
 from datetime import datetime
 from app.core.logging import logger
 from app.models.model_manager import BaseModel, TrainedModel, MLModel
+from app.models.benchmark_task_manager import BenchmarkTask, BenchmarkTaskModelRelation
+from app.models.evaluation_task_manager import EvaluationReport, EvaluationTask, EvaluationTaskDatasetModelRelation
+from app.models.inference_result_manager import InferenceResultDataset
+from app.models.inference_task_manager import InferenceTask
 from app.models.models import JwtUserInfo, Project, KubernetesResource, ProjectKubernetesRelation, \
     KubernetesStorageRelation, KubernetesRepositoryRelation, RepositoryResource, TaskExecution, ChunkUploadSession, Notebook
 from app.schemas.model import (
@@ -72,6 +76,140 @@ class DefaultModelService(ModelService):
         super().__init__(mapper, storage)
         self.mapper = mapper
         self.storage = storage
+
+    async def _raise_if_query_has_reference(self, query, detail: str) -> None:
+        result = await self.mapper.execute(query.limit(1))
+        if result.first():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=detail,
+            )
+
+    async def _ensure_base_model_not_referenced(self, project_id: Optional[int], base_model: BaseModel) -> None:
+        id_str = str(base_model.id)
+        name = (base_model.name or "").strip()
+        training_task_ref_conditions = [
+            cast(TrainingTask.base_model, String).contains(f'"base_model_id": {id_str}'),
+            cast(TrainingTask.base_model, String).contains(f'"base_model_id":{id_str}'),
+            cast(TrainingTask.base_model, String).contains(f"'base_model_id': {id_str}"),
+            cast(TrainingTask.base_model, String).contains(f"'base_model_id':{id_str}"),
+        ]
+        trained_model_ref_conditions = [TrainedModel.base_model_id == base_model.id]
+        if name:
+            training_task_ref_conditions.extend(
+                [
+                    cast(TrainingTask.base_model, String).contains(f'"base_model_name": "{name}"'),
+                    cast(TrainingTask.base_model, String).contains(f'"base_model_name":"{name}"'),
+                ]
+            )
+            trained_model_ref_conditions.append(TrainedModel.base_model_name == name)
+
+        await self._raise_if_query_has_reference(
+            select(TrainingTask.id).where(or_(*training_task_ref_conditions)),
+            "模型已被大模型训练任务引用，无法删除",
+        )
+        await self._raise_if_query_has_reference(
+            select(TrainedModel.id).where(or_(*trained_model_ref_conditions)),
+            "模型已被训练模型引用，无法删除",
+        )
+        await self._ensure_model_ids_not_referenced(
+            model_source="base_model",
+            model_ids=[base_model.id],
+            project_id=project_id,
+            label="模型",
+        )
+        await self._raise_if_query_has_reference(
+            select(BenchmarkTaskModelRelation.id)
+            .join(BenchmarkTask, BenchmarkTask.id == BenchmarkTaskModelRelation.benchmark_task_id)
+            .where(
+                BenchmarkTaskModelRelation.model_type == "model",
+                BenchmarkTaskModelRelation.model_id == base_model.id,
+                BenchmarkTaskModelRelation.model_version.is_(None),
+                *([BenchmarkTask.project_id == project_id] if project_id is not None else []),
+            ),
+            "模型已被基准评估任务引用，无法删除",
+        )
+
+    async def _ensure_model_ids_not_referenced(
+        self,
+        *,
+        model_source: str,
+        model_ids: List[int],
+        project_id: Optional[int],
+        label: str,
+    ) -> None:
+        ids = [model_id for model_id in model_ids if model_id is not None]
+        if not ids:
+            return
+
+        project_filter = [InferenceTask.project_id == project_id] if project_id is not None else []
+        await self._raise_if_query_has_reference(
+            select(InferenceTask.id).where(
+                InferenceTask.model_source == model_source,
+                InferenceTask.model_id.in_(ids),
+                *project_filter,
+            ),
+            f"{label}已被模型部署任务引用，无法删除",
+        )
+
+        project_filter = [InferenceResultDataset.project_id == project_id] if project_id is not None else []
+        await self._raise_if_query_has_reference(
+            select(InferenceResultDataset.id).where(
+                InferenceResultDataset.model_source == model_source,
+                InferenceResultDataset.model_id.in_(ids),
+                *project_filter,
+            ),
+            f"{label}已被推理结果集引用，无法删除",
+        )
+
+        project_filter = [EvaluationTask.project_id == project_id] if project_id is not None else []
+        await self._raise_if_query_has_reference(
+            select(EvaluationTask.id).where(
+                EvaluationTask.referee_type == "model",
+                EvaluationTask.referee_model_source == model_source,
+                EvaluationTask.referee_model_id.in_(ids),
+                *project_filter,
+            ),
+            f"{label}已被评估任务裁判模型引用，无法删除",
+        )
+        await self._raise_if_query_has_reference(
+            select(EvaluationTaskDatasetModelRelation.id)
+            .join(EvaluationTask, EvaluationTask.id == EvaluationTaskDatasetModelRelation.evaluation_task_id)
+            .where(
+                EvaluationTaskDatasetModelRelation.evaluated_model_source == model_source,
+                EvaluationTaskDatasetModelRelation.evaluated_model_id.in_(ids),
+                *project_filter,
+            ),
+            f"{label}已被评估任务待评估模型引用，无法删除",
+        )
+        await self._raise_if_query_has_reference(
+            select(EvaluationReport.id)
+            .join(EvaluationTask, EvaluationTask.id == EvaluationReport.evaluation_task_id)
+            .where(
+                EvaluationReport.evaluated_model_source == model_source,
+                EvaluationReport.evaluated_model_id.in_(ids),
+                *project_filter,
+            ),
+            f"{label}已被评估报告引用，无法删除",
+        )
+
+    async def _ensure_trained_models_not_referenced_by_benchmark(
+        self,
+        project_id: int,
+        models: List[TrainedModel],
+    ) -> None:
+        for model in models:
+            await self._raise_if_query_has_reference(
+                select(BenchmarkTaskModelRelation.id)
+                .join(BenchmarkTask, BenchmarkTask.id == BenchmarkTaskModelRelation.benchmark_task_id)
+                .where(
+                    BenchmarkTask.project_id == project_id,
+                    BenchmarkTaskModelRelation.model_type == "model",
+                    BenchmarkTaskModelRelation.model_id == model.id,
+                    BenchmarkTaskModelRelation.model_version == model.model_version,
+                ),
+                "训练模型已被基准评估任务引用，无法删除",
+            )
 
     @staticmethod
     def _prefix_tenant_to_model_uri(uri: Optional[str], tenant_id: Optional[str]) -> Optional[str]:
@@ -651,6 +789,8 @@ class DefaultModelService(ModelService):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"当前任务状态为 {base_model.status}，不允许删除"
             )
+
+        await self._ensure_base_model_not_referenced(None, base_model)
 
         try:
             jfs_client = await self.storage.JUICEFS_CLIENT()
@@ -1441,6 +1581,12 @@ class DefaultModelService(ModelService):
                         "请确认版本号（如 V1、V2）"
                     ),
                 )
+            await self._ensure_model_ids_not_referenced(
+                model_source="ml_model",
+                model_ids=[row.id],
+                project_id=project_id,
+                label="机器学习模型",
+            )
             await self.mapper.delete(row)
             # 清理已复制的文件
             try:
@@ -1471,6 +1617,12 @@ class DefaultModelService(ModelService):
                     status_code=404,
                     detail=f"项目中不存在名为 '{model_name}' 的机器学习模型",
                 )
+            await self._ensure_model_ids_not_referenced(
+                model_source="ml_model",
+                model_ids=[row.id for row in rows],
+                project_id=project_id,
+                label="机器学习模型",
+            )
             for row in rows:
                 await self.mapper.delete(row)
                 # 清理已复制的文件
@@ -1583,7 +1735,7 @@ class DefaultModelService(ModelService):
 
             trained_model = await self.mapper.query_one(select(TrainedModel).where(TrainedModel.id == trained_model_id))
             await self.start_training_merge_job_impl(trained_model, k8s_uuid, namespace)
-    
+
     async def create_trained_model(
             self, current_user: JwtUserInfo, trained_model: TrainedModelCreate
     ) -> TrainedModel:
@@ -2098,6 +2250,14 @@ class DefaultModelService(ModelService):
                 detail=f"无法删除模型 '{model_name}'，以下版本状态不允许删除: {', '.join(non_deletable_versions)}"
             )
 
+        await self._ensure_model_ids_not_referenced(
+            model_source="trained_model",
+            model_ids=[model.id for model in models],
+            project_id=project_id,
+            label="训练模型",
+        )
+        await self._ensure_trained_models_not_referenced_by_benchmark(project_id, models)
+
         # 删除所有版本的模型文件和数据库记录
         deleted_count = 0
         failed_models = []
@@ -2163,6 +2323,14 @@ class DefaultModelService(ModelService):
                 status_code=400,
                 detail=f"{trained_model.status}的模型不允许删除: {model_name} (版本: {version})"
             )
+
+        await self._ensure_model_ids_not_referenced(
+            model_source="trained_model",
+            model_ids=[trained_model.id],
+            project_id=project_id,
+            label="训练模型",
+        )
+        await self._ensure_trained_models_not_referenced_by_benchmark(project_id, [trained_model])
 
         try:
             # 先删除模型文件（如果存在）

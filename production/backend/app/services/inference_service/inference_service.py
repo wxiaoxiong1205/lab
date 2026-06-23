@@ -10,6 +10,10 @@ from sqlalchemy.exc import IntegrityError
 from starlette import status
 
 from app.core.logging import logger
+from app.models.benchmark_task_manager import BenchmarkTask, BenchmarkTaskModelRelation
+from app.models.evaluation_task_manager import EvaluationReport, EvaluationTask, EvaluationTaskDatasetModelRelation
+from app.models.inference_result_manager import InferenceResultDataset
+from app.models.label_manager import LabelAutoModel
 from app.models.models import InferenceService, JwtUserInfo
 from app.repository.base_mapper import BaseMapper
 from app.schemas.common import ModelTypeBase
@@ -34,6 +38,69 @@ class DefaultInferenceServiceService(InferenceServiceService):
     def __init__(self, mapper: BaseMapper) -> None:
         self.mapper = mapper
         self.attr_helper = BusinessAttrValueHelper(mapper)
+
+    async def _raise_if_query_has_reference(self, query, detail: str) -> None:
+        result = await self.mapper.execute(query.limit(1))
+        if result.first():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=detail,
+            )
+
+    async def _ensure_services_not_referenced(self, project_id: int, ids: List[int]) -> None:
+        service_ids = [service_id for service_id in ids if service_id is not None]
+        if not service_ids:
+            return
+
+        await self._raise_if_query_has_reference(
+            select(InferenceResultDataset.id).where(
+                InferenceResultDataset.project_id == project_id,
+                InferenceResultDataset.online_service_id.in_(service_ids),
+            ),
+            "在线推理服务已被推理结果集引用，无法删除",
+        )
+        await self._raise_if_query_has_reference(
+            select(EvaluationTask.id).where(
+                EvaluationTask.project_id == project_id,
+                EvaluationTask.referee_type == "service",
+                EvaluationTask.referee_model_id.in_(service_ids),
+            ),
+            "在线推理服务已被评估任务裁判服务引用，无法删除",
+        )
+        await self._raise_if_query_has_reference(
+            select(EvaluationTaskDatasetModelRelation.id)
+            .join(EvaluationTask, EvaluationTask.id == EvaluationTaskDatasetModelRelation.evaluation_task_id)
+            .where(
+                EvaluationTask.project_id == project_id,
+                EvaluationTaskDatasetModelRelation.evaluated_model_source == "service",
+                EvaluationTaskDatasetModelRelation.evaluated_model_id.in_(service_ids),
+            ),
+            "在线推理服务已被评估任务待评估服务引用，无法删除",
+        )
+        await self._raise_if_query_has_reference(
+            select(EvaluationReport.id)
+            .join(EvaluationTask, EvaluationTask.id == EvaluationReport.evaluation_task_id)
+            .where(
+                EvaluationTask.project_id == project_id,
+                EvaluationReport.evaluated_model_source == "service",
+                EvaluationReport.evaluated_model_id.in_(service_ids),
+            ),
+            "在线推理服务已被评估报告引用，无法删除",
+        )
+        await self._raise_if_query_has_reference(
+            select(BenchmarkTaskModelRelation.id)
+            .join(BenchmarkTask, BenchmarkTask.id == BenchmarkTaskModelRelation.benchmark_task_id)
+            .where(
+                BenchmarkTask.project_id == project_id,
+                BenchmarkTaskModelRelation.model_type == "service",
+                BenchmarkTaskModelRelation.model_id.in_(service_ids),
+            ),
+            "在线推理服务已被基准评估任务引用，无法删除",
+        )
+        await self._raise_if_query_has_reference(
+            select(LabelAutoModel.id).where(LabelAutoModel.model_id.in_(service_ids)),
+            "在线推理服务已被自动标注任务引用，无法删除",
+        )
 
     async def create(self, project_id, current_user: JwtUserInfo, request: InferenceServiceCreateRequest) -> bool:
         try:
@@ -136,6 +203,7 @@ class DefaultInferenceServiceService(InferenceServiceService):
         if not ids:
             return None
         logger.info(f"删除服务，id列表：{ids}")
+        await self._ensure_services_not_referenced(project_id, ids)
         # 删除属性值
         await self.attr_helper.delete_by_reference_ids(
             ids, business_type=BusinessAttrValueBusinessType.INFERENCE_SERVICE.value

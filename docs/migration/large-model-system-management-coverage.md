@@ -86,11 +86,11 @@ Main route evidence:
 - Project routes include training, finetune task detail, service/inference, API service, and API access key in `production/frontend/apps/lab/src/routes/index.tsx`.
 - Backend routers are included in `production/backend/app/main.py`.
 
-Open V1.14 checks:
+V1.14 checks:
 
 - `partial-conflict`: GRPO / RFT-GRPO data purpose, parameters, template management, reward function upload, and version-detail YAML display.
 - `partial-conflict`: inference data selection split by SFT, DPO, RFT-GRPO, image understanding, and business inference scenarios.
-- `partial-conflict`: model/service reference protection before deletion. The dataset deletion guard has already been migrated, but the model and service guard still needs module-specific review.
+- `partial-conflict`: model/service reference protection before deletion has been migrated into production backend guards. `DefaultModelService` blocks deletion of base models, trained models, and machine-learning models when referenced by training tasks, trained-model outputs, deployment tasks, inference result datasets, evaluation tasks, evaluation reports, or benchmark tasks. `DefaultInferenceServiceService.delete` blocks online inference service deletion when referenced by inference result datasets, evaluation tasks, evaluation reports, benchmark tasks, or automatic annotation configuration. The Demo localStorage reference table was not migrated.
 
 ## System Management Production Map
 
@@ -166,14 +166,11 @@ Open V1.14 checks:
 
 - `partial-conflict`: production supports platform admin, project admin, menu visibility, URL permission matching, and project scope checks, but Demo had a local dynamic role/data-scope model. Do not copy the Demo model; check only whether V1.14 acceptance explicitly requires dynamic role configuration beyond production IAM.
 - `partial-conflict`: permission rejection UX and resource-scope hints need route-level smoke checks.
-- `partial-conflict`: the GRPO template-management tab belongs under production system settings, but current production system settings only has attribute and tag settings.
+- `partial-conflict`: the GRPO template-management tab now belongs under production system settings and has been adapted to the production `training_parameter_templates` backend instead of the Demo localStorage template center.
 
 ## Current Handling Decision
 
 - Large-model and system-management production code is present and should remain the baseline.
-- Machine-learning work has received more migration activity so far because concrete V1.14 gaps were found there first.
-- Next migration work must not stay machine-learning-only:
-  1. Finish the GRPO template frontend under system settings and training creation.
-  2. Review inference data selection under the large-model inference creation flow.
-  3. Review model/service deletion reference protection.
-  4. Review permission resource scope against production IAM and only migrate missing V1.14 behavior.
+- Machine-learning work received more early migration activity because concrete V1.14 gaps were found there first; large-model and system-management gaps are now being migrated module by module on the same branch.
+- Completed V1.14 large-model/system-management migrations include GRPO training parameter templates under system settings, inference import usage split, and model/service deletion reference guards.
+- Remaining migration work should focus on permission resource scope against production IAM and only migrate missing V1.14 behavior.
