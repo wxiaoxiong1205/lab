@@ -1,0 +1,46 @@
+# vLLM NPU 镜像
+# 支持两种使用方式：
+# 1. 启动 vLLM API 服务（通过 vllm.entrypoints.openai.api_server）
+# 2. 直接调用 vllm.LLM 进行批量推理（在代码中使用 from vllm import LLM）
+#
+# 使用 Ascend vLLM 基础镜像（使用稳定版本标签，而非 latest）
+FROM quay.io/ascend/vllm-ascend:v0.13.0
+
+# 设置工作目录
+WORKDIR /app
+
+# 设置时区
+RUN rm -f /etc/localtime && \
+    ln -s /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+
+# 配置 pip 镜像源（如果需要安装额外依赖）
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ || true
+
+# 安装推理脚本所需依赖（用于直接调用 vllm.LLM 的场景）
+RUN pip install --no-cache-dir \
+    openai>=1.0.0 \
+    jinja2>=3.0.0 \
+    loguru>=0.7.0 \
+    pyyaml>=6.0.0 \
+    jieba==0.42.1 \
+    rouge_score==0.1.2 \
+    scikit-learn==1.7.2 \
+    rouge-chinese==1.0.3
+
+# 复制项目代码（用于直接调用 vllm.LLM 的场景）
+COPY ./scripts ./scripts
+
+# 设置 Python 路径
+ENV PYTHONPATH=/app:$PYTHONPATH
+
+# 暴露端口（vLLM 默认使用 8000 端口）
+EXPOSE 8000
+
+# 默认启动命令（可以通过环境变量或命令行参数覆盖）
+# 方式1：启动 API 服务
+# 示例：python -m vllm.entrypoints.openai.api_server --model <model_path> --host 0.0.0.0 --port 8000
+# 方式2：直接调用 vllm.LLM 运行推理脚本
+# 示例（生成推理结果）：python -m scripts.inference.inference_script --input_file /data/input.jsonl --output_file /data/output.jsonl --config_file /config/config.yaml --client_type vllm --log_level INFO
+# 示例（评估推理结果）：python -m scripts.inference.evaluate_script --input_file /data/input.jsonl --output_file /data/output.jsonl --config_file /config/config.yaml --client_type vllm --log_level INFO
+CMD ["python", "-m", "vllm.entrypoints.openai.api_server", "--help"]
+

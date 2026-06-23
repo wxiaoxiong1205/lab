@@ -1,0 +1,20 @@
+{
+  "b6b7f7d1421584f8547e64d2e72242ad": "Welcome to the AI Model Lifecycle Development Platform",
+  "ssh_config": "SSH Configuration",
+  "username_password": "Username/Password",
+  "click_to_set": "Click to Set",
+  "ssh_key": "SSH Key",
+  "generate_ssh_key": "Generate SSH Key",
+  "username": "Username",
+  "password": "Password",
+  "please_enter_username": "Please enter username",
+  "please_enter_password": "Please enter password",
+  "reset": "Reset",
+  "confirm": "Confirm",
+  "cancel": "Cancel",
+  "ssh_config_saved": "SSH configuration saved",
+  "ssh_key_generated": "SSH Key generated",
+  "confirm_reset_ssh_key": "Confirm reset SSH Key?",
+  "reset_ssh_key_warning": "After resetting, this SSH Key will no longer be supported as a login credential",
+  "reset_ssh_key": "Reset SSH Key"
+}

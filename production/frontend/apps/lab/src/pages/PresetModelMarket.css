@@ -1,0 +1,12 @@
+.preset-template-description {
+  display: -webkit-box;
+  flex: 1;
+  color: var(--lab-color-text-muted);
+  line-height: 12px;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.preset-template-panel {
+  flex: 0 0 35%;
+}

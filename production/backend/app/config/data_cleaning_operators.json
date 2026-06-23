@@ -1,0 +1,430 @@
+[
+  {
+    "type": "whitespace_cleaner",
+    "name": "空白字符清洗",
+    "category": "format_cleaning",
+    "description": "移除多余的空行、行首/行尾空格、制表符，并将多种换行符统一为\\n",
+    "params_schema": {}
+  },
+  {
+    "type": "text_quality_filter",
+    "name": "乱码清洗",
+    "category": "format_cleaning",
+    "description": "清洗多种乱码，包括编码异常、键盘乱打、低质量重复文本等",
+    "params_schema": {
+      "max_abnormal_char_ratio": {
+        "type": "float",
+        "default": 0.25,
+        "description": "最大允许的异常符号（如乱码、特殊字符）占比",
+        "min": 0,
+        "max": 1,
+        "step": 0.01,
+        "ui_type": "number",
+        "required": true
+      },
+      "min_meaningful_char_ratio": {
+        "type": "float",
+        "default": 0.7,
+        "description": "有效文字字符（如汉字、字母）最小占比",
+        "min": 0,
+        "max": 1,
+        "step": 0.01,
+        "ui_type": "number",
+        "required": true
+      },
+      "max_rare_char_ratio": {
+        "type": "float",
+        "default": 0.3,
+        "description": "罕见汉字最大允许比例",
+        "min": 0,
+        "max": 1,
+        "step": 0.01,
+        "ui_type": "number",
+        "required": true
+      },
+      "max_compression_ratio": {
+        "type": "float",
+        "default": 0.4,
+        "description": "最大允许的压缩率（用于检测重复或冗余内容）",
+        "min": 0,
+        "max": 1,
+        "step": 0.01,
+        "ui_type": "number",
+        "required": true
+      },
+      "min_base64_char_ratio": {
+        "type": "float",
+        "default": 0.2,
+        "description": "最小允许的 base64 编码字符占比（用于识别编码内容）",
+        "min": 0,
+        "max": 1,
+        "step": 0.01,
+        "ui_type": "number",
+        "required": true
+      },
+      "max_consecutive_noise_len": {
+        "type": "int",
+        "default": 8,
+        "description": "连续异常或非文字字符的最大长度",
+        "min": 1,
+        "ui_type": "number",
+        "required": true
+      },
+      "max_consecutive_rare_len": {
+        "type": "int",
+        "default": 5,
+        "description": "连续生僻/异常汉字最大长度",
+        "min": 1,
+        "ui_type": "number",
+        "required": true
+      }
+    }
+  },
+  {
+    "type": "html_cleaner",
+    "name": "HTML标签清洗",
+    "category": "format_cleaning",
+    "description": "移除HTML标签，保留纯文本内容",
+    "params_schema": {}
+  },
+  {
+    "type": "consecutive_newline_cleaner",
+    "name": "多余换行符清洗",
+    "category": "format_cleaning",
+    "description": "将连续多个换行符合并为单个换行符",
+    "params_schema": {
+      "keep_one_blank_line": {
+        "type": "bool",
+        "default": true,
+        "description": "是否保留段落间的一个空行",
+        "ui_type": "switch",
+        "required": true
+      },
+      "convert_literal": {
+        "type": "bool",
+        "default": true,
+        "description": "是否把字符串中的 \"\\\\n\" 转为真实换行",
+        "ui_type": "switch",
+        "required": true
+      }
+    }
+  },
+  {
+    "type": "token_num_filter",
+    "name": "长度异常文本过滤器",
+    "category": "llm_data_cleaning",
+    "description": "移除长度小于指定阈值或大于指定阈值（按token数计算）的内容",
+    "params_schema": {
+      "min_num": {
+        "type": "int",
+        "default": 10,
+        "description": "最小 Token 数。低于此值的样本将被过滤",
+        "min": 1,
+        "unit": "tokens",
+        "ui_type": "number",
+        "required": true
+      },
+      "max_num": {
+        "type": "int",
+        "default": 512,
+        "description": "最大 Token 数。高于此值的样本将被过滤",
+        "min": 1,
+        "unit": "tokens",
+        "ui_type": "number",
+        "required": true
+      }
+    }
+  },
+  {
+    "type": "repeat_info_processor",
+    "name": "重复生成内容移除器",
+    "category": "llm_data_cleaning",
+    "description": "检测并移除LLM重复生成的内容片段",
+    "params_schema": {
+      "max_char_repeat": {
+        "type": "int",
+        "default": 20,
+        "description": "连续N个字符重复则踢掉",
+        "min": 1,
+        "ui_type": "number",
+        "required": true
+      },
+      "max_phrase_repeat": {
+        "type": "int",
+        "default": 10,
+        "description": "连续N个长句重复则踢掉",
+        "min": 1,
+        "ui_type": "number",
+        "required": true
+      },
+      "rep_len": {
+        "type": "int",
+        "default": 10,
+        "description": "N-gram 统计词组长度",
+        "min": 1,
+        "ui_type": "number",
+        "required": true
+      },
+      "max_ratio": {
+        "type": "float",
+        "default": 0.5,
+        "description": "显著重复占比过半则踢掉",
+        "min": 0,
+        "max": 1,
+        "step": 0.01,
+        "ui_type": "number",
+        "required": true
+      },
+      "max_compression_ratio": {
+        "type": "float",
+        "default": 0.45,
+        "description": "信息密度不足N%则踢掉",
+        "min": 0,
+        "max": 1,
+        "step": 0.01,
+        "ui_type": "number",
+        "required": true
+      }
+    }
+  },
+  {
+    "type": "judge_truncated_process",
+    "name": "截断句移除器",
+    "category": "llm_data_cleaning",
+    "description": "移除不完整的截断句子，保证文本完整性",
+    "params_schema": {}
+  },
+  {
+    "type": "language_filter",
+    "name": "语种过滤器",
+    "category": "llm_data_cleaning",
+    "description": "基于语言识别过滤非目标语种的内容，过滤掉不属于lang_filter_allowed_languages的语言",
+    "params_schema": {
+      "lang_filter_allowed_languages": {
+        "type": "list",
+        "default": ["en"],
+        "description": "支持的语言列表",
+        "list_item_type": "string",
+        "enum": ["zh", "en"],
+        "enum_labels": {
+          "zh": "中文",
+          "en": "英文"
+        },
+        "ui_type": "multi_select",
+        "required": true
+      }
+    }
+  },
+  {
+    "type": "document_deduplicator",
+    "name": "精确匹配去重器",
+    "category": "deduplication",
+    "description": "基于精确哈希值的文档去重，适用于完全相同内容的检测。基于内容的哈希值（如MD5, SHA256）进行精确匹配，删除完全一样的数据项",
+    "params_schema": {
+      "lowercase": {
+        "type": "bool",
+        "default": false,
+        "description": "是否转换成小写",
+        "ui_type": "switch",
+        "required": true
+      },
+      "ignore_non_character": {
+        "type": "bool",
+        "default": false,
+        "description": "是否忽略非字母字符",
+        "ui_type": "switch",
+        "required": true
+      }
+    }
+  },
+  {
+    "type": "document_minhash_deduplicator",
+    "name": "MinHash去重器",
+    "category": "deduplication",
+    "description": "利用MinHash和局部敏感哈希（LSH）技术，高效地找出Jaccard相似度高的文本对，适合在海量数据中进行近乎重复的文档检测。使用MinHash LSH在文档级别去重样本",
+    "params_schema": {
+      "tokenization": {
+        "type": "string",
+        "default": "character",
+        "description": "分词方法：中文数据必须使用 'character'，否则无法生成签名",
+        "enum": ["space", "punctuation", "character", "sentencepiece"],
+        "enum_labels": {
+          "space": "按空格切分（适合英文）",
+          "punctuation": "按标点切分",
+          "character": "按字符切分（适合中文）",
+          "sentencepiece": "子词切分"
+        },
+        "ui_type": "select",
+        "required": true
+      },
+      "window_size": {
+        "type": "int",
+        "default": 5,
+        "description": "分片窗口大小：注意文本长度必须 >= window_size",
+        "min": 1,
+        "ui_type": "number",
+        "required": true
+      },
+      "lowercase": {
+        "type": "bool",
+        "default": true,
+        "description": "是否先将文本转换为小写",
+        "ui_type": "switch",
+        "required": true
+      },
+      "num_permutations": {
+        "type": "int",
+        "default": 128,
+        "description": "排列次数：决定签名长度，越大计算 Jaccard 相似度越准",
+        "min": 1,
+        "ui_type": "number",
+        "required": true
+      },
+      "jaccard_threshold": {
+        "type": "float",
+        "default": 0.85,
+        "description": "Jaccard 相似度阈值：当相似度 >= 此值时视为重复",
+        "min": 0,
+        "max": 1,
+        "step": 0.01,
+        "ui_type": "number",
+        "required": true
+      },
+      "ignore_pattern": {
+        "type": "string",
+        "default": null,
+        "description": "计算 minhash 时忽略符合特定模式的子串",
+        "ui_type": "text",
+        "required": false
+      },
+      "num_bands": {
+        "type": "int",
+        "default": null,
+        "description": "LSH 的 Band 数量：",
+        "min": 1,
+        "ui_type": "number",
+        "required": false
+      },
+      "num_rows_per_band": {
+        "type": "int",
+        "default": null,
+        "description": "每个 Band 的行数：",
+        "min": 1,
+        "ui_type": "number",
+        "required": false
+      }
+    }
+  },
+  {
+    "type": "document_simhash_deduplicator",
+    "name": "SimHash去重器",
+    "category": "deduplication",
+    "description": "将文本转换为一个紧凑的SimHash指纹（如64位），通过计算指纹间的汉明距离来判断文本相似度。为每个样本计算SimHash值，并根据指定的汉明距离阈值移除重复项。注：若执行失败，需要安装simhash-pybind库（uv pip install simhash-pybind）",
+    "params_schema": {
+      "tokenization": {
+        "type": "string",
+        "default": "character",
+        "description": "样本文本分词方法：为了防止中文报错，强制设为 'character'",
+        "enum": ["space", "punctuation", "character"],
+        "enum_labels": {
+          "space": "按空格分词",
+          "punctuation": "按标点分词",
+          "character": "按字符分词"
+        },
+        "ui_type": "select",
+        "required": true
+      },
+      "window_size": {
+        "type": "int",
+        "default": 6,
+        "description": "shingling (分片) 的窗口大小",
+        "min": 1,
+        "ui_type": "number",
+        "required": true
+      },
+      "num_blocks": {
+        "type": "int",
+        "default": 6,
+        "description": "simhash 计算中的分块数量",
+        "min": 1,
+        "ui_type": "number",
+        "required": true
+      },
+      "hamming_distance": {
+        "type": "int",
+        "default": 4,
+        "description": "海明距离阈值：<=此值视为重复，只保留一个（应小于num_blocks）",
+        "min": 1,
+        "max": 64,
+        "ui_type": "number",
+        "required": true
+      },
+      "lowercase": {
+        "type": "bool",
+        "default": true,
+        "description": "是否先将文本转换为小写",
+        "ui_type": "switch",
+        "required": true
+      },
+      "ignore_pattern": {
+        "type": "string",
+        "default": null,
+        "description": "计算 simhash 时忽略符合特定模式的子串",
+        "ui_type": "text",
+        "required": false
+      }
+    }
+  },
+  {
+    "type": "sensitive_conn_process",
+    "name": "联系方式脱敏",
+    "category": "sensitive_data_cleaning",
+    "description": "基于正则表达式，识别并处理手机号、Email地址和座机号",
+    "params_schema": {}
+  },
+  {
+    "type": "id_passport_filter",
+    "name": "身份与证件脱敏",
+    "category": "sensitive_data_cleaning",
+    "description": "基于正则表达式和校验规则，识别并处理身份证号、护照号等",
+    "params_schema": {}
+  },
+  {
+    "type": "sensitive_data_masker",
+    "name": "网络与地址脱敏",
+    "category": "sensitive_data_cleaning",
+    "description": "识别并处理IP地址、URL链接、MAC地址及物理地址",
+    "params_schema": {}
+  },
+  {
+    "type": "sensitive_money_masker",
+    "name": "金融与车辆脱敏",
+    "category": "sensitive_data_cleaning",
+    "description": "识别并处理银行卡号、信用卡号、车牌号等",
+    "params_schema": {}
+  },
+  {
+    "type": "social_media_id_filter",
+    "name": "社交账号脱敏",
+    "category": "sensitive_data_cleaning",
+    "description": "识别并处理微信号、QQ号、微博账号等社交平台账号",
+    "params_schema": {}
+  },
+  {
+    "type": "sensitive_keyword_mask",
+    "name": "自定义关键词脱敏",
+    "category": "sensitive_data_cleaning",
+    "description": "根据用户提供的关键词列表进行脱敏处理",
+    "params_schema": {
+      "key_words": {
+        "type": "list",
+        "default": [],
+        "description": "自定义关键词",
+        "list_item_type": "string",
+        "ui_type": "tags",
+        "placeholder": "请输入关键词，多个关键词用逗号分隔",
+        "required": true
+      }
+    }
+  }
+]

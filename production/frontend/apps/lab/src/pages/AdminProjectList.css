@@ -1,0 +1,22 @@
+.admin-project-actions .ant-btn {
+  height: 20px !important;
+  padding: 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.admin-project-actions .ant-btn:hover {
+  color: rgba(0, 71, 187, 1) !important;
+}
+
+.admin-project-actions .ant-btn .anticon {
+  font-size: 16px;
+}
+
+.admin-project-actions .table-action-column {
+  column-gap: 24px !important;
+  row-gap: 8px !important;
+}

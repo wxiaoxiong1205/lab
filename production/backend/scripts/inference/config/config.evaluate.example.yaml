@@ -1,0 +1,127 @@
+# 模型推理脚本配置文件示例
+
+# 推理配置
+inference:
+  # 推理参数（适用于所有客户端）
+  temperature: 0.7  # 控制随机性，范围0-2，默认0.7
+  max_tokens: 4096  # 最大生成token数，建议设置合理值（如512、1024、2048），vLLM默认仅16会导致截断
+  top_p: 1.0  # 核采样，范围0-1，默认1.0（采样时考虑所有tokens）
+  presence_penalty: 0.0  # 存在性惩罚，范围-2.0到2.0，默认0.0（不惩罚）
+  seed: 42  # 随机种子，用于可复现生成，null表示随机。注意：OpenAI是"尽力而为"，vLLM提供严格确定性
+
+# OpenAI客户端配置
+openai:
+  # api_key 配置说明：
+  # - 在 docker-compose 内部网络中访问 vLLM API 时，可以设置为任意占位符值（如 "not-required"）
+  # - vLLM 的 OpenAI 兼容 API 通常不强制验证 API key（除非服务端启用了认证）
+  # - 如果访问外部 OpenAI API 或启用了认证的 vLLM 服务，需要提供真实的 API key
+  api_key: "not-required"  # 必需字段，但在内部网络中可以使用占位符值
+  # base_url 配置说明：
+  # - 在 docker-compose 网络中，可以通过服务名作为 hostname 访问
+  # - 例如：http://vllm-service:8000/v1 （vllm-service 是 docker-compose 中的服务名）
+  # - 如果从外部访问，使用：http://localhost:8001/v1 （需要暴露端口）
+  base_url: "http://vllm-service:8000/v1"  # 必需，OpenAI API基础URL，使用服务名作为 hostname
+  model: "Qwen2.5-0.5B-Instruct"  # 必需，OpenAI模型名称，如"gpt-4"、"gpt-3.5-turbo"等（vLLM服务中可设置为任意值）
+  timeout: 120  # 请求超时时间（秒），默认120秒，超过此时间未响应将抛出超时异常
+  max_retries: 3  # 最大重试次数，默认3次，当请求失败时会自动重试
+  max_concurrent: 10  # 最大并发数，默认10，控制同时进行的请求数，避免触发速率限制
+
+# vLLM配置
+vllm:
+  model_path: "/models/Qwen2.5-0.5B-Instruct"  # 必需，模型文件路径，指向本地或挂载的模型目录
+  tensor_parallel_size: 2  # 张量并行大小，默认1（单GPU），多GPU推理时可设置为GPU数量
+  max_model_len: null  # 最大模型长度（token数），null表示使用模型默认值，用于限制输入+输出的总长度
+  gpu_memory_utilization: 0.85  # GPU内存利用率，范围0.0-1.0，默认0.9（使用90%的GPU内存），影响可同时处理的请求数
+  max_num_batched_tokens: null  # 单批次最大token数量，null表示使用默认值，用于连续批处理优化，控制批处理效率
+  max_num_seqs: null  # 最大序列数，null表示使用默认值，用于连续批处理优化，控制同时处理的序列数量
+
+# Prompt配置
+prompt:
+  # 评估模板文件路径（用于多指标评估场景）
+  template_path: "/data/configs/prompt_template.evaluate.example.j2"
+
+# 评估指标配置（多指标评估场景）
+# 每个metric对应一个评估维度，并包含自己的字段映射配置
+metrics:
+  - name: "上下文相关性"
+    description: "评估检索到的上下文与用户问题的相关程度。"
+    score_min: 0
+    score_max: 10
+    score_definitions: |
+      0-1分：检索内容完全不相关，与问题无任何关联。
+      2-3分：检索内容基本不相关，仅有极少量相关信息。
+      4-5分：检索内容部分相关，但包含较多无关信息。
+      6-7分：检索内容较为相关，大部分信息与问题相关。
+      8-10分：检索内容高度相关，几乎所有信息都与问题直接相关。
+    field_mapping:
+      input_content: "question"   # JSONL中的"question"字段映射到模板变量"input_content"
+      retrieval_context: "context"  # JSONL中的"context"字段映射到模板变量"retrieval_context"
+
+  - name: "答案相关性"
+    description: "评估生成答案与用户问题的相关程度。"
+    score_min: 0
+    score_max: 10
+    score_definitions: |
+      0-1分：答案完全不相关，未回答用户问题。
+      2-3分：答案基本不相关，仅触及问题边缘。
+      4-5分：答案部分相关，但未充分回答问题核心。
+      6-7分：答案较为相关，基本回答了问题要点。
+      8-10分：答案高度相关，完全针对问题进行了准确回答。
+    field_mapping:
+      input_content: "question"   # 用户问题
+      actual_output: "answer"     # 模型实际回答
+
+  - name: "忠实性"
+    description: "评估生成答案对检索上下文的忠实程度，是否基于检索内容生成。"
+    score_min: 0
+    score_max: 10
+    score_definitions: |
+      0-1分：答案完全脱离检索内容，存在明显幻觉。
+      2-3分：答案大部分脱离检索内容，少量基于检索信息。
+      4-5分：答案部分基于检索内容，但有一定程度的偏离。
+      6-7分：答案主要基于检索内容，偏离程度较小。
+      8-10分：答案完全基于检索内容，高度忠实于参考文档。
+    field_mapping:
+      actual_output: "answer"
+      retrieval_context: "context"
+
+  - name: "上下文召回性"
+    description: "评估检索到的上下文包含正确答案信息的程度。"
+    score_min: 0
+    score_max: 10
+    score_definitions: |
+      0-1分：检索内容完全不包含正确答案所需信息。
+      2-3分：检索内容包含极少量正确答案相关信息。
+      4-5分：检索内容包含部分正确答案信息，但不够完整。
+      6-7分：检索内容包含大部分正确答案所需信息。
+      8-10分：检索内容完全包含回答问题所需的所有关键信息。
+    field_mapping:
+      expected_output: "expected_answer"
+      retrieval_context: "context"
+
+# 数据处理配置
+data:
+  batch_size: 5000  # 数据读取批次大小，默认5000（控制每次从JSONL文件读取的数据量）
+  skip_errors: true  # 是否跳过错误数据，默认true
+
+# 运行配置
+runtime:
+  client_type: "openai"  # 推理客户端类型，可选值: "openai", "vllm"
+  log_level: "INFO"  # 日志级别，可选值: "DEBUG", "INFO", "WARNING", "ERROR"
+  # 输入文件路径（可以是单个文件或文件列表）
+  input_file:
+    - "/data/input/input.evaluate.example.jsonl"
+  # 输出文件路径（可以是单个文件或文件列表，数量需与输入文件一致）
+  output_file:
+    - "/data/output/output.evaluate.jsonl"
+  # 进度文件路径（用于记录实时进度信息，JSONL格式，可选）
+  # 如果未指定，则不写入进度文件
+  progress_file: "/data/output/output.process.jsonl"
+  # 统计文件路径（用于记录统计信息，JSONL格式，可选）
+  # 如果未指定，则不写入统计文件
+  statistics_file: "/data/output/output.calculate.jsonl"
+  # 推理结果数据集ID列表（用于在统计文件中标识数据集，可选）
+  # 如果指定，会在统计文件中写入 inference_result_dataset_id 字段
+  inference_result_dataset_id:
+    - 123  # 示例：推理结果数据集ID
+    - 456  # 如果有多个数据集，可以添加多个ID

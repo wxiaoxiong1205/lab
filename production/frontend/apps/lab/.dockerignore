@@ -1,0 +1,114 @@
+# ==============================================
+# Docker Ignore Configuration for Frontend Only
+# ==============================================
+# This file excludes unnecessary files from Docker build context
+# to improve build performance and reduce image size.
+# 
+# Essential files for frontend container operation:
+# - src/ (React application code)
+# - public/ (static assets)
+# - package.json (Node.js dependencies)
+# - vite.config.ts (Vite build configuration)
+# - tailwind.config.js (Tailwind CSS configuration)
+# ==============================================
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# Frontend build outputs
+dist/
+.next/
+out/
+build/
+.cache/
+.parcel-cache/
+.temp/
+.nuxt/
+
+# IDE & Editors
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+*~
+.vim/
+.emacs.d/
+.eclipse/
+.netbeans/
+
+# OS
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs and temporary files
+*.log
+temp/
+tmp/
+*.tmp
+*.temp
+
+# Environment and configuration
+# .env.*
+.envrc
+*.local
+
+# Development and documentation files
+README*.md
+CHANGELOG*.md
+CONTRIBUTING*.md
+LICENSE*
+docs/
+doc/
+documentation/
+*.md
+
+# Development scripts and tools
+scripts/
+tools/
+dev-tools/
+Makefile
+makefile
+
+# Project specific development files
+project_doc/
+FRONTEND_DEV_README.md
+
+# Docker development files
+*.dev.Dockerfile
+build_*.sh
+quick_start_*.sh
+
+# Development shell scripts
+*.sh
+
+# Package files (but allow frontend dependencies)
+package-lock.json
+yarn.lock
+# Allow pnpm-lock.yaml for Docker builds
+!pnpm-lock.yaml
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+coverage/
+.nyc_output/
+.lcov
+
+# ESLint
+.eslintcache 

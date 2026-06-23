@@ -1,0 +1,68 @@
+.dataset-comparison-page {
+  max-width: 1600px;
+  margin: 20px auto;
+  padding: 0 16px;
+  overflow-x: hidden;
+}
+
+.comparison-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.log-card {
+  height: 100%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.content-wrapper {
+  border: 1px solid #f0f0f0;
+  padding: 12px;
+  border-radius: 4px;
+  background-color: #fafafa;
+}
+
+.markdown-content-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.markdown-content-wrapper img {
+  max-width: 100%;
+  display: block;
+  margin: 8px 0;
+}
+
+.markdown-content-wrapper pre {
+  overflow-x: auto;
+  padding: 12px;
+  border-radius: 4px;
+  background-color: #f5f5f5;
+}
+
+.markdown-content-wrapper table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.markdown-content-wrapper table th,
+.markdown-content-wrapper table td {
+  border: 1px solid #e8e8e8;
+  padding: 8px;
+  text-align: left;
+}
+
+.markdown-content-wrapper table th {
+  background-color: #f5f5f5;
+  font-weight: 500;
+}
+
+/* Responsive styling */
+@media (max-width: 768px) {
+  .comparison-cards {
+    grid-template-columns: 1fr;
+  }
+} 

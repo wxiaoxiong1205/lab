@@ -1,0 +1,321 @@
+{
+  "name": "文档中心",
+  "id": "Documentation",
+  "children": [
+    {
+      "name": "接口 API",
+      "id": "interface_api",
+      "children": [
+        {
+          "id": "openapi_common",
+          "name": "开放平台接口公共说明",
+          "type": "doc",
+          "path": "common.md",
+          "children": []
+        },
+        {
+          "id": "auth_signature",
+          "name": "认证与签名",
+          "children": [
+            {
+              "id": "generate_signature",
+              "name": "密钥签名生成",
+              "type": "doc",
+              "path": "auth/generate_signature.md",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "dataset_api",
+          "name": "数据集接口",
+          "children": [
+            {
+              "id": "create_dataset",
+              "name": "上传数据集",
+              "type": "interface",
+              "path": "dataset/create_dataset.md",
+              "children": []
+            },
+            {
+              "id": "create_dataset_version",
+              "name": "上传数据集新版本",
+              "type": "interface",
+              "path": "dataset/create_dataset_version.md",
+              "children": []
+            },
+            {
+              "id": "delete_dataset_version",
+              "name": "删除数据集单个版本",
+              "type": "interface",
+              "path": "dataset/delete_dataset_version.md",
+              "children": []
+            },
+            {
+              "id": "delete_dataset_all_versions",
+              "name": "删除数据集全部版本",
+              "type": "interface",
+              "path": "dataset/delete_dataset_all_versions.md",
+              "children": []
+            },
+            {
+              "id": "list_datasets",
+              "name": "分页查询数据集",
+              "type": "interface",
+              "path": "dataset/list_datasets.md",
+              "children": []
+            },
+            {
+              "id": "filter_datasets",
+              "name": "按聚合条件过滤数据集",
+              "type": "interface",
+              "path": "dataset/filter_datasets.md",
+              "children": []
+            },
+            {
+              "id": "list_dataset_versions",
+              "name": "查询数据集版本列表",
+              "type": "interface",
+              "path": "dataset/list_dataset_versions.md",
+              "children": []
+            },
+            {
+              "id": "check_dataset_in_use",
+              "name": "查询数据集使用状态",
+              "type": "interface",
+              "path": "dataset/check_dataset_in_use.md",
+              "children": []
+            },
+            {
+              "id": "preview_dataset_samples",
+              "name": "预览数据集样本",
+              "type": "interface",
+              "path": "dataset/preview_dataset_samples.md",
+              "children": []
+            },
+            {
+              "id": "get_dataset_aggregation_stats",
+              "name": "查询数据集聚合统计",
+              "type": "interface",
+              "path": "dataset/get_dataset_aggregation_stats.md",
+              "children": []
+            },
+            {
+              "id": "download_dataset",
+              "name": "下载数据集版本",
+              "type": "interface",
+              "path": "dataset/download_dataset.md",
+              "children": []
+            },
+            {
+              "id": "download_sample_dataset",
+              "name": "下载数据集样例",
+              "type": "interface",
+              "path": "dataset/download_sample_dataset.md",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "machine_learning_api",
+          "name": "机器学习",
+          "children": [
+            {
+              "id": "machine_learning_dataset_api",
+              "name": "机器学习数据集接口",
+              "children": [
+                {
+                  "id": "ml_create_dataset",
+                  "name": "上传机器学习数据集",
+                  "type": "interface",
+                  "path": "machine_learning_dataset/create_dataset.md",
+                  "children": []
+                },
+                {
+                  "id": "ml_create_dataset_version",
+                  "name": "上传机器学习数据集新版本",
+                  "type": "interface",
+                  "path": "machine_learning_dataset/create_dataset_version.md",
+                  "children": []
+                },
+                {
+                  "id": "ml_delete_dataset",
+                  "name": "删除机器学习数据集版本",
+                  "type": "interface",
+                  "path": "machine_learning_dataset/delete_dataset.md",
+                  "children": []
+                },
+                {
+                  "id": "ml_delete_dataset_all_versions",
+                  "name": "删除机器学习数据集全部版本",
+                  "type": "interface",
+                  "path": "machine_learning_dataset/delete_dataset_all_versions.md",
+                  "children": []
+                },
+                {
+                  "id": "ml_update_dataset_basic_info",
+                  "name": "编辑机器学习数据集基础信息",
+                  "type": "interface",
+                  "path": "machine_learning_dataset/update_dataset_basic_info.md",
+                  "children": []
+                },
+                {
+                  "id": "ml_list_datasets",
+                  "name": "分页查询机器学习数据集",
+                  "type": "interface",
+                  "path": "machine_learning_dataset/list_datasets.md",
+                  "children": []
+                },
+                {
+                  "id": "ml_list_dataset_versions",
+                  "name": "查询机器学习数据集版本列表",
+                  "type": "interface",
+                  "path": "machine_learning_dataset/list_dataset_versions.md",
+                  "children": []
+                },
+                {
+                  "id": "ml_get_dataset_detail",
+                  "name": "查询机器学习数据集详情",
+                  "type": "interface",
+                  "path": "machine_learning_dataset/get_dataset_detail.md",
+                  "children": []
+                },
+                {
+                  "id": "ml_get_export_formats",
+                  "name": "查询机器学习数据集导出格式",
+                  "type": "interface",
+                  "path": "machine_learning_dataset/get_export_formats.md",
+                  "children": []
+                },
+                {
+                  "id": "ml_download_sample_dataset",
+                  "name": "下载机器学习数据集样例",
+                  "type": "interface",
+                  "path": "machine_learning_dataset/download_sample_dataset.md",
+                  "children": []
+                },
+                {
+                  "id": "ml_download_dataset",
+                  "name": "下载机器学习数据集",
+                  "type": "interface",
+                  "path": "machine_learning_dataset/download_dataset.md",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "upload_api",
+          "name": "文件上传接口",
+          "children": [
+            {
+              "id": "init_upload",
+              "name": "初始化分片上传",
+              "type": "interface",
+              "path": "upload/init_upload.md",
+              "children": []
+            },
+            {
+              "id": "upload_chunk",
+              "name": "上传文件分片",
+              "type": "interface",
+              "path": "upload/upload_chunk.md",
+              "children": []
+            },
+            {
+              "id": "get_upload_progress",
+              "name": "查询分片上传进度",
+              "type": "interface",
+              "path": "upload/get_upload_progress.md",
+              "children": []
+            },
+            {
+              "id": "complete_upload",
+              "name": "完成分片上传",
+              "type": "interface",
+              "path": "upload/complete_upload.md",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "file_management_api",
+          "name": "文件管理接口",
+          "children": [
+            {
+              "id": "create_folder",
+              "name": "创建文件夹",
+              "type": "interface",
+              "path": "file_management/create_folder.md",
+              "children": []
+            },
+            {
+              "id": "save_file_by_upload_id",
+              "name": "保存上传文件信息",
+              "type": "interface",
+              "path": "file_management/save_file_by_upload_id.md",
+              "children": []
+            },
+            {
+              "id": "delete_folder",
+              "name": "删除文件夹",
+              "type": "interface",
+              "path": "file_management/delete_folder.md",
+              "children": []
+            },
+            {
+              "id": "delete_file",
+              "name": "删除文件",
+              "type": "interface",
+              "path": "file_management/delete_file.md",
+              "children": []
+            },
+            {
+              "id": "update_folder",
+              "name": "更新文件夹",
+              "type": "interface",
+              "path": "file_management/update_folder.md",
+              "children": []
+            },
+            {
+              "id": "list_folders",
+              "name": "查询文件夹列表",
+              "type": "interface",
+              "path": "file_management/list_folders.md",
+              "children": []
+            },
+            {
+              "id": "get_folder",
+              "name": "查询文件夹详情",
+              "type": "interface",
+              "path": "file_management/get_folder.md",
+              "children": []
+            },
+            {
+              "id": "list_files",
+              "name": "查询文件列表",
+              "type": "interface",
+              "path": "file_management/list_files.md",
+              "children": []
+            },
+            {
+              "id": "get_file",
+              "name": "查询文件详情",
+              "type": "interface",
+              "path": "file_management/get_file.md",
+              "children": []
+            },
+            {
+              "id": "download_file",
+              "name": "下载文件",
+              "type": "interface",
+              "path": "file_management/download_file.md",
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+/* Antd component overrides shared by lab pages.
+   Move page-specific overrides into component CSS unless they intentionally apply globally. */
+
+.storage-transfer-container .ant-transfer-list-content-item-remove,
+.registry-transfer-container .ant-transfer-list-content-item-remove {
+  display: none !important;
+}

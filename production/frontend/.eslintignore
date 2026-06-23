@@ -1,0 +1,5 @@
+*.conf
+*.sh
+*.arm64
+Dockerfile
+Jenkinsfile

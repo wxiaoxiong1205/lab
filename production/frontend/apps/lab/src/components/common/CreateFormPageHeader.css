@@ -1,0 +1,117 @@
+.create-form-page {
+  min-height: 100%;
+  /* padding: 0 10px 10px; */
+  overflow: visible;
+  background-color: rgba(248, 249, 250, 1.0);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.create-form-card {
+  width: 100%;
+  min-height: 830px;
+  margin: 0;
+  overflow: visible;
+  background-color: rgba(255, 255, 255, 1.0);
+  border-radius: 10px;
+  box-shadow: 0px 2px 6px 0px rgba(0, 0, 0, 0.05);
+}
+
+.create-form-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  height: 92px;
+  padding: 20px 30px 0 20px;
+  background-color: rgba(255, 255, 255, 1.0);
+  border-radius: 10px 10px 0 0;
+}
+
+.create-form-title-group {
+  display: flex;
+  align-items: flex-start;
+}
+
+.create-form-back.ant-btn {
+  width: 32px;
+  height: 32px;
+  margin: -2px -7px 0 -7px;
+  padding: 0;
+  color: rgba(24, 24, 25, 1);
+  border-radius: 6px;
+}
+
+.create-form-back .anticon {
+  font-size: 18px;
+}
+
+.create-form-title-copy {
+  margin-left: 16px;
+}
+
+.create-form-title-copy h1 {
+  height: 28px;
+  margin: 0;
+  overflow: hidden;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.create-form-title-copy p {
+  height: 20px;
+  margin: 10px 0 0 0;
+  overflow: hidden;
+  color: rgba(112, 118, 127, 1);
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.create-form-cancel.ant-btn,
+.create-form-submit.ant-btn {
+  width: 88px;
+  height: 36px;
+  margin-top: 27px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.create-form-cancel.ant-btn {
+  color: rgba(24, 24, 25, 1);
+  background-color: rgba(255, 255, 255, 1.0);
+  border: 1px solid rgba(216, 217, 220, 1);
+}
+
+.create-form-submit.ant-btn {
+  color: rgba(255, 255, 255, 1);
+  background-color: rgba(0, 71, 187, 1.0);
+  border-color: rgba(0, 71, 187, 1.0);
+}
+
+.create-form-submit.ant-btn:disabled,
+.create-form-submit.ant-btn.ant-btn-disabled {
+  color: rgba(0, 0, 0, 0.25);
+  background-color: rgba(0, 0, 0, 0.04);
+  border-color: rgba(217, 217, 217, 1);
+}
+
+.create-form-divider {
+  width: calc(100% - 30px);
+  height: 1px;
+  margin: 0 15px;
+  background-color: rgba(233, 236, 239, 1);
+}
+
+.create-form-body {
+  padding: 25px 40px 34px;
+}

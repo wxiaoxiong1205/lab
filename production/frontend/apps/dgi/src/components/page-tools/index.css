@@ -1,0 +1,18 @@
+.page-tools {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 70px;
+}
+
+.page-tools .left {
+  display: flex;
+  align-items: center;
+  font-size: var(--font-size-middle);
+}
+
+.page-tools .right {
+  display: flex;
+  align-items: center;
+  font-size: var(--font-size-middle);
+}

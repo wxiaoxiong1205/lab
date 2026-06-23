@@ -1,0 +1,35 @@
+# 推理脚本客户端镜像
+# 用于运行推理脚本，支持 OpenAI API 客户端（通过配置文件连接到 OpenAI 兼容的 API 服务）
+
+FROM python:3.10.16-slim
+
+# 设置工作目录
+WORKDIR /app
+
+# 设置时区
+RUN rm -f /etc/localtime && \
+    ln -s /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+
+# 配置 pip 镜像源
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
+
+# 安装基础依赖（必需）
+RUN pip install --no-cache-dir \
+    openai>=1.0.0 \
+    jinja2>=3.0.0 \
+    loguru>=0.7.0 \
+    pyyaml>=6.0.0 \
+    jieba==0.42.1 \
+    rouge_score==0.1.2 \
+    scikit-learn==1.7.2 \
+    rouge-chinese==1.0.3
+
+# 复制项目代码
+COPY ./scripts ./scripts
+
+# 设置 Python 路径
+ENV PYTHONPATH=/app:$PYTHONPATH
+
+# 默认命令
+CMD ["python", "-m", "scripts.inference.inference_script", "--help"]
+

@@ -1,0 +1,85 @@
+.my-notebook-search-input {
+  width: 180px;
+}
+
+.my-notebook-toolbar .ant-form > .flex > .flex.gap-2:last-child > .ant-btn {
+  width: 88px;
+}
+
+.my-notebook-table-filter {
+  width: 280px;
+  padding: 14px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.my-notebook-table-filter-title {
+  padding-bottom: 12px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(229, 231, 235, 1);
+  color: rgba(31, 41, 55, 1);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.my-notebook-table-filter-options {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.my-notebook-table-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.my-notebook-table-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.my-notebook-table-filter-label {
+  flex: 1;
+  min-width: 0;
+  color: rgba(31, 41, 55, 1);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.my-notebook-table-filter-count {
+  color: rgba(107, 114, 128, 1);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.my-notebook-table-filter-empty {
+  padding: 18px 0;
+  color: rgba(107, 114, 128, 1);
+  font-size: 13px;
+  text-align: center;
+}
+
+.my-notebook-table-filter-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid rgba(229, 231, 235, 1);
+}
+
+.my-notebook-table-filter-icon {
+  color: rgba(148, 163, 184, 1);
+}
+
+.my-notebook-table-filter-icon-active {
+  color: var(--lab-color-brand-primary);
+}

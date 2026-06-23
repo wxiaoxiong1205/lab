@@ -1,0 +1,42 @@
+.logs-wrap {
+  background-color: #141414;
+  border-radius: 2px;
+  font-family: monospace, Menlo, Courier, 'Courier New', Consolas, Monaco,
+    'Liberation Mono' !important;
+}
+
+.logs-wrap .content {
+  word-wrap: break-word;
+  height: 100%;
+  padding-right: 2px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  line-height: 22px;
+  white-space: pre-wrap;
+  background-color: #141414;
+}
+
+.logs-wrap .content.line-break {
+  word-wrap: break-word;
+}
+
+.logs-wrap .content .text {
+  min-height: 22px;
+  padding-inline-end: 80px;
+}
+
+.logs-wrap .content .text.numable {
+  position: relative;
+  padding-left: 45px;
+}
+
+.logs-wrap .content .text.numable .line-num {
+  display: flex;
+  align-items: center;
+  width: 40px;
+  justify-content: center;
+  position: absolute;
+  left: 0;
+  top: 0;
+  background-color: rgba(71, 71, 71, 50%);
+}

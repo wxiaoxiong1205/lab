@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Lab Token Launcher",
+  "version": "0.1.0",
+  "description": "Read auth_token from the current official-site tab and open local lab with _tk auto-login.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Lab Token Launcher"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
+  ]
+}

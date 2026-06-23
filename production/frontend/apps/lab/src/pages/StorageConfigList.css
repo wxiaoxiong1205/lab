@@ -1,0 +1,169 @@
+.storage-config-table-card.ant-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.storage-config-table-card .ant-card-body {
+  padding: 0;
+}
+
+.storage-config-table .ant-table {
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.storage-config-table .ant-table-thead > tr {
+  height: 40px !important;
+}
+
+.storage-config-table .ant-table-thead > tr > th {
+  height: 40px;
+  padding: 10px 16px !important;
+  background-color: rgba(244, 246, 248, 1.0) !important;
+  color: rgba(24, 24, 25, 1) !important;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px !important;
+  font-weight: normal !important;
+  line-height: 20px !important;
+}
+
+.storage-config-table .ant-table-tbody > tr:not(.ant-table-measure-row) > td {
+  height: 50px;
+  padding: 15px 16px !important;
+  border-bottom: 1px solid rgba(232, 233, 234, 1.0);
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.storage-config-table .ant-table-tbody > tr.ant-table-measure-row,
+.storage-config-table .ant-table-tbody > tr.ant-table-measure-row > td {
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  line-height: 0 !important;
+  visibility: hidden;
+}
+
+.storage-config-table .ant-table-tbody > tr:hover > td {
+  background-color: rgba(244, 246, 248, 1.0) !important;
+}
+
+.storage-config-table .ant-pagination {
+  margin: 22px 0 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.storage-config-table .ant-pagination-total-text {
+  margin-inline-end: 24px;
+}
+
+.storage-config-table .ant-pagination .ant-pagination-item,
+.storage-config-table .ant-pagination .ant-pagination-prev,
+.storage-config-table .ant-pagination .ant-pagination-next {
+  min-width: 32px;
+  height: 32px;
+  line-height: 30px;
+}
+
+.storage-config-table .ant-pagination .ant-pagination-item-active {
+  background-color: #ECEEEF;
+  border-color: #ECEEEF;
+}
+
+.storage-config-table .ant-pagination .ant-pagination-item-active a {
+  color: inherit;
+  font-weight: 400 !important;
+}
+
+.storage-config-table .ant-pagination .ant-pagination-options {
+  margin-inline-start: 24px;
+}
+
+.storage-config-table .ant-pagination .ant-select-selector,
+.storage-config-table .ant-pagination .ant-pagination-options-quick-jumper input {
+  height: 32px;
+  border-color: rgba(216, 217, 220, 1);
+  border-radius: 6px;
+}
+
+.storage-config-actions .ant-btn {
+  height: 20px !important;
+  padding: 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.storage-config-actions .ant-btn:hover {
+  color: rgba(0, 71, 187, 1) !important;
+}
+
+.storage-config-actions .ant-btn .anticon {
+  font-size: 16px;
+}
+
+.storage-config-actions .table-action-column {
+  column-gap: 24px !important;
+  row-gap: 8px !important;
+}
+
+.storage-config-readonly-field {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 4px 11px;
+  overflow: hidden;
+  color: var(--lab-color-text-primary);
+  line-height: 24px;
+  cursor: default;
+  background-color: var(--lab-color-surface-readonly);
+  border: 1px solid var(--lab-color-border-subtle);
+  border-radius: var(--lab-radius-md);
+}
+
+.storage-config-readonly-field-visible {
+  overflow: visible;
+}
+
+.storage-config-readonly-field-description {
+  min-height: 64px;
+  align-items: flex-start;
+  padding: 8px 11px;
+  line-height: 22px;
+}
+
+.storage-config-readonly-text {
+  flex: 1;
+  min-width: 0;
+  overflow: visible;
+  white-space: nowrap;
+  user-select: text;
+}
+
+.storage-config-section {
+  padding: 16px;
+  margin-bottom: 20px;
+  background-color: var(--lab-color-surface-page);
+  border: var(--lab-border-subtle);
+  border-radius: var(--lab-radius-md);
+}
+
+.storage-config-section-title {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  color: var(--lab-color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}

@@ -1,0 +1,125 @@
+.markdown-viewer {
+  word-break: break-word;
+  font-size: var(--font-size-base);
+}
+
+.markdown-viewer .hr,
+.markdown-viewer hr {
+  border: none;
+  height: 1px;
+  background-color: var(--ant-color-split);
+  border-color: var(--ant-color-split);
+}
+
+.markdown-viewer p {
+  margin-bottom: 0;
+}
+
+.markdown-viewer b {
+  font-weight: var(--font-weight-bold);
+}
+
+.markdown-viewer pre {
+  white-space: pre-wrap;
+}
+
+.markdown-viewer h1,
+.markdown-viewer h2,
+.markdown-viewer h3,
+.markdown-viewer h4 {
+  font-weight: var(--font-weight-bold);
+  margin-top: 1em;
+}
+
+.markdown-viewer h1 {
+  font-size: 20px;
+}
+
+.markdown-viewer h2 {
+  font-size: 18px;
+}
+
+.markdown-viewer h3 {
+  font-size: 16px;
+}
+
+.markdown-viewer h4,
+.markdown-viewer h5,
+.markdown-viewer h6 {
+  font-size: 14px;
+}
+
+.markdown-viewer .hj-wrapper {
+  margin-top: 16px;
+}
+
+.markdown-viewer strong {
+  font-weight: var(--font-weight-bold);
+}
+
+.markdown-viewer ul,
+.markdown-viewer ol {
+  margin-bottom: 0;
+  padding-left: 20px;
+  line-height: 2;
+}
+
+.markdown-viewer a * {
+  color: inherit;
+}
+
+.markdown-viewer table {
+  width: 100%;
+  margin-bottom: 1.2em;
+  font-size: var(--font-size-small);
+}
+
+.markdown-viewer table th {
+  font-weight: var(--font-weight-bold);
+  line-height: 1.5;
+  padding-inline: 6px;
+  border: 1px solid var(--ant-color-split);
+  word-break: break-word;
+  text-align: left !important;
+}
+
+.markdown-viewer table td {
+  line-height: 1.5;
+  padding-inline: 6px;
+  border: 1px solid var(--ant-color-split);
+  word-break: break-word;
+  text-align: left !important;
+}
+
+.markdown-viewer table div {
+  display: inline;
+}
+
+.markdown-viewer a div {
+  display: inline;
+}
+
+.markdown-viewer img {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-viewer img[src^="https://img.shields.io/"],
+.markdown-viewer img[src*="badge.svg"] {
+  margin-bottom: 6px;
+  width: unset;
+  max-width: 100%;
+}
+
+.markdown-viewer video,
+.markdown-viewer audio {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--border-radius-base);
+}
+
+.markdown-viewer .item-token {
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}

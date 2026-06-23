@@ -1,0 +1,15 @@
+{
+  "name": "deepexi-lab-web",
+  "private": true,
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2"
+  },
+  "lint-staged": {
+    "apps/dgi/**/*.{js,ts,tsx,jsx,mjs}": "node scripts/lint-staged-run.mjs dgi",
+    "apps/lab/**/*.{js,ts,tsx,jsx,mjs}": "node scripts/lint-staged-run.mjs lab"
+  }
+}

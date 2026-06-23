@@ -1,0 +1,30 @@
+.dataset-cascader-selector-trigger.ant-space-compact {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.dataset-cascader-selector-trigger.dataset-cascader-selector-trigger.ant-space-compact > .ant-input {
+  flex: 1 1 0 !important;
+  width: 0 !important;
+  min-width: 0 !important;
+}
+
+.dataset-cascader-selector-trigger.dataset-cascader-selector-trigger.ant-space-compact > .ant-btn {
+  flex: 0 0 auto;
+}
+
+.dataset-cascader-selector-trigger > .ant-input {
+  overflow: hidden;
+  padding-right: 30px !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dataset-cascader-selector-clear {
+  position: absolute;
+  top: 50%;
+  right: 96px;
+  z-index: 3;
+  transform: translateY(-50%);
+}

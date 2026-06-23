@@ -1,0 +1,49 @@
+.lab-log-container {
+  background-color: var(--lab-color-surface-subtle);
+}
+
+.lab-log-container-bordered {
+  background-color: var(--lab-color-surface-elevated);
+  border: var(--lab-border-control);
+}
+
+.lab-log-alert {
+  background-color: var(--lab-color-brand-selected-bg);
+  border: 1px solid rgba(0, 71, 187, 0.2);
+}
+
+.lab-log-live {
+  background-color: rgba(50, 190, 72, 0.08);
+  border: 1px solid rgba(50, 190, 72, 0.3);
+}
+
+.lab-log-line {
+  padding: 2px 0;
+  margin-bottom: 2px;
+  color: var(--lab-color-text-primary);
+  border-bottom: var(--lab-border-subtle);
+}
+
+.lab-log-line-error {
+  color: var(--lab-color-danger);
+  font-weight: 700;
+}
+
+.lab-log-line-warning {
+  color: var(--lab-color-warning);
+  font-weight: 700;
+}
+
+.lab-log-line-info {
+  color: var(--lab-color-brand-primary);
+}
+
+.lab-log-highlight {
+  padding: 1px 2px;
+  background-color: rgba(250, 173, 20, 0.2);
+  border-radius: var(--lab-radius-xs);
+}
+
+.lab-log-empty {
+  color: var(--lab-color-text-muted);
+}

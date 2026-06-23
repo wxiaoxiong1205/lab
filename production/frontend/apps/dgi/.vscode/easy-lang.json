@@ -1,0 +1,10 @@
+{
+  "translationPath": "locales/translation.json",
+  "translateMode": "google",
+  "targetLangs": ["en-US", "zh-CN", "zh-HK"],
+  "model": {
+    "endpoint": "",
+    "model": "",
+    "apiKey": ""
+  }
+}

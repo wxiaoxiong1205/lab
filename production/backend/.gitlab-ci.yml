@@ -1,0 +1,377 @@
+# ============================================================================
+# GitLab CI - 企业级全自动 AI 代码评审（MR 专用完整版 - OpenCode 版）
+#
+# 依赖变量（Settings → CI/CD → Variables）：
+#   - GITLAB_TOKEN          （类型：Variable，Personal Access Token，需 api 权限）
+#   - OPENCODE_CONFIG_JSON  （类型：File，内容为 opencode.json 完整 JSON）
+#   - DINGTALK_WEBHOOK      （类型：Variable，钉钉机器人 Webhook URL）
+#   - DINGTALK_SECRET       （类型：Variable，钉钉机器人加签密钥，可选）
+#
+# ============================================================================
+
+stages:
+  - code_review
+
+code_review:
+  stage: code_review
+
+  tags:
+    - basion-lab
+
+  image:
+    name: deploy.deepexi.com/applife/opencode-code-review:v1.0
+    pull_policy: if-not-present
+
+  rules:
+    # 目标分支是 version/* 的 MR
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^version\//'
+      when: always
+    # 目标分支是 dev 的 MR
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"'
+      when: always
+    # 其他 MR 可手动触发
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
+
+  script:
+    - ls -al
+    - git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - git checkout $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
+
+    # =========================================================
+    # 0️⃣ 注入 OpenCode 配置（私有模型）
+    # =========================================================
+    - |
+      echo "🔑 配置 OpenCode..."
+      if [ -z "$OPENCODE_CONFIG_JSON" ]; then
+        echo "❌ 错误: 未设置 OPENCODE_CONFIG_JSON 变量"
+        echo "请在 Settings → CI/CD → Variables 中添加 File 类型变量"
+        exit 1
+      fi
+
+      mkdir -p ~/.config/opencode
+
+      # 修复 GitLab 将 $schema 展开为空 key 的问题，并清洗格式
+      if ! jq '. + {"$schema": "https://opencode.ai/config.json"} | del(.[""])' \
+        "$OPENCODE_CONFIG_JSON" > ~/.config/opencode/opencode.json; then
+        echo "❌ 错误: OPENCODE_CONFIG_JSON 内容不是合法 JSON"
+        echo "--- 原始内容调试 ---"
+        cat -A "$OPENCODE_CONFIG_JSON"
+        echo "--- 结束 ---"
+        exit 1
+      fi
+
+      echo "✅ OpenCode 配置已就绪："
+      jq '.provider[].options.apiKey = "***"' ~/.config/opencode/opencode.json
+
+    # =========================================================
+    # 1️⃣ 拉取 MR Diff 原始数据
+    # =========================================================
+    - |
+      echo "📥 获取 MR Diff..."
+      MR_IID="${CI_MERGE_REQUEST_IID}"
+      if [ -z "$MR_IID" ]; then
+        echo "❌ 错误: 未检测到 MR 编号（CI_MERGE_REQUEST_IID 为空）"
+        echo "请确保 pipeline 是通过 MR 触发的"
+        exit 1
+      fi
+      echo "MR #${MR_IID}: ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME} → ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
+
+      curl -sf -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$MR_IID/changes" \
+        > mr_raw.json
+
+      # 校验返回是否有效
+      if ! jq -e '.changes' mr_raw.json > /dev/null 2>&1; then
+        echo "❌ 错误: 获取 MR Diff 失败，API 返回："
+        head -20 mr_raw.json
+        exit 1
+      fi
+      echo "✅ 获取到 $(jq '.changes | length' mr_raw.json) 个变更文件"
+
+    # =========================================================
+    # 2️⃣ 自动解析 + 识别 新增 / 修改 / 删除 + 结构化 JSON
+    # =========================================================
+    - |
+      echo "📊 解析结构化 Diff..."
+      SOURCE_BRANCH="${CI_MERGE_REQUEST_REQUESTED_SOURCE_BRANCH_NAME:-$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}"
+      jq --arg project "$CI_PROJECT_PATH" \
+         --arg mr_iid "$CI_MERGE_REQUEST_IID" \
+         --arg source_branch "$SOURCE_BRANCH" \
+         --arg target_branch "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" \
+      '{
+        project: $project,
+        mr_iid: $mr_iid,
+        source_branch: $source_branch,
+        target_branch: $target_branch,
+        changes: [
+          .changes[] | {
+            file: .new_path,
+            old_file: .old_path,
+            type: (
+              if .new_file then "added"
+              elif .deleted_file then "deleted"
+              else "modified" end
+            ),
+            additions: .additions,
+            deletions: .deletions,
+            patch: (
+              .diff
+              | split("\n")
+              | map(select(startswith("+") or startswith("-")))
+              | .[0:300]
+            )
+          }
+        ]
+      }' mr_raw.json > mr_structured.json
+      echo "✅ 解析完成"
+
+    # =========================================================
+    # 3️⃣ 调用 OpenCode 进行 AI 代码评审
+    # =========================================================
+    - |
+      echo "🤖 触发 OpenCode 自动评审..."
+
+      STRUCTURED_DIFF=$(cat mr_structured.json)
+
+      # 加载审核规范文件
+      RULES_FILE="project_doc/rules/代码审核规范.md"
+      if [ -f "$RULES_FILE" ]; then
+        REVIEW_RULES=$(cat "$RULES_FILE")
+        echo "✅ 已加载审核规范 ($(wc -l < "$RULES_FILE") 行)"
+      else
+        echo "⚠️ 审核规范文件不存在: $RULES_FILE，使用内置默认规范"
+        REVIEW_RULES="请按通用代码评审标准进行：安全、性能、规范、可读性。"
+      fi
+
+      # 构建 prompt（不加引号以支持变量展开）
+      cat > /tmp/review_prompt.txt << PROMPT_EOF
+      你是一个企业级代码评审专家，正在评审 GitLab 合并请求。
+
+      ========== 审核范围（严格遵守） ==========
+      - 只审核本次 MR Diff 中【新增】【修改】【删除】的代码行
+      - 不要审核 Diff 之外已存在的历史代码，即使历史代码不符合规范也必须忽略
+      - 如果 Diff 中的改动依赖了有问题的历史代码，可以标注为 💡 建议（提示存在历史债务），但不得标为阻塞或重要
+      - 判断标准：只有 patch 中以 + 或 - 开头的行才属于本次审核范围
+
+      ========== 评审规范 ==========
+      请严格按以下规范对本次变更代码进行评审：
+
+      ${REVIEW_RULES}
+
+      ========== 输出要求 ==========
+      1. 输出必须是 Markdown
+      2. 按【文件】分组
+      3. 每个问题必须包含：
+        - 文件路径
+        - 行号
+        - 问题说明
+        - 修复建议
+      4. 必须标注级别：
+        🚨 阻塞 | 🔒 安全 | ⚡ 性能 | ⚠️ 重要 | 💡 建议
+      5. 若无任何问题，必须输出：
+        ✅ 代码评审通过
+      6. 末尾附评审摘要：各级别数量统计 + 是否建议合并
+      7. 直接输出评审结果，不需要询问确认
+      PROMPT_EOF
+
+      echo "" >> /tmp/review_prompt.txt
+      echo "========== 项目信息 ==========" >> /tmp/review_prompt.txt
+      echo "项目：$CI_PROJECT_PATH" >> /tmp/review_prompt.txt
+      echo "MR：!$CI_MERGE_REQUEST_IID" >> /tmp/review_prompt.txt
+      echo "源分支：$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME" >> /tmp/review_prompt.txt
+      echo "目标分支：$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" >> /tmp/review_prompt.txt
+      echo "" >> /tmp/review_prompt.txt
+      echo "========== 结构化 Diff（JSON） ==========" >> /tmp/review_prompt.txt
+      echo "$STRUCTURED_DIFF" >> /tmp/review_prompt.txt
+
+      echo "Prompt 大小: $(wc -c < /tmp/review_prompt.txt) 字节"
+      echo "========== Prompt 内容 =========="
+      cat /tmp/review_prompt.txt
+      echo "========== Prompt 结束 =========="
+      echo "正在调用模型，请等待..."
+
+      REVIEW_PROMPT=$(cat /tmp/review_prompt.txt)
+
+      if ! opencode run "$REVIEW_PROMPT" > review_output_raw.md 2>&1; then
+        echo "❌ 错误: opencode 执行失败"
+        echo "错误详情："
+        cat review_output_raw.md
+        exit 1
+      fi
+
+      # 基础清洗：仅去 ANSI 颜色码 + 数据库迁移日志
+      # GitLab MR 评论保留完整内容，方便排查
+      sed -E \
+        -e 's/\x1B\[[0-9;]*[a-zA-Z]//g' \
+        -e 's/\x1B\[//g' \
+        -e '/^Performing one time database migration/d' \
+        -e '/^sqlite-migration:/d' \
+        -e '/^Database migration complete/d' \
+        review_output_raw.md > review_output.md
+
+    # =========================================================
+    # 3️⃣-结果 输出 AI 评审结果
+    # =========================================================
+    - echo "✅ AI 评审结果："
+    - cat review_output.md
+
+    # =========================================================
+    # 4️⃣ 自动将 Markdown 评审发布到 GitLab MR 评论（完整内容）
+    # =========================================================
+    - |
+      echo "📤 发布评审评论到 MR..."
+
+      if [ ! -s review_output.md ]; then
+        echo "❌ 错误: 评审结果文件为空或不存在"
+        exit 1
+      fi
+
+      if ! REVIEW_BODY=$(jq -Rs . review_output.md); then
+        echo "❌ 错误: jq 转换失败"
+        exit 1
+      fi
+
+      HTTP_CODE=$(curl -s -o /tmp/post_response.json -w "%{http_code}" -X POST \
+        -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"body\": $REVIEW_BODY}" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/notes")
+
+      if [ "$HTTP_CODE" = "201" ]; then
+        echo "✅ 评论发布成功"
+      else
+        echo "⚠️ 评论发布失败 (HTTP $HTTP_CODE)"
+        cat /tmp/post_response.json
+      fi
+
+    # =========================================================
+    # 5️⃣ 发送精简摘要到钉钉群（只发卡片，详情去 MR 查看）
+    # =========================================================
+    - |
+      echo "📱 发送钉钉通知..."
+
+      if [ -z "$DINGTALK_WEBHOOK" ]; then
+        echo "⏭️ 未配置 DINGTALK_WEBHOOK，跳过钉钉通知"
+      else
+        # 构建 MR 链接
+        MR_URL="${CI_PROJECT_URL}/-/merge_requests/${CI_MERGE_REQUEST_IID}"
+
+        # 获取最新 commit message
+        COMMIT_MSG=$(git log -1 --pretty=format:"%s" 2>/dev/null || echo "N/A")
+
+        # 从 AI 评审摘要中解析各级别问题数量（逐行匹配，避免跨行误提取行号等数字）
+        python3 << 'PYEOF' > /tmp/review_counts.env
+      import re
+      try:
+          with open("review_output.md", "r", encoding="utf-8") as f:
+              lines = f.readlines()
+      except Exception:
+          lines = []
+      for var, label in [("COUNT_BLOCK","阻塞"),("COUNT_SECURITY","安全"),("COUNT_PERF","性能"),("COUNT_IMPORTANT","重要"),("COUNT_SUGGEST","建议")]:
+          val = "0"
+          for line in lines:
+              m = re.search(label + r'[^\d]{0,10}[：:]\s*(\d+)', line)
+              if m:
+                  val = m.group(1)
+          print(f'{var}={val}')
+      PYEOF
+        . /tmp/review_counts.env 2>/dev/null || true
+        COUNT_BLOCK=${COUNT_BLOCK:-0}
+        COUNT_SECURITY=${COUNT_SECURITY:-0}
+        COUNT_PERF=${COUNT_PERF:-0}
+        COUNT_IMPORTANT=${COUNT_IMPORTANT:-0}
+        COUNT_SUGGEST=${COUNT_SUGGEST:-0}
+        TOTAL_ISSUES=$((COUNT_BLOCK + COUNT_SECURITY + COUNT_PERF + COUNT_IMPORTANT + COUNT_SUGGEST))
+
+        echo "📊 解析到的问题数量: 阻塞=$COUNT_BLOCK 安全=$COUNT_SECURITY 性能=$COUNT_PERF 重要=$COUNT_IMPORTANT 建议=$COUNT_SUGGEST 总计=$TOTAL_ISSUES"
+
+        # 判断评审结果状态（优先使用解析的数量，避免 prompt 回显导致误匹配）
+        if [ "$COUNT_BLOCK" -gt 0 ]; then
+          STATUS_ICON="🚨"
+          STATUS_TEXT="存在阻塞问题"
+        elif [ "$TOTAL_ISSUES" -gt 0 ]; then
+          STATUS_ICON="⚠️"
+          STATUS_TEXT="存在 ${TOTAL_ISSUES} 个待处理问题"
+        elif grep -q "不建议合并" review_output.md; then
+          STATUS_ICON="⚠️"
+          STATUS_TEXT="不建议合并"
+        else
+          STATUS_ICON="✅"
+          STATUS_TEXT="通过"
+        fi
+
+        TITLE="${STATUS_ICON} AI 代码评审通知"
+
+        # 构建问题统计行（只显示数量 > 0 的级别）
+        STATS_LINE=""
+        [ "$COUNT_BLOCK" -gt 0 ] && STATS_LINE="${STATS_LINE}🚨 阻塞：${COUNT_BLOCK}  "
+        [ "$COUNT_SECURITY" -gt 0 ] && STATS_LINE="${STATS_LINE}🔒 安全：${COUNT_SECURITY}  "
+        [ "$COUNT_PERF" -gt 0 ] && STATS_LINE="${STATS_LINE}⚡ 性能：${COUNT_PERF}  "
+        [ "$COUNT_IMPORTANT" -gt 0 ] && STATS_LINE="${STATS_LINE}⚠️ 重要：${COUNT_IMPORTANT}  "
+        [ "$COUNT_SUGGEST" -gt 0 ] && STATS_LINE="${STATS_LINE}💡 建议：${COUNT_SUGGEST}"
+
+        # 变更文件数
+        FILE_COUNT=$(jq '.changes | length' mr_structured.json 2>/dev/null || echo "N/A")
+
+        # 用 jq 安全构建精简摘要卡片
+        DING_BODY=$(jq -n \
+          --arg title "$TITLE" \
+          --arg icon "$STATUS_ICON" \
+          --arg project "$CI_PROJECT_PATH" \
+          --arg user "$GITLAB_USER_NAME" \
+          --arg source "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME" \
+          --arg target "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" \
+          --arg status "$STATUS_TEXT" \
+          --arg mr_iid "$CI_MERGE_REQUEST_IID" \
+          --arg commit "$COMMIT_MSG" \
+          --arg stats "$STATS_LINE" \
+          --arg file_count "$FILE_COUNT" \
+          --arg mr_url "$MR_URL" \
+          '{
+            msgtype: "markdown",
+            markdown: {
+              title: $title,
+              text: (
+                $icon + " **AI 代码评审通知**\n\n" +
+                "项目名称：" + $project + "\n\n" +
+                "提交人：" + $user + "\n\n" +
+                "评审分支：" + $source + " → " + $target + "\n\n" +
+                "变更文件：" + $file_count + " 个\n\n" +
+                "评审状态：**" + $status + "**\n\n" +
+                "**Commit message：**\n\n> " + $commit + "\n\n" +
+                "---\n\n" +
+                (if ($stats | length) > 0 then $stats + "\n\n" else "" end) +
+                "[👉 点击查看完整评审详情](" + $mr_url + ")"
+              )
+            }
+          }')
+
+        # 加签处理
+        if [ -n "$DINGTALK_SECRET" ]; then
+          TIMESTAMP=$(date +%s%3N)
+          STRING_TO_SIGN="${TIMESTAMP}\n${DINGTALK_SECRET}"
+          SIGN=$(echo -ne "$STRING_TO_SIGN" | openssl dgst -sha256 -hmac "$DINGTALK_SECRET" -binary | base64)
+          SIGN_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote_plus('${SIGN}'))")
+          WEBHOOK_URL="${DINGTALK_WEBHOOK}&timestamp=${TIMESTAMP}&sign=${SIGN_ENCODED}"
+        else
+          WEBHOOK_URL="${DINGTALK_WEBHOOK}"
+        fi
+
+        HTTP_CODE=$(curl -s -o /tmp/ding_response.json -w "%{http_code}" \
+          -X POST \
+          -H "Content-Type: application/json" \
+          -d "$DING_BODY" \
+          "$WEBHOOK_URL")
+
+        ERRCODE=$(jq -r '.errcode // ""' /tmp/ding_response.json 2>/dev/null)
+        if [ "$ERRCODE" = "0" ]; then
+          echo "✅ 钉钉通知发送成功"
+        else
+          echo "⚠️ 钉钉通知发送失败 (HTTP $HTTP_CODE)"
+          cat /tmp/ding_response.json
+        fi
+      fi
+
+    - echo "✅ 自动代码评审 + 评论发布 + 钉钉通知 完成 ✅"

@@ -1,0 +1,4 @@
+# 锁定 pnpm 版本
+use-node-version=20
+auto-install-peers=true
+@deep:registry=http://npm.fe-daas.deepexi.com

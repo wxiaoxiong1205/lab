@@ -1,0 +1,51 @@
+.docs-sider {
+  background: var(--lab-color-surface-elevated) !important;
+  border-right: var(--lab-border-subtle);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+}
+
+.docs-toolbar {
+  background: var(--lab-color-surface-elevated);
+  border-bottom: var(--lab-border-subtle);
+}
+
+.docs-sidebar-header {
+  background-color: var(--lab-color-surface-readonly);
+  border-bottom: var(--lab-border-subtle);
+}
+
+.docs-sidebar-menu {
+  border: none !important;
+}
+
+.docs-sidebar-footer {
+  color: var(--lab-color-text-muted);
+  background-color: var(--lab-color-surface-readonly);
+  border-top: var(--lab-border-subtle);
+}
+
+.docs-hero {
+  background: linear-gradient(135deg, rgba(0, 71, 187, 0.07) 0%, rgba(50, 190, 72, 0.07) 100%);
+}
+
+.docs-hero-title.ant-typography {
+  background: linear-gradient(135deg, var(--lab-color-brand-primary), var(--lab-color-success));
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.docs-card.ant-card {
+  border: var(--lab-border-subtle);
+}
+
+.docs-card.ant-card-hoverable {
+  transition: all 0.3s ease;
+}
+
+.docs-muted {
+  color: var(--lab-color-text-muted);
+}
+
+.docs-disabled {
+  color: var(--lab-color-placeholder);
+}

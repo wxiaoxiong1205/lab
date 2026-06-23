@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# 使用 lint-staged：仅对本次暂存的文件执行 eslint，不通过则阻止提交
+echo "husky - pre-commit: lint-staged 校验暂存文件..."
+pnpm exec lint-staged

@@ -1,0 +1,19 @@
+sequenceDiagram
+    participant 用户
+    participant 前端
+    participant 后端
+    participant Notebook服务
+    participant DB as 数据库(ml_models)
+
+    用户->>前端: 进入创建模型页，填写名称、描述、大类 model_type、第二层 annotation_type、可选第三层 task_type
+    前端->>前端: 获取机器学习在线 Notebook 相对路径（下拉数据源）
+    用户->>前端: 选择模型来源 Notebook，选择具体模型得到 source_ref
+    用户->>前端: 填写网络结构，点击确定
+    前端->>后端: POST 创建模型 (name, model_type, annotation_type, task_type?, source_ref, network_structure 等)
+    后端->>Notebook服务: 调用接口，传入 source_ref 相对路径
+    Notebook服务-->>后端: 返回 JFS 完整路径 model_path
+    后端->>后端: 生成 model_version（如 V1）
+    后端->>DB: 写入 ml_models（artifact_uri=model_path 等）
+    DB-->>后端: 写入成功
+    后端-->>前端: 返回创建结果（模型 id、版本等）
+    前端->>用户: 刷新列表 / 进入模型详情

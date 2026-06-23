@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lab Token Launcher</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Microsoft YaHei", sans-serif;
+      }
+
+      body {
+        width: 340px;
+        margin: 0;
+        padding: 16px;
+        background: linear-gradient(180deg, #f5f7fb 0%, #ffffff 100%);
+        color: #1f2937;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 18px;
+      }
+
+      p {
+        margin: 0 0 12px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #4b5563;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 10px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      input {
+        width: 100%;
+        margin-top: 6px;
+        padding: 9px 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        box-sizing: border-box;
+        font-size: 12px;
+      }
+
+      button {
+        width: 100%;
+        padding: 10px 12px;
+        border: 0;
+        border-radius: 10px;
+        background: #0f766e;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        margin-top: 8px;
+        background: #e5e7eb;
+        color: #111827;
+      }
+
+      #status {
+        min-height: 38px;
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: #ecfeff;
+        color: #155e75;
+        font-size: 12px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Lab Token Launcher</h1>
+    <p>在官网已登录页面点一下，就会读取当前标签页的 <code>auth_token</code> 并打开本地 lab。</p>
+
+    <label>
+      本地 Lab 地址
+      <input id="labUrl" type="text" placeholder="http://localhost:5173/" />
+    </label>
+
+    <label>
+      Token 缓存 Key
+      <input id="tokenKey" type="text" placeholder="auth_token" />
+    </label>
+
+    <label>
+      Refresh Token Key
+      <input id="refreshTokenKey" type="text" placeholder="auth_refresh_token" />
+    </label>
+
+    <button id="launchBtn" type="button">读取当前页 Token 并打开 Lab</button>
+    <button id="saveBtn" class="secondary" type="button">保存配置</button>
+
+    <div id="status">等待操作</div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,35 @@
+/* 滚动条：默认“透明滑块 + 保留占位”，hover / focus 时显示滑块 */
+.hover-auto-scrollbar {
+    /* 让 gutter 稳定（支持的浏览器会生效） */
+    scrollbar-gutter: stable;
+
+    /* Firefox：保留占位，用透明 thumb 达到“隐藏”效果 */
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+
+/* WebKit：始终保留滚动条宽度占位 */
+.hover-auto-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.hover-auto-scrollbar::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 9999px;
+}
+
+.hover-auto-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* hover / focus 时显示滑块 */
+.hover-auto-scrollbar:hover,
+.hover-auto-scrollbar:focus-within {
+    scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+}
+
+.hover-auto-scrollbar:hover::-webkit-scrollbar-thumb,
+.hover-auto-scrollbar:focus-within::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.25);
+}

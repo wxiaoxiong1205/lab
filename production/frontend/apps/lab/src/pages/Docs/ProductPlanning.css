@@ -1,0 +1,95 @@
+.product-planning {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.product-header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding: 40px 0;
+  background: linear-gradient(135deg, #1890ff11 0%, #52c41a11 100%);
+  border-radius: 8px;
+}
+
+.subtitle {
+  font-size: 18px;
+  color: #666;
+}
+
+.section-card {
+  margin-bottom: 30px;
+  border-radius: 8px;
+}
+
+.highlight-block {
+  background-color: #e6f7ff;
+  border-left: 4px solid #1890ff;
+  padding: 16px;
+  margin: 20px 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.feature-grid {
+  margin: 20px 0;
+}
+
+.feature-card {
+  height: 100%;
+  transition: all 0.3s;
+  border-top: 3px solid #1890ff;
+}
+
+.feature-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.feature-card .ant-card-head {
+  color: #1890ff;
+  font-weight: bold;
+}
+
+.timeline-title {
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 8px;
+  color: #1890ff;
+}
+
+.footer {
+  text-align: center;
+  margin-top: 50px;
+  padding: 20px 0;
+  color: #888;
+  border-top: 1px solid #eee;
+}
+
+/* 图表容器样式 */
+.architecture-container {
+  margin: 20px 0;
+  padding: 20px;
+  background-color: #fafafa;
+  border-radius: 8px;
+  overflow: auto;
+}
+
+/* 确保图表能够水平滚动 */
+.architecture-diagram {
+  min-width: 600px;
+  position: relative;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .product-header {
+    padding: 20px 0;
+  }
+  
+  .section-card {
+    padding: 15px;
+  }
+  
+  .architecture-container {
+    padding: 10px;
+  }
+} 

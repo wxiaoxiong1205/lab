@@ -1,0 +1,42 @@
+.referee-inference-parameters-card .fixed-label-form-item .ant-form-item-row,
+.inference-parameters-card .fixed-label-form-item .ant-form-item-row {
+  flex-direction: row !important;
+  align-items: center;
+}
+
+.referee-inference-parameters-card .fixed-label-form-item .ant-form-item-label,
+.inference-parameters-card .fixed-label-form-item .ant-form-item-label {
+  width: 240px !important;
+  min-width: 240px !important;
+  flex: 0 0 240px !important;
+  padding: 0 12px 0 0;
+  text-align: right;
+}
+
+.referee-inference-parameters-card .fixed-label-form-item .ant-form-item-label > label,
+.inference-parameters-card .fixed-label-form-item .ant-form-item-label > label {
+  height: auto;
+  white-space: normal;
+}
+
+.referee-inference-parameters-card .fixed-label-form-item .ant-form-item-control,
+.inference-parameters-card .fixed-label-form-item .ant-form-item-control {
+  flex: 1 1 auto !important;
+}
+
+@media (max-width: 640px) {
+  .referee-inference-parameters-card .fixed-label-form-item .ant-form-item-row,
+  .inference-parameters-card .fixed-label-form-item .ant-form-item-row {
+    flex-direction: column !important;
+    align-items: stretch;
+  }
+
+  .referee-inference-parameters-card .fixed-label-form-item .ant-form-item-label,
+  .inference-parameters-card .fixed-label-form-item .ant-form-item-label {
+    width: auto !important;
+    min-width: 0 !important;
+    flex: 0 0 auto !important;
+    padding: 0 0 4px;
+    text-align: left;
+  }
+}

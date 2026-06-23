@@ -1,0 +1,23 @@
+sequenceDiagram
+    participant 用户
+    participant 前端
+    participant 后端
+    participant DB as 数据库(ml_models)
+    participant K8s
+    participant 容器
+
+    用户->>前端: 进入部署服务页，选择模型来源为 ML 模型
+    前端->>前端: 拉取 ML 模型列表（含版本）
+    用户->>前端: 选择某一模型版本，配置资源、镜像、运行命令等
+    用户->>前端: 点击开始部署
+    前端->>后端: POST 创建推理任务 (model_source=ml_model, ml_model_id 等)
+    后端->>后端: 解析 ml_model_id
+    后端->>DB: 查询 ml_models，取 artifact_uri 作为 model_path
+    DB-->>后端: 返回 model_path、model_name、network_structure
+    后端->>K8s: 创建部署：挂载 model_path 到容器，传入运行命令/脚本
+    K8s->>容器: 挂载卷，启动容器
+    容器->>容器: 执行运行脚本，从挂载路径加载模型
+    容器->>容器: 推理服务运行
+    后端->>DB: 写入 inference_tasks
+    后端-->>前端: 返回部署结果
+    前端->>用户: 展示部署状态 / 部署列表

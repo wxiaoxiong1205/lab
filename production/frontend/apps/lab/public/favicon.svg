@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .primary { fill: #1890ff; }
+    .secondary { fill: #52c41a; }
+    .background { fill: #f0f5ff; }
+    .outline { fill: none; stroke: #1890ff; stroke-width: 2; }
+  </style>
+  
+  <!-- Background circle -->
+  <circle cx="24" cy="24" r="22" class="background"/>
+  
+  <!-- Brain representing LLM -->
+  <path class="primary" d="M24,12 C19.582,12 16,15.582 16,20 C16,22.8 17.6,25.2 20,26.338 L20,30 C20,30.552 20.448,31 21,31 L27,31 C27.552,31 28,30.552 28,30 L28,26.338 C30.4,25.2 32,22.8 32,20 C32,15.582 28.418,12 24,12 Z M24,14 C27.314,14 30,16.686 30,20 C30,22.216 28.84,24.126 27,25.108 L26,25.662 L26,29 L22,29 L22,25.662 L21,25.108 C19.16,24.126 18,22.216 18,20 C18,16.686 20.686,14 24,14 Z"/>
+  
+  <!-- Data flow paths -->
+  <path class="outline" d="M14,32 C10,32 10,36 14,36 L34,36 C38,36 38,32 34,32"/>
+  
+  <!-- Nodes representing workflow steps -->
+  <circle cx="18" cy="36" r="3" class="primary"/>
+  <circle cx="24" cy="36" r="3" class="secondary"/>
+  <circle cx="30" cy="36" r="3" class="primary"/>
+</svg> 

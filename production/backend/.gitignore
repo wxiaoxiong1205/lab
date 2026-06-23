@@ -1,0 +1,36 @@
+# 忽略 node_modules 目录
+node_modules/
+
+# 忽略所有 __pycache__ 目录
+**/__pycache__/
+__pycache__/
+*.pyc
+
+# 忽略构建输出
+dist/
+build/
+data/
+
+# 忽略环境变量文件
+.*env
+.venv/
+.vscode/
+
+# 忽略日志文件
+*.log 
+*.pyc
+*.mdc
+
+
+# 忽略 .coverage 文件
+.coverage 
+data/sql_app.db
+
+.idea/
+**/loki-data/
+deployment/
+scripts/inference/docker/config/
+scripts/inference/docker/data/
+deployment/
+migrations/
+.conda/

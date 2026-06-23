@@ -1,0 +1,564 @@
+.create-inference-result-page {
+  min-height: 100%;
+  padding: 0;
+  overflow: visible;
+  background-color: var(--lab-color-surface-page);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.fixed-label-form-item .ant-form-item-label {
+  width: 240px !important;
+  min-width: 240px !important;
+  flex: 0 0 240px !important;
+}
+
+.fixed-label-form-item .ant-form-item-control {
+  flex: 1 1 auto !important;
+}
+
+.create-inference-result-card {
+  width: 100%;
+  min-height: 1273px;
+  overflow: visible;
+  background-color: var(--lab-color-surface-elevated);
+  border-radius: 10px;
+  box-shadow: var(--lab-shadow-page-card);
+}
+
+.create-inference-result-form {
+  width: 1172px;
+  padding: 21px 0 20px 40px;
+}
+
+.create-inference-result-form .ant-form-item {
+  width: 560px;
+  margin-bottom: 24px;
+}
+
+.create-inference-result-form .ant-form-item-label {
+  width: 560px;
+  height: 24px;
+  padding: 0 0 6px;
+  overflow: visible;
+}
+
+.create-inference-result-form .ant-form-item-label > label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 560px;
+  height: 20px;
+  color: var(--lab-color-text-primary);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.create-inference-result-form .ant-form-item-required::before {
+  flex: none;
+  color: var(--lab-color-danger) !important;
+  font-size: 14px !important;
+}
+
+.create-inference-result-form .ant-input,
+.create-inference-result-form .ant-input-affix-wrapper,
+.create-inference-result-form .ant-select-selector,
+.create-inference-result-form .ant-picker {
+  width: 560px !important;
+  min-height: 40px !important;
+  border: 1px solid var(--lab-color-border-control) !important;
+  border-radius: 6px !important;
+  color: var(--lab-color-text-primary);
+  font-size: 14px;
+  line-height: 20px;
+  box-shadow: none !important;
+}
+
+.create-inference-result-form .ant-input,
+.create-inference-result-form .ant-input-affix-wrapper {
+  padding: 9px 12px !important;
+}
+
+.create-inference-name-label-content {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  height: 20px;
+  white-space: nowrap;
+}
+
+.create-inference-name-label-content > span:first-child {
+  white-space: nowrap;
+}
+
+.create-inference-name-label-tip {
+  position: absolute;
+  top: 1px;
+  left: 155px;
+  flex: none;
+  height: 17px;
+  margin-left: 0;
+  color: var(--lab-color-placeholder);
+  font-size: 12px;
+  font-weight: normal;
+  line-height: 17px;
+  white-space: nowrap;
+}
+
+.create-inference-result-form .ant-input-affix-wrapper .ant-input,
+.create-inference-result-form .ant-input-textarea-affix-wrapper .ant-input,
+.create-inference-result-form .ant-input-textarea-show-count .ant-input {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.create-inference-result-form .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper) .ant-input {
+  width: 100% !important;
+  min-height: 20px !important;
+  padding: 0 !important;
+}
+
+.create-inference-name-input.ant-input {
+  height: 40px !important;
+}
+
+.create-inference-name-field .ant-input-affix-wrapper {
+  width: 560px !important;
+  height: 40px !important;
+}
+
+.create-inference-description-input.ant-input {
+  width: 560px !important;
+  height: 85px !important;
+  min-height: 85px !important;
+  padding: 10px 12px 10px 12px !important;
+  resize: none;
+}
+
+.create-inference-result-form .ant-input-textarea-affix-wrapper,
+.create-inference-result-form .ant-input-textarea-show-count::after {
+  width: 560px !important;
+}
+
+.create-inference-result-form .ant-input-textarea-affix-wrapper {
+  height: 85px !important;
+  padding: 0 !important;
+  border: 1px solid var(--lab-color-border-control) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+.create-inference-result-form .ant-input::placeholder,
+.create-inference-result-form .ant-select-selection-placeholder,
+.create-inference-result-form .ant-picker-input > input::placeholder {
+  color: var(--lab-color-placeholder) !important;
+  font-size: 14px;
+}
+
+.create-inference-result-form .ant-input-show-count-suffix {
+  color: var(--lab-color-placeholder);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.create-inference-result-form .ant-space-compact {
+  position: relative;
+  width: 560px !important;
+}
+
+.create-inference-result-form .ant-space-compact .ant-input {
+  width: 560px !important;
+  padding-right: 86px !important;
+}
+
+.create-inference-result-form .ant-space-compact .ant-btn-primary {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  min-width: 58px;
+  height: 28px;
+  padding: 0;
+  color: var(--lab-color-brand-primary);
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+  background-color: var(--lab-color-surface-control-muted);
+  border: 0;
+  border-radius: 4px !important;
+  box-shadow: none;
+}
+
+.create-inference-result-form .ant-space-compact .ant-btn-primary:hover,
+.create-inference-result-form .ant-space-compact .ant-btn-primary:focus {
+  color: var(--lab-color-brand-primary);
+  background-color: var(--lab-color-surface-control-muted);
+}
+
+.create-inference-result-form .ant-radio-group {
+  display: flex;
+  gap: 10px;
+  height: 40px;
+}
+
+.create-inference-result-form .ant-radio-wrapper,
+.create-inference-result-form .ant-radio-button-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  height: 40px;
+  margin: 0;
+  padding: 0 16px;
+  color: var(--lab-color-text-primary);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+  background-color: var(--lab-color-surface-elevated);
+  border: 1px solid var(--lab-color-border-control);
+  border-radius: 6px;
+}
+
+.create-inference-result-form .ant-radio-wrapper:has(.ant-radio-checked),
+.create-inference-result-form .ant-radio-button-wrapper-checked {
+  background-color: var(--lab-color-brand-selected-bg);
+  border-color: var(--lab-color-brand-border-active) !important;
+}
+
+.create-inference-result-form .ant-radio,
+.create-inference-result-form .ant-radio-button-wrapper::before {
+  display: none !important;
+}
+
+.create-inference-result-form .ant-radio-wrapper span:not(.ant-radio),
+.create-inference-result-form .ant-radio-button-wrapper span:not(.ant-radio) {
+  padding: 0;
+}
+
+.create-inference-result-form .ant-radio-button-wrapper .ant-space {
+  gap: 0 !important;
+}
+
+.create-inference-result-form .ant-radio-button-wrapper .anticon:not(.anticon-question-circle) {
+  display: none;
+}
+
+.create-inference-result-form .ant-radio-wrapper > span:last-child,
+.create-inference-result-form .ant-radio-button-wrapper > span:last-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.create-inference-format-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+}
+
+.create-inference-format-option .ant-radio-wrapper {
+  min-width: 0;
+}
+
+.create-inference-format-option .ant-radio-wrapper > span:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  line-height: 20px;
+}
+
+.create-inference-format-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  line-height: 20px;
+}
+
+.create-inference-format-help.anticon {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 8px;
+  color: var(--lab-color-text-muted);
+  font-size: 14px;
+  line-height: 14px;
+  vertical-align: middle;
+  cursor: help;
+}
+
+.create-inference-format-option .ant-popover-open,
+.create-inference-format-option .ant-popover-disabled-compatible-wrapper {
+  display: inline-flex;
+  align-items: center;
+  height: 14px;
+}
+
+.create-inference-schedule-panel {
+  width: 560px;
+  height: 154px;
+  padding: 16px 16px 16px;
+  background-color: var(--lab-color-surface-control-muted);
+  border-radius: 6px;
+}
+
+.create-inference-result-form .create-inference-schedule-panel .ant-form-item {
+  width: 528px;
+  margin-bottom: 12px;
+}
+
+.create-inference-result-form .create-inference-schedule-panel .ant-form-item:last-child {
+  margin-bottom: 0;
+}
+
+.create-inference-result-form .create-inference-schedule-panel .ant-form-item-label {
+  height: 24px;
+}
+
+.create-inference-result-form .create-inference-schedule-panel .ant-picker {
+  width: 528px !important;
+  background-color: var(--lab-color-surface-elevated);
+  border: 0 !important;
+}
+
+.create-inference-upload-wrapper {
+  width: 562px;
+}
+
+.create-inference-upload-wrapper .ant-upload-wrapper {
+  width: 562px;
+}
+
+.create-inference-upload-wrapper .ant-upload.ant-upload-drag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 562px;
+  height: 142px;
+  padding: 0;
+  background-color: var(--lab-color-brand-soft-bg);
+  border: 1px dashed var(--lab-color-brand-border-active);
+  border-radius: 6px;
+}
+
+.create-inference-upload-wrapper .ant-upload.ant-upload-drag .ant-upload {
+  padding: 0;
+}
+
+.create-inference-upload-wrapper .ant-upload-drag-icon {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 12px !important;
+  color: var(--lab-color-text-primary) !important;
+  font-size: 18px !important;
+  line-height: 44px;
+  background-color: var(--lab-color-surface-elevated);
+  border-radius: 50%;
+}
+
+.create-inference-upload-wrapper .ant-upload-drag-icon .anticon {
+  color: var(--lab-color-text-primary) !important;
+  font-size: 18px;
+}
+
+.create-inference-upload-wrapper .ant-upload-text {
+  margin: 0;
+  color: var(--lab-color-text-primary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.create-inference-upload-wrapper .ant-upload-hint,
+.create-inference-upload-wrapper .ant-upload-hint p {
+  margin: 4px 0 0 !important;
+  color: var(--lab-color-text-muted) !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+}
+
+.create-inference-example-row {
+  display: flex;
+  align-items: center;
+  width: 560px;
+  height: 50px;
+  margin: 10px 0 20px;
+  padding: 0 14px;
+  background-color: var(--lab-color-surface-control-muted);
+  border-radius: 6px;
+}
+
+.create-inference-example-row > span {
+  margin-right: 22px;
+  color: var(--lab-color-text-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.create-inference-example-row .ant-space {
+  margin-right: 24px;
+}
+
+.create-inference-example-row .ant-btn-link {
+  height: 20px;
+  padding: 0;
+  color: var(--lab-color-brand-primary);
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.create-inference-gpu-resource {
+  width: 1172px;
+  margin: 0 0 96px;
+}
+
+.create-inference-gpu-resource-title {
+  display: flex;
+  align-items: center;
+  width: 1172px;
+  height: 20px;
+  margin-bottom: 8px;
+  color: var(--lab-color-text-primary);
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.create-inference-gpu-resource-info {
+  margin-left: 6px;
+  color: var(--lab-color-text-muted);
+  font-size: 14px;
+  line-height: 14px;
+}
+
+.create-inference-gpu-resource-panel {
+  width: 1172px;
+  height: 292px;
+  padding: 20px 30px;
+  overflow: hidden;
+  background-color: var(--lab-color-surface-control-muted);
+  border-radius: 6px;
+}
+
+.create-inference-gpu-resource-grid {
+  display: grid;
+  grid-template-columns: 528px 528px;
+  column-gap: 56px;
+  row-gap: 24px;
+}
+
+.create-inference-result-form .create-inference-gpu-resource .ant-form-item {
+  width: 528px;
+  height: 68px;
+  margin-bottom: 0;
+}
+
+.create-inference-result-form .create-inference-gpu-resource .ant-form-item-row {
+  display: flex;
+  flex-direction: column;
+  row-gap: 8px;
+}
+
+.create-inference-result-form .create-inference-gpu-resource .ant-form-item-label {
+  width: 528px;
+  height: 20px;
+  margin-bottom: 0;
+  padding: 0;
+}
+
+.create-inference-result-form .create-inference-gpu-resource .ant-form-item-label > label {
+  width: 528px;
+  height: 20px;
+}
+
+.create-inference-result-form .create-inference-gpu-resource .ant-form-item-control {
+  width: 528px;
+}
+
+.create-inference-result-form .create-inference-gpu-resource-control,
+.create-inference-result-form .create-inference-gpu-resource-control.ant-select,
+.create-inference-result-form .create-inference-gpu-resource-control.ant-cascader,
+.create-inference-result-form .create-inference-gpu-resource-control.ant-input-number-group-wrapper,
+.create-inference-result-form .create-inference-gpu-resource-control .ant-select-selector,
+.create-inference-result-form .create-inference-gpu-resource-control .ant-input-number,
+.create-inference-result-form .create-inference-gpu-resource-control .ant-input-number-group-addon {
+  width: 528px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+}
+
+.create-inference-result-form .create-inference-gpu-resource-control .ant-select-selector,
+.create-inference-result-form .create-inference-gpu-resource-control .ant-input-number,
+.create-inference-result-form .create-inference-gpu-resource-control .ant-input-number-group-addon {
+  border: 0 !important;
+  border-radius: 6px !important;
+  background-color: var(--lab-color-surface-elevated);
+  box-shadow: none !important;
+}
+
+.create-inference-result-form .create-inference-gpu-resource-control .ant-select-selector {
+  display: flex;
+  align-items: center;
+  padding: 0 12px !important;
+}
+
+.create-inference-result-form .create-inference-gpu-resource-control .ant-select-selection-item,
+.create-inference-result-form .create-inference-gpu-resource-control .ant-select-selection-placeholder {
+  line-height: 40px !important;
+}
+
+.create-inference-result-form .create-inference-gpu-resource-control .ant-input-number-input {
+  height: 40px;
+  padding: 0 12px;
+  color: var(--lab-color-text-primary);
+  font-size: 14px;
+  line-height: 40px;
+}
+
+.create-inference-result-form .create-inference-gpu-resource-control .ant-input-number-group-addon {
+  width: 52px !important;
+  padding: 0 12px;
+  color: var(--lab-color-text-muted);
+  font-size: 14px;
+  line-height: 40px;
+}
+
+.create-inference-result-form .create-inference-gpu-resource-control.ant-input-number-group-wrapper .ant-input-number {
+  width: 476px !important;
+}
+
+.create-inference-result-form .ant-card {
+  width: 1172px;
+  background-color: var(--lab-color-surface-control-muted);
+  border: 0;
+  border-radius: 6px;
+}
+
+.create-inference-result-form .ant-card .ant-card-body {
+  padding: 20px 30px;
+}
+
+@media (max-width: 1400px) {
+  .create-inference-result-page {
+    padding-left: 20px;
+  }
+
+  .create-inference-result-card {
+    width: 100%;
+  }
+}

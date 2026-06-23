@@ -1,0 +1,315 @@
+.lab-main-header {
+  background: rgba(248, 249, 250, 1.0) !important;
+}
+
+.project-header-nav {
+  width: 100%;
+  max-width: 100%;
+  height: 60px;
+  min-width: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.project-header-nav-btn {
+  display: inline-flex;
+  min-width: 110px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  background: transparent;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  font-weight: normal;
+  line-height: 22px;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.project-header-nav-btn:hover {
+  background: rgba(233, 236, 239, 0.6);
+}
+
+.project-header-nav-btn-active,
+.project-header-nav-btn-active:hover {
+  border-color: rgba(0, 71, 188, 0.2);
+  background: linear-gradient(180deg, rgba(96, 157, 255, 0.2) 0%, rgba(199, 221, 255, 0.08) 100%);
+  color: rgba(24, 24, 25, 1);
+  box-shadow: 0px 2px 4px 0px rgba(0, 71, 187, 0.12);
+}
+
+/* header [data-lab-injected-header-nav] {
+  height: 60px !important;
+  align-items: center !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
+}
+
+header [data-lab-injected-header-nav] > .project-header-nav-btn {
+  min-width: 88px !important;
+  height: 32px !important;
+  border-radius: 16px !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
+}
+
+header [data-lab-injected-project-selector] {
+  height: 60px !important;
+  align-items: center !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
+} */
+
+.lab-header-project-select {
+  width: 194px !important;
+  min-width: 194px !important;
+  height: 36px !important;
+  border-radius: 8px !important;
+  background-color: rgba(255, 255, 255, 0.0) !important;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif !important;
+}
+
+.lab-header-project-select.ant-select {
+  flex-shrink: 0;
+}
+
+.lab-header-project-select .ant-select-selector {
+  min-width: 194px !important;
+  height: 36px !important;
+  padding: 0 8px !important;
+  border: 1px solid rgba(255, 255, 255, 0.0) !important;
+  border-radius: 8px !important;
+  background-color: rgba(255, 255, 255, 0.0) !important;
+  box-shadow: none !important;
+}
+
+.lab-header-project-select.ant-select-focused .ant-select-selector,
+.lab-header-project-select:hover .ant-select-selector {
+  border-color: rgba(255, 255, 255, 0.0) !important;
+  background-color: rgba(255, 255, 255, 0.0) !important;
+  box-shadow: none !important;
+}
+
+.lab-header-project-select .ant-select-selection-item,
+.lab-header-project-select .ant-select-selection-placeholder {
+  color: rgba(24, 24, 25, 1) !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 36px !important;
+}
+
+.lab-header-project-select .ant-select-prefix {
+  margin-inline-end: 4px !important;
+}
+
+.lab-header-project-select .lab-header-project-icon {
+  color: var(--lab-color-project-folder, rgba(255, 210, 61, 1)) !important;
+}
+
+.lab-header-project-select .ant-select-arrow {
+  color: rgba(24, 24, 25, 1) !important;
+  font-size: 10px !important;
+}
+
+.project-visual-sider {
+  border-right: none;
+  background: rgba(248, 249, 250, 1.0) !important;
+  position: relative;
+  z-index: 1000;
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  flex-direction: column;
+}
+
+.project-visual-sider .project-menu-scroll-container {
+  padding: 40px 10px 0;
+}
+
+.project-visual-sider .ant-menu {
+  background: transparent !important;
+  color: rgba(24, 24, 25, 1) !important;
+}
+
+.project-visual-sider .ant-menu-item {
+  height: 36px !important;
+  line-height: 36px !important;
+  margin-inline: 0 !important;
+  margin-block: 0 !important;
+  width: 100% !important;
+  border-radius: 6px !important;
+  padding-inline: 0 !important;
+  color: rgba(24, 24, 25, 1) !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif !important;
+}
+
+.project-visual-sider .ant-menu-item:not(:last-child) {
+  margin-bottom: 16px !important;
+}
+
+.project-visual-sider .ant-menu-item-group {
+  margin-bottom: 34px !important;
+}
+
+.project-visual-sider .ant-menu-item-group-title {
+  height: 20px !important;
+  padding: 0 2px !important;
+  margin-bottom: 16px !important;
+  color: rgba(112, 118, 127, 1) !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif !important;
+  line-height: 20px !important;
+}
+
+.project-visual-sider .ant-menu-item-group-list {
+  margin: 0 !important;
+}
+
+.project-visual-sider .ant-menu-title-content {
+  height: 36px;
+  line-height: 36px;
+}
+
+.project-visual-sider .ant-menu-item .ant-menu-item-icon {
+  margin-left: 12px;
+}
+
+.project-visual-sider .ant-menu-item .ant-menu-item-icon + .ant-menu-title-content {
+  margin-inline-start: 8px;
+}
+
+.project-visual-sider .project-sider-leaf-label {
+  display: block;
+  padding-left: 34px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-visual-sider .project-sider-root-leaf-label {
+  display: block;
+  padding-left: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-visual-sider .project-sider-group-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 20px;
+  padding-left: 10px;
+  line-height: 20px;
+}
+
+.project-visual-sider .project-sider-group-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(112, 118, 127, 1);
+}
+
+.project-visual-sider .project-sider-group-icon .anticon {
+  font-size: 16px;
+}
+
+.project-visual-sider .ant-menu-item:hover {
+  background: rgba(233, 236, 239, 0.72) !important;
+  color: rgba(24, 24, 25, 1) !important;
+}
+
+.project-visual-sider .ant-menu-item-selected:hover {
+  background: rgba(233, 236, 239, 1.0) !important;
+  color: rgba(24, 24, 25, 1) !important;
+}
+
+.project-visual-sider .ant-menu-item-selected {
+  background: rgba(233, 236, 239, 1.0) !important;
+  color: rgba(24, 24, 25, 1) !important;
+  font-weight: 500 !important;
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif !important;
+}
+
+.project-visual-sider .ant-menu-item-selected::after {
+  display: none !important;
+}
+
+.project-visual-sider .ant-menu-submenu-expand-icon,
+.project-visual-sider .ant-menu-submenu-arrow {
+  color: rgba(112, 118, 127, 1) !important;
+}
+
+.project-visual-sider .sider-collapse-trigger {
+  border-top: none;
+}
+
+.project-header-nav-btn-compact {
+  min-width: 88px;
+  height: 32px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.project-header-back-btn.ant-btn {
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  color: var(--lab-color-text-muted) !important;
+  font-size: 16px !important;
+  border-radius: var(--lab-radius-pill) !important;
+}
+
+.project-header-back-btn.ant-btn:hover {
+  color: var(--lab-color-text-primary) !important;
+  background-color: rgba(233, 236, 239, 0.6) !important;
+}
+
+.project-header-selector-wrap {
+  position: relative;
+  z-index: 2;
+  min-width: 194px;
+}
+
+.project-header-nav-wrap {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.project-layout-surface {
+  background: var(--lab-color-surface-page);
+}
+
+.project-content-surface {
+  min-height: auto;
+  margin: 0;
+  overflow: visible;
+  background: var(--lab-color-surface-page);
+}
+
+.project-menu-no-animation {
+  border: none !important;
+}
+
+.project-loading-fallback {
+  display: flex;
+  height: 400px;
+  align-items: center;
+  justify-content: center;
+  background: var(--lab-color-surface-elevated);
+}

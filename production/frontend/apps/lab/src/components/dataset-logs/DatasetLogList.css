@@ -1,0 +1,25 @@
+.dataset-log-thinking-toggle {
+  background-color: var(--lab-color-surface-subtle);
+}
+
+.dataset-log-thinking-content {
+  word-break: break-word;
+  background-color: var(--lab-color-surface-readonly);
+  border-left: 2px solid var(--lab-color-divider);
+}
+
+.dataset-log-layout {
+  background: var(--lab-color-surface-elevated);
+}
+
+.dataset-log-detail-block {
+  word-break: break-word;
+  background-color: var(--lab-color-surface-page);
+  border: var(--lab-border-subtle);
+}
+
+.dataset-log-error-block {
+  word-break: break-word;
+  background-color: rgba(224, 32, 32, 0.06);
+  border: 1px solid rgba(224, 32, 32, 0.24);
+}

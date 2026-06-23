@@ -1,0 +1,373 @@
+.machine-annotation-page {
+  height: calc(100% - 21px);
+  min-height: 830px;
+  margin: 0 10px 21px 0;
+  padding: 20px 20px 16px !important;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 1.0) !important;
+  box-shadow: 0 2px 8px rgba(24, 24, 25, 0.06);
+  display: flex;
+  flex-direction: column;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.machine-annotation-page-title.ant-typography {
+  height: 28px;
+  margin: 0 0 10px !important;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.machine-annotation-page-desc.ant-typography {
+  display: block;
+  height: 20px;
+  color: rgba(112, 118, 127, 1);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.machine-annotation-main-tabs.ant-tabs {
+  flex: 1;
+  min-height: 0;
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.machine-annotation-main-tabs > .ant-tabs-nav {
+  flex: 0 0 auto;
+  min-height: 33px;
+  height: auto;
+  margin: 0 0 25px !important;
+  overflow: visible;
+}
+
+.machine-annotation-main-tabs > .ant-tabs-content-holder {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.machine-annotation-main-tabs > .ant-tabs-content-holder > .ant-tabs-content,
+.machine-annotation-main-tabs > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane {
+  height: 100%;
+  min-height: 0;
+}
+
+.machine-annotation-main-tabs > .ant-tabs-nav::before {
+  border-bottom: 1px solid rgba(233, 236, 239, 1);
+}
+
+.machine-annotation-main-tabs > .ant-tabs-nav .ant-tabs-tab {
+  height: auto;
+  min-height: 32px;
+  margin: 0 0 0 40px !important;
+  padding: 0 0 12px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.machine-annotation-main-tabs > .ant-tabs-nav .ant-tabs-tab:first-child {
+  margin-left: 0 !important;
+}
+
+.machine-annotation-main-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: rgba(0, 71, 187, 1);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 500;
+}
+
+.machine-annotation-main-tabs .ant-tabs-ink-bar {
+  height: 2px;
+  background: rgba(0, 71, 187, 1.0);
+}
+
+.machine-annotation-tab-pane {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.machine-annotation-sub-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.machine-annotation-sub-tabs > .ant-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.machine-annotation-sub-tabs > .ant-tabs > .ant-tabs-content-holder {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.machine-annotation-sub-tabs > .ant-tabs > .ant-tabs-content-holder > .ant-tabs-content,
+.machine-annotation-sub-tabs > .ant-tabs > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane {
+  height: 100%;
+  min-height: 0;
+}
+
+.machine-annotation-main-tabs .ant-tabs-tabpane-hidden,
+.machine-annotation-sub-tabs .ant-tabs-tabpane-hidden {
+  display: none !important;
+}
+
+.machine-annotation-segmented {
+  width: auto;
+  min-width: 272px;
+  height: 40px;
+  padding: 3px;
+  border-radius: 6px;
+  background: rgba(236, 238, 239, 1.0);
+}
+
+.machine-annotation-segmented .ant-segmented-group {
+  height: 34px;
+}
+
+.machine-annotation-segmented .ant-segmented-item {
+  min-width: 88px;
+  min-height: 34px;
+  border-radius: 6px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.machine-annotation-segmented .ant-segmented-item-label {
+  min-height: 34px;
+  line-height: 34px;
+}
+
+.machine-annotation-segmented .ant-segmented-item-selected {
+  background-color: rgba(255, 255, 255, 1.0);
+  box-shadow: 0px 0px 4px 0px rgba(0, 0, 0, 0.05);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 500;
+}
+
+.machine-annotation-workflow-step {
+  height: 82px;
+  background: linear-gradient(90deg, rgba(246,249,251,1) 0%, rgba(233,241,252,1) 57%, rgba(223,235,255,1) 100%);
+  border: 1px solid rgba(255,255,255,1);
+  clip-path: polygon(0 0, calc(100% - 40px) 0, 100% 50%, calc(100% - 40px) 100%, 0 100%, 40px 50%);
+  margin-left: -40px;
+}
+
+.machine-annotation-workflow-step:first-child {
+  clip-path: polygon(0 0, calc(100% - 40px) 0, 100% 50%, calc(100% - 40px) 100%, 0 100%);
+  margin-left: 0;
+}
+
+.machine-annotation-workflow-step:last-child {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 40px 50%);
+}
+
+.machine-annotation-refresh-btn.ant-btn,
+.machine-annotation-create-btn.ant-btn {
+  height: 36px;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.machine-annotation-refresh-btn.ant-btn {
+  width: 88px;
+  border-color: rgba(216, 217, 220, 1);
+  background: rgba(255, 255, 255, 1.0);
+  color: rgba(24, 24, 25, 1);
+}
+
+.machine-annotation-create-btn.ant-btn {
+  width: 130px;
+  background: rgba(0, 71, 187, 1.0);
+  color: rgba(255, 255, 255, 1);
+}
+
+.machine-annotation-table-block {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.machine-annotation-table .ant-table {
+  max-height: 590px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+}
+
+.machine-annotation-table .ant-table-body {
+  max-height: 550px !important;
+}
+
+.machine-annotation-table .ant-table-thead > tr > th {
+  height: 40px;
+  padding: 10px 16px !important;
+  border-bottom: none !important;
+  background: rgba(244, 246, 248, 1.0) !important;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.machine-annotation-table .ant-table-tbody > tr > td {
+  height: 50px;
+  padding: 15px 16px !important;
+  border-bottom: 1px solid rgba(232, 233, 234, 1.0) !important;
+  line-height: 20px;
+}
+
+.machine-annotation-table .ant-table-tbody > tr.ant-table-measure-row,
+.machine-annotation-table .ant-table-tbody > tr.ant-table-measure-row > td {
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  line-height: 0 !important;
+  visibility: hidden;
+}
+
+.machine-annotation-table .ant-table-cell::before {
+  display: none;
+}
+
+.machine-annotation-table .ant-progress-line {
+  width: 150px;
+}
+
+.machine-annotation-table .ant-progress-bg {
+  height: 6px !important;
+  border-radius: 2px;
+}
+
+.machine-annotation-table .ant-progress-inner {
+  background: rgba(244, 246, 248, 1.0);
+}
+
+.machine-annotation-table .ant-table-cell .ant-btn-link {
+  height: 20px;
+  padding: 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.machine-annotation-table .ant-table-cell .ant-btn-link .anticon {
+  color: rgba(24, 24, 25, 1);
+  font-size: 16px;
+}
+
+.machine-annotation-table .ant-table-cell .ant-btn-link:hover,
+.machine-annotation-table .ant-table-cell .ant-btn-link:hover .anticon {
+  color: rgba(0, 71, 187, 1) !important;
+}
+
+.machine-annotation-table .ant-table-cell .ant-btn-link[disabled],
+.machine-annotation-table .ant-table-cell .ant-btn-link[disabled] .anticon,
+.machine-annotation-table .ant-table-cell .ant-btn-link.ant-btn-dangerous[disabled],
+.machine-annotation-table .ant-table-cell .ant-btn-link.ant-btn-dangerous[disabled] .anticon {
+  color: rgba(157, 161, 167, 1) !important;
+}
+
+.machine-annotation-table .ant-table-cell .ant-btn-link.ant-btn-dangerous:not([disabled]) {
+  color: rgba(24, 24, 25, 1);
+}
+
+.machine-annotation-table .ant-table-cell .ant-btn-link.ant-btn-dangerous:not([disabled]) .anticon {
+  color: rgba(24, 24, 25, 1);
+}
+
+.machine-annotation-action-cell {
+  display: inline-flex;
+  width: 136px;
+  min-width: 136px;
+  max-width: 136px;
+  align-items: center;
+  gap: 8px;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.machine-annotation-action-cell .ant-btn {
+  flex: 0 0 auto;
+}
+
+.machine-annotation-action-cell .machine-annotation-more-action.ant-btn {
+  width: 20px;
+  min-width: 20px;
+  padding: 0;
+}
+
+.machine-annotation-action-cell .machine-annotation-more-action.ant-btn .anticon {
+  font-size: 18px;
+}
+
+.machine-annotation-action-cell .machine-annotation-more-action.ant-btn svg {
+  transform: rotate(90deg);
+}
+
+.machine-annotation-table .ant-pagination {
+  display: flex;
+  align-items: center;
+  margin: 22px 0 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.machine-annotation-table .ant-pagination-total-text {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  margin-inline-end: 24px;
+  line-height: 32px;
+}
+
+.machine-annotation-table .ant-pagination .ant-pagination-item,
+.machine-annotation-table .ant-pagination .ant-pagination-prev,
+.machine-annotation-table .ant-pagination .ant-pagination-next,
+.machine-annotation-table .ant-pagination .ant-pagination-jump-prev,
+.machine-annotation-table .ant-pagination .ant-pagination-jump-next {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  margin-inline-end: 8px;
+  border-radius: 6px;
+  line-height: 30px;
+}
+
+.machine-annotation-table .ant-pagination .ant-pagination-item-active {
+  background-color: #ECEEEF;
+  border-color: #ECEEEF;
+}
+
+.machine-annotation-table .ant-pagination .ant-pagination-item-active a {
+  color: inherit;
+  font-weight: 400 !important;
+}

@@ -1,0 +1,425 @@
+.directory-management-page {
+  height: calc(100% - 21px);
+  min-height: 830px;
+  margin: 0 10px 21px 0;
+  overflow: hidden;
+  padding: 20px 20px 16px !important;
+  background-color: rgba(255, 255, 255, 1.0);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(24, 24, 25, 0.06);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.directory-management-header {
+  display: flex;
+  align-items: center;
+  height: 28px;
+}
+
+.directory-management-title.ant-typography {
+  width: 120px;
+  height: 28px;
+  margin: 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+  white-space: nowrap;
+}
+
+.directory-management-description {
+  height: 20px;
+  margin-top: 10px;
+}
+
+.directory-management-description .ant-typography {
+  color: rgba(112, 118, 127, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.directory-management-tabs {
+  margin-top: 20px;
+}
+
+.directory-management-content {
+  margin-top: 20px;
+}
+
+.directory-management-tabs > .ant-tabs-nav {
+  min-height: 33px;
+  margin: 0 0 22px;
+  overflow: visible;
+}
+
+.directory-management-tabs > .ant-tabs-nav::before {
+  border-bottom-color: rgba(233, 236, 239, 1);
+}
+
+.directory-management-tabs .ant-tabs-tab {
+  height: auto;
+  min-height: 32px;
+  margin: 0 40px 0 0;
+  padding: 0 0 12px;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.directory-management-tabs .ant-tabs-tab-btn {
+  line-height: 20px;
+}
+
+.directory-management-tabs .ant-tabs-tab + .ant-tabs-tab {
+  margin-left: 0;
+}
+
+.directory-management-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: rgba(0, 71, 187, 1);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 500;
+}
+
+.directory-management-tabs .ant-tabs-ink-bar {
+  height: 2px;
+  background-color: rgba(0, 71, 187, 1.0);
+}
+
+.directory-dataset-toolbar {
+  margin-bottom: 16px;
+}
+
+.directory-dataset-toolbar .mb-4 {
+  margin-bottom: 0;
+}
+
+.directory-dataset-toolbar .ant-form-item {
+  margin-inline-end: 10px;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  height: 36px;
+}
+
+.directory-dataset-toolbar .ant-form-item-control,
+.directory-dataset-toolbar .ant-form-item-control-input,
+.directory-dataset-toolbar .ant-form-item-control-input-content {
+  display: flex;
+  align-items: center;
+  min-height: 36px !important;
+}
+
+.directory-dataset-toolbar .flex.flex-wrap.items-center.gap-2.w-full {
+  gap: 0;
+}
+
+.directory-dataset-toolbar .flex.flex-wrap.items-center.gap-2.flex-1 {
+  gap: 0;
+}
+
+.directory-dataset-toolbar .flex.gap-2 {
+  gap: 10px;
+}
+
+.directory-dataset-toolbar .ant-input-affix-wrapper,
+.directory-dataset-toolbar .ant-select-selector,
+.directory-dataset-toolbar .ant-btn {
+  height: 36px;
+  border-radius: 6px;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.directory-dataset-toolbar .ant-input-affix-wrapper,
+.directory-dataset-toolbar .ant-select-selector {
+  border-color: rgba(216, 217, 220, 1) !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.directory-dataset-toolbar .ant-input-prefix {
+  margin-inline-end: 8px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  width: 16px;
+}
+
+.directory-dataset-name-input {
+  width: 180px;
+  display: flex;
+  align-items: center;
+}
+
+.directory-dataset-toolbar .directory-dataset-name-input.ant-input-affix-wrapper .ant-input {
+  height: 34px !important;
+  line-height: 34px !important;
+  padding: 0 !important;
+}
+
+.directory-dataset-name-input input::placeholder {
+  color: rgba(157, 161, 167, 1);
+}
+
+.directory-dataset-type-select {
+  width: 160px !important;
+  display: flex;
+  align-items: center;
+}
+
+.directory-dataset-toolbar .ant-select-selection-placeholder,
+.directory-dataset-toolbar .ant-select-selection-item {
+  color: rgba(24, 24, 25, 1);
+  line-height: 34px !important;
+  display: flex;
+  align-items: center;
+}
+
+.directory-dataset-toolbar .directory-dataset-type-select .ant-select-selection-wrap {
+  height: 34px;
+  display: flex;
+  align-items: center;
+}
+
+.directory-dataset-toolbar .ant-btn {
+  padding: 6px 30px;
+  color: rgba(24, 24, 25, 1);
+  border-color: rgba(216, 217, 220, 1);
+  box-shadow: none;
+}
+
+.directory-dataset-toolbar .ant-btn-primary {
+  width: 116px;
+  padding: 8px 16px;
+  color: rgba(255, 255, 255, 1);
+  background-color: rgba(0, 71, 187, 1.0);
+  border-color: rgba(0, 71, 187, 1.0);
+}
+
+.directory-dataset-toolbar .ant-btn-primary .anticon {
+  font-size: 14px;
+}
+
+.directory-dataset-table .ant-table {
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.directory-dataset-table .ant-table-thead > tr {
+  height: 40px !important;
+}
+
+.directory-dataset-table .ant-table-thead > tr > th {
+  height: 40px;
+  padding: 10px 16px !important;
+  background-color: rgba(244, 246, 248, 1.0) !important;
+  color: rgba(24, 24, 25, 1) !important;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px !important;
+  font-weight: normal !important;
+  line-height: 20px !important;
+}
+
+.directory-dataset-table .ant-table-tbody > tr:not(.ant-table-measure-row) > td {
+  height: 50px;
+  /* padding: 15px 16px !important; */
+  border-bottom: 1px solid rgba(232, 233, 234, 1.0);
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.directory-dataset-table .ant-table-tbody > tr.ant-table-measure-row,
+.directory-dataset-table .ant-table-tbody > tr.ant-table-measure-row > td {
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  line-height: 0 !important;
+  visibility: hidden;
+}
+
+.directory-dataset-table .ant-table-tbody > tr:hover > td {
+  background-color: rgba(244, 246, 248, 1.0) !important;
+}
+
+.directory-dataset-name-cell {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.directory-dataset-name-link.ant-typography {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding-inline-end: 24px;
+  overflow: hidden;
+  margin-bottom: 0;
+  color: rgba(0, 71, 187, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.directory-dataset-name-link.ant-typography .ant-typography-edit {
+  position: absolute;
+  top: 50%;
+  inset-inline-end: 0;
+  margin-inline-start: 0;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.2s;
+}
+
+.directory-dataset-name-column:hover .directory-dataset-name-link.ant-typography .ant-typography-edit,
+.directory-dataset-name-link.ant-typography .ant-typography-edit:focus-visible {
+  opacity: 1;
+}
+
+.directory-dataset-name-link.ant-btn-link {
+  color: rgba(0, 71, 187, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.directory-dataset-status-success {
+  color: rgba(32, 201, 93, 1);
+}
+
+.directory-dataset-status-error {
+  color: rgba(255, 45, 45, 1);
+}
+
+.directory-dataset-status-running {
+  color: rgba(255, 147, 26, 1);
+}
+
+.directory-dataset-status-normal {
+  color: rgba(24, 144, 255, 1);
+}
+
+.directory-dataset-status-muted {
+  color: rgba(112, 118, 127, 1);
+}
+
+.directory-dataset-tag.ant-tag {
+  height: 26px;
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.directory-dataset-tag-blue.ant-tag,
+.directory-dataset-tag-cyan.ant-tag {
+  color: rgba(0, 84, 221, 1);
+  background-color: rgba(232, 240, 255, 1);
+  border: 1px solid rgba(0, 84, 221, 0.1);
+}
+
+.directory-dataset-tag-orange.ant-tag,
+.directory-dataset-tag-green.ant-tag {
+  color: rgba(255, 147, 26, 1);
+  background-color: rgba(254, 245, 234, 1);
+  border: 1px solid rgba(246, 161, 50, 0.1);
+}
+
+.directory-dataset-tag-yellow.ant-tag {
+  color: rgba(236, 145, 26, 1);
+  background-color: rgba(254, 245, 234, 1);
+  border: 1px solid rgba(246, 161, 50, 0.1);
+}
+
+.directory-dataset-tag-default.ant-tag {
+  color: rgba(112, 118, 127, 1);
+  background-color: rgba(244, 246, 248, 1.0);
+  border: 1px solid rgba(233, 236, 239, 1);
+}
+
+.directory-dataset-actions .ant-btn {
+  height: 20px;
+  padding: 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.directory-dataset-actions .ant-btn:hover {
+  color: rgba(0, 71, 187, 1) !important;
+}
+
+.directory-dataset-actions .ant-btn .anticon {
+  font-size: 16px;
+}
+
+.directory-dataset-table .ant-pagination {
+  margin: 22px 0 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.directory-dataset-table .ant-pagination-total-text {
+  margin-inline-end: 24px;
+}
+
+.directory-dataset-table .ant-pagination .ant-pagination-item,
+.directory-dataset-table .ant-pagination .ant-pagination-prev,
+.directory-dataset-table .ant-pagination .ant-pagination-next {
+  min-width: 32px;
+  height: 32px;
+  line-height: 30px;
+}
+
+.directory-dataset-table .ant-pagination .ant-pagination-item-active {
+  background-color: #ECEEEF;
+  border-color: #ECEEEF;
+}
+
+.directory-dataset-table .ant-pagination .ant-pagination-item-active a {
+  color: inherit;
+  font-weight: 400 !important;
+}
+
+.directory-dataset-table .ant-pagination .ant-pagination-options {
+  margin-inline-start: 24px;
+}
+
+.directory-dataset-table .ant-pagination .ant-select-selector,
+.directory-dataset-table .ant-pagination .ant-pagination-options-quick-jumper input {
+  height: 32px;
+  border-color: rgba(216, 217, 220, 1);
+  border-radius: 6px;
+}

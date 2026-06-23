@@ -1,0 +1,78 @@
+import { Button, Space } from 'antd'
+import React from 'react'
+import styled from 'styled-components'
+import { $t } from '@/locales'
+
+type ModalFooterProps = {
+  onOk?: () => void
+  onCancel?: () => void
+  cancelText?: string
+  okText?: string
+  htmlType?: 'button' | 'submit'
+  okBtnProps?: any
+  cancelBtnProps?: any
+  loading?: boolean
+  style?: React.CSSProperties
+  showOkBtn?: boolean
+  showCancelBtn?: boolean
+  extra?: React.ReactNode
+  form?: any
+  description?: React.ReactNode
+}
+
+const Wrapper = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+`
+
+const ModalFooter: React.FC<ModalFooterProps> = ({
+  onOk,
+  onCancel,
+  cancelText,
+  okText,
+  okBtnProps,
+  cancelBtnProps,
+  loading,
+  htmlType = 'button',
+  style,
+  showOkBtn = true,
+  description,
+  extra,
+  showCancelBtn = true,
+  form,
+}) => {
+  // const intl = useIntl();
+  return (
+    <Wrapper>
+      <div>{description}</div>
+      <Space size={20} style={{ ...style }}>
+        {showCancelBtn && (
+          <Button
+            onClick={onCancel}
+            style={{ width: '88px' }}
+            {...cancelBtnProps}
+          >
+            {cancelText || /* intl.formatMessage({ id: 'common.button.cancel' }) */ $t('取消')}
+          </Button>
+        )}
+        {extra}
+        {showOkBtn && (
+          <Button
+            type="primary"
+            onClick={onOk}
+            style={{ width: '88px' }}
+            loading={loading}
+            htmlType={htmlType}
+            {...okBtnProps}
+          >
+            {okText || /* intl.formatMessage({ id: 'common.button.save' }) */ $t('保存')}
+          </Button>
+        )}
+      </Space>
+    </Wrapper>
+  )
+}
+
+export default ModalFooter

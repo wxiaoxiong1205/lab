@@ -1,0 +1,61 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual Environment
+venv/
+.venv/
+.env
+.venv
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+data/
+logs/
+*.log
+node_modules/
+.next/
+out/
+deployment/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+
+# Inference scripts - config and data (mounted via volumes, not needed in image)
+scripts/inference/docker/

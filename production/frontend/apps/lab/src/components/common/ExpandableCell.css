@@ -1,0 +1,7 @@
+.expandable-cell-content {
+  -ms-overflow-style: none;
+}
+
+.expandable-cell-content::-webkit-scrollbar {
+  display: none;
+}

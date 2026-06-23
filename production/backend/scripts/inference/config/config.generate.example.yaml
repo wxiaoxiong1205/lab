@@ -1,0 +1,66 @@
+# 推理生成脚本配置文件示例
+# 用于生成推理结果集（inference_script.py）
+# 与评估脚本的区别：不需要 metrics 配置
+
+# 推理参数（适用于所有客户端）
+inference:
+  temperature: 0.7  # 控制随机性，范围0-2，默认0.7
+  max_tokens: 4096  # 最大生成token数，建议设置合理值（如512、1024、2048），vLLM默认仅16会导致截断
+  top_p: 1.0  # 核采样，范围0-1，默认1.0（采样时考虑所有tokens）
+  presence_penalty: 0.0  # 存在性惩罚，范围-2.0到2.0，默认0.0（不惩罚）
+  seed: 42  # 随机种子，用于可复现生成，null表示随机。注意：OpenAI是"尽力而为"，vLLM提供严格确定性
+
+# OpenAI客户端配置
+openai:
+  # api_key 配置说明：
+  # - 在 docker-compose 内部网络中访问 vLLM API 时，可以设置为任意占位符值（如 "not-required"）
+  # - vLLM 的 OpenAI 兼容 API 通常不强制验证 API key（除非服务端启用了认证）
+  # - 如果访问外部 OpenAI API 或启用了认证的 vLLM 服务，需要提供真实的 API key
+  api_key: "not-required"  # 必需字段，但在内部网络中可以使用占位符值
+  # base_url 配置说明：
+  # - 在 docker-compose 网络中，可以通过服务名作为 hostname 访问
+  # - 例如：http://vllm-service:8000/v1 （vllm-service 是 docker-compose 中的服务名）
+  # - 如果从外部访问，使用：http://localhost:8001/v1 （需要暴露端口）
+  base_url: "http://vllm-service:8000/v1"  # 必需，OpenAI API基础URL，使用服务名作为 hostname
+  model: "Qwen2.5-0.5B-Instruct"  # 必需，OpenAI模型名称，如"gpt-4"、"gpt-3.5-turbo"等（vLLM服务中可设置为任意值）
+  timeout: 120  # 请求超时时间（秒），默认120秒，超过此时间未响应将抛出超时异常
+  max_retries: 3  # 最大重试次数，默认3次，当请求失败时会自动重试
+  max_concurrent: 10  # 最大并发数，默认10，控制同时进行的请求数，避免触发速率限制
+
+# vLLM配置
+vllm:
+  model_path: "/models/Qwen2.5-0.5B-Instruct"  # 必需，模型文件路径，指向本地或挂载的模型目录
+  tensor_parallel_size: 2  # 张量并行大小，默认1（单GPU），多GPU推理时可设置为GPU数量
+  max_model_len: null  # 最大模型长度（token数），null表示使用模型默认值，用于限制输入+输出的总长度
+  gpu_memory_utilization: 0.85  # GPU内存利用率，范围0.0-1.0，默认0.9（使用90%的GPU内存），影响可同时处理的请求数
+  max_num_batched_tokens: null  # 单批次最大token数量，null表示使用默认值，用于连续批处理优化，控制批处理效率
+  max_num_seqs: null  # 最大序列数，null表示使用默认值，用于连续批处理优化，控制同时处理的序列数量
+
+# Prompt配置
+prompt:
+  # 生成模板文件路径（用于推理生成场景）
+  # 模板直接使用 JSONL 数据中的字段，不需要 field_mapping
+  template_path: "/data/configs/prompt_template.generate.example.j2"
+
+# 运行配置
+runtime:
+  client_type: "openai"  # 推理客户端类型，可选值: "openai", "vllm"
+  log_level: "INFO"  # 日志级别，可选值: "DEBUG", "INFO", "WARNING", "ERROR"
+  # 输入文件路径（可以是单个文件或文件列表）
+  input_file:
+    - "/data/input/input.generate.example.jsonl"
+  # 输出文件路径（可以是单个文件或文件列表，数量需与输入文件一致）
+  output_file:
+    - "/data/output/output.generated.jsonl"
+  # 进度文件路径（用于记录实时进度信息，JSONL格式，可选）
+  # 如果未指定，则不写入进度文件
+  progress_file: "/data/output/output.process.jsonl"
+  # 统计文件路径（用于记录统计信息，JSONL格式，可选）
+  # 如果未指定，则不写入统计文件
+  statistics_file: "/data/output/output.calculate.jsonl"
+
+# 数据处理配置
+data:
+  batch_size: 5000  # 每批处理的数据条数，默认5000
+  skip_errors: true  # 是否跳过数据解析错误，默认true（跳过错误继续处理）
+

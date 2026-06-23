@@ -1,0 +1,613 @@
+.create-dataset-page {
+  min-height: 100%;
+  /* padding: 0 10px 10px; */
+  overflow: visible;
+  background-color: rgba(248, 249, 250, 1.0);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.create-dataset-card {
+  width: 100%;
+  min-height: 1387px;
+  margin: 0;
+  overflow: visible;
+  background-color: rgba(255, 255, 255, 1.0);
+  border-radius: 10px;
+  box-shadow: 0px 2px 6px 0px rgba(0, 0, 0, 0.05);
+}
+
+.create-dataset-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  height: 92px;
+  padding: 20px 30px 0 20px;
+}
+
+.create-dataset-title-group {
+  display: flex;
+  align-items: flex-start;
+}
+
+.create-dataset-back.ant-btn {
+  width: 18px;
+  height: 18px;
+  margin: 8px 0 0 0;
+  padding: 0;
+  color: rgba(24, 24, 25, 1);
+}
+
+.create-dataset-back .anticon {
+  font-size: 18px;
+}
+
+.create-dataset-title-copy {
+  margin-left: 16px;
+}
+
+.create-dataset-title-copy h1 {
+  width: 160px;
+  height: 28px;
+  margin: 0;
+  overflow: hidden;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.create-dataset-title-copy p {
+  width: 56px;
+  height: 20px;
+  margin: 10px 0 0 0;
+  overflow: hidden;
+  color: rgba(112, 118, 127, 1);
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.create-dataset-cancel.ant-btn,
+.create-dataset-submit.ant-btn {
+  width: 88px;
+  height: 36px;
+  margin-top: 27px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.create-dataset-cancel.ant-btn {
+  color: rgba(24, 24, 25, 1);
+  background-color: rgba(255, 255, 255, 1.0);
+  border: 1px solid rgba(216, 217, 220, 1);
+}
+
+.create-dataset-submit.ant-btn {
+  color: rgba(255, 255, 255, 1);
+  background-color: rgba(0, 71, 187, 1.0);
+  border-color: rgba(0, 71, 187, 1.0);
+}
+
+.create-dataset-divider {
+  width: calc(100% - 30px);
+  height: 1px;
+  margin: 0 15px;
+  background-color: rgba(233, 236, 239, 1);
+}
+
+.create-dataset-form {
+  padding: 25px 40px 34px;
+}
+
+.create-dataset-form .ant-form-item {
+  margin-bottom: 0;
+}
+
+.create-dataset-form .ant-form-item-label {
+  height: 24px;
+  padding: 0;
+}
+
+.create-dataset-form .ant-form-item-label > label {
+  height: 20px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.create-dataset-basic-grid {
+  display: grid;
+  grid-template-columns: 560px 560px;
+  column-gap: 52px;
+  row-gap: 24px;
+  width: 1172px;
+}
+
+.create-dataset-name-label {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  height: 24px;
+}
+
+.create-dataset-name-field > .ant-form-item-row > .ant-form-item-label {
+  width: 560px;
+}
+
+.create-dataset-name-field > .ant-form-item-row > .ant-form-item-label > label {
+  width: 100%;
+}
+
+.create-dataset-required {
+  margin-left: 4px;
+  color: rgba(224, 32, 32, 1);
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.create-dataset-name-help {
+  margin: 4px 0 0 auto;
+  color: rgba(157, 161, 167, 1);
+  font-size: 12px;
+  line-height: 17px;
+  white-space: nowrap;
+}
+
+.create-dataset-control.ant-input,
+.create-dataset-form .ant-input-affix-wrapper {
+  width: 560px;
+  height: 40px;
+  padding: 9px 12px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 20px;
+  border: 1px solid rgba(216, 217, 220, 1);
+  border-radius: 6px;
+}
+
+.create-dataset-control.ant-input::placeholder,
+.create-dataset-textarea.ant-input::placeholder {
+  color: rgba(157, 161, 167, 1);
+}
+
+.create-dataset-form .ant-input-show-count-suffix,
+.create-dataset-form .ant-input-data-count {
+  color: rgba(157, 161, 167, 1);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.create-dataset-version-control.ant-input {
+  background-color: rgba(244, 246, 248, 1.0);
+  cursor: default;
+}
+
+.create-dataset-description-field {
+  grid-column: 1;
+}
+
+.create-dataset-description-field .ant-input-textarea {
+  position: relative;
+  width: 560px;
+  height: 85px !important;
+  min-height: 85px !important;
+}
+
+.create-dataset-description-field .ant-input-textarea-show-count::after {
+  position: absolute;
+  right: 12px;
+  bottom: 6px;
+  margin: 0;
+  color: rgba(157, 161, 167, 1);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.create-dataset-textarea.ant-input,
+.create-dataset-description-field .ant-input-textarea .ant-input {
+  width: 560px;
+  height: 85px !important;
+  min-height: 85px !important;
+  max-height: 85px !important;
+  padding: 10px 12px 24px;
+  resize: none;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 20px;
+  border: 1px solid rgba(216, 217, 220, 1);
+  border-radius: 6px;
+}
+
+.create-dataset-radio-field {
+  margin-top: 20px;
+}
+
+.create-dataset-radio-field .ant-form-item-control {
+  margin-top: 8px;
+}
+
+.create-dataset-usage-option.ant-radio-button-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100px;
+  height: 40px;
+  padding: 0 10px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 20px;
+  border: 1px solid rgba(216, 217, 220, 1);
+  border-radius: 6px;
+}
+
+.create-dataset-usage-option.ant-radio-button-wrapper > span:last-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.create-dataset-usage-option .ant-space {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  height: 20px;
+  gap: 4px !important;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.create-dataset-usage-option .ant-space-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.create-dataset-usage-option .anticon {
+  width: 16px;
+  height: 16px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 16px;
+  line-height: 16px;
+}
+
+.create-dataset-usage-option span:not(.anticon) {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.create-dataset-usage-option.ant-radio-button-wrapper::before,
+.create-dataset-format-option.ant-radio-button-wrapper::before,
+.create-dataset-source-option.ant-radio-button-wrapper::before {
+  display: none;
+}
+
+.create-dataset-usage-option.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
+.create-dataset-format-option.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
+.create-dataset-source-option.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) {
+  color: rgba(24, 24, 25, 1);
+  background-color: rgba(238, 248, 255, 1.0);
+  border: 1px solid rgba(0, 71, 187, 0.7);
+  box-shadow: none;
+}
+
+.create-dataset-readonly-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100px;
+  height: 40px;
+  padding: 0 16px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 20px;
+  white-space: nowrap;
+  background-color: rgba(238, 248, 255, 1.0);
+  border: 1px solid rgba(0, 71, 187, 0.7);
+  border-radius: 6px;
+}
+
+.create-dataset-readonly-usage-option {
+  width: 100px;
+  padding: 0 10px;
+}
+
+.create-dataset-method-row {
+  height: 20px;
+  margin-top: 24px;
+}
+
+.create-dataset-method-row .ant-radio-wrapper {
+  height: 20px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.create-dataset-method-row .ant-radio-inner {
+  width: 14px;
+  height: 14px;
+  border-color: rgba(0, 71, 187, 1);
+}
+
+.create-dataset-method-row .ant-radio-checked .ant-radio-inner {
+  background-color: rgba(0, 71, 187, 1);
+  border-color: rgba(0, 71, 187, 1);
+}
+
+.create-dataset-format-field {
+  margin-top: 24px;
+}
+
+.create-dataset-format-option.ant-radio-button-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 16px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 20px;
+  border: 1px solid rgba(216, 217, 220, 1);
+  border-radius: 6px;
+}
+
+.create-dataset-format-option.ant-radio-button-wrapper > span:not(.ant-radio-button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  white-space: nowrap;
+  line-height: 20px;
+}
+
+.create-dataset-format-option-prompt-response.ant-radio-button-wrapper {
+  width: 193px;
+}
+
+.create-dataset-format-option-role-based.ant-radio-button-wrapper {
+  width: 143px;
+}
+
+.create-dataset-info-icon {
+  margin-left: 6px;
+  color: rgba(112, 118, 127, 1);
+  font-size: 14px;
+  line-height: 14px;
+  vertical-align: middle;
+}
+
+.create-dataset-attr-section {
+  width: 1172px;
+  margin-top: 24px;
+}
+
+.create-dataset-attr-section > .ant-form-item > .ant-form-item-row > .ant-form-item-label {
+  height: 20px;
+}
+
+.create-dataset-attr-section .ant-form-item-control {
+  margin-top: 9px;
+}
+
+.create-dataset-attr-section .ant-spin-container > div {
+  width: 1172px;
+  margin: 0 0 10px 0 !important;
+  padding: 16px 30px 20px;
+  background-color: rgba(244, 246, 248, 1.0);
+  border-radius: 10px;
+}
+
+.create-dataset-attr-section .ant-spin-container > div > .text-gray-600 {
+  margin: 0 0 16px 0 !important;
+  color: rgba(24, 24, 25, 1) !important;
+  font-size: 14px !important;
+  font-weight: normal !important;
+  line-height: 20px;
+}
+
+.create-dataset-attr-section .ant-spin-container > div > .flex {
+  display: grid !important;
+  grid-template-columns: 528px 528px;
+  column-gap: 56px;
+  row-gap: 24px;
+}
+
+.create-dataset-attr-section .ant-spin-container > div .ant-form-item {
+  width: 528px;
+}
+
+.create-dataset-attr-section .ant-spin-container > div .ant-form-item-label {
+  height: 20px;
+}
+
+.create-dataset-attr-section .ant-spin-container > div .ant-form-item-control {
+  margin-top: 8px;
+}
+
+.create-dataset-attr-section .ant-select-selector,
+.create-dataset-attr-section .ant-input,
+.create-dataset-url-field .ant-input {
+  width: 528px !important;
+  min-height: 40px !important;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background-color: rgba(255, 255, 255, 1.0) !important;
+  box-shadow: none !important;
+}
+
+.create-dataset-attr-section .ant-select-selection-placeholder,
+.create-dataset-attr-section .ant-input::placeholder {
+  color: rgba(157, 161, 167, 1) !important;
+}
+
+.create-dataset-attr-section .ant-select-selection-item {
+  min-height: 26px;
+  border-radius: 6px;
+  color: rgba(39, 47, 59, 1);
+  font-size: 14px;
+}
+
+.create-dataset-source-field {
+  margin-top: 46px;
+}
+
+.create-dataset-source-field .ant-form-item-control {
+  margin-top: 14px;
+}
+
+.create-dataset-source-option.ant-radio-button-wrapper {
+  width: 88px;
+  height: 40px;
+  padding: 0;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 38px;
+  text-align: center;
+  border: 1px solid rgba(216, 217, 220, 1);
+  border-radius: 6px;
+}
+
+.create-dataset-upload-section {
+  width: 560px;
+  margin-top: 26px;
+}
+
+.create-dataset-upload-field .ant-form-item-control {
+  margin-top: 12px;
+}
+
+.create-dataset-upload-box {
+  width: 562px;
+}
+
+.create-dataset-upload-box .ant-upload-wrapper {
+  width: 562px;
+}
+
+.create-dataset-upload-box .ant-upload-wrapper .ant-upload-drag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 562px;
+  height: 142px;
+  padding: 0;
+  background-color: rgba(241, 247, 251, 1);
+  border: 1px dashed rgba(0, 71, 187, 0.7);
+  border-radius: 6px;
+}
+
+.create-dataset-upload-box .ant-upload-wrapper .ant-upload-drag .ant-upload {
+  padding: 0;
+}
+
+.create-dataset-upload-box .ant-upload-drag-icon {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 12px !important;
+  color: rgba(24, 24, 25, 1) !important;
+  font-size: 18px !important;
+  line-height: 44px;
+  background-color: rgba(255, 255, 255, 1.0);
+  border-radius: 50%;
+}
+
+.create-dataset-upload-box .ant-upload-drag-icon .anticon {
+  color: rgba(24, 24, 25, 1) !important;
+  font-size: 18px;
+}
+
+.create-dataset-upload-box .ant-upload-text {
+  margin: 0;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.create-dataset-upload-box .ant-upload-hint,
+.create-dataset-upload-box .ant-upload-hint p {
+  margin: 6px 0 0;
+  color: rgba(112, 118, 127, 1) !important;
+  font-size: 12px !important;
+  line-height: 17px;
+}
+
+.create-dataset-example-row {
+  display: flex;
+  align-items: center;
+  width: 560px;
+  height: 50px;
+  margin-top: 10px;
+  padding: 0 16px;
+  background-color: rgba(244, 246, 248, 1.0);
+  border-radius: 6px;
+}
+
+.create-dataset-example-row > span {
+  margin-right: 26px;
+  color: rgba(112, 118, 127, 1);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.create-dataset-example-row .ant-btn-link {
+  height: 20px;
+  margin-right: 20px;
+  padding: 0;
+  color: rgba(0, 71, 187, 1);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.create-dataset-url-field {
+  width: 560px;
+  margin-top: 26px;
+}
+
+@media (max-width: 1280px) {
+  .create-dataset-card {
+    width: 100%;
+  }
+
+  .create-dataset-basic-grid,
+  .create-dataset-attr-section,
+  .create-dataset-attr-section .ant-spin-container > div {
+    width: 100%;
+  }
+
+  .create-dataset-basic-grid {
+    grid-template-columns: repeat(2, minmax(420px, 1fr));
+  }
+
+  .create-dataset-control.ant-input,
+  .create-dataset-form .ant-input-affix-wrapper,
+  .create-dataset-textarea.ant-input {
+    width: 100%;
+  }
+
+  .create-dataset-name-field {
+    width: 100%;
+  }
+
+  .create-dataset-name-field > .ant-form-item-row > .ant-form-item-label {
+    width: 100%;
+  }
+}

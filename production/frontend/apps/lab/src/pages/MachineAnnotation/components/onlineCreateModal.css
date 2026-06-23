@@ -1,0 +1,11 @@
+.machine-annotation-online-create-cascader-popup .ant-cascader-menu {
+  min-width: 180px;
+  max-width: 280px;
+}
+
+.machine-annotation-online-create-cascader-popup .ant-cascader-menu-item-content {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

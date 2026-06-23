@@ -1,0 +1,80 @@
+services:
+  # 推理客户端服务（用于生成推理结果集）
+  inference-client:
+    build:
+      context: ../../../ # 构建上下文：项目根目录
+      dockerfile: scripts/inference/docker/Dockerfile.client
+    image: inference-client:1.0.0
+    container_name: inference-client-generate
+    volumes:
+      # 挂载项目代码目录（方便开发调试，无需重新构建镜像）
+      # 注意：使用绝对路径，相对于 docker-compose.yml 所在目录
+      - ../../../scripts:/app/scripts
+      # 挂载配置文件目录
+      - ./config:/data/configs:ro
+      # 挂载输入数据目录
+      - ./data/input:/data/input:ro
+      # 挂载输出数据目录
+      - ./data/output:/data/output
+    environment:
+      - TZ=Asia/Shanghai
+    # 直接启动推理生成脚本（使用示例配置）
+    # 注意：这是推理生成脚本（inference_script），用于生成推理结果集
+    # 如果需要评估推理结果，使用 docker-compose.yml 中的 evaluate_script
+    command: >
+      python3 -m scripts.inference.inference_script --config_file /data/configs/config.generate.example.yaml
+    restart: "no"
+    # 等待 vLLM 服务健康检查通过后再启动推理客户端
+    # 注意：在 docker-compose 网络中，可以通过服务名 "vllm-service" 作为 hostname 访问
+    # 配置文件中 base_url 应设置为: http://vllm-service:8000/v1
+    depends_on:
+      vllm-service:
+        condition: service_healthy
+
+  # vLLM 服务（启动 OpenAI 兼容 API 服务）
+  vllm-service:
+    build:
+      context: ../../../ # 构建上下文：项目根目录
+      dockerfile: scripts/inference/docker/Dockerfile.vllm
+    image: vllm-service:v0.11.2
+    container_name: vllm-service-generate
+    volumes:
+      # 挂载模型目录（根据实际情况调整路径）
+      - /data/models:/models:ro
+      # 挂载项目代码目录（方便开发调试，无需重新构建镜像）
+      # 注意：使用绝对路径，相对于 docker-compose.yml 所在目录
+      - ../../../scripts:/app/scripts
+      # 挂载配置文件目录（用于直接调用 vllm.LLM 的场景）
+      - ./config:/data/configs:ro
+      # 挂载输入数据目录（用于直接调用 vllm.LLM 的场景）
+      - ./data/input:/data/input:ro
+      # 挂载输出数据目录（用于直接调用 vllm.LLM 的场景）
+      - ./data/output:/data/output
+    environment:
+      - TZ=Asia/Shanghai
+    # 覆盖默认入口点，使用 Python 直接运行启动脚本
+    entrypoint: [ "python3", "-m", "scripts.inference.start_vllm_server" ]
+    # 使用启动脚本启动 vLLM API 服务（从配置文件读取参数）
+    # 配置文件路径：/data/configs/config.example.yaml
+    command: >
+      --config-file /data/configs/config.generate.example.yaml --log-level INFO
+    # 健康检查：检查 vLLM API 服务是否就绪
+    # 使用 /v1/models 端点检查服务是否可用（vLLM 的 OpenAI 兼容 API）
+    # 使用 Python 检查，因为镜像可能没有 curl
+    healthcheck:
+      test: [ "CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/models').read()" ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    # 如果需要外部访问 vLLM API，可以取消下面的注释暴露端口
+    # ports:
+    #   - "8001:8000"  # 外部访问地址：http://localhost:8001/v1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: [ '0', '2','3','4' ]
+              capabilities: [ gpu ]
+    restart: "no"

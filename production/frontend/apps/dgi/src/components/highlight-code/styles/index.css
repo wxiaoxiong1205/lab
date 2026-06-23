@@ -1,0 +1,72 @@
+.high-light-wrapper {
+  text-align: left;
+  font-size: var(--font-size-code);
+}
+
+.high-light-wrapper .hljs {
+  font-weight: var(--font-weight-normal);
+  padding-inline: 0;
+  padding-block: 1.2em;
+}
+
+.high-light-wrapper .hljs::-webkit-scrollbar {
+  height: var(--scrollbar-size);
+}
+
+.high-light-wrapper .hljs::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 4px;
+}
+
+.high-light-wrapper .hljs::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+.high-light-wrapper .hljs.light:hover::-webkit-scrollbar-thumb {
+  background-color: var(--color-scrollbar-thumb);
+  border-radius: 4px;
+}
+
+.high-light-wrapper .hljs.dark:hover::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-handle-light-bg);
+  border-radius: 4px;
+}
+
+.high-light-wrapper .code-pre {
+  padding-inline: 12px 12px;
+  border-radius: 0 0 var(--border-radius-mini) var(--border-radius-mini);
+  position: relative;
+  white-space: pre-wrap;
+}
+
+.high-light-wrapper .code-pre code {
+  line-height: 1.5;
+}
+
+.high-light-wrapper .code-pre.copyable {
+  padding-inline: 12px 32px;
+}
+
+.high-light-wrapper .code-pre .copy-button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
+.high-light-wrapper .code-pre.dark {
+  background-color: var(--color-editor-dark);
+}
+
+.high-light-wrapper .code-pre.dark:hover::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-handle-light-bg);
+  border-radius: 4px;
+}
+
+.high-light-wrapper .code-pre.light {
+  background-color: rgb(250, 250, 250);
+}
+
+.high-light-wrapper .code-pre.light:hover::-webkit-scrollbar-thumb {
+  background-color: var(--color-scrollbar-thumb);
+  border-radius: 4px;
+}

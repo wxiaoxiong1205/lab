@@ -1,0 +1,15 @@
+@Library('deepexi-build@master') _
+   
+Basebuild ( {
+    repoName = "deepexi-lab-web"
+    service = "frontend"
+    project = ["applife"]
+    dockerImages = [
+        [
+            "imageName": "deepexilab-lab-web",
+            "dockerfilePath": "./apps/lab/docker/Dockerfile",
+            "arch":['arm64','amd64'],
+            'directory': "."
+        ],
+    ]
+})

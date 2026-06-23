@@ -1,0 +1,12 @@
+{
+  "langs": [
+    "en",
+    "zh-TW"
+  ],
+  "scanPath": "src",
+  "fileType": "vue|ts|js|jsx|tsx",
+  "localePath": "src/locales",
+  "keyCount": 32,
+  "onlyExtract": true,
+  "translateBy": "google"
+}

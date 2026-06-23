@@ -1,0 +1,63 @@
+.lab-main-header.ant-layout-header {
+  background: var(--lab-color-surface-page) !important;
+  color: var(--lab-color-text-primary);
+}
+
+.lab-header-menu-btn.ant-btn {
+  color: var(--lab-color-text-primary);
+}
+
+.lab-header-menu-btn.ant-btn:hover,
+.lab-header-menu-btn.ant-btn:focus {
+  background: rgba(233, 236, 239, 0.6) !important;
+  color: var(--lab-color-text-primary) !important;
+}
+
+.lab-header-logo-divider {
+  width: 1px;
+  height: 20px;
+  margin-left: 10px;
+  background: #e0e0e0;
+}
+
+.lab-header-user-btn.ant-btn {
+  height: 36px;
+  color: var(--lab-color-text-muted);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.lab-header-user-btn.ant-btn:hover,
+.lab-header-user-btn.ant-btn:focus {
+  background: transparent !important;
+  color: var(--lab-color-text-muted) !important;
+}
+
+.lab-header-user-btn .ant-btn-icon {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  margin-inline-end: 6px !important;
+  border: 0.5px solid var(--lab-color-divider);
+  border-radius: 50%;
+  background: #f1f2f4;
+  color: var(--lab-color-brand-primary);
+}
+
+.lab-header-doc-btn.ant-btn {
+  height: 36px;
+  margin-right: 16px;
+  color: var(--lab-color-text-primary);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.lab-header-doc-btn.ant-btn:hover,
+.lab-header-doc-btn.ant-btn:focus {
+  background: rgba(233, 236, 239, 0.6) !important;
+  color: var(--lab-color-brand-primary) !important;
+}

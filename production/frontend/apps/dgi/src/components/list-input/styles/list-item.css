@@ -1,0 +1,15 @@
+.list-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.list-item .field-wrapper {
+  flex: 1;
+}
+
+.list-item .btn {
+  margin-left: 10px;
+}

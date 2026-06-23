@@ -1,0 +1,337 @@
+.data-cleaning-page {
+  height: calc(100% - 21px);
+  min-height: 830px;
+  margin: 0 10px 21px 0;
+  padding: 20px 20px 16px !important;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 1.0) !important;
+  box-shadow: 0 2px 8px rgba(24, 24, 25, 0.06);
+  display: flex;
+  flex-direction: column;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.data-cleaning-page-title.ant-typography {
+  height: 28px;
+  margin: 0 0 10px !important;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.data-cleaning-page-desc.ant-typography {
+  display: block;
+  height: 20px;
+  color: rgba(112, 118, 127, 1);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.data-cleaning-toolbar {
+  margin-bottom: 16px;
+}
+
+.data-cleaning-toolbar .ant-form-item {
+  height: 36px;
+  margin-inline-end: 10px;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+}
+
+.data-cleaning-toolbar .ant-form-item-control,
+.data-cleaning-toolbar .ant-form-item-control-input,
+.data-cleaning-toolbar .ant-form-item-control-input-content {
+  min-height: 36px !important;
+  display: flex;
+  align-items: center;
+}
+
+.data-cleaning-toolbar .ant-input-affix-wrapper,
+.data-cleaning-toolbar .ant-select-selector,
+.data-cleaning-toolbar .ant-btn {
+  height: 36px !important;
+  border-radius: 6px;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.data-cleaning-toolbar .ant-input-affix-wrapper,
+.data-cleaning-toolbar .ant-select-selector {
+  border-color: rgba(216, 217, 220, 1) !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.data-cleaning-name-input.ant-input-affix-wrapper {
+  width: 180px;
+  padding: 0 10px;
+}
+
+.data-cleaning-name-input .ant-input {
+  height: 34px !important;
+  padding: 0 !important;
+  color: rgba(24, 24, 25, 1);
+  line-height: 34px !important;
+}
+
+.data-cleaning-name-input .ant-input::placeholder,
+.data-cleaning-status-select .ant-select-selection-placeholder {
+  color: rgba(157, 161, 167, 1);
+}
+
+.data-cleaning-name-input .ant-input-prefix {
+  margin-inline-end: 8px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 18px;
+}
+
+.data-cleaning-status-select {
+  width: 160px !important;
+}
+
+.data-cleaning-status-select .ant-select-selector {
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+.data-cleaning-status-select .ant-select-selection-item {
+  color: rgba(24, 24, 25, 1);
+  line-height: 34px !important;
+}
+
+.data-cleaning-refresh-btn.ant-btn,
+.data-cleaning-create-btn.ant-btn {
+  padding: 6px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+}
+
+.data-cleaning-refresh-btn.ant-btn {
+  width: 88px;
+  border-color: rgba(216, 217, 220, 1);
+  background: rgba(255, 255, 255, 1.0);
+  color: rgba(24, 24, 25, 1);
+}
+
+.data-cleaning-create-btn.ant-btn {
+  width: 130px;
+  border-color: rgba(0, 71, 187, 1.0);
+  background: rgba(0, 71, 187, 1.0);
+  color: rgba(255, 255, 255, 1);
+}
+
+.data-cleaning-table-block {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.data-cleaning-table.ant-table-wrapper {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.data-cleaning-table .ant-table {
+  max-height: 590px;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.data-cleaning-table .ant-table-body {
+  max-height: 550px !important;
+}
+
+.data-cleaning-table .ant-table-thead > tr > th {
+  height: 40px;
+  padding: 10px 16px !important;
+  border-bottom: none !important;
+  background: rgba(244, 246, 248, 1.0) !important;
+  color: rgba(24, 24, 25, 1) !important;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px !important;
+  font-weight: normal !important;
+  line-height: 20px !important;
+}
+
+.data-cleaning-table .ant-table-cell::before {
+  display: none;
+}
+
+.data-cleaning-table .ant-table-tbody > tr:not(.ant-table-measure-row) > td {
+  height: 50px;
+  padding: 15px 16px !important;
+  border-bottom: 1px solid rgba(232, 233, 234, 1.0) !important;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.data-cleaning-table .ant-table-tbody > tr.ant-table-measure-row,
+.data-cleaning-table .ant-table-tbody > tr.ant-table-measure-row > td {
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  line-height: 0 !important;
+  visibility: hidden;
+}
+
+.data-cleaning-table .ant-table-tbody > tr:hover > td {
+  background-color: rgba(244, 246, 248, 1.0) !important;
+}
+
+.data-cleaning-status {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.data-cleaning-status-success {
+  color: rgba(32, 201, 93, 1);
+}
+
+.data-cleaning-status-running {
+  color: rgba(24, 144, 255, 1);
+}
+
+.data-cleaning-status-error {
+  color: rgba(255, 45, 45, 1);
+}
+
+.data-cleaning-status-muted {
+  color: rgba(112, 118, 127, 1);
+}
+
+.data-cleaning-table .table-action-column {
+  gap: 16px !important;
+}
+
+.data-cleaning-table .table-action-column .ant-btn-link {
+  height: 20px !important;
+  padding: 0 !important;
+  color: rgba(24, 24, 25, 1) !important;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.data-cleaning-table .table-action-column .ant-btn-link:hover {
+  color: rgba(0, 71, 187, 1) !important;
+}
+
+.data-cleaning-table .table-action-column .ant-btn-link[disabled] {
+  color: rgba(157, 161, 167, 1) !important;
+}
+
+.data-cleaning-table .ant-pagination {
+  display: flex;
+  align-items: center;
+  margin: 22px 0 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.data-cleaning-table .ant-pagination-total-text {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  margin-inline-end: 24px;
+  line-height: 32px;
+}
+
+.data-cleaning-table .ant-pagination .ant-pagination-item,
+.data-cleaning-table .ant-pagination .ant-pagination-prev,
+.data-cleaning-table .ant-pagination .ant-pagination-next,
+.data-cleaning-table .ant-pagination .ant-pagination-jump-prev,
+.data-cleaning-table .ant-pagination .ant-pagination-jump-next {
+  min-width: 32px;
+  height: 32px;
+  margin-inline-end: 8px;
+  border-radius: 6px;
+  line-height: 30px;
+}
+
+.data-cleaning-table .ant-pagination .ant-pagination-item a,
+.data-cleaning-table .ant-pagination .ant-pagination-prev .ant-pagination-item-link,
+.data-cleaning-table .ant-pagination .ant-pagination-next .ant-pagination-item-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+}
+
+.data-cleaning-table .ant-pagination .ant-pagination-item-active {
+  background-color: rgba(236, 238, 239, 1.0);
+  border-color: rgba(236, 238, 239, 1.0);
+}
+
+.data-cleaning-table .ant-pagination .ant-pagination-item-active a {
+  color: inherit;
+  font-weight: 400 !important;
+}
+
+.data-cleaning-table .ant-pagination .ant-pagination-options {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  margin-inline-start: 24px;
+}
+
+.data-cleaning-table .ant-pagination .ant-pagination-options-quick-jumper {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  line-height: 32px;
+}
+
+.data-cleaning-table .ant-pagination .ant-select-selector,
+.data-cleaning-table .ant-pagination .ant-pagination-options-quick-jumper input {
+  box-sizing: border-box;
+  height: 32px !important;
+  border-color: rgba(216, 217, 220, 1) !important;
+  border-radius: 6px;
+}
+
+.data-cleaning-table .ant-pagination .ant-pagination-options-quick-jumper input {
+  display: inline-flex;
+  align-items: center;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 30px;
+  vertical-align: middle;
+}
+
+.data-cleaning-table .ant-pagination .ant-select-single,
+.data-cleaning-table .ant-pagination .ant-pagination-options-size-changer {
+  height: 32px;
+}
+
+.data-cleaning-table .ant-pagination .ant-select-single .ant-select-selector {
+  display: flex;
+  align-items: center;
+}
+
+.data-cleaning-table .ant-pagination .ant-select-single .ant-select-selection-item,
+.data-cleaning-table .ant-pagination .ant-select-single .ant-select-selection-placeholder {
+  line-height: 30px;
+}
+
+.data-cleaning-table .ant-pagination .ant-select-single .ant-select-arrow {
+  margin-top: 0;
+  transform: translateY(-50%);
+}

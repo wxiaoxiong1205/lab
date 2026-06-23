@@ -1,0 +1,123 @@
+.registry-config-table-card.ant-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.registry-config-table-card .ant-card-body {
+  padding: 0;
+}
+
+.registry-config-table .ant-table {
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.registry-config-table .ant-table-thead > tr {
+  height: 40px !important;
+}
+
+.registry-config-table .ant-table-thead > tr > th {
+  height: 40px;
+  padding: 10px 16px !important;
+  background-color: rgba(244, 246, 248, 1.0) !important;
+  color: rgba(24, 24, 25, 1) !important;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px !important;
+  font-weight: normal !important;
+  line-height: 20px !important;
+}
+
+.registry-config-table .ant-table-tbody > tr:not(.ant-table-measure-row) > td {
+  height: 50px;
+  padding: 15px 16px !important;
+  border-bottom: 1px solid rgba(232, 233, 234, 1.0);
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.registry-config-table .ant-table-tbody > tr.ant-table-measure-row,
+.registry-config-table .ant-table-tbody > tr.ant-table-measure-row > td {
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  line-height: 0 !important;
+  visibility: hidden;
+}
+
+.registry-config-table .ant-table-tbody > tr:hover > td {
+  background-color: rgba(244, 246, 248, 1.0) !important;
+}
+
+.registry-config-table .ant-pagination {
+  margin: 22px 0 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.registry-config-table .ant-pagination-total-text {
+  margin-inline-end: 24px;
+}
+
+.registry-config-table .ant-pagination .ant-pagination-item,
+.registry-config-table .ant-pagination .ant-pagination-prev,
+.registry-config-table .ant-pagination .ant-pagination-next {
+  min-width: 32px;
+  height: 32px;
+  line-height: 30px;
+}
+
+.registry-config-table .ant-pagination .ant-pagination-item-active {
+  background-color: #ECEEEF;
+  border-color: #ECEEEF;
+}
+
+.registry-config-table .ant-pagination .ant-pagination-item-active a {
+  color: inherit;
+  font-weight: 400 !important;
+}
+
+.registry-config-table .ant-pagination .ant-pagination-options {
+  margin-inline-start: 24px;
+}
+
+.registry-config-table .ant-pagination .ant-select-selector,
+.registry-config-table .ant-pagination .ant-pagination-options-quick-jumper input {
+  height: 32px;
+  border-color: rgba(216, 217, 220, 1);
+  border-radius: 6px;
+}
+
+.registry-config-actions {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.registry-config-actions .ant-btn {
+  height: 20px !important;
+  padding: 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.registry-config-actions .ant-btn:hover {
+  color: rgba(0, 71, 187, 1) !important;
+}
+
+.registry-config-actions .ant-btn .anticon {
+  font-size: 16px;
+}
+
+.registry-config-more-action.ant-btn {
+  width: 20px;
+}

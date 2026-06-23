@@ -1,0 +1,78 @@
+.workflow-steps {
+  display: flex;
+  width: 100%;
+  min-height: 82px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.workflow-steps-item {
+  position: relative;
+  min-width: 0;
+  min-height: 82px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding-right: 52px;
+  background: linear-gradient(90deg, rgba(246,249,251,1) 0%, rgba(233,241,252,1) 57%, rgba(223,235,255,1) 100%);
+  border: 1px solid rgba(255,255,255,1);
+  clip-path: polygon(0 0, calc(100% - 40px) 0, 100% 50%, calc(100% - 40px) 100%, 0 100%, 40px 50%);
+  margin-left: -40px;
+}
+
+.workflow-steps-item:first-child {
+  margin-left: 0;
+  padding-left: 42px;
+  clip-path: polygon(0 0, calc(100% - 40px) 0, 100% 50%, calc(100% - 40px) 100%, 0 100%);
+}
+
+.workflow-steps-item:not(:first-child) {
+  padding-left: 74px;
+}
+
+.workflow-steps-item:last-child {
+  padding-right: 30px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 40px 50%);
+}
+
+.workflow-steps-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(24, 24, 25, 1);
+  font-size: 32px;
+  line-height: 1;
+}
+
+.workflow-steps-copy {
+  min-width: 0;
+  margin-left: 8px;
+}
+
+.workflow-steps-title {
+  height: 22px;
+  overflow: hidden;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 22px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.workflow-steps-desc {
+  margin-top: 3px;
+  overflow: hidden;
+  color: rgba(112, 118, 127, 1);
+  font-size: 12px;
+  font-weight: normal;
+  line-height: 17px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

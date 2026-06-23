@@ -1,0 +1,3850 @@
+{
+  "模型属性": {
+    "zh-CN": "模型属性",
+    "zh-TW": "模型屬性",
+    "en-US": "Model Properties"
+  },
+  "模型中心": {
+    "zh-CN": "模型中心",
+    "zh-TW": "模型中心",
+    "en-US": "Models"
+  },
+  "网关访问地址": {
+    "zh-CN": "网关访问地址",
+    "zh-TW": "網關訪問地址",
+    "en-US": "Gateway Access Address"
+  },
+  "退出登录": {
+    "zh-CN": "退出登录",
+    "zh-TW": "退出登錄",
+    "en-US": "Logout"
+  },
+  "统计分析": {
+    "zh-CN": "统计分析",
+    "zh-TW": "統計分析",
+    "en-US": "Analysis"
+  },
+  "调用日志": {
+    "zh-CN": "日志",
+    "zh-TW": "日志",
+    "en-US": "Logs"
+  },
+  "额度": {
+    "zh-CN": "额度",
+    "zh-TW": "額度",
+    "en-US": "Quota"
+  },
+  "密钥的额度仅用于密钥本身的最大额度使用量，实际的使用受到账户的剩余额度限制。": {
+    "zh-CN": "密钥的额度仅用于密钥本身的最大额度使用量，实际的使用受到账户的剩余额度限制。",
+    "zh-TW": "密鍵的額度僅用於密鍵本身的最大額度使用量，實際的使用受到賬戶的剩餘額度限制。",
+    "en-US": "The quota of the key is only used for the maximum quota usage of the key itself, and the actual usage is limited by the remaining quota of the account."
+  },
+  "额度最多六位数": {
+    "zh-CN": "额度最多六位数",
+    "zh-TW": "額度最多六位數",
+    "en-US": "Quota最多六位数"
+  },
+  "模型目录": {
+    "zh-CN": "模型目录",
+    "zh-TW": "模型目錄",
+    "en-US": "Model Directory"
+  },
+  "渠道管理": {
+    "zh-CN": "渠道管理",
+    "zh-TW": "渠道管理",
+    "en-US": "Channels"
+  },
+  "访问密钥": {
+    "zh-CN": "访问密钥",
+    "zh-TW": "訪問秘鑰",
+    "en-US": "AccessKeys"
+  },
+  "系统管理": {
+    "zh-CN": "系统管理",
+    "zh-TW": "系統管理",
+    "en-US": "System Management"
+  },
+  "账号权限": {
+    "zh-CN": "账号权限",
+    "zh-TW": "賬戶權限",
+    "en-US": "Accounts"
+  },
+  "其他配置": {
+    "zh-CN": "设置",
+    "zh-TW": "設定",
+    "en-US": "Settings"
+  },
+  "已启用": {
+    "zh-CN": "已启用",
+    "zh-TW": "已啟用",
+    "en-US": "Enabled"
+  },
+  "已禁用": {
+    "zh-CN": "已禁用",
+    "zh-TW": "已停用",
+    "en-US": "Disabled"
+  },
+  "已过期": {
+    "zh-CN": "已过期",
+    "zh-TW": "已過期",
+    "en-US": "Expired"
+  },
+  "已耗尽": {
+    "zh-CN": "已耗尽",
+    "zh-TW": "用完咗",
+    "en-US": "Exhausted"
+  },
+  "密钥名称": {
+    "zh-CN": "密钥名称",
+    "zh-TW": "秘鑰名稱",
+    "en-US": "Key Name"
+  },
+  "模型数": {
+    "zh-CN": "模型数",
+    "zh-TW": "模型數量",
+    "en-US": "Number of Models"
+  },
+  "已用额度": {
+    "zh-CN": "已用额度",
+    "zh-TW": "用完嘅額度",
+    "en-US": "Used Quota"
+  },
+  "剩余额度": {
+    "zh-CN": "剩余额度",
+    "zh-TW": "剩餘額度",
+    "en-US": "Remaining Quota"
+  },
+  "过期时间": {
+    "zh-CN": "过期时间",
+    "zh-TW": "過期時間",
+    "en-US": "Expiration Time"
+  },
+  "状态": {
+    "zh-CN": "状态",
+    "zh-TW": "狀態",
+    "en-US": "Status"
+  },
+  "创建人": {
+    "zh-CN": "创建人",
+    "zh-TW": "創建人",
+    "en-US": "Creator"
+  },
+  "修改时间": {
+    "zh-CN": "修改时间",
+    "zh-TW": "修改時間",
+    "en-US": "Modified Time"
+  },
+  "操作": {
+    "zh-CN": "操作",
+    "zh-TW": "操作",
+    "en-US": "Operation"
+  },
+  "请输入密钥名称": {
+    "zh-CN": "请输入密钥名称",
+    "zh-TW": "請輸入秘鑰名稱",
+    "en-US": "Enter Key Name"
+  },
+  "新增访问密钥": {
+    "zh-CN": "新增访问密钥",
+    "zh-TW": "新增訪問秘鑰",
+    "en-US": "Add Access Key"
+  },
+  "新增密钥": {
+    "zh-CN": "新增密钥",
+    "zh-TW": "新增秘鑰",
+    "en-US": "Add Key"
+  },
+  "取消": {
+    "zh-CN": "取消",
+    "zh-TW": "取消",
+    "en-US": "Cancel"
+  },
+  "确定": {
+    "zh-CN": "确定",
+    "zh-TW": "確定",
+    "en-US": "Confirm"
+  },
+  "基本信息": {
+    "zh-CN": "基本信息",
+    "zh-TW": "基本資訊",
+    "en-US": "Basic Information"
+  },
+  "请输入名称": {
+    "zh-CN": "请输入名称",
+    "zh-TW": "請輸入名稱",
+    "en-US": "Enter Name"
+  },
+  "模型": {
+    "zh-CN": "模型",
+    "zh-TW": "模型",
+    "en-US": "Model"
+  },
+  "选择模型": {
+    "zh-CN": "选择模型",
+    "zh-TW": "選擇模型",
+    "en-US": "Select Model"
+  },
+  "请选择模型": {
+    "zh-CN": "请选择模型",
+    "zh-TW": "請選擇模型",
+    "en-US": "Please Select Model"
+  },
+  "密钥配置": {
+    "zh-CN": "密钥配置",
+    "zh-TW": "秘鑰設定",
+    "en-US": "Key Configuration"
+  },
+  "密钥过期时间": {
+    "zh-CN": "密钥过期时间",
+    "zh-TW": "秘鑰過期時間",
+    "en-US": "Key Expiration Time"
+  },
+  "请选择过期时间": {
+    "zh-CN": "请选择过期时间",
+    "zh-TW": "請選擇過期時間",
+    "en-US": "Please Select Expiration Time"
+  },
+  "设为永久生效": {
+    "zh-CN": "设为永久生效",
+    "zh-TW": "設為永久生效",
+    "en-US": "Make Permanent"
+  },
+  "一个月后过期": {
+    "zh-CN": "一个月后过期",
+    "zh-TW": "一個月後過期",
+    "en-US": "Expires One Month Later"
+  },
+  "一天后过期": {
+    "zh-CN": "一天后过期",
+    "zh-TW": "一天後過期",
+    "en-US": "Expires One Day Later"
+  },
+  "一小时后过期": {
+    "zh-CN": "一小时后过期",
+    "zh-TW": "一個小時後過期",
+    "en-US": "Expires One Hour Later"
+  },
+  "Token 额度": {
+    "zh-CN": "Token 额度",
+    "zh-TW": "Token 額度",
+    "en-US": "Token Quota"
+  },
+  "请输入额度": {
+    "zh-CN": "请输入额度",
+    "zh-TW": "請輸入額度",
+    "en-US": "Enter Quota"
+  },
+  "无限额度": {
+    "zh-CN": "无限额度",
+    "zh-TW": "無限額度",
+    "en-US": "Unlimited Quota"
+  },
+  "限流": {
+    "zh-CN": "限流",
+    "zh-TW": "限流",
+    "en-US": "Rate Limiting"
+  },
+  "每分钟调用次数": {
+    "zh-CN": "每分钟调用次数",
+    "zh-TW": "每分鐘呼叫次數",
+    "en-US": "Calls Per Minute"
+  },
+  "数字必须大于或等于 0!": {
+    "zh-CN": "数字必须大于或等于 0!",
+    "zh-TW": "數字必須大於或等於 0!",
+    "en-US": "Number must be greater than or equal to 0!"
+  },
+  "请输入": {
+    "zh-CN": "请输入",
+    "zh-TW": "請輸入",
+    "en-US": "Enter"
+  },
+  "每分钟消耗Token数": {
+    "zh-CN": "每分钟消耗Token数",
+    "zh-TW": "每分鐘消耗Token數",
+    "en-US": "Tokens Consumed Per Minute"
+  },
+  "查看密钥": {
+    "zh-CN": "查看密钥",
+    "zh-TW": "查看秘鑰",
+    "en-US": "View Key"
+  },
+  "请您务必妥善保管！不要以任何方式公开到外部渠道，避免因未经授权的使用造成安全风险或资金损失。": {
+    "zh-CN": "请您务必妥善保管！不要以任何方式公开到外部渠道，避免因未经授权的使用造成安全风险或资金损失。",
+    "zh-TW": "請您務必妥善保管！不要以任何方式公開到外部渠道，避免因未經授權的使用造成安全風險或資金損失。",
+    "en-US": "Please keep it safe! Do not expose it to external channels in any way, to avoid security risks or financial losses caused by unauthorized use."
+  },
+  "网关访问内网地址": {
+    "zh-CN": "网关访问内网地址",
+    "zh-TW": "網關訪問內網地址",
+    "en-US": "Gateway Access Internal Address"
+  },
+  "网关访问外网地址": {
+    "zh-CN": "网关访问外网地址",
+    "zh-TW": "網關訪問外網地址",
+    "en-US": "Gateway Access External Address"
+  },
+  "密钥": {
+    "zh-CN": "密钥",
+    "zh-TW": "秘鑰",
+    "en-US": "Key"
+  },
+  "可用模型": {
+    "zh-CN": "可用模型",
+    "zh-TW": "可用模型",
+    "en-US": "Available Models"
+  },
+  "禁用": {
+    "zh-CN": "禁用",
+    "zh-TW": "停用",
+    "en-US": "Disabled"
+  },
+  "编辑": {
+    "zh-CN": "编辑",
+    "zh-TW": "編輯",
+    "en-US": "Edit"
+  },
+  "删除": {
+    "zh-CN": "删除",
+    "zh-TW": "刪除",
+    "en-US": "Delete"
+  },
+  "总共 {total} 条": {
+    "zh-CN": "总共 {total} 条",
+    "zh-TW": "一共有 {total} 條",
+    "en-US": "Total {total} items"
+  },
+  "禁用成功": {
+    "zh-CN": "禁用成功",
+    "zh-TW": "停用成功",
+    "en-US": "Disabled Successfully"
+  },
+  "语音模型": {
+    "zh-CN": "语音模型",
+    "zh-TW": "語音模型",
+    "en-US": "Speech Model"
+  },
+  "语音识别": {
+    "zh-CN": "语音识别",
+    "zh-TW": "語音識別",
+    "en-US": "Speech Recognition"
+  },
+  "语音合成": {
+    "zh-CN": "语音合成",
+    "zh-TW": "語音合成",
+    "en-US": "Speech Synthesis"
+  },
+  "启用成功": {
+    "zh-CN": "启用成功",
+    "zh-TW": "啟用成功",
+    "en-US": "Enabled Successfully"
+  },
+  "删除成功": {
+    "zh-CN": "删除成功",
+    "zh-TW": "刪除成功",
+    "en-US": "Deleted Successfully"
+  },
+  "编辑成功": {
+    "zh-CN": "编辑成功",
+    "zh-TW": "編輯成功",
+    "en-US": "Edited Successfully"
+  },
+  "新增成功": {
+    "zh-CN": "新增成功",
+    "zh-TW": "新增成功",
+    "en-US": "Added Successfully"
+  },
+  "编辑密钥": {
+    "zh-CN": "编辑密钥",
+    "zh-TW": "編輯秘鑰",
+    "en-US": "Edit Key"
+  },
+  "复制成功！": {
+    "zh-CN": "复制成功！",
+    "zh-TW": "複製成功！",
+    "en-US": "Copied Successfully!"
+  },
+  "用户名": {
+    "zh-CN": "用户名",
+    "zh-TW": "用戶名稱",
+    "en-US": "Username"
+  },
+  "效果测试": {
+    "zh-CN": "效果测试",
+    "zh-TW": "效果測試",
+    "en-US": "Effect Test"
+  },
+  "账号": {
+    "zh-CN": "账号",
+    "zh-TW": "帳號",
+    "en-US": "Account"
+  },
+  "监测频率": {
+    "zh-CN": "监测频率",
+    "zh-TW": "監測頻率",
+    "en-US": "Monitoring Frequency"
+  },
+  "请输入监测频率": {
+    "zh-CN": "请输入监测频率",
+    "zh-TW": "請輸入監測頻率",
+    "en-US": "Enter Monitoring Frequency"
+  },
+  "指定时间内模型无响应会触发告警，对于需复杂推理的模型建议调大响应超时，避免发送告警。": {
+    "zh-CN": "指定时间内模型无响应会触发告警，对于需复杂推理的模型建议调大响应超时，避免发送告警。",
+    "zh-TW": "指定時間內模型無響應會觸發告警，對於需複雜推理的模型建議調大響應超時，避免發送告警。",
+    "en-US": "If the model does not respond within the specified time, it will trigger an alarm. For models that require complex reasoning, it is recommended to increase the response timeout to avoid sending alarms."
+  },
+  "响应超时": {
+    "zh-CN": "响应超时",
+    "zh-TW": "響應超時",
+    "en-US": "Response Timeout"
+  },
+  "分组": {
+    "zh-CN": "分组",
+    "zh-TW": "組別",
+    "en-US": "Group"
+  },
+  "用户额度": {
+    "zh-CN": "用户额度",
+    "zh-TW": "用戶額度",
+    "en-US": "User Quota"
+  },
+  "申请可用额度": {
+    "zh-CN": "申请可用额度",
+    "zh-TW": "申請可用額度",
+    "en-US": "Apply for available quota"
+  },
+  "请输入申请额度": {
+    "zh-CN": "请输入申请额度",
+    "zh-TW": "請輸入申請額度",
+    "en-US": "Enter apply quota"
+  },
+  "申请额度不能超过18位": {
+    "zh-CN": "申请额度不能超过18位",
+    "zh-TW": "申請額度不能超過18位",
+    "en-US": "Apply quota cannot exceed 18 digits"
+  },
+  "创建时间": {
+    "zh-CN": "创建时间",
+    "zh-TW": "創建時間",
+    "en-US": "Created Time"
+  },
+  "请输入用户名称": {
+    "zh-CN": "请输入用户名称",
+    "zh-TW": "請輸入用戶名稱",
+    "en-US": "Enter Username"
+  },
+  "请输入账号名称": {
+    "zh-CN": "请输入账号名称",
+    "zh-TW": "請輸入帳號名稱",
+    "en-US": "Enter Account Name"
+  },
+  "新增用户": {
+    "zh-CN": "新增用户",
+    "zh-TW": "新增用戶",
+    "en-US": "Add User"
+  },
+  "用户名称长度为1-20位": {
+    "zh-CN": "用户名称长度为1-20位",
+    "zh-TW": "用戶名稱長度為1-20位",
+    "en-US": "Username Length is 1-20 characters"
+  },
+  "请输入密码": {
+    "zh-CN": "请输入密码",
+    "zh-TW": "請輸入密碼",
+    "en-US": "Enter Password"
+  },
+  "账号长度为1-12位": {
+    "zh-CN": "账号长度为1-12位",
+    "zh-TW": "帳號長度為1-12位",
+    "en-US": "Account Length is 1-12 characters"
+  },
+  "密码长度为8-20位": {
+    "zh-CN": "密码长度为8-20位",
+    "zh-TW": "密碼長度為8-20位",
+    "en-US": "Password Length is 8-20 characters"
+  },
+  "请输入账号名称，用于登录校验，创建后不可修改": {
+    "zh-CN": "请输入账号名称，用于登录校验，创建后不可修改",
+    "zh-TW": "請輸入賬號名稱，用於登錄驗證，創建後不可修改",
+    "en-US": "Please enter account name for login validation, cannot be modified after creation"
+  },
+  "密码": {
+    "zh-CN": "密码",
+    "zh-TW": "密碼",
+    "en-US": "Password"
+  },
+  "用于登录校验，创建后不可修改": {
+    "zh-CN": "用于登录校验，创建后不可修改",
+    "zh-TW": "用於登錄驗證，創建後不可修改",
+    "en-US": "For login validation, cannot be modified after creation"
+  },
+  "请选择所属分组": {
+    "zh-CN": "请选择所属分组",
+    "zh-TW": "請選擇所属組別",
+    "en-US": "Please select the belonging group"
+  },
+  "请选择接收人": {
+    "zh-CN": "请选择接收人",
+    "zh-TW": "請選擇接收人",
+    "en-US": "Please select the receiver"
+  },
+  "请选择钉钉群": {
+    "zh-CN": "请选择钉钉群",
+    "zh-TW": "請選擇釘釘群",
+    "en-US": "Please select the DingTalk group"
+  },
+  "请选择企微群": {
+    "zh-CN": "请选择企微群",
+    "zh-TW": "請選擇企微群",
+    "en-US": "Please select the WeChat group"
+  },
+  "请选择飞书群": {
+    "zh-CN": "请选择飞书群",
+    "zh-TW": "請選擇飛書群",
+    "en-US": "Please select the Feishu group"
+  },
+  "告警方式": {
+    "zh-CN": "告警方式",
+    "zh-TW": "告警方式",
+    "en-US": "Alarm Method"
+  },
+  "告警次数": {
+    "zh-CN": "告警次数",
+    "zh-TW": "告警次數",
+    "en-US": "Alarm Count"
+  },
+  "请输入告警次数": {
+    "zh-CN": "请输入告警次数",
+    "zh-TW": "請輸入告警次數",
+    "en-US": "Enter alarm count"
+  },
+  "间隔时间": {
+    "zh-CN": "间隔时间",
+    "zh-TW": "間隔時間",
+    "en-US": "Interval Time"
+  },
+  "请输入间隔时间": {
+    "zh-CN": "请输入间隔时间",
+    "zh-TW": "請輸入間隔時間",
+    "en-US": "Enter interval time"
+  },
+  "间隔时间范围在1~30分钟之间": {
+    "zh-CN": "间隔时间范围在1~30分钟之间",
+    "zh-TW": "間隔時間範圍在1~30分鐘之間",
+    "en-US": "Interval time range is 1~30 minutes"
+  },
+  "钉钉群": {
+    "zh-CN": "钉钉群",
+    "zh-TW": "釘釘群",
+    "en-US": "DingTalk Group"
+  },
+  "企微群": {
+    "zh-CN": "企微群",
+    "zh-TW": "企微群",
+    "en-US": "WeChat Group"
+  },
+  "飞书群": {
+    "zh-CN": "飞书群",
+    "zh-TW": "飛書群",
+    "en-US": "Feishu Group"
+  },
+  "请选择": {
+    "zh-CN": "请选择",
+    "zh-TW": "請選擇",
+    "en-US": "Please Select"
+  },
+  "秒": {
+    "zh-CN": "秒",
+    "zh-TW": "秒",
+    "en-US": "Second"
+  },
+  "小时": {
+    "zh-CN": "小时",
+    "zh-TW": "小時",
+    "en-US": "h"
+  },
+  "分": {
+    "zh-CN": "分",
+    "zh-TW": "分",
+    "en-US": "m"
+  },
+  "分钟": {
+    "zh-CN": "分钟",
+    "zh-TW": "分鐘",
+    "en-US": "Minute"
+  },
+  "接收人": {
+    "zh-CN": "接收人",
+    "zh-TW": "接收人",
+    "en-US": "Receiver"
+  },
+  "请输入响应超时时间": {
+    "zh-CN": "请输入响应超时时间",
+    "zh-TW": "請輸入響應超時時間",
+    "en-US": "Enter Response Timeout"
+  },
+  "响应超时应大于等于5秒": {
+    "zh-CN": "响应超时应大于等于5秒",
+    "zh-TW": "響應超時應大於等於5秒",
+    "en-US": "Response Timeout Should Be Greater Than or Equal to 5 Seconds"
+  },
+  "监测间隔时间应大于等于3分钟": {
+    "zh-CN": "监测间隔时间应大于等于3分钟",
+    "zh-TW": "監測間隔時間應大於等於3分鐘",
+    "en-US": "Monitoring Interval Time Should Be Greater Than or Equal to 3 Minutes"
+  },
+  "每": {
+    "zh-CN": "每",
+    "zh-TW": "每",
+    "en-US": "Per"
+  },
+  "分钟触发监测": {
+    "zh-CN": "分钟触发监测",
+    "zh-TW": "分鐘觸發監測",
+    "en-US": "Minute Trigger Monitoring"
+  },
+  "请选择敏感类型": {
+    "zh-CN": "请选择敏感类型",
+    "zh-TW": "請選擇敏感類型",
+    "en-US": "Please Select Sensitive Type"
+  },
+  "监控模型": {
+    "zh-CN": "监控模型",
+    "zh-TW": "監控模型",
+    "en-US": "Monitoring Model"
+  },
+  "规则名称": {
+    "zh-CN": "规则名称",
+    "zh-TW": "規則名稱",
+    "en-US": "Rule Name"
+  },
+  "请输入规则名称": {
+    "zh-CN": "请输入规则名称",
+    "zh-TW": "請輸入規則名稱",
+    "en-US": "Enter Rule Name"
+  },
+  "请选择监控模型": {
+    "zh-CN": "请选择监控模型",
+    "zh-TW": "請選擇監控模型",
+    "en-US": "Please Select Monitoring Model"
+  },
+  "告警规则": {
+    "zh-CN": "告警规则",
+    "zh-TW": "告警規則",
+    "en-US": "Alarm Rule"
+  },
+  "新建": {
+    "zh-CN": "新建",
+    "zh-TW": "新建",
+    "en-US": "New"
+  },
+  "开发团队群": {
+    "zh-CN": "开发团队群",
+    "zh-TW": "開發團隊群",
+    "en-US": "Development Team Group"
+  },
+  "运维团队群": {
+    "zh-CN": "运维团队群",
+    "zh-TW": "運維團隊群",
+    "en-US": "Operation Team Group"
+  },
+  "安全团队群": {
+    "zh-CN": "安全团队群",
+    "zh-TW": "安全團隊群",
+    "en-US": "Security Team Group"
+  },
+  "管理团队群": {
+    "zh-CN": "管理团队群",
+    "zh-TW": "管理團隊群",
+    "en-US": "Management Team Group"
+  },
+  "创建成功": {
+    "zh-CN": "创建成功",
+    "zh-TW": "創建成功",
+    "en-US": "Create Success"
+  },
+  "开始时间": {
+    "zh-CN": "开始时间",
+    "zh-TW": "開始時間",
+    "en-US": "Start Time"
+  },
+  "结束时间": {
+    "zh-CN": "结束时间",
+    "zh-TW": "結束時間",
+    "en-US": "End Time"
+  },
+  "用户": {
+    "zh-CN": "用户",
+    "zh-TW": "用戶",
+    "en-US": "User"
+  },
+  "异常": {
+    "zh-CN": "异常",
+    "zh-TW": "異常",
+    "en-US": "Exception"
+  },
+  "花费": {
+    "zh-CN": "花费",
+    "zh-TW": "花費",
+    "en-US": "Cost"
+  },
+  "美元": {
+    "zh-CN": "美元",
+    "zh-TW": "美元",
+    "en-US": "USD"
+  },
+  "Token使用": {
+    "zh-CN": "Token使用",
+    "zh-TW": "Token使用",
+    "en-US": "Token Usage"
+  },
+  "请求数": {
+    "zh-CN": "请求数",
+    "zh-TW": "請求數",
+    "en-US": "Request Count"
+  },
+  "请求用户": {
+    "zh-CN": "请求用户",
+    "zh-TW": "請求用戶",
+    "en-US": "Request User"
+  },
+  "请求": {
+    "zh-CN": "请求",
+    "zh-TW": "請求",
+    "en-US": "Request"
+  },
+  "花费(美元)": {
+    "zh-CN": "花费(美元)",
+    "zh-TW": "花費(美元)",
+    "en-US": "Cost (USD)"
+  },
+  "渠道": {
+    "zh-CN": "渠道",
+    "zh-TW": "渠道",
+    "en-US": "Channel"
+  },
+  "用户平均请求数": {
+    "zh-CN": "用户平均请求数",
+    "zh-TW": "用戶平均請求數",
+    "en-US": "Average Request Count per User"
+  },
+  "错误率": {
+    "zh-CN": "错误率",
+    "zh-TW": "錯誤率",
+    "en-US": "Error Rate"
+  },
+  "错误数": {
+    "zh-CN": "错误数",
+    "zh-TW": "錯誤數",
+    "en-US": "Error Count"
+  },
+  "已用token数": {
+    "zh-CN": "已用token数",
+    "zh-TW": "已用Token數",
+    "en-US": "Used Token Count"
+  },
+  "token 使用": {
+    "zh-CN": "token 使用",
+    "zh-TW": "Token 使用",
+    "en-US": "Token Usage"
+  },
+  "您当前没有可用模型": {
+    "zh-CN": "您当前没有可用模型",
+    "zh-TW": "您當前沒有可用模型",
+    "en-US": "You currently have no available models"
+  },
+  "申请模型": {
+    "zh-CN": "申请模型",
+    "zh-TW": "申請模型",
+    "en-US": "Apply for model"
+  },
+  "申请理由不能超过64个字符": {
+    "zh-CN": "申请理由不能超过64个字符",
+    "zh-TW": "申請理由不能超過64個字符",
+    "en-US": "The application reason cannot exceed 64 characters"
+  },
+  "申请成功": {
+    "zh-CN": "申请成功",
+    "zh-TW": "申請成功",
+    "en-US": "Apply Success"
+  },
+  "申请失败": {
+    "zh-CN": "申请失败",
+    "zh-TW": "申請失敗",
+    "en-US": "Apply Failed"
+  },
+  "输入Token": {
+    "zh-CN": "输入Token",
+    "zh-TW": "輸入Token",
+    "en-US": "Input Token"
+  },
+  "输出Token": {
+    "zh-CN": "输出Token",
+    "zh-TW": "輸出Token",
+    "en-US": "Output Token"
+  },
+  "总Token": {
+    "zh-CN": "总Token",
+    "zh-TW": "總Token",
+    "en-US": "Total Token"
+  },
+  "概览": {
+    "zh-CN": "概览",
+    "zh-TW": "概覽",
+    "en-US": "Overview"
+  },
+  "渠道ID": {
+    "zh-CN": "渠道ID",
+    "zh-TW": "渠道ID",
+    "en-US": "Channel ID"
+  },
+  "渠道名称": {
+    "zh-CN": "渠道名称",
+    "zh-TW": "渠道名稱",
+    "en-US": "Channel Name"
+  },
+  "模型地址": {
+    "zh-CN": "模型地址",
+    "zh-TW": "模型地址",
+    "en-US": "Model Address"
+  },
+  "模型提供商": {
+    "zh-CN": "模型提供商",
+    "zh-TW": "模型提供商",
+    "en-US": "Model Provider"
+  },
+  "请输入渠道ID": {
+    "zh-CN": "请输入渠道ID",
+    "zh-TW": "請輸入渠道ID",
+    "en-US": "Enter Channel ID"
+  },
+  "请输入渠道名称": {
+    "zh-CN": "请输入渠道名称",
+    "zh-TW": "請輸入渠道名稱",
+    "en-US": "Enter Channel Name"
+  },
+  "请输入模型地址": {
+    "zh-CN": "请输入模型地址",
+    "zh-TW": "請輸入模型地址",
+    "en-US": "Enter Model Address"
+  },
+  "提供商": {
+    "zh-CN": "提供商",
+    "zh-TW": "提供商",
+    "en-US": "Provider"
+  },
+  "全部": {
+    "zh-CN": "全部",
+    "zh-TW": "全部",
+    "en-US": "All"
+  },
+  "新增通用渠道": {
+    "zh-CN": "新增通用渠道",
+    "zh-TW": "新增通用渠道",
+    "en-US": "Add Generic Channel"
+  },
+  "新增渠道": {
+    "zh-CN": "新增渠道",
+    "zh-TW": "新增渠道",
+    "en-US": "Add Channel"
+  },
+  "请选择提供商": {
+    "zh-CN": "请选择提供商",
+    "zh-TW": "請選擇提供商",
+    "en-US": "Select Provider"
+  },
+  "模型重定向": {
+    "zh-CN": "模型重定向",
+    "zh-TW": "模型重定向",
+    "en-US": "Model Redirection"
+  },
+  "此项可选，用于修改请求中的模型名称，为一个 JSON 字符串，键为请求中的模型名称，值为要替换的模型名称，例如：": {
+    "zh-CN": "此项可选，用于修改请求中的模型名称，为一个 JSON 字符串，键为请求中的模型名称，值为要替换的模型名称，例如：",
+    "zh-TW": "此項可選，用於修改請求中的模型名稱，為一個 JSON 字符串，鍵為請求中的模型名稱，值為要替換的模型名稱，例如：",
+    "en-US": "This is optional, used to modify the model name in the request, a JSON string, the key is the model name in the request, the value is the model name to be replaced, for example:"
+  },
+  "添加一个选项值": {
+    "zh-CN": "添加一个选项值",
+    "zh-TW": "添加一个选项值",
+    "en-US": "Add one option value"
+  },
+  "请至少添加一个选项值": {
+    "zh-CN": "请至少添加一个选项值",
+    "zh-TW": "请至少添加一个选项值",
+    "en-US": "Please add at least one option value"
+  },
+  "例如：": {
+    "zh-CN": "例如：",
+    "zh-TW": "例如：",
+    "en-US": "For example:"
+  },
+  "请输入密钥": {
+    "zh-CN": "请输入密钥",
+    "zh-TW": "請輸入密钥",
+    "en-US": "Enter Key"
+  },
+  "请输入密钥,多个密钥请用换行符分隔": {
+    "zh-CN": "请输入密钥,多个密钥请用换行符分隔",
+    "zh-TW": "請輸入密钥,多个密钥請用換行符分隔",
+    "en-US": "Enter Key, Multiple Keys Separated by Newline"
+  },
+  "请选择分组": {
+    "zh-CN": "请选择分组",
+    "zh-TW": "請選擇分组",
+    "en-US": "Select Group"
+  },
+  "确定要删除吗？": {
+    "zh-CN": "确定要删除吗？",
+    "zh-TW": "確定要刪除嗎？",
+    "en-US": "Are You Sure You Want to Delete?"
+  },
+  "启用": {
+    "zh-CN": "启用",
+    "zh-TW": "啟用",
+    "en-US": "Enable"
+  },
+  "模型名称": {
+    "zh-CN": "模型名称",
+    "zh-TW": "模型名稱",
+    "en-US": "Model Name"
+  },
+  "请输入模型名称": {
+    "zh-CN": "请输入模型名称",
+    "zh-TW": "請輸入模型名稱",
+    "en-US": "Enter Model Name"
+  },
+  "请选择模型端点": {
+    "zh-CN": "请选择模型端点",
+    "zh-TW": "請選擇模型端點",
+    "en-US": "Select Model Endpoint"
+  },
+  "请输入自定义模型地址": {
+    "zh-CN": "请输入自定义模型地址",
+    "zh-TW": "請輸入自定模型地址",
+    "en-US": "Enter Custom Model Address"
+  },
+  "请输入自定义渠道的 Base URL": {
+    "zh-CN": "请输入自定义渠道的 Base URL",
+    "zh-TW": "請輸入自定渠道的 Base URL",
+    "en-US": "Enter Custom Channel Base URL"
+  },
+  "编辑渠道": {
+    "zh-CN": "编辑渠道",
+    "zh-TW": "編輯渠道",
+    "en-US": "Edit Channel"
+  },
+  "操作成功": {
+    "zh-CN": "操作成功",
+    "zh-TW": "操作成功",
+    "en-US": "Operation Successful"
+  },
+  "Chat文本": {
+    "zh-CN": "Chat文本",
+    "zh-TW": "Chat文本",
+    "en-US": "Chat Text"
+  },
+  "默认 API 版本": {
+    "zh-CN": "默认 API 版本",
+    "zh-TW": "默认 API 版本",
+    "en-US": "Default API Version"
+  },
+  "该配置可以被实际的请求参数覆盖": {
+    "zh-CN": "该配置可以被实际的请求参数覆盖",
+    "zh-TW": "該配置可以被實際的請求參數覆蓋",
+    "en-US": "This configuration can be overridden by actual request parameters"
+  },
+  "请输入默认 API 版本": {
+    "zh-CN": "请输入默认 API 版本",
+    "zh-TW": "請輸入默認 API 版本",
+    "en-US": "Enter Default API Version"
+  },
+  "请输入默认API版本": {
+    "zh-CN": "请输入默认API版本",
+    "zh-TW": "請輸入默認API版本",
+    "en-US": "Enter Default API Version"
+  },
+  "代理地址": {
+    "zh-CN": "代理地址",
+    "zh-TW": "代理地址",
+    "en-US": "Proxy Address"
+  },
+  "此项可选，用于通过代理站来进行API调用，请输入代理地址，格式为：https:/domaincom。注意，这里所需要填入的代理地址仅会在实际请求时替换域名部分": {
+    "zh-CN": "此项可选，用于通过代理站来进行API调用，请输入代理地址，格式为：https:/domaincom。注意，这里所需要填入的代理地址仅会在实际请求时替换域名部分",
+    "zh-TW": "此項可選，用來通過代理站進行API調用，請輸入代理地址，格式為：https:/domaincom。注意，這裡需要填入的代理地址僅會在實際請求時替換域名部分",
+    "en-US": "This is optional and used to make API calls through a proxy. Enter the proxy address in the format: https:/domaincom. Note that the proxy address entered here will only replace the domain name part when the actual request is made."
+  },
+  "请输入代理地址，格式为：https:/domaincom": {
+    "zh-CN": "请输入代理地址，格式为：https:/domaincom",
+    "zh-TW": "請輸入代理地址，格式為：https:/domaincom",
+    "en-US": "Enter Proxy Address, Format: https:/domaincom"
+  },
+  "编辑用户": {
+    "zh-CN": "编辑用户",
+    "zh-TW": "編輯用戶",
+    "en-US": "Edit User"
+  },
+  "时间": {
+    "zh-CN": "时间",
+    "zh-TW": "時間",
+    "en-US": "Time"
+  },
+  "问题": {
+    "zh-CN": "问题",
+    "zh-TW": "問題",
+    "en-US": "Question"
+  },
+  "回答": {
+    "zh-CN": "回答",
+    "zh-TW": "回答",
+    "en-US": "Answer"
+  },
+  "答案": {
+    "zh-CN": "答案",
+    "zh-TW": "答案",
+    "en-US": "Answer"
+  },
+  "用户名称": {
+    "zh-CN": "用户名称",
+    "zh-TW": "用戶名稱",
+    "en-US": "User Name"
+  },
+  "查询": {
+    "zh-CN": "查询",
+    "zh-TW": "查詢",
+    "en-US": "Query"
+  },
+  "重置": {
+    "zh-CN": "重置",
+    "zh-TW": "重置",
+    "en-US": "Reset"
+  },
+  "总 Token": {
+    "zh-CN": "总 Token",
+    "zh-TW": "總 Token",
+    "en-US": "Total Token"
+  },
+  "输入 Token": {
+    "zh-CN": "输入 Token",
+    "zh-TW": "輸入 Token",
+    "en-US": "Input Token"
+  },
+  "输出 Token": {
+    "zh-CN": "输出 Token",
+    "zh-TW": "輸出 Token",
+    "en-US": "Output Token"
+  },
+  "耗时(S)": {
+    "zh-CN": "耗时(S)",
+    "zh-TW": "耗時(S)",
+    "en-US": "Duration (S)"
+  },
+  "日志详情": {
+    "zh-CN": "日志详情",
+    "zh-TW": "日志詳情",
+    "en-US": "Log Details"
+  },
+  "详情": {
+    "zh-CN": "详情",
+    "zh-TW": "詳情",
+    "en-US": "Details"
+  },
+  "问答": {
+    "zh-CN": "问答",
+    "zh-TW": "問答",
+    "en-US": "Question Answering"
+  },
+  "JSON": {
+    "zh-CN": "JSON",
+    "zh-TW": "JSON",
+    "en-US": "JSON"
+  },
+  "深度思考": {
+    "zh-CN": "深度思考",
+    "zh-TW": "深度思考",
+    "en-US": "Deep Thinking"
+  },
+  "总请求数": {
+    "zh-CN": "总请求数",
+    "zh-TW": "總請求數",
+    "en-US": "Total Requests"
+  },
+  "错误": {
+    "zh-CN": "错误",
+    "zh-TW": "錯誤",
+    "en-US": "Error"
+  },
+  "分组设置": {
+    "zh-CN": "分组设置",
+    "zh-TW": "分组設定",
+    "en-US": "Group Settings"
+  },
+  "保存": {
+    "zh-CN": "保存",
+    "zh-TW": "保存",
+    "en-US": "Save"
+  },
+  "保存成功": {
+    "zh-CN": "保存成功",
+    "zh-TW": "保存成功",
+    "en-US": "Save Successfully"
+  },
+  "JSON 格式错误": {
+    "zh-CN": "JSON 格式错误",
+    "zh-TW": "JSON 格式錯誤",
+    "en-US": "Invalid JSON format"
+  },
+  "模型设置": {
+    "zh-CN": "模型设置",
+    "zh-TW": "模型設置",
+    "en-US": "Model Settings"
+  },
+  "模型类型": {
+    "zh-CN": "模型类型",
+    "zh-TW": "模型類型",
+    "en-US": "Model Type"
+  },
+  "模型说明": {
+    "zh-CN": "模型说明",
+    "zh-TW": "模型說明",
+    "en-US": "Model Description"
+  },
+  "设置": {
+    "zh-CN": "设置",
+    "zh-TW": "設置",
+    "en-US": "Settings"
+  },
+  "确认删除该模型？": {
+    "zh-CN": "确认删除该模型？",
+    "zh-TW": "確認刪除該模型？",
+    "en-US": "Are you sure to delete this model?"
+  },
+  "仅支持 JPG/PNG 格式": {
+    "zh-CN": "仅支持 JPG/PNG 格式",
+    "zh-TW": "只支持 JPG/PNG 格式",
+    "en-US": "Only JPG/PNG format supported"
+  },
+  "图片大小不能超过2MB": {
+    "zh-CN": "图片大小不能超过2MB",
+    "zh-TW": "圖片大小不能超過2MB",
+    "en-US": "Image size must not exceed 2MB"
+  },
+  "上传成功": {
+    "zh-CN": "上传成功",
+    "zh-TW": "上傳成功",
+    "en-US": "Upload successful"
+  },
+  "上传失败": {
+    "zh-CN": "上传失败",
+    "zh-TW": "上傳失敗",
+    "en-US": "Upload failed"
+  },
+  "模型说明最多512字": {
+    "zh-CN": "模型说明最多512字",
+    "zh-TW": "模型說明最多512字",
+    "en-US": "Model description up to 512 characters"
+  },
+  "模型 Logo": {
+    "zh-CN": "模型 Logo",
+    "zh-TW": "模型 Logo",
+    "en-US": "Model Logo"
+  },
+  "系统头像": {
+    "zh-CN": "系统头像",
+    "zh-TW": "系統頭像",
+    "en-US": "System Avatar"
+  },
+  "上传头像": {
+    "zh-CN": "上传头像",
+    "zh-TW": "上傳頭像",
+    "en-US": "Upload Avatar"
+  },
+  "点击上传": {
+    "zh-CN": "点击上传",
+    "zh-TW": "點擊上傳",
+    "en-US": "Click to upload"
+  },
+  "请选择模型类型": {
+    "zh-CN": "请选择模型类型",
+    "zh-TW": "請選擇模型類型",
+    "en-US": "Please select model type"
+  },
+  "请输入模型说明，最多512字": {
+    "zh-CN": "请输入模型说明，最多512字",
+    "zh-TW": "請輸入模型說明，最多512字",
+    "en-US": "Enter model description, up to 512 characters"
+  },
+  "模型广场": {
+    "zh-CN": "模型广场",
+    "zh-TW": "模型廣場",
+    "en-US": "Models"
+  },
+  "DGI融合推理引擎": {
+    "zh-CN": "DGI融合推理引擎",
+    "zh-TW": "DGI融合推理引擎",
+    "en-US": "DGI Fusion Reasoning Engine"
+  },
+  "DGI": {
+    "zh-CN": "DGI",
+    "zh-TW": "DGI",
+    "en-US": "DGI"
+  },
+  "是基于异构算力生态的融合推理引擎，致力于为企业提供标准化、高稳定、易扩展的模型加速推理与接口服务管理能力。通过智能资源调度和请求路由提高算力利用率，助力企业加速Agentic AI 应用落地。": {
+    "zh-CN": "是基于异构算力生态的融合推理引擎，致力于为企业提供标准化、高稳定、易扩展的模型加速推理与接口服务管理能力。通过智能资源调度和请求路由提高算力利用率，助力企业加速Agentic AI 应用落地。",
+    "zh-TW": "是基于異構算力生態的融合推理引擎，致力於為企業提供標準化、高穩定、易擴展的模型加速推理與接口服務管理能力。透過智能資源調度與請求路由提高算力利用率，助力企業加速Agentic AI 应用落地。",
+    "en-US": "It is a fusion reasoning engine based on heterogeneous computing ecology, dedicated to providing enterprises with standardized, high-stability, and easily extensible model acceleration inference and interface service management capabilities. Through intelligent resource scheduling and request routing, it improves computing power utilization rate, helping enterprises accelerate the landing of Agentic AI applications."
+  },
+  "欢迎登录": {
+    "zh-CN": "欢迎登录",
+    "zh-TW": "歡迎登入",
+    "en-US": "Welcome Login"
+  },
+  "请输入账号": {
+    "zh-CN": "请输入账号",
+    "zh-TW": "請輸入帳號",
+    "en-US": "Please Enter Account"
+  },
+  "登录": {
+    "zh-CN": "登录",
+    "zh-TW": "登入",
+    "en-US": "Login"
+  },
+  "点击登录代表我已同意《隐私协议》": {
+    "zh-CN": "点击登录代表我已同意《隐私协议》",
+    "zh-TW": "點擊登入代表我已同意《隱私協議》",
+    "en-US": "Clicking Login indicates that I have agreed to the Privacy Agreement"
+  },
+  "《隐私协议》": {
+    "zh-CN": "《隐私协议》",
+    "zh-TW": "《隱私協議》",
+    "en-US": "Privacy Agreement"
+  },
+  "Copyright © 2025 滴普科技 版权所有": {
+    "zh-CN": "Copyright © 2025 滴普科技 版权所有",
+    "zh-TW": "Copyright © 2025 滴普科技 版權所有",
+    "en-US": "Copyright © 2025 Dipu Technology All Rights Reserved"
+  },
+  "点击登录代表我已同意": {
+    "zh-CN": "点击登录代表我已同意",
+    "zh-TW": "點擊登入代表我已同意",
+    "en-US": "Clicking Login indicates that I have agreed to the terms and conditions"
+  },
+  "模型Logo": {
+    "zh-CN": "模型Logo",
+    "zh-TW": "模型Logo",
+    "en-US": "Model Logo"
+  },
+  "自定义": {
+    "zh-CN": "自定义",
+    "zh-TW": "自訂",
+    "en-US": "Custom"
+  },
+  "字节火山引擎": {
+    "zh-CN": "字节火山引擎",
+    "zh-TW": "ByteDance火山引擎",
+    "en-US": "ByteDance Volcano Engine"
+  },
+  "模型ID": {
+    "zh-CN": "模型ID",
+    "zh-TW": "模型ID",
+    "en-US": "Model ID"
+  },
+  "响应时间": {
+    "zh-CN": "响应时间",
+    "zh-TW": "回應時間",
+    "en-US": "Response Time"
+  },
+  "未通过": {
+    "zh-CN": "未通过",
+    "zh-TW": "未通過",
+    "en-US": "Failed"
+  },
+  "测试": {
+    "zh-CN": "测试",
+    "zh-TW": "測試",
+    "en-US": "Test"
+  },
+  "测试成功": {
+    "zh-CN": "测试成功",
+    "zh-TW": "測試成功",
+    "en-US": "Test Successful"
+  },
+  "加载失败": {
+    "zh-CN": "加载失败",
+    "zh-TW": "載入失敗",
+    "en-US": "Load Failed"
+  },
+  "重试": {
+    "zh-CN": "重试",
+    "zh-TW": "重試",
+    "en-US": "Retry"
+  },
+  "返回模型广场": {
+    "zh-CN": "返回模型广场",
+    "zh-TW": "返回模型廣場",
+    "en-US": "Return to Model Hub"
+  },
+  "返回": {
+    "zh-CN": "返回",
+    "zh-TW": "返回",
+    "en-US": "Back"
+  },
+  "名称": {
+    "zh-CN": "名称",
+    "zh-TW": "名稱",
+    "en-US": "Name"
+  },
+  "模型详情": {
+    "zh-CN": "模型详情",
+    "zh-TW": "模型細節",
+    "en-US": "Model Details"
+  },
+  "类型": {
+    "zh-CN": "类型",
+    "zh-TW": "類型",
+    "en-US": "Type"
+  },
+  "描述": {
+    "zh-CN": "描述",
+    "zh-TW": "描述",
+    "en-US": "Description"
+  },
+  "暂无描述": {
+    "zh-CN": "暂无描述",
+    "zh-TW": "暫無描述",
+    "en-US": "No Description"
+  },
+  "模型列表": {
+    "zh-CN": "模型列表",
+    "zh-TW": "模型列表",
+    "en-US": "Model List"
+  },
+  "连通性": {
+    "zh-CN": "连通性",
+    "zh-TW": "連通性",
+    "en-US": "Connectivity"
+  },
+  "已通过": {
+    "zh-CN": "已通过",
+    "zh-TW": "已通過",
+    "en-US": "Passed"
+  },
+  "暂无数据": {
+    "zh-CN": "暂无数据",
+    "zh-TW": "暫無數據",
+    "en-US": "No data"
+  },
+  "更新时间": {
+    "zh-CN": "更新时间",
+    "zh-TW": "更新時間",
+    "en-US": "Update time"
+  },
+  "新增渠道成功": {
+    "zh-CN": "新增渠道成功",
+    "zh-TW": "新增渠道成功",
+    "en-US": "New channel successful"
+  },
+  "必须是一个有效的对象格式 JSON 字符串": {
+    "zh-CN": "必须是一个有效的对象格式 JSON 字符串",
+    "zh-TW": "必須是一個有效的对象格式 JSON 字符串",
+    "en-US": "Must be a valid object format JSON string"
+  },
+  "请输入正确的 JSON 字符串": {
+    "zh-CN": "请输入正确的 JSON 字符串",
+    "zh-TW": "請輸入正確的 JSON 字符串",
+    "en-US": "Please enter a valid JSON string"
+  },
+  "暂无模型": {
+    "zh-CN": "暂无模型",
+    "zh-TW": "暫無模型",
+    "en-US": "No models"
+  },
+  "渠道列表": {
+    "zh-CN": "渠道列表",
+    "zh-TW": "渠道列表",
+    "en-US": "Channel list"
+  },
+  "模型筛选": {
+    "zh-CN": "模型筛选",
+    "zh-TW": "模型篩選",
+    "en-US": "Model filter"
+  },
+  "清空": {
+    "zh-CN": "清空",
+    "zh-TW": "清除",
+    "en-US": "Clear"
+  },
+  "未指定类型": {
+    "zh-CN": "未指定类型",
+    "zh-TW": "未指定類型",
+    "en-US": "Unspecified type"
+  },
+  "共 {total} 个模型": {
+    "zh-CN": "共 {total} 个模型",
+    "zh-TW": "共 {total} 個模型",
+    "en-US": "Total {total} models"
+  },
+  "渠道数量": {
+    "zh-CN": "渠道数量",
+    "zh-TW": "渠道數量",
+    "en-US": "Channel count"
+  },
+  "渠道数": {
+    "zh-CN": "渠道数",
+    "zh-TW": "渠道數",
+    "en-US": "Channel"
+  },
+  "暂无配置项，点击上方按钮添加": {
+    "zh-CN": "暂无配置项，点击上方按钮添加",
+    "zh-TW": "暫無配置項，點擊上方按鈕添加",
+    "en-US": "No configuration items, click the button above to add"
+  },
+  "确定删除这个配置项吗？": {
+    "zh-CN": "确定删除这个配置项吗？",
+    "zh-TW": "確定刪除這個配置項嗎？",
+    "en-US": "Are you sure to delete this configuration item?"
+  },
+  "添加配置项": {
+    "zh-CN": "添加配置项",
+    "zh-TW": "添加配置項",
+    "en-US": "Add configuration item"
+  },
+  "分组名称": {
+    "zh-CN": "分组名称",
+    "zh-TW": "分組名稱",
+    "en-US": "Group Name"
+  },
+  "分组倍率": {
+    "zh-CN": "分组倍率",
+    "zh-TW": "分組倍率",
+    "en-US": "Group Rate"
+  },
+  "输入分组名称": {
+    "zh-CN": "输入分组名称",
+    "zh-TW": "輸入分組名稱",
+    "en-US": "Enter group name"
+  },
+  "输入分组倍率": {
+    "zh-CN": "输入分组倍率",
+    "zh-TW": "輸入分組倍率",
+    "en-US": "Enter group rate"
+  },
+  "加载中...": {
+    "zh-CN": "加载中...",
+    "zh-TW": "載入中...",
+    "en-US": "Loading..."
+  },
+  "企业统一模型门户，让模型安全可靠的被使用，驱动AI赋能": {
+    "zh-CN": "企业统一模型门户，让模型安全可靠的被使用，驱动AI赋能",
+    "zh-TW": "企業統一模型門戶，讓模型安全可靠的被使用，驅動AI賦能",
+    "en-US": "Enterprise Unified Model Portal - Enabling safe and reliable model usage to drive AI empowerment"
+  },
+  "模型请求日志记录": {
+    "zh-CN": "模型请求日志记录",
+    "zh-TW": "模型請求日誌記錄",
+    "en-US": "Model request log record"
+  },
+  "密钥管理实现安全、合规的模型服务访问控制": {
+    "zh-CN": "密钥管理实现安全、合规的模型服务访问控制",
+    "zh-TW": "秘鍵管理實現安全、合規的模型服務訪問控制",
+    "en-US": "Key management implements secure and compliant model service access control"
+  },
+  "模型请求可视化监控": {
+    "zh-CN": "模型请求可视化监控",
+    "zh-TW": "模型請求可視化監控",
+    "en-US": "Model request visualization monitoring"
+  },
+  "模型统一标准接入": {
+    "zh-CN": "模型统一标准接入",
+    "zh-TW": "模型統一標準接入",
+    "en-US": "Model unified standard access"
+  },
+  "角色": {
+    "zh-CN": "角色",
+    "zh-TW": "角色",
+    "en-US": "Role"
+  },
+  "请选择角色": {
+    "zh-CN": "请选择角色",
+    "zh-TW": "請選擇角色",
+    "en-US": "Please Select Role"
+  },
+  "额度最多六位小数": {
+    "zh-CN": "额度最多六位小数",
+    "zh-TW": "額度最多六位小數",
+    "en-US": "Quota最多六位小数"
+  },
+  "Token额度": {
+    "zh-CN": "Token额度",
+    "zh-TW": "Token額度",
+    "en-US": "Token quota"
+  },
+  "请输入Token额度": {
+    "zh-CN": "请输入Token额度",
+    "zh-TW": "請輸入Token額度",
+    "en-US": "Enter Token quota"
+  },
+  "等价金额": {
+    "zh-CN": "等价金额",
+    "zh-TW": "等價金額",
+    "en-US": "Equivalent amount"
+  },
+  "输入应为正整数": {
+    "zh-CN": "输入应为正整数",
+    "zh-TW": "輸入應為正整數",
+    "en-US": "Input should be a positive integer"
+  },
+  "手机号": {
+    "zh-CN": "手机号",
+    "zh-TW": "手機號",
+    "en-US": "Phone Number"
+  },
+  "请输入手机号": {
+    "zh-CN": "请输入手机号",
+    "zh-TW": "請輸入手機號",
+    "en-US": "Please enter phone number"
+  },
+  "请输入正确的手机号格式": {
+    "zh-CN": "请输入正确的手机号格式",
+    "zh-TW": "請輸入正確的手機號格式",
+    "en-US": "Please enter correct phone number format"
+  },
+  "邮箱": {
+    "zh-CN": "邮箱",
+    "zh-TW": "郵箱",
+    "en-US": "Email"
+  },
+  "请输入邮箱": {
+    "zh-CN": "请输入邮箱",
+    "zh-TW": "請輸入郵箱",
+    "en-US": "Please enter email"
+  },
+  "请输入正确的邮箱格式": {
+    "zh-CN": "请输入正确的邮箱格式",
+    "zh-TW": "請輸入正確的郵箱格式",
+    "en-US": "Please enter correct email format"
+  },
+  "可用额度": {
+    "zh-CN": "可用额度",
+    "zh-TW": "可用額度",
+    "en-US": "Available quota"
+  },
+  "额度管理": {
+    "zh-CN": "额度管理",
+    "zh-TW": "可用額度",
+    "en-US": "Quota management"
+  },
+  "模型权限": {
+    "zh-CN": "模型权限",
+    "zh-TW": "模型權限",
+    "en-US": "Model permission"
+  },
+  "申请使用权限": {
+    "zh-CN": "申请使用权限",
+    "zh-TW": "申請使用權限",
+    "en-US": "Apply for model permission"
+  },
+  "账号可用模型": {
+    "zh-CN": "账号可用模型",
+    "zh-TW": "賬號可用模型",
+    "en-US": "Account available models"
+  },
+  "当前用户角色为【模型推理管理员】，拥有所有模型和API使用权限": {
+    "zh-CN": "当前用户角色为【模型推理管理员】，拥有所有模型和API使用权限",
+    "zh-TW": "當前用戶角色為【模型推理管理員】，擁有所有模型和API使用權限",
+    "en-US": "The current user role is [model inference administrator], and has all model and API usage permissions"
+  },
+  "账号可用额度": {
+    "zh-CN": "账号可用额度",
+    "zh-TW": "賬號可用額度",
+    "en-US": "Account available credit limit"
+  },
+  "累计已用额度": {
+    "zh-CN": "累计已用额度",
+    "zh-TW": "累計已用額度",
+    "en-US": "Accumulated used credit limit"
+  },
+  "申请额度": {
+    "zh-CN": "申请额度",
+    "zh-TW": "申請額度",
+    "en-US": "Apply for credit limit"
+  },
+  "申请理由": {
+    "zh-CN": "申请理由",
+    "zh-TW": "申請理由",
+    "en-US": "Reasons for application"
+  },
+  "请输入申请理由": {
+    "zh-CN": "请输入申请理由",
+    "zh-TW": "请输入申請理由",
+    "en-US": "Enter reasons for application"
+  },
+  "发起申请": {
+    "zh-CN": "发起申请",
+    "zh-TW": "發起申請",
+    "en-US": "Initiate an application"
+  },
+  "编辑角色": {
+    "zh-CN": "编辑角色",
+    "zh-TW": "編輯角色",
+    "en-US": "Editor role"
+  },
+  "角色名": {
+    "zh-CN": "角色名",
+    "zh-TW": "角色名",
+    "en-US": "Character name"
+  },
+  "请输入角色名": {
+    "zh-CN": "请输入角色名",
+    "zh-TW": "請輸入角色名",
+    "en-US": "Please enter the character name"
+  },
+  "角色描述": {
+    "zh-CN": "角色描述",
+    "zh-TW": "角色描述",
+    "en-US": "Role description"
+  },
+  "请输入角色描述": {
+    "zh-CN": "请输入角色描述",
+    "zh-TW": "請輸入角色描述",
+    "en-US": "Please enter the role description"
+  },
+  "权限配置": {
+    "zh-CN": "权限配置",
+    "zh-TW": "權限配置",
+    "en-US": "Permission configuration"
+  },
+  "请输入角色名称": {
+    "zh-CN": "请输入角色名称",
+    "zh-TW": "請輸入角色名稱",
+    "en-US": "Please enter the character name"
+  },
+  "审批信息": {
+    "zh-CN": "审批信息",
+    "zh-TW": "審批信息",
+    "en-US": "Approval Information"
+  },
+  "审批结果": {
+    "zh-CN": "审批结果",
+    "zh-TW": "審批結果",
+    "en-US": "Approval Result"
+  },
+  "审批人": {
+    "zh-CN": "审批人",
+    "zh-TW": "審批人",
+    "en-US": "Approver"
+  },
+  "审批时间": {
+    "zh-CN": "审批时间",
+    "zh-TW": "審批時間",
+    "en-US": "Approval Time"
+  },
+  "审批意见": {
+    "zh-CN": "审批意见",
+    "zh-TW": "審批意見",
+    "en-US": "Approval Comment"
+  },
+  "待审批": {
+    "zh-CN": "待审批",
+    "zh-TW": "待審批",
+    "en-US": "Pending"
+  },
+  "已拒绝": {
+    "zh-CN": "已拒绝",
+    "zh-TW": "已拒絕",
+    "en-US": "Rejected"
+  },
+  "审批": {
+    "zh-CN": "审批",
+    "zh-TW": "審批",
+    "en-US": "Approval"
+  },
+  "通过": {
+    "zh-CN": "通过",
+    "zh-TW": "通過",
+    "en-US": "Approve"
+  },
+  "不通过": {
+    "zh-CN": "不通过",
+    "zh-TW": "不通過",
+    "en-US": "Reject"
+  },
+  "申请信息": {
+    "zh-CN": "申请信息",
+    "zh-TW": "申請信息",
+    "en-US": "Application Information"
+  },
+  "申请人": {
+    "zh-CN": "申请人",
+    "zh-TW": "申請人",
+    "en-US": "Applicant"
+  },
+  "申请时间": {
+    "zh-CN": "申请时间",
+    "zh-TW": "申請時間",
+    "en-US": "Application Time"
+  },
+  "审批管理": {
+    "zh-CN": "审批管理",
+    "zh-TW": "審批管理",
+    "en-US": "Approval Management"
+  },
+  "请输入申请人": {
+    "zh-CN": "请输入申请人",
+    "zh-TW": "請輸入申請人",
+    "en-US": "Enter applicant name"
+  },
+  "请输入审批人": {
+    "zh-CN": "请输入审批人",
+    "zh-TW": "請輸入審批人",
+    "en-US": "Enter approver name"
+  },
+  "提交开始时间": {
+    "zh-CN": "提交开始时间",
+    "zh-TW": "提交開始時間",
+    "en-US": "Submission start time"
+  },
+  "提交结束时间": {
+    "zh-CN": "提交结束时间",
+    "zh-TW": "提交結束時間",
+    "en-US": "Submission end time"
+  },
+  "审批开始时间": {
+    "zh-CN": "审批开始时间",
+    "zh-TW": "審批開始時間",
+    "en-US": "Approval start time"
+  },
+  "审批结束时间": {
+    "zh-CN": "审批结束时间",
+    "zh-TW": "審批結束時間",
+    "en-US": "Approval end time"
+  },
+  "提交时间": {
+    "zh-CN": "提交时间",
+    "zh-TW": "提交時間",
+    "en-US": "Submission Time"
+  },
+  "搜索": {
+    "zh-CN": "搜索",
+    "zh-TW": "搜尋",
+    "en-US": "Search"
+  },
+  "查看详情": {
+    "zh-CN": "查看详情",
+    "zh-TW": "查看詳情",
+    "en-US": "View Details"
+  },
+  "已审批": {
+    "zh-CN": "已审批",
+    "zh-TW": "已審批",
+    "en-US": "Approved"
+  },
+  "我提交的": {
+    "zh-CN": "我提交的",
+    "zh-TW": "我提交的",
+    "en-US": "My Submissions"
+  },
+  "请填写审批意见": {
+    "zh-CN": "请填写审批意见",
+    "zh-TW": "請填寫審批意見",
+    "en-US": "‌Please fill in the approval comments"
+  },
+  "已添加模型": {
+    "zh-CN": "已添加模型",
+    "zh-TW": "已添加模型",
+    "en-US": "Added Models"
+  },
+  "待添加模型": {
+    "zh-CN": "待添加模型",
+    "zh-TW": "待添加模型",
+    "en-US": "Models to Add"
+  },
+  "添加模型": {
+    "zh-CN": "添加模型",
+    "zh-TW": "添加模型",
+    "en-US": "Add Model"
+  },
+  "可选择模型": {
+    "zh-CN": "可选择模型",
+    "zh-TW": "可選擇模型",
+    "en-US": "Available Models"
+  },
+  "内容安全审核策略": {
+    "zh-CN": "内容安全审核策略",
+    "en-US": "Content Security Policy"
+  },
+  "输入": {
+    "zh-CN": "输入",
+    "zh-TW": "輸入",
+    "en-US": "Input"
+  },
+  "输出": {
+    "zh-CN": "输出",
+    "zh-TW": "輸出",
+    "en-US": "Output"
+  },
+  "请选择内容安全审核策略": {
+    "zh-CN": "请选择内容安全审核策略",
+    "en-US": "Please select a content security policy"
+  },
+  "Chat 文本生成": {
+    "en-US": "Chat Text Generation",
+    "zh-CN": "Chat 文本生成",
+    "zh-HK": "Chat 文本生成"
+  },
+  "内容安全": {
+    "en-US": "Content security",
+    "zh-CN": "内容安全",
+    "zh-HK": "內容安全"
+  },
+  "安全审核策略": {
+    "en-US": "Security audit strategy",
+    "zh-CN": "安全审核策略",
+    "zh-HK": "安全審核策略"
+  },
+  "审核标签": {
+    "en-US": "Review tags",
+    "zh-CN": "审核标签",
+    "zh-HK": "審核標籤"
+  },
+  "用户无该模型使用权限。": {
+    "en-US": "You do not have permission to experience this model.",
+    "zh-CN": "用户无该模型使用权限。",
+    "zh-HK": "用戶無該模型使用權限。"
+  },
+  "审核内容": {
+    "en-US": "Review content",
+    "zh-CN": "审核内容",
+    "zh-HK": "審核內容"
+  },
+  "审核耗时(s)": {
+    "en-US": "Review time taken (s)",
+    "zh-CN": "审核耗时(s)",
+    "zh-HK": "審核耗時(s)"
+  },
+  "无审核": {
+    "en-US": "No audit",
+    "zh-CN": "无审核",
+    "zh-HK": "無審核"
+  },
+  "安全": {
+    "en-US": "Safety",
+    "zh-CN": "安全",
+    "zh-HK": "安全"
+  },
+  "不安全": {
+    "en-US": "Insecure",
+    "zh-CN": "不安全",
+    "zh-HK": "不安全"
+  },
+  "测试所有渠道": {
+    "en-US": "Test all channels",
+    "zh-CN": "测试所有渠道",
+    "zh-HK": "測試所有渠道"
+  },
+  "编辑渠道成功": {
+    "en-US": "The editing channel is successful",
+    "zh-CN": "编辑渠道成功",
+    "zh-HK": "編輯渠道成功"
+  },
+  "提交成功": {
+    "en-US": "Submission successful",
+    "zh-CN": "提交成功",
+    "zh-HK": "提交成功"
+  },
+  "请填写审核意见": {
+    "en-US": "Please fill in the review opinion",
+    "zh-CN": "请填写审核意见",
+    "zh-HK": "請填寫審核意見"
+  },
+  "L0 无审核：不对请求内容审核，依赖基础模型自有的合规检查机制提供内容安全保障。": {
+    "en-US": "L0 No audit: No audit is required for content review, and the basic model's own compliance inspection mechanism provides content security guarantees.",
+    "zh-CN": "L0 无审核：不对请求内容审核，依赖基础模型自有的合规检查机制提供内容安全保障。",
+    "zh-HK": "L0 無審核：不對請求內容審核，依賴基礎模型自有的合規檢查機制提供內容安全保障。"
+  },
+  "L1 敏感词审核：对基础模型安全加固，采用敏感词过滤算法，通过敏感词库对违规问题拦截。": {
+    "en-US": "L1 Sensitive word review: The basic model is securely reinforced, sensitive word filtering algorithm is used, and violations are intercepted through sensitive thesaurus.",
+    "zh-CN": "L1 敏感词审核：对基础模型安全加固，采用敏感词过滤算法，通过敏感词库对违规问题拦截。",
+    "zh-HK": "L1 敏感詞審核：對基礎模型安全加固，採用敏感詞過濾算法，通過敏感詞庫對違規問題攔截。"
+  },
+  "L2 语义融合审核：对基础模型安全加固，通过敏感词与语义分析双重审核，提升对隐晦违规内容的识别率。": {
+    "en-US": "L2 semantic fusion audit: Strengthen the basic model safely, and improve the recognition rate of obscure and illegal content through dual audits of sensitive words and semantic analysis.",
+    "zh-CN": "L2 语义融合审核：对基础模型安全加固，通过敏感词与语义分析双重审核，提升对隐晦违规内容的识别率。",
+    "zh-HK": "L2 語義融合審核：對基礎模型安全加固，通過敏感詞與語義分析雙重審核，提升對隱晦違規內容的識別率。"
+  },
+  "键": {
+    "en-US": "Key",
+    "zh-CN": "键",
+    "zh-HK": "鍵"
+  },
+  "值": {
+    "en-US": "Value",
+    "zh-CN": "值",
+    "zh-HK": "值"
+  },
+  "添加选择器": {
+    "en-US": "Add Selector",
+    "zh-CN": "添加选择器",
+    "zh-HK": "添加選擇器"
+  },
+  "粘贴多行文本，每行包含一个键值对，键和值之间用 = 号分隔，不同的键值对之间用换行符分隔。": {
+    "en-US": "Paste multiple lines of text, with each line containing a key-value pair. Keys and values are separated by = sign, and different key-value pairs are separated by line breaks.",
+    "zh-CN": "粘贴多行文本，每行包含一个键值对，键和值之间用 = 号分隔，不同的键值对之间用换行符分隔。",
+    "zh-HK": "粘貼多行文本，每行包含一個鍵值對，鍵和值之間用 = 號分隔，不同的鍵值對之間用換行符分隔。"
+  },
+  "名称查询": {
+    "en-US": "Name Query",
+    "zh-CN": "名称查询",
+    "zh-HK": "名稱查詢"
+  },
+  "来源": {
+    "en-US": "Source",
+    "zh-CN": "来源",
+    "zh-HK": "來源"
+  },
+  "后端": {
+    "en-US": "Backend",
+    "zh-CN": "后端",
+    "zh-HK": "後端"
+  },
+  "副本数": {
+    "en-US": "Number of Replicas",
+    "zh-CN": "副本数",
+    "zh-HK": "副本數"
+  },
+  "多副本数实现 http://localhost:9000/v1 接口推理请求的负载均衡": {
+    "en-US": "Multiple replicas implement load balancing for inference requests at http://localhost:9000/v1",
+    "zh-CN": "多副本数实现 http://localhost:9000/v1 接口推理请求的负载均衡",
+    "zh-HK": "多副本數實現 http://localhost:9000/v1 接口推理請求的負載均衡"
+  },
+  "仍然提交": {
+    "en-US": "Submit Anyway",
+    "zh-CN": "仍然提交",
+    "zh-HK": "仍然提交"
+  },
+  "确定删除选中的模型吗？": {
+    "en-US": "Are you sure you want to delete the selected model?",
+    "zh-CN": "确定删除选中的模型吗？",
+    "zh-HK": "確定刪除選中的模型嗎？"
+  },
+  "确定删除": {
+    "en-US": "Confirm Delete",
+    "zh-CN": "确定删除",
+    "zh-HK": "確定刪除"
+  },
+  "确认停止选中的模型吗？": {
+    "en-US": "Are you sure you want to stop the selected model?",
+    "zh-CN": "确认停止选中的模型吗？",
+    "zh-HK": "確認停止選中的模型嗎？"
+  },
+  "确认停止": {
+    "en-US": "Confirm Stop",
+    "zh-CN": "确认停止",
+    "zh-HK": "確認停止"
+  },
+  "停止": {
+    "en-US": "Stop",
+    "zh-CN": "停止",
+    "zh-HK": "停止"
+  },
+  "确认启动选中的模型吗？": {
+    "en-US": "Are you sure you want to start the selected model?",
+    "zh-CN": "确认启动选中的模型吗？",
+    "zh-HK": "確認啟動選中的模型嗎？"
+  },
+  "确认启动": {
+    "en-US": "Confirm Start",
+    "zh-CN": "确认启动",
+    "zh-HK": "確認啟動"
+  },
+  "启动": {
+    "en-US": "Start",
+    "zh-CN": "启动",
+    "zh-HK": "啟動"
+  },
+  "按类别筛选": {
+    "en-US": "Filter by Category",
+    "zh-CN": "按类别筛选",
+    "zh-HK": "按類別篩選"
+  },
+  "部署模型": {
+    "en-US": "Deploy Model",
+    "zh-CN": "部署模型",
+    "zh-HK": "部署模型"
+  },
+  "编辑模型": {
+    "en-US": "Edit Model",
+    "zh-CN": "编辑模型",
+    "zh-HK": "編輯模型"
+  },
+  "确认删除": {
+    "en-US": "Confirm Delete",
+    "zh-CN": "确认删除",
+    "zh-HK": "確認刪除"
+  },
+  "复制成功": {
+    "en-US": "Copy Successful",
+    "zh-CN": "复制成功",
+    "zh-HK": "複製成功"
+  },
+  "复制": {
+    "en-US": "Copy",
+    "zh-CN": "复制",
+    "zh-HK": "複製"
+  },
+  "标签": {
+    "en-US": "Tags",
+    "zh-CN": "标签",
+    "zh-HK": "標籤"
+  },
+  "内存": {
+    "en-US": "Memory",
+    "zh-CN": "内存",
+    "zh-HK": "內存"
+  },
+  "显存": {
+    "en-US": "GPU Memory",
+    "zh-CN": "显存",
+    "zh-HK": "顯存"
+  },
+  "磁盘": {
+    "en-US": "Disk",
+    "zh-CN": "磁盘",
+    "zh-HK": "磁盤"
+  },
+  "编辑 Worker": {
+    "en-US": "Edit Worker",
+    "zh-CN": "编辑 Worker",
+    "zh-HK": "編輯 Worker"
+  },
+  "添加标签": {
+    "en-US": "Add Tag",
+    "zh-CN": "添加标签",
+    "zh-HK": "添加標籤"
+  },
+  "同时从磁盘文件中删除！": {
+    "en-US": "Delete from disk file simultaneously!",
+    "zh-CN": "同时从磁盘文件中删除！",
+    "zh-HK": "同時從磁盤文件中刪除！"
+  },
+  "存储路径": {
+    "en-US": "Storage Path",
+    "zh-CN": "存储路径",
+    "zh-HK": "存儲路徑"
+  },
+  "文件名称": {
+    "en-US": "File Name",
+    "zh-CN": "文件名称",
+    "zh-HK": "文件名稱"
+  },
+  "文件名称查询": {
+    "en-US": "File Name Query",
+    "zh-CN": "文件名称查询",
+    "zh-HK": "文件名稱查詢"
+  },
+  "文件大小": {
+    "en-US": "File Size",
+    "zh-CN": "文件大小",
+    "zh-HK": "文件大小"
+  },
+  "按worker筛选": {
+    "en-US": "Filter by Worker",
+    "zh-CN": "按worker筛选",
+    "zh-HK": "按worker篩選"
+  },
+  "路径查询": {
+    "en-US": "Path Query",
+    "zh-CN": "路径查询",
+    "zh-HK": "路徑查詢"
+  },
+  "多模态": {
+    "en-US": "Multimodal",
+    "zh-CN": "多模态",
+    "zh-HK": "多模態"
+  },
+  "文本模型": {
+    "en-US": "Text Model",
+    "zh-CN": "文本模型",
+    "zh-HK": "文本模型"
+  },
+  "创建密钥": {
+    "en-US": "Create Key",
+    "zh-CN": "创建密钥",
+    "zh-HK": "創建密鑰"
+  },
+  "立即体验": {
+    "en-US": "Experience now",
+    "zh-CN": "立即体验",
+    "zh-HK": "立即體驗"
+  },
+  "请选择模型开始体验": {
+    "en-US": "Please select the model to start the experience",
+    "zh-CN": "请选择模型开始体验",
+    "zh-HK": "請選擇模型開始體驗"
+  },
+  "添加模型文件": {
+    "en-US": "Add Model File",
+    "zh-CN": "添加模型文件",
+    "zh-HK": "添加模型文件"
+  },
+  "模型来源": {
+    "en-US": "Model Source",
+    "zh-CN": "模型来源",
+    "zh-HK": "模型來源"
+  },
+  "模型Token价格设置。可参考的价格区间：": {
+    "en-US": "Model Token price settings. ",
+    "zh-CN": "模型Token价格设置。",
+    "zh-HK": "模型Token價格設置。"
+  },
+  "文本模型：输入价格0.002~0.004¥/1k tokens，输出价格0.006~0.012¥/1k tokens": {
+    "en-US": "Text model: input price 0.002~0.004¥/1k tokens, output price 0.006~0.012¥/1k tokens",
+    "zh-CN": "文本模型：输入价格0.002~0.004¥/1k tokens，输出价格0.006~0.012¥/1k tokens",
+    "zh-HK": "文本模型：輸入價格0.002~0.004¥/1k tokens，輸出價格0.006~0.012¥/1k tokens"
+  },
+  "VL模型：输入价格0.008~0.016¥/1k tokens，输出价格0.024~0.048¥/1k tokens": {
+    "en-US": "VL model: input price 0.008~0.016¥/1k tokens, output price 0.024~0.048¥/1k tokens",
+    "zh-CN": "VL模型：输入价格0.008~0.016¥/1k tokens，输出价格0.024~0.048¥/1k tokens",
+    "zh-HK": "VL模型：輸入價格0.008~0.016¥/1k tokens，輸出價格0.024~0.048¥/1k tokens"
+  },
+  "语音识别：输入价格0.06~0.12¥/1k tokens，输出价格0.024~0.048¥/1k tokens": {
+    "en-US": "Speech recognition: input price 0.06~0.12¥/1k tokens, output price 0.024~0.048¥/1k tokens",
+    "zh-CN": "语音识别：输入价格0.06~0.12¥/1k tokens，输出价格0.024~0.048¥/1k tokens",
+    "zh-HK": "語音識別：輸入價格0.06~0.12¥/1k tokens，輸出價格0.024~0.048¥/1k tokens"
+  },
+  "实时语音识别：输入价格0.0002~0.0004¥/秒": {
+    "en-US": "Real-time speech recognition: input price 0.0002~0.0004¥/second",
+    "zh-CN": "实时语音识别：输入价格0.0002~0.0004¥/秒",
+    "zh-HK": "實時語音識別：輸入價格0.0002~0.0004¥/秒"
+  },
+  "语音合成：输入价格0.0016~0.0032¥/1k tokens，输出价格0.01~0.02¥/1k tokens": {
+    "en-US": "Speech synthesis: input price 0.0016~0.0032¥/1k tokens, output price 0.01~0.02¥/1k tokens",
+    "zh-CN": "语音合成：输入价格0.0016~0.0032¥/1k tokens，输出价格0.01~0.02¥/1k tokens",
+    "zh-HK": "語音合成：輸入價格0.0016~0.0032¥/1k tokens，輸出價格0.01~0.02¥/1k tokens"
+  },
+  "向量模型：输入价格0.0005~0.0007¥/1k tokens": {
+    "en-US": "Vector model: Enter price 0.0005~0.0007¥/1k tokens",
+    "zh-CN": "向量模型：输入价格0.0005~0.0007¥/1k tokens",
+    "zh-HK": "向量模型：輸入價格0.0005~0.0007¥/1k tokens"
+  },
+  "重排模型：输入价格0.0008¥/1k tokens": {
+    "en-US": "Rearrangement model: Enter price 0.0008¥/1k tokens",
+    "zh-CN": "重排模型：输入价格0.0008¥/1k tokens",
+    "zh-HK": "重排模型：輸入價格0.0008¥/1k tokens"
+  },
+  "输入Token价格": {
+    "en-US": "Enter the Token price",
+    "zh-CN": "输入Token价格",
+    "zh-HK": "輸入Token價格"
+  },
+  "请输入输入Token价格": {
+    "en-US": "Please enter the Token price",
+    "zh-CN": "请输入输入Token价格",
+    "zh-HK": "請輸入輸入Token價格"
+  },
+  "输出Token价格": {
+    "en-US": "Output Token price",
+    "zh-CN": "输出Token价格",
+    "zh-HK": "輸出Token價格"
+  },
+  "请输入输出Token价格": {
+    "en-US": "Please input and output the Token price",
+    "zh-CN": "请输入输出Token价格",
+    "zh-HK": "請輸入輸出Token價格"
+  },
+  "IP 限制": {
+    "en-US": "IP Restrictions",
+    "zh-CN": "IP 限制",
+    "zh-HK": "IP 限制"
+  },
+  "多个网段请使用英文逗号分隔": {
+    "en-US": "Please use English commas to separate multiple network segments",
+    "zh-CN": "多个网段请使用英文逗号分隔",
+    "zh-HK": "多個網段請使用英文逗號分隔"
+  },
+  "请输入允许访问的网段，例如：192.168.0.0/24": {
+    "en-US": "Please enter the network segment that is allowed to access, for example: 192.168.0.0/24",
+    "zh-CN": "请输入允许访问的网段，例如：192.168.0.0/24",
+    "zh-HK": "請輸入允許訪問的網段，例如：192.168.0.0/24"
+  },
+  "该账号可用Token数量，基于价格1{symbol}={unit}Token，实际金额花费根据不同的模型输入输出价格决定": {
+    "en-US": "The number of tokens available for this account is based on the price 1{symbol}={unit}Token. The actual amount spent is determined based on the input and output prices of different models.",
+    "zh-CN": "该账号可用Token数量，基于价格1{symbol}={unit}Token，实际金额花费根据不同的模型输入输出价格决定",
+    "zh-HK": "該賬號可用Token數量，基於價格1{symbol}={unit}Token，實際金額花費根據不同的模型輸入輸出價格決定"
+  },
+  "敏感级别": {
+    "en-US": "Sensitivity level",
+    "zh-CN": "敏感级别",
+    "zh-HK": "敏感級別"
+  },
+  "敏感类别": {
+    "en-US": "Sensitive categories",
+    "zh-CN": "敏感类别",
+    "zh-HK": "敏感類別"
+  },
+  "编辑敏感词": {
+    "en-US": "Edit sensitive words",
+    "zh-CN": "编辑敏感词",
+    "zh-HK": "編輯敏感詞"
+  },
+  "新增敏感词": {
+    "en-US": "Added sensitive words",
+    "zh-CN": "新增敏感词",
+    "zh-HK": "新增敏感詞"
+  },
+  "敏感词": {
+    "en-US": "Sensitive words",
+    "zh-CN": "敏感词",
+    "zh-HK": "敏感詞"
+  },
+  "请输入敏感词": {
+    "en-US": "Please enter sensitive words",
+    "zh-CN": "请输入敏感词",
+    "zh-HK": "請輸入敏感詞"
+  },
+  "敏感词类别": {
+    "en-US": "Sensitive word categories",
+    "zh-CN": "敏感词类别",
+    "zh-HK": "敏感詞類別"
+  },
+  "请选择敏感词类别": {
+    "en-US": "Please select sensitive word category",
+    "zh-CN": "请选择敏感词类别",
+    "zh-HK": "請選擇敏感詞類別"
+  },
+  "更改仅在删除并重新创建实例后生效": {
+    "zh-CN": "更改仅在删除并重新创建实例后生效",
+    "zh-TW": "更改僅在刪除並重新創建實例後生效",
+    "en-US": "Changes will only take effect after deleting and recreating the instance"
+  },
+  "搜索类别": {
+    "en-US": "Search category",
+    "zh-CN": "搜索类别",
+    "zh-HK": "搜索類別"
+  },
+  "编辑一级类别": {
+    "en-US": "Edit primary category",
+    "zh-CN": "编辑一级类别",
+    "zh-HK": "編輯一級類別"
+  },
+  "类别名称": {
+    "en-US": "Category name",
+    "zh-CN": "类别名称",
+    "zh-HK": "類別名稱"
+  },
+  "请输入类别名称": {
+    "en-US": "Please enter the category name",
+    "zh-CN": "请输入类别名称",
+    "zh-HK": "請輸入類別名稱"
+  },
+  "只允许包含中文、字母、数字和下划线，64字符以内": {
+    "en-US": "Only Chinese, letters, numbers, and underscores are allowed, and the length must be less than 64 characters",
+    "zh-CN": "只允许包含中文、字母、数字和下划线，64字符以内",
+    "zh-HK": "只允許包含中文、字母、數字和下劃線，64字符以內"
+  },
+  "请选择敏感类别": {
+    "en-US": "Please select sensitive categories",
+    "zh-CN": "请选择敏感类别",
+    "zh-HK": "請選擇敏感類別"
+  },
+  "上级类别": {
+    "en-US": "Parent category",
+    "zh-CN": "上级类别",
+    "zh-HK": "上級類別"
+  },
+  "请选择上级类别": {
+    "en-US": "Please select the parent category",
+    "zh-CN": "请选择上级类别",
+    "zh-HK": "請選擇上級類別"
+  },
+  "批量删除": {
+    "en-US": "Batch Delete",
+    "zh-CN": "批量删除",
+    "zh-HK": "批量刪除"
+  },
+  "批量导入": {
+    "en-US": "Batch import",
+    "zh-CN": "批量导入",
+    "zh-HK": "批量導入"
+  },
+  "采用敏感词过滤算法，对敏感词泛化，通过敏感词库对违规问题拦截": {
+    "en-US": "Use sensitive word filtering algorithm to generalize sensitive words and intercept violations through sensitive thesaurus",
+    "zh-CN": "采用敏感词过滤算法，对敏感词泛化，通过敏感词库对违规问题拦截",
+    "zh-HK": "採用敏感詞過濾算法，對敏感詞泛化，通過敏感詞庫對違規問題攔截"
+  },
+  "配置后通过内容安全服务，识别请求内容的违规信息，保障安全与合规性。": {
+    "en-US": "After configuration, the content security service is used to identify the violation information of the requested content to ensure security and compliance.",
+    "zh-CN": "配置后通过内容安全服务，识别请求内容的违规信息，保障安全与合规性。",
+    "zh-HK": "配置後通過內容安全服務，識別請求內容的違規信息，保障安全與合規性。"
+  },
+  "敏感词库": {
+    "en-US": "Sensitive thesaurus",
+    "zh-CN": "敏感词库",
+    "zh-HK": "敏感詞庫"
+  },
+  "安全设置": {
+    "en-US": "Security settings",
+    "zh-CN": "安全设置",
+    "zh-HK": "安全設置"
+  },
+  "低风险": {
+    "en-US": "Low risk",
+    "zh-CN": "低风险",
+    "zh-HK": "低風險"
+  },
+  "中风险": {
+    "en-US": "Medium risk",
+    "zh-CN": "中风险",
+    "zh-HK": "中風險"
+  },
+  "高风险": {
+    "en-US": "High risk",
+    "zh-CN": "高风险",
+    "zh-HK": "高風險"
+  },
+  "获取日志详情失败": {
+    "en-US": "Failed to get log details",
+    "zh-CN": "获取日志详情失败",
+    "zh-HK": "獲取日誌詳情失敗"
+  },
+  "命中缓存状态": {
+    "en-US": "Cache Hit Status",
+    "zh-CN": "命中缓存状态",
+    "zh-HK": "命中緩存狀態"
+  },
+  "命中": {
+    "en-US": "Hit",
+    "zh-CN": "命中",
+    "zh-HK": "命中"
+  },
+  "未命中": {
+    "en-US": "Miss",
+    "zh-CN": "未命中",
+    "zh-HK": "未命中"
+  },
+  "元": {
+    "en-US": "Yuan",
+    "zh-CN": "元",
+    "zh-HK": "元"
+  },
+  "价格": {
+    "en-US": "Price",
+    "zh-CN": "价格",
+    "zh-HK": "價格"
+  },
+  "输入价格": {
+    "en-US": "Input Price",
+    "zh-CN": "输入价格",
+    "zh-HK": "輸入價格"
+  },
+  "输出价格": {
+    "en-US": "Output Price",
+    "zh-CN": "输出价格",
+    "zh-HK": "輸出價格"
+  },
+  "花费(元)": {
+    "en-US": "Cost(Yuan)",
+    "zh-CN": "花费(元)",
+    "zh-HK": "花費(元)"
+  },
+  "Token数": {
+    "en-US": "Token Count",
+    "zh-CN": "Token数",
+    "zh-HK": "Token數"
+  },
+  "该密钥可用Token数量，基于价格1{symbol}={unit}Token，实际金额花费根据不同的模型输入输出价格决定": {
+    "en-US": "The number of tokens available for this secret key is based on the price of 1{symbol}={unit}Token. The actual amount spent is determined based on the input and output prices of different models.",
+    "zh-CN": "该密钥可用Token数量，基于价格1{symbol}={unit}Token，实际金额花费根据不同的模型输入输出价格决定",
+    "zh-HK": "該秘鑰可用Token數量，基於價格1{symbol}={unit}Token，實際金額花費根據不同的模型輸入輸出價格決定"
+  },
+  "多副本数实现": {
+    "en-US": "Multiple replicas implement",
+    "zh_CN": "多副本数实现",
+    "zh_HK": "多副本數實現"
+  },
+  "接口推理请求的负载均衡": {
+    "en-US": "load balancing for interface inference requests",
+    "zh_CN": "接口推理请求的负载均衡",
+    "zh_HK": "接口推理請求的負載均衡"
+  },
+  "已选择": {
+    "en-US": "Selected",
+    "zh-CN": "已选择",
+    "zh-HK": "已選擇"
+  },
+  "开启模型体验吧": {
+    "en-US": "Turn on the model to experience it",
+    "zh-CN": "开启模型体验吧",
+    "zh-HK": "開啟模型體驗吧"
+  },
+  "更多模型": {
+    "en-US": "More models",
+    "zh-CN": "更多模型",
+    "zh-HK": "更多模型"
+  },
+  "模型路径": {
+    "en-US": "Model Path",
+    "zh_CN": "模型路径",
+    "zh_HK": "模型路徑"
+  },
+  "本地路径": {
+    "en-US": "Local Path",
+    "zh_CN": "本地路径",
+    "zh_HK": "本地路徑"
+  },
+  "自动": {
+    "en-US": "Auto",
+    "zh_CN": "自动",
+    "zh_HK": "自動"
+  },
+  "用于非 GGUF 格式模型，仅支持 Linux。": {
+    "en-US": "For non-GGUF format models, Linux only.",
+    "zh_CN": "用于非 GGUF 格式模型，仅支持 Linux。",
+    "zh_HK": "用於非 GGUF 格式模型，僅支持 Linux。"
+  },
+  "用于非 GGUF 格式模型，仅支持昇腾 910B 和 310P。": {
+    "en-US": "For non-GGUF format models, supports only Ascend 910B and 310P.",
+    "zh_CN": "用于非 GGUF 格式模型，仅支持昇腾 910B 和 310P。",
+    "zh_HK": "用於非 GGUF 格式模型，僅支持昇騰 910B 和 310P。"
+  },
+  "指向模型文件，例如 /data/models/model.gguf": {
+    "en-US": "Points to model file, e.g. /data/models/model.gguf",
+    "zh_CN": "指向模型文件，例如 /data/models/model.gguf",
+    "zh_HK": "指向模型文件，例如 /data/models/model.gguf"
+  },
+  "指向模型第一个分片文件，例如 /data/models/model-00001-of-00004.gguf": {
+    "en-US": "Points to the first shard file, e.g. /data/models/model-00001-of-00004.gguf",
+    "zh_CN": "指向模型第一个分片文件，例如 /data/models/model-00001-of-00004.gguf",
+    "zh_HK": "指向模型第一個分片文件，例如 /data/models/model-00001-of-00004.gguf"
+  },
+  "指向包含 .safetensors, config.json 文件的模型目录，例如 /data/models/model": {
+    "en-US": "Points to model directory containing .safetensors, config.json files, e.g. /data/models/model",
+    "zh_CN": "指向包含 .safetensors, config.json 文件的模型目录，例如 /data/models/model",
+    "zh_HK": "指向包含 .safetensors, config.json 文件的模型目錄，例如 /data/models/model"
+  },
+  "例如， --max-model-len=8192": {
+    "en-US": "e.g., --max-model-len=8192",
+    "zh_CN": "例如， --max-model-len=8192",
+    "zh_HK": "例如， --max-model-len=8192"
+  },
+  "该模型大约需要分配": {
+    "en-US": "This model requires approximately",
+    "zh_CN": "该模型大约需要分配",
+    "zh_HK": "該模型大約需要分配"
+  },
+  "兼容性检查通过": {
+    "en-US": "Compatibility check passed",
+    "zh_CN": "兼容性检查通过",
+    "zh_HK": "兼容性檢查通過"
+  },
+  "GGUF 格式模型": {
+    "en-US": "GGUF Format Model",
+    "zh_CN": "GGUF 格式模型",
+    "zh_HK": "GGUF 格式模型"
+  },
+  "分片的 GGUF 格式模型": {
+    "en-US": "Sharded GGUF Format Model",
+    "zh_CN": "分片的 GGUF 格式模型",
+    "zh_HK": "分片的 GGUF 格式模型"
+  },
+  "safetensors 格式模型": {
+    "en-US": "Safetensors Format Model",
+    "zh_CN": "safetensors 格式模型",
+    "zh_HK": "safetensors 格式模型"
+  },
+  "敏感类型": {
+    "zh-CN": "敏感类型",
+    "zh-TW": "敏感類型",
+    "en-US": "Sensitive Type"
+  },
+  "可依据不同的敏感类型配置不同的告警策略分级告警，会触发不同级别的事件": {
+    "zh-CN": "可依据不同的敏感类型配置不同的告警策略分级告警，会触发不同级别的事件",
+    "zh-TW": "可依據不同的敏感類型配置不同的告警策略分級告警，會觸發不同級別的事件",
+    "en-US": "Different alarm policies can be configured based on different sensitive types for graded alarms, which will trigger events of different levels"
+  },
+  "高风险：": {
+    "zh-CN": "高风险：",
+    "zh-TW": "高風險：",
+    "en-US": "High Risk:"
+  },
+  "社会公共安全类、人身权益侵害类、道德伦理类、政治与国际关系安全类、社会公平与正义类、违禁品类": {
+    "zh-CN": "社会公共安全类、人身权益侵害类、道德伦理类、政治与国际关系安全类、社会公平与正义类、违禁品类",
+    "zh-TW": "社會公共安全類、人身權益侵害類、道德倫理類、政治與國際關係安全類、社會公平與正義類、違禁品類",
+    "en-US": "Social public security, personal rights infringement, moral ethics, political and international relations security, social fairness and justice, contraband"
+  },
+  "中风险：": {
+    "zh-CN": "中风险：",
+    "zh-TW": "中風險：",
+    "en-US": "Medium Risk:"
+  },
+  "经济犯罪类、环境与资源类、技术安全类、信息安全类、医疗健康安全类": {
+    "zh-CN": "经济犯罪类、环境与资源类、技术安全类、信息安全类、医疗健康安全类",
+    "zh-TW": "經濟犯罪類、環境與資源類、技術安全類、信息安全類、醫療健康安全類",
+    "en-US": "Economic crime, environment and resources, technical security, information security, medical health security"
+  },
+  "低风险：": {
+    "zh-CN": "低风险：",
+    "zh-TW": "低風險：",
+    "en-US": "Low Risk:"
+  },
+  "知识产权类": {
+    "zh-CN": "知识产权类",
+    "zh-TW": "知識產權類",
+    "en-US": "Intellectual property"
+  },
+  "查看日志": {
+    "zh-CN": "查看日志",
+    "zh-TW": "查看日志",
+    "en-US": "View Logs"
+  },
+  "手动": {
+    "zh-CN": "手动",
+    "zh-TW": "手動",
+    "en-US": "Manual"
+  },
+  "自动调度": {
+    "zh-CN": "自动调度",
+    "zh-TW": "自動調度",
+    "en-US": "Auto Scheduling"
+  },
+  "手动调度": {
+    "zh-CN": "手动调度",
+    "zh-TW": "手動調度",
+    "en-US": "Manual Scheduling"
+  },
+  "自动根据当前资源情况部署模型实例到合适的 GPU/Worker。": {
+    "zh-CN": "自动根据当前资源情况部署模型实例到合适的 GPU/Worker。",
+    "zh-TW": "自動根據當前資源情況部署模型實例到合適的 GPU/Worker。",
+    "en-US": "Automatically deploy model instances to suitable GPU/Worker based on current resource conditions."
+  },
+  "手动调度可指定模型实例部署的 GPU/Worker": {
+    "zh-CN": "手动调度可指定模型实例部署的 GPU/Worker",
+    "zh-TW": "手動調度可指定模型實例部署的 GPU/Worker",
+    "en-US": "Manual scheduling allows specifying GPU/Worker for model instance deployment"
+  },
+  "使得集群整体的资源在所有 Worker 之间分配得相对均匀。可能会在单个 Worker 上产生较多资源碎片。": {
+    "zh-CN": "使得集群整体的资源在所有 Worker 之间分配得相对均匀。可能会在单个 Worker 上产生较多资源碎片。",
+    "zh-TW": "使得集群整體的資源在所有 Worker 之間分配得相對均勻。可能會在單個 Worker 上產生較多資源碎片。",
+    "en-US": "Distributes cluster resources relatively evenly across all Workers. May generate more resource fragmentation on individual Workers."
+  },
+  "优先考虑整体集群的资源最大化利用，减少 GPU/Worker 上的资源碎片。": {
+    "zh-CN": "优先考虑整体集群的资源最大化利用，减少 GPU/Worker 上的资源碎片。",
+    "zh-TW": "優先考慮整體集群的資源最大化利用，減少 GPU/Worker 上的資源碎片。",
+    "en-US": "Prioritizes maximizing overall cluster resource utilization and reduces resource fragmentation on GPU/Worker."
+  },
+  "Ascend 310P 仅支持 FP16，需要设置 --dtype=float16": {
+    "zh-CN": "Ascend 310P 仅支持 FP16，需要设置 --dtype=float16",
+    "zh-TW": "Ascend 310P 僅支持 FP16，需要設置 --dtype=float16",
+    "en-US": "Ascend 310P only supports FP16, requires setting --dtype=float16"
+  },
+  "确定删除以下内容？": {
+    "zh-CN": "确定删除以下内容？",
+    "zh-TW": "確定刪除以下內容？",
+    "en-US": "Are you sure you want to delete the following content?"
+  },
+  "确认删除所选内容？": {
+    "zh-CN": "确认删除所选内容？",
+    "zh-TW": "確定刪除所選內容？",
+    "en-US": "Are you sure you want to delete the selected content?"
+  },
+  "系统在部署模型实例时，会根据预定义的标签来选择最符合要求的 Worker。": {
+    "zh-CN": "系统在部署模型实例时，会根据预定义的标签来选择最符合要求的 Worker。",
+    "zh-TW": "系統在部署模型實例時，會根據預定義的標籤來選擇最符合要求的 Worker。",
+    "en-US": "The system will select the most suitable Worker based on predefined labels when deploying model instances."
+  },
+  "允许在单个 Worker 资源不足时，将部分计算卸载到一个或多个远程 Worker。": {
+    "zh-CN": "允许在单个 Worker 资源不足时，将部分计算卸载到一个或多个远程 Worker。",
+    "zh-TW": "允許在單個 Worker 資源不足時，將部分計算卸載到一個或多個遠程 Worker。",
+    "en-US": "Allow partial computation to be offloaded to one or more remote Workers when a single Worker resource is insufficient."
+  },
+  "当发生错误时，将自动尝试恢复": {
+    "zh-CN": "当发生错误时，将自动尝试恢复",
+    "zh-TW": "當發生錯誤時，將自動嘗試恢復",
+    "en-US": "Automatically attempt to recover when an error occurs"
+  },
+  "错误时重启": {
+    "zh-CN": "错误时重启",
+    "zh-TW": "錯誤時重啟",
+    "en-US": "Restart on error"
+  },
+  "启用跨Worker分布式推理": {
+    "zh-CN": "启用跨Worker分布式推理",
+    "zh-TW": "啟用跨Worker分布式推理",
+    "en-US": "Enable cross-Worker distributed inference"
+  },
+  "连通性测试": {
+    "zh-CN": "连通性测试",
+    "zh-TW": "連通性測試",
+    "en-US": "Connectivity Test"
+  },
+  "开启模型对比体验吧": {
+    "zh-CN": "开启模型对比体验吧",
+    "zh-TW": "開啟模型對比體驗吧",
+    "en-US": "Turn on the model comparison experience"
+  },
+  "最多只能选择3个模型进行对比": {
+    "zh-CN": "最多只能选择3个模型进行对比",
+    "zh-TW": "最多只能選擇3個模型進行對比",
+    "en-US": "At most 3 models can be selected for comparison"
+  },
+  "请选择至少一个模型开始体验": {
+    "zh-CN": "请选择至少一个模型开始体验",
+    "zh-TW": "請選擇至少一個模型開始體驗",
+    "en-US": "Please select at least one model to start experience"
+  },
+  "模型体验": {
+    "zh-CN": "模型体验",
+    "zh-TW": "模型體驗",
+    "en-US": "Model Experience"
+  },
+  "模型对比体验": {
+    "zh-CN": "模型对比体验",
+    "zh-TW": "模型對比體驗",
+    "en-US": "Model Comparison Experience"
+  },
+  "可选择文本生成与深度推理模型服务，立即开启体验": {
+    "zh-CN": "可选择文本生成与深度推理模型服务，立即开启体验",
+    "zh-TW": "可選擇文本生成與深度推理模型服務，立即開啟體驗",
+    "en-US": "Select text generation and deep reasoning model services, start experience now"
+  },
+  "可选择VL模型服务，立即开启体验": {
+    "zh-CN": "可选择VL模型服务，立即开启体验",
+    "zh-TW": "可選擇VL模型服務，立即開啟體驗",
+    "en-US": "Select VL model services, start experience now"
+  },
+  "可选择重排模型服务，立即开启体验": {
+    "zh-CN": "可选择重排模型服务，立即开启体验",
+    "zh-TW": "可選擇重排模型服務，立即開啟體驗",
+    "en-US": "Select rerank model services, start experience now"
+  },
+  "可以选择多个模型进行对比，最多可选择3个模型同时对比": {
+    "zh-CN": "可以选择多个模型进行对比，最多可选择3个模型同时对比",
+    "zh-TW": "可以選擇多個模型進行對比，最多可選擇3個模型同時對比",
+    "en-US": "Select multiple models for comparison, up to 3 models can be compared at the same time"
+  },
+  "请输入您的问题，例如：元宇宙是什么": {
+    "zh-CN": "请输入您的问题，例如：元宇宙是什么",
+    "zh-TW": "請輸入您的问题，例如：元宇宙是什么",
+    "en-US": "Please enter your question, e.g. What is the metaverse?"
+  },
+  "请输入待排序分片，多个分片用英文逗号分制，例如：元宇宙是什么东西,元宇宙的元年": {
+    "zh-CN": "请输入待排序分片，多个分片用英文逗号分制，例如：元宇宙是什么东西,元宇宙的元年",
+    "zh-TW": "請輸入待排序分片，多個分片用英文逗號分制，例如：元宇宙是什么东西,元宇宙的元年",
+    "en-US": "Please enter the sorted fragments, separated by commas, e.g. What is the metaverse?,The year of the metaverse"
+  },
+  "请输入问题，将同时发送给所有选中的模型": {
+    "zh-CN": "请输入问题，将同时发送给所有选中的模型",
+    "zh-TW": "請輸入問題，將同時發送給所有選中的模型",
+    "en-US": "Please enter a question, which will be sent to all selected models"
+  },
+  "支持上传JPEG/PNG/BMP/JPG格式的图片，最大不超过10MB": {
+    "zh-CN": "支持上传JPEG/PNG/BMP/JPG格式的图片，最大不超过10MB",
+    "zh-TW": "支持上傳JPEG/PNG/BMP/JPG格式的圖片，最大不超過10MB",
+    "en-US": "Supports uploading JPEG/PNG/BMP/JPG format images, up to 10MB"
+  },
+  "本回答由AI生成，内容仅供参考，请仔细甄别": {
+    "zh-CN": "本回答由AI生成，内容仅供参考，请仔细甄别",
+    "zh-TW": "本回答由AI生成，內容僅供參考，請仔細甄別",
+    "en-US": "This answer is generated by AI. The content is for reference only. Please exercise caution"
+  },
+  "仅支持昇腾910B": {
+    "zh-CN": "仅支持昇腾910B",
+    "zh-TW": "僅支持昇騰910B",
+    "en-US": "Only supports Ascend 910B"
+  },
+  "系统运行时间": {
+    "zh-CN": "系统运行时间",
+    "zh-TW": "系統運行時間",
+    "en-US": "System Uptime"
+  },
+  "week": {
+    "zh-CN": "week",
+    "zh-TW": "week",
+    "en-US": "week"
+  },
+  "CPU核数": {
+    "zh-CN": "CPU核数",
+    "zh-TW": "CPU核數",
+    "en-US": "CPU Cores"
+  },
+  "内存总量": {
+    "zh-CN": "内存总量",
+    "zh-TW": "記憶體總量",
+    "en-US": "Total Memory"
+  },
+  "CPU使用率": {
+    "zh-CN": "CPU使用率",
+    "zh-TW": "CPU使用率",
+    "en-US": "CPU Usage"
+  },
+  "CPU iowait": {
+    "zh-CN": "CPU iowait",
+    "zh-TW": "CPU iowait",
+    "en-US": "CPU iowait"
+  },
+  "内存使用率": {
+    "zh-CN": "内存使用率",
+    "zh-TW": "記憶體使用率",
+    "en-US": "Memory Usage"
+  },
+  "当前打开文件描述符": {
+    "zh-CN": "当前打开文件描述符",
+    "zh-TW": "當前打開文件描述符",
+    "en-US": "Current Open File Descriptors"
+  },
+  "根分区使用率": {
+    "zh-CN": "根分区使用率",
+    "zh-TW": "根分區使用率",
+    "en-US": "Root Partition Usage"
+  },
+  "最大分区(/data)使用率": {
+    "zh-CN": "最大分区(/data)使用率",
+    "zh-TW": "最大分區(/data)使用率",
+    "en-US": "Max Partition (/data) Usage"
+  },
+  "CPU使用率详情": {
+    "zh-CN": "CPU使用率详情",
+    "zh-TW": "CPU使用率詳情",
+    "en-US": "CPU Usage Details"
+  },
+  "CPU使用": {
+    "zh-CN": "CPU使用",
+    "zh-TW": "CPU使用",
+    "en-US": "CPU Usage"
+  },
+  "系统": {
+    "zh-CN": "系统",
+    "zh-TW": "系統",
+    "en-US": "System"
+  },
+  "IO等待": {
+    "zh-CN": "IO等待",
+    "zh-TW": "IO等待",
+    "en-US": "IO Wait"
+  },
+  "空闲": {
+    "zh-CN": "空闲",
+    "zh-TW": "空閒",
+    "en-US": "Idle"
+  },
+  "GPU使用率": {
+    "zh-CN": "GPU使用率",
+    "zh-TW": "GPU使用率",
+    "en-US": "GPU Usage"
+  },
+  "显存使用率": {
+    "zh-CN": "显存使用率",
+    "zh-TW": "顯存使用率",
+    "en-US": "VRAM Usage"
+  },
+  "系统平均负载": {
+    "zh-CN": "系统平均负载",
+    "zh-TW": "系統平均負載",
+    "en-US": "System Average Load"
+  },
+  "内存信息": {
+    "zh-CN": "内存信息",
+    "zh-TW": "記憶體信息",
+    "en-US": "Memory Information"
+  },
+  "已用内存": {
+    "zh-CN": "已用内存",
+    "zh-TW": "已用記憶體",
+    "en-US": "Used Memory"
+  },
+  "当前已用": {
+    "zh-CN": "当前已用",
+    "zh-TW": "當前已用",
+    "en-US": "Currently Used"
+  },
+  "各分区可使用空间": {
+    "zh-CN": "各分区可使用空间",
+    "zh-TW": "各分區可使用空間",
+    "en-US": "Available Space by Partition"
+  },
+  "文件系统": {
+    "zh-CN": "文件系统",
+    "zh-TW": "文件系統",
+    "en-US": "File System"
+  },
+  "分区": {
+    "zh-CN": "分区",
+    "zh-TW": "分區",
+    "en-US": "Partition"
+  },
+  "总空间": {
+    "zh-CN": "总空间",
+    "zh-TW": "總空間",
+    "en-US": "Total Space"
+  },
+  "使用率": {
+    "zh-CN": "使用率",
+    "zh-TW": "使用率",
+    "en-US": "Usage"
+  },
+  "磁盘读写速率": {
+    "zh-CN": "磁盘读写速率",
+    "zh-TW": "磁盤讀寫速率",
+    "en-US": "Disk Read/Write Rate"
+  },
+  "磁盘读写容量": {
+    "zh-CN": "磁盘读写容量",
+    "zh-TW": "磁盤讀寫容量",
+    "en-US": "Disk Read/Write Capacity"
+  },
+  "磁盘IO读写时间": {
+    "zh-CN": "磁盘IO读写时间",
+    "zh-TW": "磁盤IO讀寫時間",
+    "en-US": "Disk IO Read/Write Time"
+  },
+  "TCP连接情况": {
+    "zh-CN": "TCP连接情况",
+    "zh-TW": "TCP連接情況",
+    "en-US": "TCP Connection Status"
+  },
+  "网络流量": {
+    "zh-CN": "网络流量",
+    "zh-TW": "網絡流量",
+    "en-US": "Network Traffic"
+  },
+  "in下载": {
+    "zh-CN": "in下载",
+    "zh-TW": "in下載",
+    "en-US": "Download"
+  },
+  "out上传": {
+    "zh-CN": "out上传",
+    "zh-TW": "out上傳",
+    "en-US": "Upload"
+  },
+  "更换模型": {
+    "zh-CN": "更换模型",
+    "zh-TW": "更換模型",
+    "en-US": "Change Model"
+  },
+  "没有可用的模型": {
+    "zh-CN": "没有可用的模型",
+    "zh-TW": "沒有可用的模型",
+    "en-US": "No available models"
+  },
+  "此选项可选，可设置JSON格式的推理参数，自动合并到原始请求中；如果原始请求中存在相同参数，按此处设置的值生效。样例：": {
+    "zh-CN": "此选项可选，可设置JSON格式的推理参数，自动合并到原始请求中；如果原始请求中存在相同参数，按此处设置的值生效。样例：",
+    "zh-TW": "此項可選，可設置JSON格式的推理參數，自動合併到原始請求中；如果原始請求中存在相同參數，按此處設置的值生效。樣例：",
+    "en-US": "This is optional and can set JSON format inference parameters, which will be automatically merged into the original request. If the original request has the same parameter, the value set here will take effect. Example: "
+  },
+  "推理参数": {
+    "zh-CN": "推理参数",
+    "zh-TW": "推理參數",
+    "en-US": "Inference Parameters"
+  },
+  "模型状态": {
+    "zh-CN": "模型状态",
+    "zh-TW": "模型狀態",
+    "en-US": "Model Status"
+  },
+  "其他配置 ": {
+    "zh-CN": "其他配置",
+    "zh-TW": "其他配置",
+    "en-US": "Other Configuration"
+  },
+  "WebHook": {
+    "zh-CN": "WebHook",
+    "zh-TW": "WebHook",
+    "en-US": "WebHook"
+  },
+  "数据安全级别": {
+    "zh-CN": "数据安全级别",
+    "zh-TW": "數據安全級別",
+    "en-US": "Data Security Level"
+  },
+  "请选择渠道密级": {
+    "zh-CN": "请选择渠道密级",
+    "zh-TW": "請選擇渠道密級",
+    "en-US": "Please select channel confidentiality level"
+  },
+  "选择该渠道可以访问的数据安全级别": {
+    "zh-CN": "选择该渠道可以访问的数据安全级别",
+    "zh-TW": "選擇該渠道可以訪問的數據安全級別",
+    "en-US": "Select the data security level that this channel can access"
+  },
+  "密级": {
+    "zh-CN": "密级",
+    "zh-TW": "密級",
+    "en-US": "Security Level"
+  },
+  "请选择密级": {
+    "zh-CN": "请选择密级",
+    "zh-TW": "請選擇密級",
+    "en-US": "Please select security level"
+  },
+  "人员权限与数据密级的关系，可根据不同的项目需求初始化不同的数据": {
+    "zh-CN": "人员权限与数据密级的关系，可根据不同的项目需求初始化不同的数据",
+    "zh-TW": "人員權限與數據密級的關係，可根據不同的項目需求初始化不同的數據",
+    "en-US": "The relationship between user permissions and data security levels, which can be initialized according to different project requirements"
+  },
+  "模型密级": {
+    "zh-CN": "模型密级",
+    "zh-TW": "模型密級",
+    "en-US": "Model Security Level"
+  },
+  "请选择模型密级": {
+    "zh-CN": "请选择模型密级",
+    "zh-TW": "請選擇模型密級",
+    "en-US": "Please select model security level"
+  },
+  "密钥密级": {
+    "zh-CN": "密钥密级",
+    "zh-TW": "密鍵密級",
+    "en-US": "Secret Key Security Level"
+  },
+  "请选择密钥密级": {
+    "zh-CN": "请选择密钥密级",
+    "zh-TW": "請選擇密鍵密級",
+    "en-US": "Please select secret key security level"
+  },
+  "租户ID": {
+    "zh-CN": "租户ID",
+    "zh-TW": "租戶ID",
+    "en-US": "Tenant ID"
+  },
+  "请输入租户ID": {
+    "zh-CN": "请输入租户ID",
+    "zh-TW": "請輸入租戶ID",
+    "en-US": "Enter Tenant ID"
+  },
+  "所选模型中包含正在被使用中的模型，无法删除": {
+    "zh-CN": "所选模型中包含正在被使用中的模型，无法删除",
+    "zh-TW": "所選模型中包含正在被使用中的模型，無法刪除",
+    "en-US": "The selected models contain models that are being used, cannot be deleted"
+  },
+  "该模型正在被使用中，无法删除": {
+    "zh-CN": "该模型正在被使用中，无法删除",
+    "zh-TW": "該模型正在被使用中，無法刪除",
+    "en-US": "The model is being used, cannot be deleted"
+  },
+  "VL模型": {
+    "zh-CN": "VL模型",
+    "zh-TW": "VL模型",
+    "en-US": "VL Model"
+  },
+  "重排模型": {
+    "zh-CN": "重排模型",
+    "zh-TW": "重排模型",
+    "en-US": "Rearrangement Model"
+  },
+  "日志": {
+    "zh-CN": "日志",
+    "zh-TW": "日志",
+    "en-US": "Logs"
+  },
+  "我的模型": {
+    "zh-CN": "我的模型",
+    "zh-TW": "我的模型",
+    "en-US": "My Models"
+  },
+  "模型部署": {
+    "zh-CN": "模型部署",
+    "zh-TW": "模型部署",
+    "en-US": "Model Deployment"
+  },
+  "监控中心": {
+    "zh-CN": "监控中心",
+    "zh-TW": "监控中心",
+    "en-US": "Monitoring Center"
+  },
+  "告警": {
+    "zh-CN": "告警",
+    "zh-TW": "告警",
+    "en-US": "Alarm"
+  },
+  "系统配置": {
+    "zh-CN": "系统配置",
+    "zh-TW": "系统配置",
+    "en-US": "System Configuration"
+  },
+  "公开": {
+    "zh-CN": "公开",
+    "zh-TW": "公開",
+    "en-US": "Public"
+  },
+  "受控": {
+    "zh-CN": "受控",
+    "zh-TW": "受控",
+    "en-US": "Acceptance"
+  },
+  "普通商密": {
+    "zh-CN": "普通商密",
+    "zh-TW": "普通商密",
+    "en-US": "General Password"
+  },
+  "核心商密": {
+    "zh-CN": "核心商密",
+    "zh-TW": "核心商密",
+    "en-US": "Core Business"
+  },
+  "内部": {
+    "zh-CN": "内部",
+    "zh-TW": "內部",
+    "en-US": "Internal"
+  },
+  "秘密": {
+    "zh-CN": "秘密",
+    "zh-TW": "秘密",
+    "en-US": "Secret"
+  },
+  "机密": {
+    "zh-CN": "机密",
+    "zh-TW": "機密",
+    "en-US": "Confidential"
+  },
+  "插件管理": {
+    "zh-CN": "插件管理",
+    "zh-TW": "插件管理",
+    "en-US": "Plugin Management"
+  },
+  "新增插件": {
+    "zh-CN": "新增插件",
+    "zh-TW": "新增插件",
+    "en-US": "Add Plugin"
+  },
+  "编辑插件": {
+    "zh-CN": "编辑插件",
+    "zh-TW": "编辑插件",
+    "en-US": "Edit Plugin"
+  },
+  "删除插件": {
+    "zh-CN": "删除插件",
+    "zh-TW": "删除插件",
+    "en-US": "Delete Plugin"
+  },
+  "插件名称": {
+    "zh-CN": "插件名称",
+    "zh-TW": "插件名称",
+    "en-US": "Plugin Name"
+  },
+  "说明": {
+    "zh-CN": "说明",
+    "zh-TW": "说明",
+    "en-US": "Description"
+  },
+  "请输入插件名称": {
+    "zh-CN": "请输入插件名称",
+    "zh-TW": "請輸入插件名称",
+    "en-US": "Enter Plugin Name"
+  },
+  "请上传文件": {
+    "zh-CN": "请上传文件",
+    "zh-TW": "請上傳文件",
+    "en-US": "Please Upload File"
+  },
+  "验证失败": {
+    "zh-CN": "验证失败",
+    "zh-TW": "驗證失敗",
+    "en-US": "Validation Failed"
+  },
+  "更新成功": {
+    "zh-CN": "更新成功",
+    "zh-TW": "更新成功",
+    "en-US": "Updated Successfully"
+  },
+  "上传文件": {
+    "zh-CN": "上传文件",
+    "zh-TW": "上傳文件",
+    "en-US": "Upload File"
+  },
+  "选择文件": {
+    "zh-CN": "选择文件",
+    "zh-TW": "選擇文件",
+    "en-US": "Select File"
+  },
+  "下载开发文档": {
+    "zh-CN": "下载开发文档",
+    "zh-TW": "下載開發文檔",
+    "en-US": "Download Development Documentation"
+  },
+  "请输入说明": {
+    "zh-CN": "请输入说明",
+    "zh-TW": "請輸入說明",
+    "en-US": "Please Enter Description"
+  },
+  "不超过150字": {
+    "zh-CN": "不超过150字",
+    "zh-TW": "不超過150字",
+    "en-US": "Less than 150 characters"
+  },
+  "请输入Webhook名称": {
+    "zh-CN": "请输入Webhook名称",
+    "zh-TW": "請輸入Webhook名称",
+    "en-US": "Enter Webhook Name"
+  },
+  "请输入Webhook地址": {
+    "zh-CN": "请输入Webhook地址",
+    "zh-TW": "請輸入Webhook地址",
+    "en-US": "Enter Webhook Address"
+  },
+  "请选择Webhook类型": {
+    "zh-CN": "请选择Webhook类型",
+    "zh-TW": "請選擇Webhook類型",
+    "en-US": "Select Webhook Type"
+  },
+  "请选择加密方式": {
+    "zh-CN": "请选择加密方式",
+    "zh-TW": "請選擇加密方式",
+    "en-US": "Select Encryption Method"
+  },
+  "请输入密文": {
+    "zh-CN": "请输入密文",
+    "zh-TW": "請輸入密文",
+    "en-US": "Enter Secret"
+  },
+  "不能超过150字": {
+    "zh-CN": "不能超过150字",
+    "zh-TW": "不能超過150字",
+    "en-US": "Less than 150 characters"
+  },
+  "不能超过150个字符": {
+    "zh-CN": "不能超过150个字符",
+    "zh-TW": "不能超過150個字符",
+    "en-US": "Less than 150 characters"
+  },
+  "主机": {
+    "zh-CN": "主机",
+    "zh-TW": "主機",
+    "en-US": "Host"
+  },
+  "显卡使用率": {
+    "zh-CN": "显卡使用率",
+    "zh-TW": "顯卡使用率",
+    "en-US": "GPU Usage Rate"
+  },
+  "已用": {
+    "zh-CN": "已用",
+    "zh-TW": "已用",
+    "en-US": "Used"
+  },
+  "总量": {
+    "zh-CN": "总量",
+    "zh-TW": "總量",
+    "en-US": "Total"
+  },
+  "当前使用率": {
+    "zh-CN": "当前使用率",
+    "zh-TW": "當前使用率",
+    "en-US": "Current Usage Rate"
+  },
+  "确定要删除 {name} 吗？": {
+    "zh-CN": "确定要删除 {name} 吗？",
+    "zh-TW": "確定要刪除 {name} 嗎？",
+    "en-US": "Are you sure to delete {name}?"
+  },
+  "显卡利用率": {
+    "zh-CN": "显卡利用率",
+    "zh-TW": "顯卡利用率",
+    "en-US": "GPU Utilization Rate"
+  },
+  "模型文件": {
+    "zh-CN": "模型文件",
+    "zh-TW": "模型文件",
+    "en-US": "Model File"
+  },
+  "显卡": {
+    "zh-CN": "显卡",
+    "zh-TW": "顯卡",
+    "en-US": "GPU"
+  },
+  "算力资源": {
+    "zh-CN": "算力资源",
+    "zh-TW": "算力資源",
+    "en-US": "Computing Power Resource"
+  },
+  "模型请求": {
+    "zh-CN": "模型请求",
+    "zh-TW": "模型請求",
+    "en-US": "Model Request"
+  },
+  "系统设置": {
+    "zh-CN": "系统设置",
+    "zh-TW": "系統設置",
+    "en-US": "System Settings"
+  },
+  "新建Webhook": {
+    "zh-CN": "新建Webhook",
+    "zh-TW": "新建Webhook",
+    "en-US": "New Webhook"
+  },
+  "编辑Webhook": {
+    "zh-CN": "编辑Webhook",
+    "zh-TW": "編輯Webhook",
+    "en-US": "Edit Webhook"
+  },
+  "删除Webhook": {
+    "zh-CN": "删除Webhook",
+    "zh-TW": "刪除Webhook",
+    "en-US": "Delete Webhook"
+  },
+  "测试Webhook": {
+    "zh-CN": "测试Webhook",
+    "zh-TW": "測試Webhook",
+    "en-US": "Test Webhook"
+  },
+  "测试失败": {
+    "zh-CN": "测试失败",
+    "zh-TW": "測試失敗",
+    "en-US": "Test Failed"
+  },
+  "获取Webhook详情失败": {
+    "zh-CN": "获取Webhook详情失败",
+    "zh-TW": "獲取Webhook詳情失敗",
+    "en-US": "Failed to get Webhook details"
+  },
+  "编辑失败": {
+    "zh-CN": "编辑失败",
+    "zh-TW": "編輯失敗",
+    "en-US": "Edit Failed"
+  },
+  "创建失败": {
+    "zh-CN": "创建失败",
+    "zh-TW": "創建失敗",
+    "en-US": "Create Failed"
+  },
+  "获取密级管理状态失败": {
+    "zh-CN": "获取密级管理状态失败",
+    "zh-TW": "獲取密級管理狀態失敗",
+    "en-US": "Failed to get security level status"
+  },
+  "设置更新成功": {
+    "zh-CN": "设置更新成功",
+    "zh-TW": "設置更新成功",
+    "en-US": "Update Success"
+  },
+  "设置更新失败": {
+    "zh-CN": "设置更新失败",
+    "zh-TW": "設置更新失敗",
+    "en-US": "Update Failed"
+  },
+  "开启后，秘钥、渠道、模型数据实体会支持密级控制。在创建、使用实体时会校验人员权限。": {
+    "zh-CN": "开启后，秘钥、渠道、模型数据实体会支持密级控制。在创建、使用实体时会校验人员权限。",
+    "zh-TW": "開啟後，秘鑰、渠道、模型數據實體會支持密級控制。在創建、使用實體時會校驗人員權限。",
+    "en-US": "After enabling, the secret key, channel, and model data entity will support confidentiality control. When creating and using entities, the personnel permission will be verified."
+  },
+  "密级管理": {
+    "zh-CN": "密级管理",
+    "zh-TW": "密級管理",
+    "en-US": "Security Level Management"
+  },
+  "开启": {
+    "zh-CN": "开启",
+    "zh-TW": "開啟",
+    "en-US": "Enable"
+  },
+  "关闭": {
+    "zh-CN": "关闭",
+    "zh-TW": "關閉",
+    "en-US": "Disable"
+  },
+  "Webhook名称": {
+    "zh-CN": "Webhook名称",
+    "zh-TW": "Webhook名称",
+    "en-US": "Webhook Name"
+  },
+  "Webhook地址": {
+    "zh-CN": "Webhook地址",
+    "zh-TW": "Webhook地址",
+    "en-US": "Webhook Address"
+  },
+  "Webhook类型": {
+    "zh-CN": "Webhook类型",
+    "zh-TW": "Webhook类型",
+    "en-US": "Webhook Type"
+  },
+  "加密方式": {
+    "zh-CN": "加密方式",
+    "zh-TW": "加密方式",
+    "en-US": "Encryption Method"
+  },
+  "密文": {
+    "zh-CN": "密文",
+    "zh-TW": "密文",
+    "en-US": "Secret"
+  },
+  "备注": {
+    "zh-CN": "备注",
+    "zh-TW": "备注",
+    "en-US": "Description"
+  },
+  "确认": {
+    "zh-CN": "确认",
+    "zh-TW": "確認",
+    "en-US": "Confirm"
+  },
+  "删除失败": {
+    "zh-CN": "删除失败",
+    "zh-TW": "刪除失敗",
+    "en-US": "Delete Failed"
+  },
+  "企业代码": {
+    "zh-CN": "企业代码",
+    "zh-TW": "企業代碼",
+    "en-US": "Company Code"
+  },
+  "请输入企业代码": {
+    "zh-CN": "请输入企业代码",
+    "zh-TW": "請輸入企業代碼",
+    "en-US": "Enter Company Code"
+  },
+  "不能超过20个字符": {
+    "zh-CN": "不能超过20个字符",
+    "zh-TW": "不能超過20個字符",
+    "en-US": "Less than 20 characters"
+  },
+  "只允许包含中文、字母、数字和下划线": {
+    "zh-CN": "只允许包含中文、字母、数字和下划线",
+    "zh-TW": "只允許包含中文、字母、數字和下劃線",
+    "en-US": "Only allow Chinese, letters, numbers and underscores"
+  },
+  "请输入有效的URL地址": {
+    "zh-CN": "请输入有效的URL地址",
+    "zh-TW": "請輸入有效的URL地址",
+    "en-US": "Enter a valid URL address"
+  },
+  "模型服务": {
+    "zh-CN": "模型服务",
+    "zh-TW": "模型服務",
+    "en-US": "Model Service"
+  },
+  "模型运维": {
+    "zh-CN": "模型运维",
+    "zh-TW": "模型運維",
+    "en-US": "Model Operation"
+  },
+  "监控告警": {
+    "zh-CN": "监控告警",
+    "zh-TW": "監控告警",
+    "en-US": "Monitoring and Alerting"
+  },
+  "对外服务": {
+    "zh-CN": "对外服务",
+    "zh-TW": "對外服務",
+    "en-US": "External Service"
+  },
+  "API访问信息": {
+    "zh-CN": "API访问信息",
+    "zh-TW": "API訪問信息",
+    "en-US": "API Access Information"
+  },
+  "高级配置": {
+    "zh-CN": "高级配置",
+    "zh-TW": "高級配置",
+    "en-US": "Advanced Configuration"
+  },
+  "部分卸载提示": {
+    "zh-CN": "部分卸载提示",
+    "zh-TW": "部分卸载提示",
+    "en-US": "Partial Offloading Hint"
+  },
+  "启用部分卸载": {
+    "zh-CN": "启用部分卸载",
+    "zh-TW": "啟用部分卸載",
+    "en-US": "Enable Partial Offloading"
+  },
+  "查看 {backend} 参数说明": {
+    "zh-CN": "查看 {backend} 参数说明",
+    "zh-TW": "查看 {backend} 參數說明",
+    "en-US": "View {backend} Parameter Description"
+  },
+  "点击这里": {
+    "zh-CN": "点击这里",
+    "zh-TW": "點擊這裡",
+    "en-US": "Click Here"
+  },
+  "环境变量": {
+    "zh-CN": "环境变量",
+    "zh-TW": "環境變量",
+    "en-US": "Environment Variable"
+  },
+  "添加变量": {
+    "zh-CN": "添加变量",
+    "zh-TW": "添加變量",
+    "en-US": "Add Variable"
+  },
+  "添加参数": {
+    "zh-CN": "添加参数",
+    "zh-TW": "添加參數",
+    "en-US": "Add Parameter"
+  },
+  "后端版本": {
+    "zh-CN": "后端版本",
+    "zh-TW": "後端版本",
+    "en-US": "Backend Version"
+  },
+  "后端版本 {backend}": {
+    "zh-CN": "后端版本 {backend}",
+    "zh-TW": "後端版本 {backend}",
+    "en-US": "Backend Version {backend}"
+  },
+  "后端参数": {
+    "zh-CN": "后端参数",
+    "zh-TW": "後端參數",
+    "en-US": "Backend Parameter"
+  },
+  "后端参数 {backend}": {
+    "zh-CN": "后端参数 {backend}",
+    "zh-TW": "後端參數 {backend}",
+    "en-US": "Backend Parameter {backend}"
+  },
+  "发布版本": {
+    "zh-CN": "发布版本",
+    "zh-TW": "發布版本",
+    "en-US": "Release Version"
+  },
+  "调度类型": {
+    "zh-CN": "调度类型",
+    "zh-TW": "調度類型",
+    "en-US": "Scheduling Type"
+  },
+  "放置策略": {
+    "zh-CN": "放置策略",
+    "zh-TW": "放置策略",
+    "en-US": "Placement Strategy"
+  },
+  "GPU选择器": {
+    "zh-CN": "GPU选择器",
+    "zh-TW": "GPU選擇器",
+    "en-US": "GPU Selector"
+  },
+  "Worker选择器": {
+    "zh-CN": "Worker选择器",
+    "zh-TW": "Worker選擇器",
+    "en-US": "Worker Selector"
+  },
+  "请输入选择器值": {
+    "zh-CN": "请输入选择器值",
+    "zh-TW": "請輸入選擇器值",
+    "en-US": "Enter Selector Value"
+  },
+  "导入": {
+    "zh-CN": "导入",
+    "zh-TW": "導入",
+    "en-US": "Import"
+  },
+  "下载模版": {
+    "zh-CN": "下载模版",
+    "zh-TW": "下載模版",
+    "en-US": "Download Template"
+  },
+  "点击或拖拽文件到此区域上传": {
+    "zh-CN": "点击或拖拽文件到此区域上传",
+    "zh-TW": "點擊或拖拽文件到此區域上傳",
+    "en-US": "Click or Drag File to This Area Upload"
+  },
+  "支持 .xls, .xlsx 格式的文件": {
+    "zh-CN": "支持 .xls, .xlsx 格式的文件",
+    "zh-TW": "支持 .xls, .xlsx 格式的文件",
+    "en-US": "Support .xls, .xlsx format files"
+  },
+  "批量导入敏感词": {
+    "zh-CN": "批量导入敏感词",
+    "zh-TW": "批量導入敏感詞",
+    "en-US": "Batch Import Sensitive Words"
+  },
+  "限流条件(超出任一数值时触发限流)：每分钟调用次数（QPM）和每分钟消耗Token数（TPM）": {
+    "zh-CN": "限流条件(超出任一数值时触发限流)：每分钟调用次数（QPM）和每分钟消耗Token数（TPM）",
+    "zh-TW": "限流條件(超出任一數值時觸發限流)：每分鐘調用次數（QPM）和每分鐘消耗Token數（TPM）",
+    "en-US": "Flow control condition (when either value is exceeded, flow control is triggered): QPM (calls per minute) and TPM (tokens per minute)"
+  },
+  "插件": {
+    "zh-CN": "插件",
+    "zh-TW": "插件",
+    "en-US": "Plugin"
+  },
+  "请选择插件": {
+    "zh-CN": "请选择插件",
+    "zh-TW": "請選擇插件",
+    "en-US": "Select Plugin"
+  },
+  "敏感词分类": {
+    "zh-CN": "敏感词分类",
+    "zh-TW": "敏感詞分類",
+    "en-US": "Sensitive Word Category"
+  },
+  "请选择输入审核策略": {
+    "zh-CN": "请选择输入审核策略",
+    "zh-TW": "請選擇輸入審核策略",
+    "en-US": "Select Input Security Policy"
+  },
+  "请选择输出审核策略": {
+    "zh-CN": "请选择输出审核策略",
+    "zh-TW": "請選擇輸出審核策略",
+    "en-US": "Select Output Security Policy"
+  },
+  "输入审核策略": {
+    "zh-CN": "输入审核策略",
+    "zh-TW": "輸入審核策略",
+    "en-US": "Input Security Policy"
+  },
+  "输出审核策略": {
+    "zh-CN": "输出审核策略",
+    "zh-TW": "輸出審核策略",
+    "en-US": "Output Security Policy"
+  },
+  "敏感输入": {
+    "zh-CN": "敏感输入",
+    "zh-TW": "敏感輸入",
+    "en-US": "Sensitive Input"
+  },
+  "敏感输出": {
+    "zh-CN": "敏感输出",
+    "zh-TW": "敏感輸出",
+    "en-US": "Sensitive Output"
+  },
+  "最近活跃时间": {
+    "zh-CN": "最近活跃时间",
+    "zh-TW": "最近活躍時間",
+    "en-US": "Last Active Time"
+  },
+  "可选择语音模型服务，立即开启体验": {
+    "zh-CN": "可选择语音模型服务，立即开启体验",
+    "zh-TW": "可選擇語音模型服務，立即開啟體驗",
+    "en-US": "Select Speech Model Service, Start Experience Now"
+  },
+  "API设置": {
+    "zh-CN": "API设置",
+    "zh-TW": "API設置",
+    "en-US": "API Settings"
+  },
+  "API Logo": {
+    "zh-CN": "API Logo",
+    "zh-TW": "API Logo",
+    "en-US": "API Logo"
+  },
+  "API名称": {
+    "zh-CN": "API名称",
+    "zh-TW": "API名称",
+    "en-US": "API Name"
+  },
+  "请输入API名称": {
+    "zh-CN": "请输入API名称",
+    "zh-TW": "請輸入API名称",
+    "en-US": "Enter API Name"
+  },
+  "调用价格": {
+    "zh-CN": "调用价格",
+    "zh-TW": "调用价格",
+    "en-US": "Call Price"
+  },
+  "请输入调用价格": {
+    "zh-CN": "请输入调用价格",
+    "zh-TW": "請輸入调用价格",
+    "en-US": "Enter Call Price"
+  },
+  "/万次": {
+    "zh-CN": "/万次",
+    "zh-TW": "/万次",
+    "en-US": "/万次"
+  },
+  "保存失败": {
+    "zh-CN": "保存失败",
+    "zh-TW": "保存失败",
+    "en-US": "Save Failed"
+  },
+  "API广场": {
+    "zh-CN": "API广场",
+    "zh-TW": "API廣場",
+    "en-US": "API Marketplace"
+  },
+  "API筛选": {
+    "zh-CN": "API筛选",
+    "zh-TW": "API篩選",
+    "en-US": "API Filters"
+  },
+  "API权限": {
+    "zh-CN": "API权限",
+    "zh-TW": "API權限",
+    "en-US": "API Permissions"
+  },
+  "API": {
+    "zh-CN": "API",
+    "zh-TW": "API",
+    "en-US": "APIs"
+  },
+  "企业统一API门户，让API安全可靠的被使用，驱动AI赋能": {
+    "zh-CN": "企业统一API门户，让API安全可靠的被使用，驱动AI赋能",
+    "zh-TW": "企業統一API門戶，讓API安全可靠地被使用，驅動AI賦能",
+    "en-US": "A unified enterprise API portal for safe, reliable API usage."
+  },
+  "账号可用API": {
+    "zh-CN": "账号可用API",
+    "zh-TW": "账号可用API",
+    "en-US": "Available APIs"
+  },
+  "您当前没有可用API": {
+    "zh-CN": "您当前没有可用API",
+    "zh-TW": "您当前没有可用API",
+    "en-US": "You currently have no available APIs"
+  },
+  "资源权限": {
+    "zh-CN": "资源权限",
+    "zh-TW": "资源权限",
+    "en-US": "Resource permissions"
+  },
+  "申请资源": {
+    "zh-CN": "申请资源",
+    "zh-TW": "申请资源",
+    "en-US": "Apply for resources"
+  },
+  "申请API": {
+    "zh-CN": "申请API",
+    "zh-TW": "申请API",
+    "en-US": "Apply for API"
+  },
+  "请选择API": {
+    "zh-CN": "请选择API",
+    "zh-TW": "请选择API",
+    "en-US": "Select API"
+  },
+  "选择API": {
+    "zh-CN": "选择API",
+    "zh-TW": "選擇API",
+    "en-US": "Select APIs"
+  },
+  "API配置": {
+    "zh-CN": "API配置",
+    "zh-TW": "API配置",
+    "en-US": "API Config"
+  },
+  "模型配置": {
+    "zh-CN": "模型配置",
+    "zh-TW": "模型配置",
+    "en-US": "Model Config"
+  },
+  "待添加API": {
+    "zh-CN": "待添加API",
+    "zh-TW": "待添加API",
+    "en-US": "Available APIs"
+  },
+  "已添加API": {
+    "zh-CN": "已添加API",
+    "zh-TW": "已添加API",
+    "en-US": "Selected APIs"
+  },
+  "请至少申请一个资源": {
+    "zh-CN": "请至少申请一个资源",
+    "zh-TW": "请至少申请一个资源",
+    "en-US": "Please apply at least one resource"
+  },
+  "API地址": {
+    "zh-CN": "API地址",
+    "zh-TW": "API地址",
+    "en-US": "API Address"
+  },
+  "资源": {
+    "zh-CN": "资源",
+    "zh-TW": "資源",
+    "en-US": "Resources"
+  },
+  "属性名称": {
+    "zh-CN": "属性名称",
+    "zh-TW": "屬性名稱",
+    "en-US": "Attribute Name"
+  },
+  "输入方式": {
+    "zh-CN": "输入方式",
+    "zh-TW": "輸入方式",
+    "en-US": "Input Type"
+  },
+  "属性描述": {
+    "zh-CN": "属性描述",
+    "zh-TW": "屬性描述",
+    "en-US": "Description"
+  },
+  "新增属性": {
+    "zh-CN": "新增属性",
+    "zh-TW": "新增屬性",
+    "en-US": "Add Attribute"
+  },
+  "请输入属性名称": {
+    "zh-CN": "请输入属性名称",
+    "zh-TW": "請輸入屬性名稱",
+    "en-US": "Please enter attribute name"
+  },
+  "确认删除该属性？": {
+    "zh-CN": "确认删除该属性？",
+    "zh-TW": "確認刪除該屬性？",
+    "en-US": "Confirm to delete this attribute?"
+  },
+  "下拉框": {
+    "zh-CN": "下拉框",
+    "zh-TW": "下拉框",
+    "en-US": "Dropdown"
+  },
+  "输入限制": {
+    "zh-CN": "输入限制",
+    "zh-TW": "輸入限制",
+    "en-US": "Input Constraints"
+  },
+  "是否必填": {
+    "zh-CN": "是否必填",
+    "zh-TW": "是否必填",
+    "en-US": "Required"
+  },
+  "是否多选": {
+    "zh-CN": "是否多选",
+    "zh-TW": "是否多選",
+    "en-US": "Multiple"
+  },
+  "选项值": {
+    "zh-CN": "选项值",
+    "zh-TW": "選項值",
+    "en-US": "Options"
+  },
+  "排序": {
+    "zh-CN": "排序",
+    "zh-TW": "排序",
+    "en-US": "Order"
+  },
+  "添加": {
+    "zh-CN": "添加",
+    "zh-TW": "添加",
+    "en-US": "Add"
+  },
+  "是": {
+    "zh-CN": "是",
+    "zh-TW": "是",
+    "en-US": "Yes"
+  },
+  "否": {
+    "zh-CN": "否",
+    "zh-TW": "否",
+    "en-US": "No"
+  },
+  "请选择输入方式": {
+    "zh-CN": "请选择输入方式",
+    "zh-TW": "請選擇輸入方式",
+    "en-US": "Please select input type"
+  },
+  "请输入属性描述": {
+    "zh-CN": "请输入属性描述",
+    "zh-TW": "請輸入屬性描述",
+    "en-US": "Please enter description"
+  },
+  "请选择属性值": {
+    "zh-CN": "请选择属性值",
+    "zh-TW": "請選擇屬性值",
+    "en-US": "Please select attribute value"
+  },
+  "新增属性成功": {
+    "zh-CN": "新增属性成功",
+    "zh-TW": "新增屬性成功",
+    "en-US": "Add attribute successfully"
+  },
+  "编辑属性成功": {
+    "zh-CN": "编辑属性成功",
+    "zh-TW": "編輯屬性成功",
+    "en-US": "Edit attribute successfully"
+  },
+  "编辑属性": {
+    "zh-CN": "编辑属性",
+    "zh-TW": "編輯屬性",
+    "en-US": "Edit attribute"
+  },
+  "删除属性也会一并删除使用对象已录入的属性数据，请确认是否删除": {
+    "zh-CN": "删除属性也会一并删除使用对象已录入的属性数据，请确认是否删除",
+    "zh-TW": "刪除屬性也會一併刪除使用對象已錄入的屬性數據，請確認是否刪除",
+    "en-US": "Deleting the attribute will also delete the data entered by the object, please confirm whether to delete"
+  },
+  "属性管理": {
+    "zh-CN": "属性管理",
+    "zh-TW": "屬性管理",
+    "en-US": "Attribute Management"
+  },
+  "模型价格": {
+    "zh-CN": "模型价格",
+    "zh-TW": "模型價格",
+    "en-US": "Model Pricing"
+  },
+  "实时语音识别价格(￥/秒)": {
+    "zh-CN": "实时语音识别价格(￥/秒)",
+    "zh-TW": "實時語音識別價格(￥/秒)",
+    "en-US": "Real-time Speech Recognition Price(￥/second)"
+  },
+  "语音时长(S)": {
+    "zh-CN": "语音时长(S)",
+    "zh-TW": "語音時長(S)",
+    "en-US": "Speech Duration(S)"
+  },
+  "语音时长": {
+    "zh-CN": "语音时长",
+    "zh-TW": "語音時長",
+    "en-US": "Speech Duration"
+  },
+  "可选择实时语音识别模型服务，立即开启体验": {
+    "zh-CN": "可选择实时语音识别模型服务，立即开启体验",
+    "zh-TW": "可選擇實時語音識別模型服務，立即開啟體驗",
+    "en-US": "Select Real-time Speech Recognition Model Service, Start Experience Now"
+  },
+  "实时语音识别暂不支持模型对比，仅支持单模型体验": {
+    "zh-CN": "实时语音识别暂不支持模型对比，仅支持单模型体验",
+    "zh-TW": "實時語音識別暫不支持模型對比，僅支持單模型體驗",
+    "en-US": "Real-time speech recognition does not support model comparison, only supports single model experience"
+  },
+  "接口文档": {
+    "zh-CN": "接口文档",
+    "zh-TW": "接口文檔",
+    "en-US": "API Document"
+  },
+  "API请求": {
+    "zh-CN": "API请求",
+    "zh-TW": "API請求",
+    "en-US": "API Requests"
+  },
+  "模型请求数": {
+    "zh-CN": "模型请求数",
+    "zh-TW": "模型請求數",
+    "en-US": "Model Requests"
+  },
+  "API请求数": {
+    "zh-CN": "API请求数",
+    "zh-TW": "API請求數",
+    "en-US": "API Requests"
+  },
+  "请输入实时语音识别价格": {
+    "zh-CN": "请输入实时语音识别价格",
+    "zh-TW": "請輸入實時語音識別價格",
+    "en-US": "Enter Real-time Speech Recognition Price"
+  },
+  "可用API": {
+    "zh-CN": "可用API",
+    "zh-TW": "可用API",
+    "en-US": "Available APIs"
+  },
+  "API数": {
+    "zh-CN": "API数",
+    "zh-TW": "API數",
+    "en-US": "API Count"
+  },
+  "查看实例": {
+    "zh-CN": "查看实例",
+    "zh-TW": "查看实例",
+    "en-US": "View Instance"
+  },
+  "返回渠道列表": {
+    "zh-CN": "返回渠道列表",
+    "zh-TW": "返回渠道列表",
+    "en-US": "Return Channel List"
+  },
+  "实例数": {
+    "zh-CN": "实例数",
+    "zh-TW": "实例数",
+    "en-US": "Instance Count"
+  },
+  "实例列表": {
+    "zh-CN": "实例列表",
+    "zh-TW": "实例列表",
+    "en-US": "Instance List"
+  },
+  "安全策略审核": {
+    "zh-CN": "安全策略审核",
+    "zh-TW": "安全策略審核",
+    "en-US": "Security Policy Audit"
+  }
+}

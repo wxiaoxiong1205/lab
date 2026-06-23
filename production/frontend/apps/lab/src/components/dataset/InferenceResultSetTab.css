@@ -1,0 +1,409 @@
+.inference-result-set-container {
+  height: calc(100% - 21px);
+  min-height: 830px;
+  margin: 0 10px 21px 0;
+  overflow: hidden;
+  padding: 20px 20px 16px !important;
+  background-color: rgba(255, 255, 255, 1.0);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(24, 24, 25, 0.06);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.inference-result-set-container > .flex.justify-between.items-center {
+  height: 28px;
+}
+
+.inference-result-set-container .ant-typography.m-0 {
+  width: 100px;
+  height: 28px;
+  margin: 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+  white-space: nowrap;
+}
+
+.inference-result-set-container > .mb-4 {
+  height: 20px;
+  margin-top: 10px;
+  margin-bottom: 20px;
+}
+
+.inference-result-set-container > .mb-4 .ant-typography {
+  color: rgba(112, 118, 127, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.inference-result-toolbar {
+  margin-bottom: 16px;
+}
+
+.inference-result-toolbar .ant-form {
+  height: 36px;
+}
+
+.inference-result-toolbar .mb-4 {
+  margin-bottom: 0;
+}
+
+.inference-result-toolbar .ant-form-item {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  margin-inline-end: 10px;
+  margin-bottom: 0;
+}
+
+.inference-result-toolbar .ant-form-item-control,
+.inference-result-toolbar .ant-form-item-control-input,
+.inference-result-toolbar .ant-form-item-control-input-content {
+  display: flex;
+  align-items: center;
+  min-height: 36px !important;
+}
+
+.inference-result-toolbar .flex.flex-wrap.items-center.gap-2.w-full {
+  flex-wrap: nowrap;
+  gap: 0;
+  height: 36px;
+}
+
+.inference-result-toolbar .flex.flex-wrap.items-center.gap-2.flex-1 {
+  flex-wrap: nowrap;
+  gap: 0;
+  height: 36px;
+}
+
+.inference-result-toolbar .flex.gap-2 {
+  gap: 10px;
+}
+
+.inference-result-toolbar .ant-input-affix-wrapper,
+.inference-result-toolbar .ant-select-selector,
+.inference-result-toolbar .ant-btn {
+  height: 36px;
+  border-radius: 6px;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.inference-result-toolbar .ant-input-affix-wrapper,
+.inference-result-toolbar .ant-select-selector {
+  display: flex !important;
+  align-items: center !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 12px !important;
+  border-color: rgba(216, 217, 220, 1) !important;
+}
+
+.inference-result-toolbar .ant-input-prefix {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-inline-end: 8px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 16px;
+}
+
+.inference-result-name-input {
+  display: flex;
+  align-items: center;
+  width: 180px;
+}
+
+.inference-result-toolbar .inference-result-name-input.ant-input-affix-wrapper .ant-input {
+  height: 34px !important;
+  padding: 0 !important;
+  line-height: 34px !important;
+}
+
+.inference-result-name-input input::placeholder {
+  color: rgba(157, 161, 167, 1);
+}
+
+.inference-result-filter-select {
+  display: flex;
+  align-items: center;
+  width: 160px !important;
+  height: 36px !important;
+}
+
+.inference-result-toolbar .inference-result-filter-select.ant-select,
+.inference-result-toolbar .inference-result-filter-select .ant-select-selector {
+  width: 160px !important;
+  height: 36px !important;
+}
+
+.inference-result-toolbar .ant-select-selection-placeholder,
+.inference-result-toolbar .ant-select-selection-item {
+  display: flex;
+  align-items: center;
+  color: rgba(24, 24, 25, 1);
+  line-height: 34px !important;
+}
+
+.inference-result-toolbar .inference-result-filter-select .ant-select-selection-wrap {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  line-height: 34px;
+}
+
+.inference-result-toolbar .ant-btn {
+  padding: 6px 30px;
+  color: rgba(24, 24, 25, 1);
+  border-color: rgba(216, 217, 220, 1);
+  box-shadow: none;
+}
+
+.inference-result-toolbar .flex.gap-2 > .ant-btn:not(.ant-btn-primary) {
+  width: 88px;
+  padding: 6px 16px;
+}
+
+.inference-result-toolbar .ant-btn-primary {
+  width: 116px;
+  padding: 8px 16px;
+  color: rgba(255, 255, 255, 1);
+  background-color: rgba(0, 71, 187, 1.0);
+  border-color: rgba(0, 71, 187, 1.0);
+}
+
+.inference-result-toolbar .ant-btn-primary .anticon {
+  font-size: 14px;
+}
+
+.inference-result-table .ant-table {
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.inference-result-table .ant-table-thead > tr {
+  height: 40px !important;
+}
+
+.inference-result-table .ant-table-thead > tr > th {
+  height: 40px;
+  padding: 10px 16px !important;
+  color: rgba(24, 24, 25, 1) !important;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px !important;
+  font-weight: normal !important;
+  line-height: 20px !important;
+  background-color: rgba(244, 246, 248, 1.0) !important;
+}
+
+.inference-result-table .ant-table-tbody > tr:not(.ant-table-measure-row) > td {
+  height: 50px;
+  padding: 15px 16px !important;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  border-bottom: 1px solid rgba(232, 233, 234, 1.0);
+}
+
+.inference-result-table .ant-table-tbody > tr.ant-table-measure-row,
+.inference-result-table .ant-table-tbody > tr.ant-table-measure-row > td {
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  line-height: 0 !important;
+  visibility: hidden;
+  border: 0 !important;
+}
+
+.inference-result-table .ant-table-tbody > tr:hover > td {
+  background-color: rgba(244, 246, 248, 1.0) !important;
+}
+
+.inference-result-name-cell {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.inference-result-name-link.ant-typography {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding-inline-end: 24px;
+  overflow: hidden;
+  margin-bottom: 0;
+  color: rgba(0, 71, 187, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inference-result-name-link.ant-typography .ant-typography-edit {
+  position: absolute;
+  top: 50%;
+  inset-inline-end: 0;
+  margin-inline-start: 0;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.2s;
+}
+
+.inference-result-name-column:hover .inference-result-name-link.ant-typography .ant-typography-edit,
+.inference-result-name-link.ant-typography .ant-typography-edit:focus-visible {
+  opacity: 1;
+}
+
+.inference-result-name-link.ant-btn-link {
+  height: auto;
+  padding: 0;
+  color: rgba(0, 71, 187, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+  text-align: left;
+}
+
+.inference-result-name-cell .ant-typography-edit-content {
+  width: 100%;
+  margin: -6px 0;
+}
+
+.inference-result-name-cell .ant-typography-edit-content textarea.ant-input {
+  min-height: 32px;
+  padding: 5px 11px;
+  line-height: 20px;
+  resize: none;
+}
+
+.inference-result-name-cell .ant-typography-edit-content-confirm {
+  margin-inline-start: 8px;
+  color: rgba(0, 71, 187, 1);
+}
+
+.inference-result-status-created {
+  color: rgba(0, 145, 255, 1);
+}
+
+.inference-result-status-success {
+  color: rgba(50, 190, 72, 1);
+}
+
+.inference-result-status-error {
+  color: rgba(255, 45, 45, 1);
+}
+
+.inference-result-status-running {
+  color: rgba(255, 147, 26, 1);
+}
+
+.inference-result-status-muted {
+  color: rgba(112, 118, 127, 1);
+}
+
+.inference-result-type-tag.ant-tag {
+  height: 24px;
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: normal;
+  line-height: 18px;
+}
+
+.inference-result-type-tag-blue.ant-tag {
+  color: rgba(25, 94, 205, 1);
+  background-color: rgba(232, 240, 255, 1.0);
+  border: 1px solid rgba(0, 84, 221, 0.1);
+}
+
+.inference-result-type-tag-orange.ant-tag {
+  color: rgba(236, 145, 26, 1);
+  background-color: rgba(254, 245, 234, 1);
+  border: 1px solid rgba(246, 161, 50, 0.1);
+}
+
+.inference-result-table .table-action-column {
+  column-gap: 16px;
+  row-gap: 0;
+}
+
+.inference-result-table .table-action-column .ant-btn.ant-btn-link {
+  height: 20px;
+  padding: 0;
+  color: rgba(24, 24, 25, 1) !important;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.inference-result-table .table-action-column .ant-btn.ant-btn-link:hover {
+  color: rgba(0, 71, 187, 1) !important;
+}
+
+.inference-result-table .table-action-column .ant-btn.ant-btn-link:disabled,
+.inference-result-table .table-action-column .ant-btn.ant-btn-link.ant-btn-disabled {
+  color: rgba(157, 161, 167, 1) !important;
+}
+
+.inference-result-table .table-action-column .ant-btn .anticon {
+  font-size: 16px;
+}
+
+.inference-result-table .ant-pagination {
+  margin: 22px 0 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.inference-result-table .ant-pagination-total-text {
+  margin-inline-end: 24px;
+}
+
+.inference-result-table .ant-pagination .ant-pagination-item,
+.inference-result-table .ant-pagination .ant-pagination-prev,
+.inference-result-table .ant-pagination .ant-pagination-next {
+  min-width: 32px;
+  height: 32px;
+  line-height: 30px;
+}
+
+.inference-result-table .ant-pagination .ant-pagination-item-active {
+  background-color: rgba(236, 238, 239, 1.0);
+  border-color: rgba(236, 238, 239, 1.0);
+}
+
+.inference-result-table .ant-pagination .ant-pagination-item-active a {
+  color: inherit;
+  font-weight: 400 !important;
+}
+
+.inference-result-table .ant-pagination .ant-pagination-options {
+  margin-inline-start: 24px;
+}
+
+.inference-result-table .ant-pagination .ant-select-selector,
+.inference-result-table .ant-pagination .ant-pagination-options-quick-jumper input {
+  height: 32px;
+  border-color: rgba(216, 217, 220, 1);
+  border-radius: 6px;
+}

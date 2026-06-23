@@ -1,0 +1,15 @@
+@Library('deepexi-build@master') _
+   
+Basebuild ( {
+    repoName = "dgi-web"
+    service = "gateway-web"
+    project = ["deepexi-ai"]
+    dockerImages = [
+        [
+            "imageName": "deepexi-console-frontend",
+            "dockerfilePath": "./apps/dgi/docker/Dockerfile",
+            "arch":['arm64','amd64'],
+            'directory': "."
+        ],
+    ]
+})

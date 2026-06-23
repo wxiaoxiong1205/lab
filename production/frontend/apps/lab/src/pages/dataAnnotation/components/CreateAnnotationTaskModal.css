@@ -1,0 +1,142 @@
+.create-annotation-task-page {
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.create-annotation-task-page * {
+  box-sizing: border-box;
+}
+
+.create-annotation-back.ant-btn {
+  border: 0;
+  color: var(--lab-color-text-primary);
+}
+
+.create-annotation-actions .ant-btn {
+  width: 90px;
+  height: 36px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.create-annotation-actions .ant-btn-default {
+  border-color: var(--lab-color-border-control);
+  color: var(--lab-color-text-primary);
+}
+
+.create-annotation-actions .ant-btn-primary {
+  background: var(--lab-color-brand-primary);
+}
+
+.create-annotation-form .ant-form-item {
+  margin-bottom: 28px;
+}
+
+.create-annotation-form .ant-form-item-label {
+  height: 22px;
+  padding-bottom: 10px;
+}
+
+.create-annotation-form .ant-form-item-label > label {
+  height: 22px;
+  color: var(--lab-color-text-primary);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.create-annotation-form .ant-input {
+  color: var(--lab-color-text-primary);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.create-annotation-task-name.ant-input {
+  width: 580px;
+  height: 40px;
+  padding: 9px 12px;
+  border-color: var(--lab-color-border-control);
+  border-radius: 6px;
+}
+
+.create-annotation-form .ant-input::placeholder {
+  color: var(--lab-color-placeholder);
+}
+
+.create-annotation-radio-buttons.ant-radio-group {
+  display: flex;
+  gap: 10px;
+}
+
+.create-annotation-radio-buttons .ant-radio-button-wrapper {
+  min-width: 90px;
+  height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--lab-color-border-control);
+  border-radius: 6px;
+  color: var(--lab-color-text-primary);
+  font-size: 14px;
+  line-height: 38px;
+}
+
+.create-annotation-radio-buttons .ant-radio-button-wrapper:not(:first-child)::before {
+  display: none;
+}
+
+.create-annotation-radio-buttons .ant-radio-button-wrapper-checked {
+  border-color: var(--lab-color-brand-primary) !important;
+  background: var(--lab-color-brand-selected-bg);
+  color: var(--lab-color-text-primary);
+}
+
+.create-annotation-selected-data-type {
+  display: inline-flex;
+  width: 90px;
+  min-width: 90px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--lab-color-brand-primary);
+  border-radius: 6px;
+  background: var(--lab-color-brand-selected-bg);
+  color: var(--lab-color-text-primary);
+  font-size: 14px;
+  line-height: 38px;
+}
+
+.create-annotation-dataset-selector .ant-form-item {
+  margin-bottom: 0;
+}
+
+.create-annotation-dataset-selector .ant-space-compact {
+  width: 580px !important;
+}
+
+.create-annotation-dataset-selector .ant-input {
+  height: 40px;
+  min-height: 40px;
+  padding: 9px 12px;
+  border-color: var(--lab-color-border-control);
+  border-radius: 6px 0 0 6px;
+}
+
+.create-annotation-dataset-selector .ant-space-compact .ant-btn {
+  display: inline-flex;
+  flex: 0 0 88px;
+  width: 88px;
+  min-width: 88px;
+  height: 40px !important;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  border-radius: 0 6px 6px 0 !important;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.create-annotation-dataset-selector .ant-space-compact .ant-btn-primary {
+  border-color: var(--lab-color-brand-selected-bg);
+  background: var(--lab-color-brand-selected-bg);
+  color: var(--lab-color-brand-primary);
+  box-shadow: none;
+}

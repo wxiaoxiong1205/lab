@@ -1,0 +1,17 @@
+.data-annotation-hero {
+  background: linear-gradient(135deg, rgba(0, 71, 187, 0.07) 0%, rgba(50, 190, 72, 0.07) 100%);
+}
+
+.data-annotation-title.ant-typography {
+  background: linear-gradient(135deg, var(--lab-color-brand-primary), var(--lab-color-success));
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.data-annotation-primary-button.ant-btn {
+  box-shadow: 0 4px 12px rgba(0, 71, 187, 0.24);
+}
+
+.data-annotation-account-card.ant-card {
+  background-color: var(--lab-color-surface-page);
+}

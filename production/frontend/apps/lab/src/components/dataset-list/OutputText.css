@@ -1,0 +1,19 @@
+.output-text-thinking {
+  background: var(--lab-color-surface-subtle);
+  border: 1px solid var(--lab-color-border-control);
+}
+
+.output-text-thinking-label {
+  color: var(--lab-color-text-muted);
+  background: var(--lab-color-surface-elevated);
+}
+
+.output-text-pre {
+  font-family: inherit;
+  word-break: break-word;
+}
+
+.output-text-modal-body {
+  user-select: text;
+  word-break: break-word;
+}

@@ -1,0 +1,33 @@
+/* 
+使用了@apply，需要@reference引入相关css变量
+https://tailwindcss.com/docs/functions-and-directives#reference-directive
+*/
+@reference "tailwindcss";
+
+.api-card {
+  width: calc((100% - 32px) / 2);
+  @apply min-w-[360px] rounded-lg border border-gray-200 hover:border-blue-300 min-h-[200px] cursor-pointer px-5 pt-5 pb-3 bg-white relative flex flex-col;
+  background: radial-gradient(26% 84% at 4% 4%, rgba(221, 220, 229, .3) 0%, rgba(245, 244, 247, 0) 94%), #fff;
+}
+
+@media(min-width: 1630px) {
+  .api-card {
+    @apply w-[calc((100%-32px)/3)];
+  }
+}
+
+@media (min-width: 2000px) {
+  .api-card {
+    @apply w-[calc((100%-48px)/4)];
+  }
+}
+
+/* 与此前约定一致：操作区默认可见，自定义属性标签无需悬停才看到 */
+.api-card.with-actions .action-buttons {
+  @apply mt-auto pt-3 flex justify-end border-t border-gray-100 shrink-0;
+}
+
+.api-card .info-content {
+  @apply flex-1 min-h-0 flex flex-col;
+}
+

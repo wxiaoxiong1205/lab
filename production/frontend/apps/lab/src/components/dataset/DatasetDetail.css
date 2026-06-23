@@ -1,0 +1,27 @@
+.dataset-detail-preview-table .ant-table-tbody > tr > td {
+  vertical-align: top !important;
+}
+
+.dataset-detail-preview-table .ant-table-thead > tr > th {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.dataset-detail-preview-table .ant-table-tbody > tr > td > div > div::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.dataset-detail-preview-table .ant-table-tbody > tr > td > div > div::-webkit-scrollbar-track {
+  border-radius: var(--lab-radius-xs);
+  background: var(--lab-color-surface-muted);
+}
+
+.dataset-detail-preview-table .ant-table-tbody > tr > td > div > div::-webkit-scrollbar-thumb {
+  border-radius: var(--lab-radius-xs);
+  background: #bfbfbf;
+}
+
+.dataset-detail-preview-table .ant-table-tbody > tr > td > div > div::-webkit-scrollbar-thumb:hover {
+  background: var(--lab-color-placeholder);
+}

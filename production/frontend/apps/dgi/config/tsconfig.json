@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ],
+  "compilerOptions": {
+    "noImplicitAny": false,
+    "noUnusedLocals": false,  // 忽略未使用的变量
+    "noUnusedParameters": false // 忽略未使用的参数
+  }
+}

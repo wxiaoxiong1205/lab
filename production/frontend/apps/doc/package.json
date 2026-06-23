@@ -1,0 +1,24 @@
+{
+  "name": "doc-center",
+  "version": "1.0.0",
+  "description": "纯前端文档中心",
+  "scripts": {
+    "predev": "node scripts/build-search-index.cjs",
+    "dev": "docusaurus start --host 0.0.0.0 --port 5173",
+    "config-server": "node scripts/config-server.cjs",
+    "prebuild": "node scripts/build-search-index.cjs",
+    "build": "docusaurus build",
+    "preview": "docusaurus serve --host localhost --port 5173",
+    "serve": "docusaurus serve",
+    "clear": "docusaurus clear"
+  },
+  "devDependencies": {
+    "@docusaurus/core": "^2.4.3",
+    "@docusaurus/preset-classic": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "redoc": "^2.1.5",
+    "url": "^0.11.3"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "b6b7f7d1421584f8547e64d2e72242ad": "歡迎使用AI模型全生命周期開發平臺",
+  "ssh_config": "SSH配置",
+  "username_password": "用戶名/密碼",
+  "click_to_set": "點擊設置",
+  "ssh_key": "SSH Key",
+  "generate_ssh_key": "生成SSH Key",
+  "username": "用戶名",
+  "password": "密碼",
+  "please_enter_username": "請輸入用戶名",
+  "please_enter_password": "請輸入密碼",
+  "reset": "重置",
+  "confirm": "確定",
+  "cancel": "取消",
+  "ssh_config_saved": "SSH配置已保存",
+  "ssh_key_generated": "SSH Key已生成",
+  "confirm_reset_ssh_key": "確認重置SSH Key?",
+  "reset_ssh_key_warning": "重置後,此SSH Key將不再支持作為登錄憑證",
+  "reset_ssh_key": "重置SSH Key"
+}

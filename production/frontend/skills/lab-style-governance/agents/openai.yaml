@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lab Style Governance"
+  short_description: "Unify antd, Tailwind, custom CSS, and theme token boundaries for the lab app."
+  default_prompt: "When changing styles in deepexi-lab-web apps/lab, apply the lab style governance skill to centralize antd styling, keep Tailwind usage readable, scope custom CSS, and preserve theme switching readiness."

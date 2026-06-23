@@ -1,0 +1,52 @@
+.training-dataset-option-card.ant-card {
+  cursor: pointer;
+  background-color: var(--lab-color-surface-readonly);
+  border: var(--lab-border-control);
+}
+
+.training-dataset-option-card-selected.ant-card {
+  background-color: rgba(50, 190, 72, 0.08);
+  border: 2px solid var(--lab-color-brand-primary);
+}
+
+.training-dataset-option-card-disabled.ant-card {
+  cursor: not-allowed;
+  background-color: var(--lab-color-surface-subtle);
+  border: var(--lab-border-subtle);
+  opacity: 0.6;
+}
+
+.training-dataset-option-icon,
+.training-dataset-option-label {
+  color: var(--lab-color-placeholder);
+}
+
+.training-dataset-option-card-selected .training-dataset-option-icon,
+.training-dataset-option-card-selected .training-dataset-option-label {
+  color: var(--lab-color-brand-primary);
+}
+
+.training-dataset-option-card-disabled .training-dataset-option-icon,
+.training-dataset-option-card-disabled .training-dataset-option-label {
+  color: var(--lab-color-border-control);
+}
+
+.training-dataset-coming-soon {
+  color: var(--lab-color-placeholder);
+  background-color: var(--lab-color-surface-elevated);
+  border: var(--lab-border-control);
+}
+
+.training-dataset-preprocess-radio {
+  background-color: var(--lab-color-surface-readonly);
+  border: var(--lab-border-control);
+}
+
+.training-dataset-preprocess-radio-selected {
+  background-color: rgba(50, 190, 72, 0.08);
+  border-color: var(--lab-color-brand-primary);
+}
+
+.training-dataset-format-preview {
+  box-shadow: var(--lab-shadow-soft);
+}

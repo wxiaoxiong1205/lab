@@ -1,0 +1,36 @@
+services:
+  # vLLM 服务（直接使用 vllm.LLM 进行推理生成，无需 API 服务）
+  vllm-service:
+    build:
+      context: ../../../ # 构建上下文：项目根目录
+      dockerfile: scripts/inference/docker/Dockerfile.vllm
+    image: vllm-service:v0.11.2
+    container_name: vllm-service-generate-vllm
+    volumes:
+      # 挂载模型目录（根据实际情况调整路径）
+      - /data/models:/models:ro
+      # 挂载项目代码目录（方便开发调试，无需重新构建镜像）
+      # 注意：使用绝对路径，相对于 docker-compose.yml 所在目录
+      - ../../../scripts:/app/scripts
+      # 挂载配置文件目录
+      - ./config:/data/configs:ro
+      # 挂载输入数据目录
+      - ./data/input:/data/input:ro
+      # 挂载输出数据目录
+      - ./data/output:/data/output
+    environment:
+      - TZ=Asia/Shanghai
+    # 覆盖默认入口点，使用 Python 直接运行脚本
+    entrypoint: [ "python3", "-m", "scripts.inference.inference_script" ]
+    # 直接运行推理生成脚本，使用 vllm.LLM 客户端（client_type: vllm）
+    # 注意：配置文件中 runtime.client_type 应设置为 "vllm"
+    command: >
+      --config_file /data/configs/config.generate.example.yaml
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: [ '0', '2','3','4' ]
+              capabilities: [ gpu ]
+    restart: "no"

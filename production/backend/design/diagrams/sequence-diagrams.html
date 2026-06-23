@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>创建模型与模型部署 - 时序图</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'base',
+            themeVariables: {
+                fontSize: '18px',
+                fontFamily: 'Microsoft YaHei, SimHei, sans-serif',
+                primaryTextColor: '#1f2937',
+                primaryBorderColor: '#374151',
+                lineColor: '#4b5563',
+                secondaryColor: '#e5e7eb',
+                tertiaryColor: '#f9fafb',
+                actorBkg: '#dbeafe',
+                actorBorder: '#2563eb',
+                actorTextColor: '#1e40af',
+                signalColor: '#1f2937',
+                signalTextColor: '#1f2937'
+            },
+            sequence: {
+                diagramMarginX: 30,
+                diagramMarginY: 20,
+                actorMargin: 80,
+                width: 180,
+                height: 65,
+                boxMargin: 12,
+                boxTextMargin: 8,
+                noteMargin: 12,
+                messageMargin: 40,
+                mirrorActors: false,
+                useMaxWidth: true,
+                wrap: true,
+                wrapPadding: 12
+            }
+        });
+        document.addEventListener('DOMContentLoaded', () => mermaid.run({ querySelector: '.mermaid', suppressErrors: true }));
+    </script>
+    <style>
+        body { font-family: Microsoft YaHei, SimHei, sans-serif; margin: 24px; background: #f8fafc; }
+        h1 { color: #1e293b; font-size: 24px; margin-bottom: 8px; }
+        h2 { color: #334155; font-size: 20px; margin-top: 32px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #cbd5e1; }
+        .diagram { background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,.08); margin-bottom: 32px; overflow: auto; }
+        .mermaid { display: flex; justify-content: center; }
+        .mermaid svg { max-width: 100%; height: auto; }
+        .hint { color: #64748b; font-size: 14px; margin-top: 16px; }
+    </style>
+</head>
+<body>
+    <h1>机器学习模型管理与部署 — 时序图</h1>
+    <p class="hint">本页为设计文档中的两张时序图的大图展示，便于评审。可在浏览器中右键图表另存为图片或打印为 PDF。</p>
+
+    <h2>5.1 创建模型流程</h2>
+    <div class="diagram">
+        <pre class="mermaid">
+sequenceDiagram
+    participant 用户
+    participant 前端
+    participant 后端
+    participant Notebook服务
+    participant DB as 数据库(ml_models)
+
+    用户->>前端: 进入创建模型页，填写名称、描述、类型、子类型
+    前端->>前端: 获取机器学习在线 Notebook 相对路径（下拉数据源）
+    用户->>前端: 选择模型来源 Notebook，选择具体模型得到 source_ref
+    用户->>前端: 填写网络结构，点击确定
+    前端->>后端: POST 创建模型 (name, source_ref, network_structure 等)
+    后端->>Notebook服务: 调用接口，传入 source_ref 相对路径
+    Notebook服务-->>后端: 返回 JFS 完整路径 model_path
+    后端->>后端: 生成 model_version（如 V1）
+    后端->>DB: 写入 ml_models（artifact_uri=model_path 等）
+    DB-->>后端: 写入成功
+    后端-->>前端: 返回创建结果（模型 id、版本等）
+    前端->>用户: 刷新列表 / 进入模型详情
+        </pre>
+    </div>
+
+    <h2>5.2 模型部署流程</h2>
+    <div class="diagram">
+        <pre class="mermaid">
+sequenceDiagram
+    participant 用户
+    participant 前端
+    participant 后端
+    participant DB as 数据库(ml_models)
+    participant K8s
+    participant 容器
+
+    用户->>前端: 进入部署服务页，选择模型来源为 ML 模型
+    前端->>前端: 拉取 ML 模型列表（含版本）
+    用户->>前端: 选择某一模型版本，配置资源、镜像、运行命令等
+    用户->>前端: 点击开始部署
+    前端->>后端: POST 创建推理任务 (model_source=ml_model, ml_model_id 等)
+    后端->>后端: 解析 ml_model_id
+    后端->>DB: 查询 ml_models，取 artifact_uri 作为 model_path
+    DB-->>后端: 返回 model_path、model_name、network_structure
+    后端->>K8s: 创建部署：挂载 model_path 到容器，传入运行命令/脚本
+    K8s->>容器: 挂载卷，启动容器
+    容器->>容器: 执行运行脚本，从挂载路径加载模型
+    容器->>容器: 推理服务运行
+    后端->>DB: 写入 inference_tasks
+    后端-->>前端: 返回部署结果
+    前端->>用户: 展示部署状态 / 部署列表
+        </pre>
+    </div>
+
+    <p class="hint">源文件：design/diagrams/create-model-sequence.mmd、deploy-sequence.mmd。可使用 <a href="https://mermaid.live" target="_blank">Mermaid Live Editor</a> 打开 .mmd 导出为 PNG/SVG 后插入文档。</p>
+</body>
+</html>

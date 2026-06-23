@@ -1,0 +1,587 @@
+// 微调功能相关样式
+
+.create-finetune-run-page {
+  min-width: 0;
+
+  .create-form-card,
+  .create-form-body,
+  form {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+// 模型选择卡片样式
+.model-card {
+  position: relative;
+  
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+  }
+  
+  &.model-card-selected {
+    box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+    
+    &:hover {
+      box-shadow: 0 6px 16px rgba(24, 144, 255, 0.3);
+    }
+  }
+}
+
+// 数据集列表页样式
+.finetune-dataset-list-container {
+  padding: 24px;
+  
+  .dataset-header {
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .ant-upload-draggable-list-item {
+    border-top: 2px dashed #f0f0f0;
+    margin-top: 8px;
+  }
+
+  .dataset-filters {
+    margin-bottom: 24px;
+  }
+
+  .dataset-upload-button {
+    margin-bottom: 16px;
+  }
+}
+
+// 数据集详情页样式
+.finetune-dataset-detail-container {
+  padding: 24px;
+  
+  .dataset-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  
+  .sample-record {
+    margin-bottom: 24px;
+    padding: 16px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+
+    pre {
+      margin-top: 8px;
+      background-color: #f5f5f5;
+      padding: 16px;
+      border-radius: 4px;
+      max-height: 300px;
+      overflow: auto;
+    }
+  }
+  
+  .dataset-stats {
+    margin-bottom: 24px;
+    
+    .stats-item {
+      text-align: center;
+      padding: 16px;
+      background-color: #f9f9f9;
+      border-radius: 4px;
+      
+      .stats-value {
+        font-size: 24px;
+        font-weight: 500;
+        margin-bottom: 8px;
+      }
+      
+      .stats-label {
+        color: rgba(0, 0, 0, 0.45);
+      }
+    }
+  }
+}
+
+// 任务状态样式（通用组件样式）
+.task-status {
+  display: flex;
+  align-items: center;
+  
+  .status-icon {
+    margin-right: 8px;
+  }
+}
+
+// 模型标签样式（通用组件样式）
+.model-tag {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+
+// 创建任务页样式
+.create-finetune-task-container {
+  padding: 24px;
+  
+  .steps-content {
+    margin-top: 24px;
+    padding: 24px;
+    background-color: #fff;
+    border: 1px solid #f0f0f0;
+    border-radius: 4px;
+    min-height: 200px;
+  }
+  
+  .steps-action {
+    margin-top: 24px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+  .parameter-form {
+    max-width: 800px;
+    
+    .parameter-item {
+      margin-bottom: 24px;
+      
+      .parameter-label {
+        font-weight: 500;
+        margin-bottom: 8px;
+      }
+      
+      .parameter-description {
+        color: rgba(0, 0, 0, 0.45);
+        margin-bottom: 8px;
+      }
+    }
+  }
+  
+  .resource-selection {
+    .resource-card {
+      cursor: pointer;
+      border: 1px solid #f0f0f0;
+      padding: 16px;
+      margin-bottom: 16px;
+      border-radius: 4px;
+      transition: all 0.3s;
+      
+      &:hover {
+        border-color: #1890ff;
+      }
+      
+      &.selected {
+        border-color: #1890ff;
+        background-color: #e6f7ff;
+      }
+      
+      .card-title {
+        font-weight: 500;
+        margin-bottom: 8px;
+      }
+      
+      .card-description {
+        color: rgba(0, 0, 0, 0.45);
+        margin-bottom: 8px;
+      }
+    }
+  }
+  
+  .preview-section {
+    margin-bottom: 24px;
+    
+    .section-title {
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    
+    .preview-content {
+      border: 1px solid #f0f0f0;
+      border-radius: 4px;
+      padding: 16px;
+    }
+  }
+  
+  // 机器选择相关样式
+  .machine-selector {
+    .ant-select-dropdown {
+      .ant-select-item-option {
+        padding: 8px 12px;
+        
+        .machine-option-content {
+          .machine-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+            
+            .machine-name {
+              font-weight: 600;
+              font-size: 14px;
+              color: #262626;
+            }
+            
+            .machine-status {
+              font-size: 12px;
+              font-weight: 500;
+              padding: 2px 8px;
+              border-radius: 12px;
+              
+              &.status-online {
+                color: #52c41a;
+                background-color: #f6ffed;
+                border: 1px solid #b7eb8f;
+              }
+              
+              &.status-idle {
+                color: #1890ff;
+                background-color: #e6f7ff;
+                border: 1px solid #91d5ff;
+              }
+              
+              &.status-busy {
+                color: #faad14;
+                background-color: #fffbe6;
+                border: 1px solid #ffe58f;
+              }
+              
+              &.status-offline {
+                color: #f5222d;
+                background-color: #fff2f0;
+                border: 1px solid #ffccc7;
+              }
+            }
+          }
+          
+          .machine-details {
+            font-size: 12px;
+            color: #8c8c8c;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            
+            .detail-item {
+              display: flex;
+              align-items: center;
+              
+              &:not(:last-child)::after {
+                content: '•';
+                margin-left: 12px;
+                color: #d9d9d9;
+              }
+            }
+          }
+        }
+        
+        &:hover {
+          .machine-option-content {
+            .machine-name {
+              color: #1890ff;
+            }
+          }
+        }
+        
+        &.ant-select-item-option-selected {
+          .machine-option-content {
+            .machine-name {
+              color: #1890ff;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// 任务详情页样式
+.finetune-task-detail-container {
+  padding: 24px;
+  
+  .detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  
+  .detail-card {
+    margin-bottom: 16px;
+  }
+  
+  .metrics-chart {
+    height: 300px;
+    margin-bottom: 24px;
+  }
+  
+  .metrics-chart-card {
+    margin-bottom: 24px;
+  }
+  
+  .metrics-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+
+    th, td {
+      padding: 8px;
+      border: 1px solid #f0f0f0;
+      text-align: left;
+    }
+
+    th {
+      background-color: #fafafa;
+      font-weight: 500;
+    }
+  }
+  
+  .log-viewer {
+    max-height: 500px;
+    overflow-y: auto;
+    background-color: #000;
+    padding: 16px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #fff;
+    
+    .log-line {
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+  }
+  
+  .logs-card {
+    margin-bottom: 24px;
+  }
+  
+  .parameter-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    
+    li {
+      margin-bottom: 8px;
+      display: flex;
+      align-items: flex-start;
+      
+      .param-name {
+        width: 200px;
+        font-weight: 500;
+        margin-right: 16px;
+      }
+      
+      .param-value {
+        flex: 1;
+        overflow-wrap: break-word;
+      }
+    }
+  }
+}
+
+// 微调模型列表页样式
+.finetuned-model-list-container {
+  padding: 24px;
+  
+  .model-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    
+    .model-info {
+      flex: 1;
+    }
+    
+    .model-name {
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    
+    .model-base {
+      color: rgba(0, 0, 0, 0.45);
+      margin-bottom: 16px;
+    }
+    
+    .model-metrics {
+      margin-bottom: 16px;
+    }
+    
+    .model-actions {
+      margin-top: auto;
+    }
+  }
+
+  .model-filters {
+    margin-bottom: 24px;
+  }
+}
+
+// 模型详情页
+.finetuned-model-detail-container {
+  padding: 24px;
+  
+  .model-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  
+  .metrics-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+
+    th, td {
+      padding: 8px;
+      border: 1px solid #f0f0f0;
+      text-align: left;
+    }
+
+    th {
+      background-color: #fafafa;
+      font-weight: 500;
+    }
+  }
+  
+  .metric-card {
+    height: 100%;
+    text-align: center;
+  }
+}
+
+// 机器管理页面
+.machine-management-container {
+  padding: 24px;
+
+  .machine-filters {
+    margin-bottom: 24px;
+  }
+}
+
+// 机器详情页
+.machine-detail-container {
+  padding: 24px;
+
+  .detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+
+  .resource-usage-card {
+    margin-bottom: 16px;
+  }
+
+  .gpu-usage-list {
+    .gpu-usage-item {
+      margin-bottom: 16px;
+      padding: 16px;
+      background-color: #f9f9f9;
+      border-radius: 4px;
+
+      .gpu-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .gpu-progress-wrapper {
+        margin-bottom: 8px;
+      }
+    }
+  }
+}
+
+// 创建任务页面
+.create-task-container {
+  padding: 24px;
+
+  .steps-container {
+    margin-bottom: 24px;
+  }
+
+  .step-content {
+    min-height: 400px;
+    padding: 24px;
+    background-color: #fff;
+    border-radius: 4px;
+  }
+
+  .step-buttons {
+    margin-top: 24px;
+    display: flex;
+    justify-content: space-between;
+  }
+}
+
+// 组件样式
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+    
+    &.online {
+      background-color: #52c41a;
+    }
+    
+    &.offline {
+      background-color: #ff4d4f;
+    }
+    
+    &.busy {
+      background-color: #faad14;
+    }
+  }
+}
+
+.model-info-card {
+  height: 100%;
+  
+  .model-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+  
+  .model-tags {
+    margin-top: 8px;
+  }
+  
+  .model-metrics {
+    margin-top: 12px;
+    
+    .metric-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      
+      .metric-name {
+        color: #888;
+      }
+    }
+  }
+  
+  .model-actions {
+    margin-top: 16px;
+  }
+}
+
+.simple-finetune-training {
+  .simple-finetune-search.ant-input-affix-wrapper {
+    width: 180px !important;
+    height: 36px;
+    border-radius: 6px;
+  }
+}

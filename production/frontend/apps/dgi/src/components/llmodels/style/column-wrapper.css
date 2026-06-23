@@ -1,0 +1,31 @@
+.column-wrapper {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.simplebar-scrollbar::before {
+  width: var(--scrollbar-size);
+  background: var(--scrollbar-handle-bg);
+}
+
+.column-wrapper-footer {
+  flex: 1;
+  display: flex;
+  position: relative;
+}
+
+.column-wrapper-footer .column-wrapper {
+  border-left: none;
+}
+
+.column-wrapper-footer .footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding-block: 0;
+  background-color: #fff;
+}

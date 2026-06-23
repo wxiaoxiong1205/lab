@@ -1,0 +1,79 @@
+/* DatasetComparison.css */
+
+/* Overall page styles */
+.dataset-comparison-page {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Styles for markdown content wrapper */
+.md-content-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* Override markdown styles to ensure full display */
+.md-content-wrapper .markdown-body {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* Make sure images in markdown don't overflow */
+.md-content-wrapper .markdown-body img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Style for code blocks */
+.md-content-wrapper .markdown-body pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Ensure tables don't overflow */
+.md-content-wrapper .markdown-body table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* Fix extra padding in markdown content */
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* Model tag styling */
+.model-tag {
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-right: 6px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  display: inline-block;
+}
+
+/* Styles for visibility controls */
+.visibility-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: #f0f0f0;
+  border-radius: 4px;
+}
+
+.visibility-control-button {
+  transition: opacity 0.3s ease;
+}
+
+.visibility-control-button.hidden {
+  opacity: 0.65;
+}
+
+/* Responsive styling for cards */
+@media (max-width: 768px) {
+  .comparison-card {
+    margin-bottom: 16px;
+  }
+} 

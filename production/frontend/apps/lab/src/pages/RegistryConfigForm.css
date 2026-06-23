@@ -1,0 +1,51 @@
+.registry-config-readonly-control,
+.registry-config-readonly-control.ant-input {
+  color: var(--lab-color-text-muted);
+  cursor: not-allowed;
+  background-color: var(--lab-color-surface-readonly);
+}
+
+.registry-config-readonly-control .ant-select-selector {
+  cursor: not-allowed !important;
+  background-color: var(--lab-color-surface-readonly) !important;
+}
+
+.registry-config-password-placeholder {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: var(--lab-color-surface-readonly);
+  border: var(--lab-border-control);
+  border-radius: var(--lab-radius-md);
+}
+
+.registry-config-section-header {
+  padding: 8px;
+  margin-bottom: 24px;
+  border-radius: var(--lab-radius-md);
+}
+
+.registry-config-section-header-basic {
+  color: var(--lab-color-brand-primary);
+  background-color: var(--lab-color-brand-selected-bg);
+  border: 1px solid rgba(0, 71, 187, 0.2);
+}
+
+.registry-config-section-header-params {
+  margin-top: 24px;
+  color: var(--lab-color-warning);
+  background-color: rgba(250, 140, 22, 0.08);
+  border: 1px solid rgba(250, 140, 22, 0.3);
+}
+
+.registry-config-action-bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 100;
+  padding: 16px;
+  margin-left: 200px;
+  background-color: var(--lab-color-surface-elevated);
+}

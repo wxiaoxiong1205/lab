@@ -1,0 +1,11 @@
+{"0":"LOC","1":"企业","2":"学校","3":"人名","4":"产品","5":"药物","6":"业务"}
+{"content": "四川省江油市华丰中学选用豆奶和复合营养素后，试验组男生的贫血率下降13个百分点，而对照组只降低0.44个百分点。", "annotations": [{"offset": [0, 2], "tag": "LOC"}, {"offset": [3, 9], "tag": "企业"}]}
+{"content": "北京市清华大学研究团队发布报告称，华为技术有限公司的5G专利数量位居全球第一。", "annotations": [{"offset": [0, 2], "tag": "LOC"}, {"offset": [3, 7], "tag": "学校"}, {"offset": [23, 31], "tag": "企业"}]}
+{"content": "阿里巴巴集团位于浙江省杭州市，创始人马云于1999年创立了这家公司。", "annotations": [{"offset": [0, 6], "tag": "企业"}, {"offset": [12, 15], "tag": "LOC"}, {"offset": [16, 19], "tag": "LOC"}, {"offset": [24, 26], "tag": "人名"}]}
+{"content": "腾讯科技（深圳）有限公司的微信产品，由张小龙团队在广州研发成功。", "annotations": [{"offset": [0, 12], "tag": "企业"}, {"offset": [15, 17], "tag": "产品"}, {"offset": [22, 25], "tag": "人名"}, {"offset": [25, 27], "tag": "LOC"}]}
+{"content": "中国科学院上海生命科学研究院的李明教授发现了新型抗癌药物。", "annotations": [{"offset": [0, 16], "tag": "学校"}, {"offset": [17, 20], "tag": "LOC"}, {"offset": [21, 24], "tag": "人名"}, {"offset": [26, 28], "tag": "药物"}]}
+{"content": "比亚迪股份有限公司在广东省深圳市生产的新能源汽车销量领先。", "annotations": [{"offset": [0, 9], "tag": "企业"}, {"offset": [13, 16], "tag": "LOC"}, {"offset": [17, 20], "tag": "LOC"}, {"offset": [24, 28], "tag": "产品"}]}
+{"content": "北京大学人民医院王医生使用辉瑞制药有限公司的疫苗进行了临床试验。", "annotations": [{"offset": [0, 8], "tag": "学校"}, {"offset": [9, 11], "tag": "人名"}, {"offset": [15, 23], "tag": "企业"}, {"offset": [25, 27], "tag": "药物"}]}
+{"content": "湖南省长沙市的三一重工股份有限公司生产的挖掘机出口到德国和法国。", "annotations": [{"offset": [0, 2], "tag": "LOC"}, {"offset": [3, 6], "tag": "LOC"}, {"offset": [8, 20], "tag": "企业"}, {"offset": [25, 28], "tag": "产品"}, {"offset": [27, 29], "tag": "LOC"}, {"offset": [30, 32], "tag": "LOC"}]}
+{"content": "钟南山院士在广州医科大学附属第一医院指导疫情防控工作。", "annotations": [{"offset": [0, 3], "tag": "人名"}, {"offset": [6, 8], "tag": "LOC"}, {"offset": [8, 22], "tag": "学校"}]}
+{"content": "江苏省南京市苏宁易购集团股份有限公司与美团点评合作推出即时零售业务。", "annotations": [{"offset": [0, 2], "tag": "LOC"}, {"offset": [3, 6], "tag": "LOC"}, {"offset": [7, 23], "tag": "企业"}, {"offset": [25, 29], "tag": "企业"}, {"offset": [32, 34], "tag": "业务"}]}

@@ -1,0 +1,24 @@
+.instance-name {
+  min-height: 54px;
+}
+
+.instance-name:hover .server-info {
+  color: var(--ant-blue-5);
+}
+
+.instance-name:hover .server-info .text {
+  display: block;
+}
+
+.instance-name .server-info {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  color: var(--ant-blue-5);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.instance-name .server-info .text {
+  display: none;
+}

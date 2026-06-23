@@ -1,0 +1,1 @@
+"""Open platform schema package."""

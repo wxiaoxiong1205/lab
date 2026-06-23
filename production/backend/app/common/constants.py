@@ -1,0 +1,7 @@
+"""
+ 全局常量
+"""
+
+GLOBAL_TENANT_ID = "0"
+
+GLOBAL_PROJECT_ID = 0

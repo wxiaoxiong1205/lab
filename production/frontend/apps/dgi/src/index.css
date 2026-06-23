@@ -1,0 +1,25 @@
+@import "tailwindcss";
+@import "@deep/theme/theme.css";
+@import "./hover-auto-scroll.css";
+@config "../tailwind.config.ts";
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: white;
+}
+
+/* 添加一些自定义样式 */
+input::placeholder {
+  color: #999;
+}
+
+/* 微前端兼容 */
+#root {
+  height: var(--mfe-height, 100%);
+}

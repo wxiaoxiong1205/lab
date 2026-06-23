@@ -1,0 +1,43 @@
+/* 
+使用了@apply，需要@reference引入相关css变量 
+https://tailwindcss.com/docs/functions-and-directives#reference-directive 
+*/
+@reference "tailwindcss";
+@import "../../hover-auto-scroll.css";
+
+.model-card {
+    width: calc((100% - 32px) / 2);
+    @apply min-w-[360px] rounded-lg border border-gray-200 hover:border-blue-300 h-[200px] cursor-pointer px-5 pt-5 pb-2 bg-white relative overflow-hidden;
+    background: radial-gradient(26% 84% at 4% 4%,rgba(221,220,229,.3) 0%,rgba(245,244,247,0) 94%),#fff;
+}
+
+@media(min-width: 1630px){
+    .model-card {
+        @apply w-[calc((100%-32px)/3)];
+    }
+}
+
+@media (min-width: 2000px) {
+    .model-card {
+        @apply w-[calc((100%-48px)/4)];
+    }
+}
+
+.model-card.selected {
+    @apply border-blue-400;
+}
+
+/* 只有在启用actions时才显示底部按钮 */
+.model-card.with-actions .action-buttons {
+    @apply absolute left-0 right-0 bottom-0 bg-white/95 py-3 px-5 opacity-0 transition-all duration-200 ease-in-out flex justify-between border-t border-gray-100;
+    transform: translateY(100%);
+}
+
+.model-card.with-actions:hover .action-buttons {
+    @apply opacity-100 shadow-[0_-2px_6px_rgba(0,0,0,0.05)];
+    transform: translateY(0);
+}
+
+.model-card .info-content {
+    height: 100%;
+}

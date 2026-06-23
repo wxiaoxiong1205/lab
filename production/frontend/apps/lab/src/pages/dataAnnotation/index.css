@@ -1,0 +1,510 @@
+.data-annotation-page {
+  height: calc(100% - 21px);
+  min-height: 830px;
+  margin: 0 10px 21px 0;
+  padding: 20px 20px 16px !important;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 1.0) !important;
+  box-shadow: 0 2px 8px rgba(24, 24, 25, 0.06);
+  display: flex;
+  flex-direction: column;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.data-annotation-page-title.ant-typography {
+  height: 28px;
+  margin: 0 0 10px !important;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.data-annotation-page-desc.ant-typography {
+  display: block;
+  height: 20px;
+  color: rgba(112, 118, 127, 1);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.data-annotation-main-tabs.ant-tabs {
+  flex: 1;
+  min-height: 0;
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.data-annotation-main-tabs > .ant-tabs-nav {
+  flex: 0 0 auto;
+  min-height: 33px;
+  height: auto;
+  margin: 0 0 25px !important;
+  overflow: visible;
+}
+
+.data-annotation-main-tabs > .ant-tabs-content-holder {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.data-annotation-main-tabs > .ant-tabs-content-holder > .ant-tabs-content {
+  height: 100%;
+}
+
+.data-annotation-main-tabs > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.data-annotation-tab-pane {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.data-annotation-sub-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.data-annotation-sub-tabs > .ant-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.data-annotation-sub-tabs > .ant-tabs > .ant-tabs-nav {
+  flex: 0 0 auto;
+}
+
+.data-annotation-sub-tabs > .ant-tabs > .ant-tabs-content-holder {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.data-annotation-sub-tabs > .ant-tabs > .ant-tabs-content-holder > .ant-tabs-content {
+  height: 100%;
+}
+
+.data-annotation-sub-tabs > .ant-tabs > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.data-annotation-main-tabs .ant-tabs-tabpane-hidden,
+.data-annotation-sub-tabs .ant-tabs-tabpane-hidden {
+  display: none !important;
+}
+
+.data-annotation-main-tabs > .ant-tabs-nav::before {
+  border-bottom: 1px solid rgba(233, 236, 239, 1);
+}
+
+.data-annotation-main-tabs > .ant-tabs-nav .ant-tabs-tab {
+  height: auto;
+  min-height: 32px;
+  margin: 0 0 0 40px !important;
+  padding: 0 0 12px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.data-annotation-main-tabs > .ant-tabs-nav .ant-tabs-tab-btn {
+  line-height: 20px;
+}
+
+.data-annotation-main-tabs > .ant-tabs-nav .ant-tabs-tab:first-child {
+  margin-left: 0 !important;
+}
+
+.data-annotation-main-tabs > .ant-tabs-nav .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: rgba(0, 71, 187, 1);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 500;
+}
+
+.data-annotation-main-tabs > .ant-tabs-nav .ant-tabs-ink-bar {
+  height: 2px;
+  background: rgba(0, 71, 187, 1.0);
+}
+
+.data-annotation-workflow-step {
+  height: 82px;
+  background: linear-gradient(90deg, rgba(246,249,251,1) 0%, rgba(233,241,252,1) 57%, rgba(223,235,255,1) 100%);
+  border: 1px solid rgba(255,255,255,1);
+  clip-path: polygon(0 0, calc(100% - 40px) 0, 100% 50%, calc(100% - 40px) 100%, 0 100%, 40px 50%);
+  margin-left: -40px;
+}
+
+.data-annotation-workflow-step:first-child {
+  clip-path: polygon(0 0, calc(100% - 40px) 0, 100% 50%, calc(100% - 40px) 100%, 0 100%);
+  margin-left: 0;
+}
+
+.data-annotation-workflow-step:last-child {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 40px 50%);
+}
+
+.data-annotation-segmented {
+  width: 182px;
+  height: 40px;
+  padding: 3px;
+  border-radius: 6px;
+  background: rgba(236, 238, 239, 1.0);
+}
+
+.data-annotation-segmented .ant-segmented-group {
+  height: 34px;
+}
+
+.data-annotation-segmented .ant-segmented-item {
+  width: 88px;
+  min-height: 34px;
+  border-radius: 6px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.data-annotation-segmented .ant-segmented-item-label {
+  min-height: 34px;
+  line-height: 34px;
+}
+
+.data-annotation-segmented .ant-segmented-item-selected {
+  background-color: rgba(255, 255, 255, 1.0);
+  box-shadow: 0px 0px 4px 0px rgba(0, 0, 0, 0.05);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 500;
+}
+
+.data-annotation-multi-segmented {
+  width: auto;
+  min-width: 272px;
+}
+
+.data-annotation-multi-segmented .ant-segmented-item {
+  min-width: 88px;
+}
+
+.data-annotation-search.ant-input-affix-wrapper {
+  width: 180px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgba(216, 217, 220, 1);
+  border-radius: 6px;
+  color: rgba(24, 24, 25, 1);
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.data-annotation-search .ant-input {
+  height: 24px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.data-annotation-search .ant-input::placeholder {
+  color: rgba(157, 161, 167, 1);
+}
+
+.data-annotation-refresh-btn.ant-btn,
+.data-annotation-create-btn.ant-btn {
+  height: 36px;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.data-annotation-refresh-btn.ant-btn {
+  width: 88px;
+  border-color: rgba(216, 217, 220, 1);
+  background: rgba(255, 255, 255, 1.0);
+  color: rgba(24, 24, 25, 1);
+}
+
+.data-annotation-create-btn.ant-btn {
+  width: 130px;
+  background: rgba(0, 71, 187, 1.0);
+  color: rgba(255, 255, 255, 1);
+}
+
+.data-annotation-table .ant-table {
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+}
+
+.data-annotation-table-block {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.data-annotation-table.ant-table-wrapper {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.data-annotation-table .ant-table {
+  max-height: 590px;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+}
+
+.data-annotation-table .ant-table-body {
+  max-height: 550px !important;
+}
+
+.data-annotation-table .ant-table-thead > tr > th {
+  height: 40px;
+  padding: 10px 16px !important;
+  border-bottom: none !important;
+  background: rgba(244, 246, 248, 1.0) !important;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.data-annotation-table .ant-table-tbody > tr > td {
+  height: 50px;
+  padding: 15px 16px !important;
+  border-bottom: 1px solid rgba(232, 233, 234, 1.0) !important;
+  line-height: 20px;
+}
+
+.data-annotation-table .ant-table-tbody > tr.ant-table-measure-row,
+.data-annotation-table .ant-table-tbody > tr.ant-table-measure-row > td {
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  line-height: 0 !important;
+  visibility: hidden;
+}
+
+.data-annotation-table .ant-table-cell::before {
+  display: none;
+}
+
+.data-annotation-table .ant-progress-line {
+  width: 150px;
+}
+
+.data-annotation-table .ant-progress-bg {
+  height: 6px !important;
+  border-radius: 2px;
+}
+
+.data-annotation-table .ant-progress-inner {
+  background: rgba(244, 246, 248, 1.0);
+}
+
+.data-annotation-table .ant-pagination {
+  display: flex;
+  align-items: center;
+  margin: 22px 0 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.data-annotation-table .ant-pagination-total-text {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  margin-inline-end: 24px;
+  line-height: 32px;
+}
+
+.data-annotation-table .ant-pagination .ant-pagination-item,
+.data-annotation-table .ant-pagination .ant-pagination-prev,
+.data-annotation-table .ant-pagination .ant-pagination-next,
+.data-annotation-table .ant-pagination .ant-pagination-jump-prev,
+.data-annotation-table .ant-pagination .ant-pagination-jump-next {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  margin-inline-end: 8px;
+  border-radius: 6px;
+  line-height: 30px;
+}
+
+.data-annotation-table .ant-pagination .ant-pagination-item a,
+.data-annotation-table .ant-pagination .ant-pagination-prev .ant-pagination-item-link,
+.data-annotation-table .ant-pagination .ant-pagination-next .ant-pagination-item-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+}
+
+.data-annotation-table .ant-pagination .ant-pagination-item-active {
+  background-color: #ECEEEF;
+  border-color: #ECEEEF;
+}
+
+.data-annotation-table .ant-pagination .ant-pagination-item-active a {
+  color: inherit;
+  font-weight: 400 !important;
+}
+
+.data-annotation-table .ant-pagination .ant-pagination-options {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  margin-inline-start: 24px;
+}
+
+.data-annotation-table .ant-pagination .ant-pagination-options-quick-jumper {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  line-height: 32px;
+}
+
+.data-annotation-table .ant-pagination .ant-select-selector,
+.data-annotation-table .ant-pagination .ant-pagination-options-quick-jumper input {
+  box-sizing: border-box;
+  height: 32px;
+  border-color: rgba(216, 217, 220, 1);
+  border-radius: 6px;
+}
+
+.data-annotation-table .ant-pagination .ant-pagination-options-quick-jumper input {
+  display: inline-flex;
+  align-items: center;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 30px;
+  vertical-align: middle;
+}
+
+.data-annotation-table .ant-pagination .ant-select-single,
+.data-annotation-table .ant-pagination .ant-pagination-options-size-changer {
+  height: 32px;
+}
+
+.data-annotation-table .ant-pagination .ant-select-single .ant-select-selector {
+  display: flex;
+  align-items: center;
+}
+
+.data-annotation-table .ant-pagination .ant-select-single .ant-select-selection-item,
+.data-annotation-table .ant-pagination .ant-select-single .ant-select-selection-placeholder {
+  line-height: 30px;
+}
+
+.data-annotation-table .ant-pagination .ant-select-single .ant-select-arrow {
+  margin-top: 0;
+  transform: translateY(-50%);
+}
+
+.data-annotation-table .ant-table-cell .ant-btn-link {
+  height: 20px;
+  padding: 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.data-annotation-table .ant-table-cell .ant-btn-link .anticon {
+  color: rgba(24, 24, 25, 1);
+  font-size: 16px;
+}
+
+.data-annotation-table .ant-table-cell .ant-btn-link:hover,
+.data-annotation-table .ant-table-cell .ant-btn-link:hover .anticon {
+  color: rgba(0, 71, 187, 1) !important;
+}
+
+.data-annotation-table .ant-table-cell .ant-btn-link[disabled],
+.data-annotation-table .ant-table-cell .ant-btn-link[disabled] .anticon,
+.data-annotation-table .ant-table-cell .ant-btn-link.ant-btn-dangerous[disabled],
+.data-annotation-table .ant-table-cell .ant-btn-link.ant-btn-dangerous[disabled] .anticon {
+  color: rgba(157, 161, 167, 1) !important;
+}
+
+.data-annotation-table .ant-table-cell .ant-btn-link.ant-btn-dangerous:not([disabled]) {
+  color: rgba(24, 24, 25, 1);
+}
+
+.data-annotation-table .ant-table-cell .ant-btn-link.ant-btn-dangerous:not([disabled]) .anticon {
+  color: rgba(24, 24, 25, 1);
+}
+
+.data-annotation-action-cell {
+  display: inline-flex;
+  width: 136px;
+  min-width: 136px;
+  max-width: 136px;
+  align-items: center;
+  gap: 8px;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.data-annotation-action-cell .ant-btn {
+  flex: 0 0 auto;
+}
+
+.data-annotation-action-cell .data-annotation-more-action.ant-btn {
+  width: 20px;
+  min-width: 20px;
+  padding: 0;
+}
+
+.data-annotation-action-cell .data-annotation-more-action.ant-btn .anticon {
+  font-size: 18px;
+}
+
+.data-annotation-action-cell .data-annotation-more-action.ant-btn svg {
+  transform: rotate(90deg);
+}
+
+.data-annotation-page .ant-tabs-top > .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+.data-annotation-page .ant-tabs-tab-btn {
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+}
+
+.data-annotation-page .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: rgba(0, 71, 187, 1);
+}
+
+.data-annotation-page .ant-tabs-ink-bar {
+  background: rgba(0, 71, 187, 1.0);
+}

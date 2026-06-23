@@ -1,0 +1,198 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# useXAgent
+
+## 何时使用
+
+与后端模型进行交互，提供抽象数据流。
+
+## 代码演示
+
+<!-- prettier-ignore -->
+<code src="./demo/preset.tsx">预设请求</code>
+<code src="./demo/requestParams.tsx">自定义入参</code>
+<code src="./demo/custom.tsx">自定义请求</code>
+<code src="./demo/model.tsx">模型接入</code>
+<code src="./demo/request-options.tsx">变更配置</code>
+
+## API
+
+```tsx | pure
+type useXAgent<AgentMessage> = (
+  config: XAgentConfigPreset | XAgentConfigCustom<AgentMessage>,
+) => [Agent];
+```
+
+### XAgentConfigPreset
+
+使用预设协议进行请求，尚未实现协议。
+
+| 属性 | 说明 | 类型 | 默认值 | 版本 |
+| --- | --- | --- | --- | --- |
+| baseURL | 请求服务端地址 | string | - |  |
+| key | 请求密钥 | string | - |  |
+| model | 协议模型 | string | - |  |
+| dangerouslyApiKey | **注意: 🔥 `dangerouslyApiKey` 存在安全风险，对此有详细的[说明](/docs/react/dangerously-api-key-cn)。** | string | - | - |
+
+### XAgentConfigCustom
+
+自定义请求协议。
+
+| 属性    | 说明                         | 类型      | 默认值 | 版本 |
+| ------- | ---------------------------- | --------- | ------ | ---- |
+| request | 配置自定义请求，支持流式更新 | RequestFn |        |      |
+
+#### RequestFn
+
+更多请查看 [XStreamOptions](/components/x-stream-cn#xstreamoptions)。
+
+```tsx | pure
+interface RequestFnInfo<Message> extends AnyObject {
+  messages?: Message[];
+  message?: Message;
+}
+
+type RequestFn<Message, Input, Output> = (
+  info: RequestFnInfo<Message, Input>,
+  callbacks: {
+    onUpdate: (chunk: Output) => void;
+    onSuccess: (chunks: Output[]) => void;
+    onError: (error: Error) => void;
+    onStream?: (abortController: AbortController) => void;
+  },
+  transformStream?: XStreamOptions<Message>['transformStream'],
+) => void;
+```
+
+### Agent
+
+| 属性 | 说明 | 类型 | 版本 |
+| --- | --- | --- | --- |
+| request | 调用 `useXAgent` 配置的请求，[详情](https://x.ant.design/components/x-request) | RequestFn |  |
+| isRequesting | 是否正在请求 | () => boolean |  |
+
+
+# useXChat
+---
+category: Components
+group:
+  title: 工具
+  order: 5
+title: useXChat
+subtitle: 数据管理
+description: 配合 Agent hook 进行对话数据管理。
+cover: https://mdn.alipayobjects.com/huamei_iwk9zp/afts/img/A*pJrtTaf-bWAAAAAAAAAAAAAADgCCAQ/original
+coverDark: https://mdn.alipayobjects.com/huamei_iwk9zp/afts/img/A*6ySvTqb7XhkAAAAAAAAAAAAADgCCAQ/original
+demo:
+  cols: 1
+---
+
+## 何时使用
+
+通过 Agent 进行会话数据管理，并产出供页面渲染使用的数据。
+
+## 代码演示
+
+<!-- prettier-ignore -->
+<code src="./demo/basic.tsx">基本</code>
+<code src="./demo/stream.tsx">流式输出</code>
+<code src="./demo/suggestions.tsx">多项建议</code>
+<code src="./demo/model.tsx">模型接入</code>
+
+## API
+
+```tsx | pure
+type useXChat<
+  AgentMessage,
+  ParsedMessage = AgentMessage,
+  Input = RequestParams<AgentMessage>,
+  Output = SSEOutput,
+> = (config: XChatConfig<AgentMessage, ParsedMessage>) => XChatConfigReturnType;
+```
+
+### XChatConfig
+
+<!-- prettier-ignore -->
+| 属性 | 说明 | 类型 | 默认值 | 版本 |
+| --- | --- | --- | --- | --- |
+| agent | 通过 `useXAgent` 生成的 `agent`，当使用 `onRequest` 方法时, `agent` 参数是必需的。 | XAgent | - | - |
+| defaultMessages | 默认展示信息 | { status, message }[] | - | - |
+| parser | 将 AgentMessage 转换成消费使用的 ParsedMessage，不设置时则直接消费 AgentMessage。支持将一条 AgentMessage 转换成多条 ParsedMessage | (message: AgentMessage) => BubbleMessage \| BubbleMessage[] | - | - |
+| requestFallback | 请求失败的兜底信息，不提供则不会展示 | AgentMessage \| () => AgentMessage | - | - |
+| requestPlaceholder | 请求中的占位信息，不提供则不会展示 | AgentMessage \| () => AgentMessage | - | - |
+| transformMessage | 可在更新数据时对`messages`做转换，同时会更新到`messages` | (info: {originMessage?: AgentMessage,chunk: Output,chunks: Output[],status: MessageStatus}) => AgentMessage| - | - |
+| transformStream | 可选的转换函数，用于处理流数据 | `XStreamOptions<Output>['transformStream']` | - | - |
+| resolveAbortController | `AbortController` 控制器，用于控制流状态 | (abortController: AbortController) => void| - | - |
+
+### XChatConfigReturnType
+
+| 属性 | 说明 | 类型 | 默认值 | 版本 |
+| --- | --- | --- | --- | --- |
+| messages | 当前管理的内容 | AgentMessages[] | - | - |
+| parsedMessages | 经过 `parser` 转译过的内容 | ParsedMessages[] | - | - |
+| onRequest | 添加一条 Message，并且触发请求，若无`key`为`message`的数据则会将整个数据做为消息处理 | (requestParams: AgentMessage \| RequestParams) => void | - | - |
+| setMessages | 直接修改 messages，不会触发请求 | (messages: { message, status }[]) => void | - | - |
+
+### RequestParams
+
+继承 [XRequestParams](https://x.ant.design/components/x-request#xrequestparams)。
+
+| 属性    | 说明           | 类型         | 默认值 | 版本 |
+| ------- | -------------- | ------------ | ------ | ---- |
+| message | 当前消息的内容 | AgentMessage | -      | -    |
+
+# XStream
+---
+category: Components
+group:
+  title: 工具
+  order: 5
+title: XStream
+subtitle: 流
+order: 1
+description: 转换可读数据流
+demo:
+  cols: 1
+cover: https://mdn.alipayobjects.com/huamei_iwk9zp/afts/img/A*OD9kTJOmGdsAAAAAAAAAAAAADgCCAQ/original
+coverDark: https://mdn.alipayobjects.com/huamei_iwk9zp/afts/img/A*PxJISo5t2YgAAAAAAAAAAAAADgCCAQ/original
+---
+
+## 何时使用
+
+- 将 SSE 协议的 `ReadableStream` 转换为 `Record`
+- 将任何协议的 `ReadableStream` 解码并读取
+
+## 使用说明
+
+常见的 `ReadableStream` 实例，如 `await fetch(...).body` 使用示例:
+
+```js
+import { XStream } from '@ant-design/x';
+
+async function request() {
+  const response = await fetch();
+  // .....
+
+  for await (const chunk of XStream({
+    readableStream: response.body,
+  })) {
+    console.log(chunk);
+  }
+}
+```
+
+## 代码演示
+
+<code src="./demo/default-protocol.tsx">默认协议 - SSE</code> <code src="./demo/custom-protocol.tsx">自定义协议</code>
+
+## API
+
+### XStreamOptions
+
+| 属性 | 说明 | 类型 | 默认值 | 版本 |
+| --- | --- | --- | --- | --- |
+| readableStream | ReadableStream 实例 | ReadableStream<'Uint8Array'> | - | - |
+| transformStream | 自定义的 transformStream 用于转换流的处理 | TransformStream<string, T> | sseTransformStream | - |

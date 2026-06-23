@@ -1,0 +1,132 @@
+.openapi-access-key-page {
+  display: flex;
+  height: calc(100% - 21px);
+  min-height: 640px;
+  flex-direction: column;
+  margin: 0 10px 21px 0;
+  padding: 20px 20px 16px !important;
+  overflow: hidden;
+  border-radius: var(--lab-radius-lg);
+  background: var(--lab-color-surface-elevated) !important;
+  box-shadow: 0 2px 8px rgba(24, 24, 25, 0.06);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.openapi-access-key-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.openapi-access-key-title-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.openapi-access-key-icon {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2b7ab4, var(--lab-color-brand-primary));
+  color: var(--lab-color-surface-elevated);
+  font-size: 18px;
+}
+
+.openapi-access-key-page-title.ant-typography {
+  height: 28px;
+  margin: 0 0 10px !important;
+  color: var(--lab-color-text-primary);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.openapi-access-key-page-desc.ant-typography {
+  display: block;
+  height: 20px;
+  color: var(--lab-color-text-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.openapi-access-key-toolbar {
+  margin-bottom: 16px;
+}
+
+.openapi-access-key-doc-btn.ant-btn,
+.openapi-access-key-create-btn.ant-btn {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 16px;
+  border-radius: var(--lab-radius-md);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.openapi-access-key-create-btn.ant-btn {
+  background: var(--lab-color-brand-primary);
+  color: var(--lab-color-surface-elevated);
+}
+
+.openapi-access-key-table-card {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  padding: 24px;
+  overflow: hidden;
+  border: 1px solid #e8e9ea;
+  border-radius: var(--lab-radius-lg);
+  background: var(--lab-color-surface-elevated);
+}
+
+.openapi-access-key-section-title {
+  display: inline-flex;
+  height: 22px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  color: var(--lab-color-text-primary);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+.openapi-access-key-value {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+}
+
+.openapi-access-key-code {
+  max-width: 280px;
+  padding: 1px 6px;
+  overflow: hidden;
+  border: var(--lab-border-control);
+  border-radius: var(--lab-radius-sm);
+  background: var(--lab-color-surface-page);
+  color: var(--lab-color-text-primary);
+  font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.openapi-access-key-delete.ant-btn-link {
+  height: 20px;
+  padding: 0;
+  color: #f53f3f;
+  line-height: 20px;
+}

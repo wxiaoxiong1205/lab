@@ -1,0 +1,340 @@
+.case-file-explorer {
+  .file-tree-card {
+    .ant-card-body {
+      padding: 8px;
+    }
+    
+    .ant-tree {
+      background: transparent;
+      
+      .ant-tree-node-content-wrapper {
+        padding: 2px 8px;
+        border-radius: 4px;
+        
+        &:hover {
+          background-color: #f0f0f0;
+        }
+        
+        &.ant-tree-node-selected {
+          background-color: #e6f7ff;
+        }
+      }
+      
+      .ant-tree-title {
+        font-size: 13px;
+        color: #333;
+        
+        .anticon {
+          margin-right: 6px;
+        }
+      }
+      
+      .ant-tree-switcher {
+        width: 16px;
+        height: 16px;
+        line-height: 16px;
+        
+        .ant-tree-switcher-icon {
+          font-size: 12px;
+        }
+      }
+    }
+  }
+  
+  .file-content-card {
+    .ant-card-body {
+      padding: 0;
+      height: calc(100% - 56px);
+      overflow: auto;
+    }
+    
+    .ant-card-head {
+      border-bottom: 1px solid #f0f0f0;
+      
+      .ant-card-head-title {
+        font-size: 14px;
+        font-weight: 500;
+        
+        .anticon {
+          margin-right: 6px;
+        }
+      }
+      
+      .ant-card-extra {
+        .ant-btn {
+          border: none;
+          box-shadow: none;
+          
+          &:hover {
+            background-color: #f0f0f0;
+          }
+        }
+      }
+    }
+  }
+}
+
+/* 文件图标样式 */
+.case-file-explorer .ant-tree-title .anticon {
+  &.case-file-icon-ipynb {
+    color: #f57c00;
+    filter: drop-shadow(0 0 2px rgba(245, 124, 0, 0.3));
+  }
+
+  &.case-file-icon-md {
+    color: #0366d6;
+    filter: drop-shadow(0 0 2px rgba(3, 102, 214, 0.3));
+  }
+
+  &.case-file-icon-py {
+    color: #3776ab;
+    filter: drop-shadow(0 0 2px rgba(55, 118, 171, 0.3));
+  }
+
+  &.case-file-icon-js {
+    color: #f7df1e;
+  }
+
+  &.case-file-icon-ts {
+    color: #3178c6;
+  }
+
+  &.case-file-icon-json {
+    color: #000;
+  }
+
+  &.case-file-icon-excel {
+    color: #207245;
+  }
+
+  &.case-file-icon-pdf {
+    color: #d32f2f;
+  }
+
+  &.case-file-icon-image {
+    color: #4caf50;
+  }
+}
+
+/* 文件内容区域样式 */
+.case-file-explorer .file-content-card {
+  .jupyter-viewer {
+    height: 100%;
+    overflow-y: auto;
+  }
+  
+  .markdown-content {
+    line-height: 1.6;
+    
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 24px;
+      margin-bottom: 16px;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+    
+    h1 {
+      font-size: 2em;
+      border-bottom: 1px solid #eaecef;
+      padding-bottom: 0.3em;
+    }
+    
+    h2 {
+      font-size: 1.5em;
+      border-bottom: 1px solid #eaecef;
+      padding-bottom: 0.3em;
+    }
+    
+    p {
+      margin-bottom: 16px;
+    }
+    
+    ul, ol {
+      padding-left: 2em;
+      margin-bottom: 16px;
+    }
+    
+    li {
+      margin-bottom: 4px;
+    }
+    
+    code {
+      background-color: rgba(27, 31, 35, 0.05);
+      border-radius: 3px;
+      font-size: 85%;
+      margin: 0;
+      padding: 0.2em 0.4em;
+    }
+    
+    pre {
+      background-color: #f6f8fa;
+      border-radius: 6px;
+      font-size: 85%;
+      line-height: 1.45;
+      overflow: auto;
+      padding: 16px;
+      margin-bottom: 16px;
+      
+      code {
+        background-color: transparent;
+        border: 0;
+        display: inline;
+        line-height: inherit;
+        margin: 0;
+        max-width: auto;
+        overflow: visible;
+        padding: 0;
+        white-space: pre;
+        word-wrap: normal;
+      }
+    }
+    
+    blockquote {
+      border-left: 4px solid #dfe2e5;
+      color: #6a737d;
+      margin-bottom: 16px;
+      padding: 0 1em;
+    }
+    
+    table {
+      border-collapse: collapse;
+      border-spacing: 0;
+      display: block;
+      overflow: auto;
+      width: 100%;
+      margin-bottom: 16px;
+      
+      th, td {
+        border: 1px solid #dfe2e5;
+        padding: 6px 13px;
+      }
+      
+      th {
+        background-color: #f6f8fa;
+        font-weight: 600;
+      }
+      
+      tr:nth-child(2n) {
+        background-color: #f6f8fa;
+      }
+    }
+  }
+  
+  .code-content {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    font-size: 12px;
+    line-height: 1.45;
+    
+    .react-syntax-highlighter {
+      margin: 0 !important;
+      border-radius: 6px;
+      
+      code {
+        font-family: inherit;
+      }
+    }
+  }
+  
+  .text-content {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    font-size: 12px;
+    line-height: 1.45;
+    color: #24292e;
+    
+    pre {
+      background-color: #f6f8fa;
+      border-radius: 6px;
+      overflow: auto;
+      padding: 16px;
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .case-file-explorer .ant-col:first-child {
+    span: 8;
+  }
+  
+  .case-file-explorer .ant-col:last-child {
+    span: 16;
+  }
+}
+
+@media (max-width: 768px) {
+  .case-file-explorer .ant-row {
+    flex-direction: column;
+  }
+  
+  .case-file-explorer .ant-col {
+    width: 100% !important;
+    margin-bottom: 16px;
+  }
+  
+  .case-file-explorer .file-tree-card {
+    height: 300px;
+  }
+}
+
+/* 滚动条样式 */
+.case-file-explorer .file-content-card .ant-card-body {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+  
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+    
+    &:hover {
+      background: #a8a8a8;
+    }
+  }
+}
+
+/* 加载状态 */
+.case-file-explorer .loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  
+  .ant-spin {
+    .ant-spin-dot {
+      font-size: 24px;
+    }
+  }
+}
+
+/* 空状态 */
+.case-file-explorer .empty-state {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #999;
+  
+  .anticon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    color: #d9d9d9;
+  }
+  
+  .empty-text {
+    font-size: 14px;
+    color: #999;
+  }
+} 

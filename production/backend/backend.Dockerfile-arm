@@ -1,0 +1,82 @@
+# FROM python:3.10.16-slim
+
+# WORKDIR /app
+
+# # Install PostgreSQL development libraries needed for psycopg2
+# RUN apt-get update && \
+#     apt-get install -y libpq-dev gcc && \
+#     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# COPY requirements.txt .
+# RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
+#     pip install -r requirements.txt
+
+# COPY ./app ./app
+
+# CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# FROM deploy.deepexi.com/applife/deep-dataset-distillation-backend:base 
+
+# WORKDIR /app
+
+# COPY requirements.txt .
+# RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
+#     pip install -r requirements.txt
+
+# # 安装juicefs依赖
+# RUN apt-get update && \
+#     apt-get install -y curl fuse && \
+#     rm -rf /var/lib/apt/lists/*
+
+# # 下载并安装 JuiceFS CLI（社区版）
+# RUN curl -sSL https://d.juicefs.com/install | sh -
+
+# # 验证
+# RUN juicefs --version
+
+# COPY ./app ./app
+# COPY celery_worker.py .
+# COPY init_db.py .
+# COPY status_manager.py .
+# COPY alembic.ini .
+# COPY migrations ./migrations
+# COPY entrypoint.sh .
+# COPY helm-v3.18.4-linux-amd64.tar.gz .
+# RUN tar -zxvf helm-v3.18.4-linux-amd64.tar.gz && \
+#     mv linux-amd64/helm /usr/local/bin/ && \
+#     rm -rf helm-v3.18.4-linux-amd64.tar.gz
+   
+# # 设置启动脚本权限
+# RUN chmod +x /app/entrypoint.sh
+
+# CMD ["/app/entrypoint.sh"]
+
+
+FROM deploy.deepexi.com/applife/deep-dataset-distillation-backend:base-20251115-arm
+WORKDIR /app
+#COPY ./libssl1.1_1.1.1w-0+deb11u1_arm64.deb /tmp/
+#RUN set -eux; \
+#    apt-get install -y --no-install-recommends /tmp/libssl1.1_1.1.1w-0+deb11u1_arm64.deb;
+#ENV LD_LIBRARY_PATH="/app:${LD_LIBRARY_PATH}"
+#时区处理
+RUN rm /etc/localtime
+RUN ln -s /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+
+COPY requirements.txt .
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
+pip install -r requirements.txt
+
+COPY ./app ./app
+COPY ./scripts ./scripts
+COPY celery_worker.py .
+COPY unified_manager.py .
+COPY entrypoint.sh .
+#COPY helm-v3.18.4-linux-arm64.tar.gz .
+#RUN tar -zxvf helm-v3.18.4-linux-arm64.tar.gz && \
+#    mv linux-arm64/helm /usr/local/bin/ && \
+#    rm -rf helm-v3.18.4-linux-arm64.tar.gz
+#COPY libcrypto.so /app/
+# 设置启动脚本权限
+RUN chmod +x /app/entrypoint.sh
+
+CMD ["/app/entrypoint.sh"]

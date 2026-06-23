@@ -1,0 +1,10 @@
+.training-config-deepspeed-option {
+  display: inline-flex;
+  min-width: 178px;
+  height: 40px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--lab-color-surface-elevated);
+  border: 1px solid #d9e1ec;
+  border-radius: var(--lab-radius-sm);
+}

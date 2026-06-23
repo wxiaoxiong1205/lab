@@ -1,0 +1,47 @@
+.thinkable-content {
+  width: 100%;
+  position: relative;
+}
+
+.think-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+  padding: 4px 8px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
+.think-section {
+  margin: 12px 0;
+  border-radius: 6px;
+  background-color: #fafafa;
+}
+
+.think-collapse .ant-collapse-header {
+  color: #1890ff !important;
+  font-weight: 500;
+  align-items: center;
+  display: flex !important;
+}
+
+.think-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1890ff;
+}
+
+.think-content {
+  padding: 12px;
+  background-color: #f0f8ff;
+  border-radius: 4px;
+  border-left: 3px solid #1890ff;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .think-content {
+    padding: 8px;
+  }
+} 

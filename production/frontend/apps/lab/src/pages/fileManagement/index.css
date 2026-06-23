@@ -1,0 +1,277 @@
+.file-management-container {
+  height: calc(100% - 21px);
+  min-height: 830px;
+  margin: 0 10px 21px 0;
+  overflow: hidden;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.file-management-container > .ant-card {
+  height: 100%;
+  min-height: 830px;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 1.0);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(24, 24, 25, 0.06);
+}
+
+.file-management-container > .ant-card > .ant-card-head {
+  min-height: 78px;
+  padding: 20px 20px 0;
+  border-bottom: 0;
+}
+
+.file-management-container > .ant-card > .ant-card-head .ant-card-head-title {
+  padding: 0;
+}
+
+.file-management-title-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.file-management-title.ant-typography {
+  height: 28px;
+  margin: 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+  white-space: nowrap;
+}
+
+.file-management-description.ant-typography {
+  height: 20px;
+  margin-top: 10px;
+  color: rgba(112, 118, 127, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.file-management-container > .ant-card > .ant-card-body {
+  padding: 20px;
+}
+
+.file-management-container .ant-form {
+  margin-bottom: 16px;
+}
+
+.file-management-container .ant-form-item {
+  margin-bottom: 0;
+}
+
+.file-management-container .ant-form-item-label {
+  height: 24px;
+  padding: 0 0 4px;
+}
+
+.file-management-container .ant-form-item-label > label {
+  height: 20px;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.file-management-container .ant-input,
+.file-management-container .ant-input-affix-wrapper,
+.file-management-container .ant-select-selector,
+.file-management-container .ant-btn {
+  height: 36px;
+  border-radius: 6px;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.file-management-container .ant-input,
+.file-management-container .ant-input-affix-wrapper,
+.file-management-container .ant-select-selector {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 36px !important;
+  padding: 0 12px !important;
+  border-color: rgba(216, 217, 220, 1) !important;
+}
+
+.file-management-container .ant-input::placeholder {
+  color: rgba(157, 161, 167, 1);
+}
+
+.file-management-container .file-management-search-input.ant-input-affix-wrapper {
+  width: 180px;
+}
+
+.file-management-container .file-management-search-input .ant-input-prefix {
+  width: 16px;
+  height: 16px;
+  margin-inline-end: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(24, 24, 25, 1);
+  font-size: 16px;
+}
+
+.file-management-container .file-management-search-input.ant-input-affix-wrapper .ant-input {
+  height: 34px !important;
+  padding: 0 !important;
+  line-height: 34px !important;
+}
+
+.file-management-container .ant-card-body > .ant-space {
+  margin-top: 0 !important;
+  margin-bottom: 16px !important;
+}
+
+.file-management-container .ant-btn {
+  padding: 6px 30px;
+  color: rgba(24, 24, 25, 1);
+  border-color: rgba(216, 217, 220, 1);
+  box-shadow: none;
+}
+
+.file-management-container .ant-btn-primary {
+  min-width: 116px;
+  padding: 8px 16px;
+  color: rgba(255, 255, 255, 1);
+  background-color: rgba(0, 71, 187, 1.0);
+  border-color: rgba(0, 71, 187, 1.0);
+}
+
+.file-management-container .ant-btn-primary .anticon {
+  font-size: 14px;
+}
+
+.file-management-container .file-management-refresh-button {
+  width: 88px;
+  padding: 6px 16px;
+}
+
+.file-management-container .file-management-create-button {
+  width: 116px;
+}
+
+.file-management-container .ant-table {
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.file-management-container .ant-table-thead > tr {
+  height: 40px !important;
+}
+
+.file-management-container .ant-table-thead > tr > th {
+  height: 40px;
+  padding: 10px 16px !important;
+  color: rgba(24, 24, 25, 1) !important;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px !important;
+  font-weight: normal !important;
+  line-height: 20px !important;
+  background-color: rgba(244, 246, 248, 1.0) !important;
+}
+
+.file-management-container .ant-table-tbody > tr:not(.ant-table-measure-row) > td {
+  height: 50px;
+  padding: 15px 16px !important;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  border-bottom: 1px solid rgba(232, 233, 234, 1.0);
+}
+
+.file-management-container .ant-table-tbody > tr.ant-table-measure-row,
+.file-management-container .ant-table-tbody > tr.ant-table-measure-row > td {
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  line-height: 0 !important;
+  visibility: hidden;
+  border: 0 !important;
+}
+
+.file-management-container .ant-table-tbody > tr:hover > td {
+  background-color: rgba(244, 246, 248, 1.0) !important;
+}
+
+.file-management-container .ant-table .ant-btn-link {
+  height: 20px;
+  padding: 0;
+  color: rgba(0, 71, 187, 1);
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.file-management-container .ant-table .ant-btn-link:hover,
+.file-management-container .ant-table .ant-btn-link:focus,
+.file-management-container .ant-table .ant-btn-link:active {
+  color: rgba(0, 71, 187, 1);
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.file-management-container .ant-table .ant-tag {
+  min-height: 24px;
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: normal;
+  line-height: 18px;
+}
+
+.file-management-container .ant-pagination {
+  margin: 22px 0 0;
+  color: rgba(24, 24, 25, 1);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.file-management-container .ant-pagination-total-text {
+  margin-inline-end: 24px;
+}
+
+.file-management-container .ant-pagination .ant-pagination-item,
+.file-management-container .ant-pagination .ant-pagination-prev,
+.file-management-container .ant-pagination .ant-pagination-next {
+  min-width: 32px;
+  height: 32px;
+  line-height: 30px;
+}
+
+.file-management-container .ant-pagination .ant-pagination-item-active {
+  background-color: rgba(236, 238, 239, 1.0);
+  border-color: rgba(236, 238, 239, 1.0);
+}
+
+.file-management-container .ant-pagination .ant-pagination-item-active a {
+  color: inherit;
+  font-weight: 400 !important;
+}
+
+.file-management-container .ant-pagination .ant-pagination-options {
+  margin-inline-start: 24px;
+}
+
+.file-management-container .ant-pagination .ant-select-selector,
+.file-management-container .ant-pagination .ant-pagination-options-quick-jumper input {
+  height: 32px;
+  border-color: rgba(216, 217, 220, 1);
+  border-radius: 6px;
+}

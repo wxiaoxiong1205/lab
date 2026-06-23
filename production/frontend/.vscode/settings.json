@@ -1,0 +1,21 @@
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "eslint.workingDirectories": [
+    {
+      "directory": "apps/lab",
+      "changeProcessCWD": true
+    },
+    {
+      "directory": "apps/dgi",
+      "changeProcessCWD": true
+    }
+  ]
+}

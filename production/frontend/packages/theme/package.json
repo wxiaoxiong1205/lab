@@ -1,0 +1,34 @@
+{
+  "name": "@deep/theme",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.js",
+  "module": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    },
+    "./preset": {
+      "types": "./preset.d.ts",
+      "import": "./preset.js",
+      "default": "./preset.js"
+    },
+    "./theme.css": "./theme.css",
+    "./themes": {
+      "import": "./themes.js",
+      "default": "./themes.js"
+    },
+    "./tokens": {
+      "types": "./tokens.d.ts",
+      "import": "./tokens.js",
+      "default": "./tokens.js"
+    }
+  },
+  "peerDependencies": {
+    "tailwindcss": "^4.1.0"
+  }
+}

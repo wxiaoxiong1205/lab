@@ -1,0 +1,110 @@
+/* HomePage 响应式样式 */
+
+.homepage-steps-wrapper {
+    overflow-x: auto;
+    overflow-y: hidden;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+    /* 细滚动条，默认半透明 */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+  }
+  
+  /* Webkit 浏览器滚动条样式 */
+  .homepage-steps-wrapper::-webkit-scrollbar {
+    height: 3px;
+  }
+  
+  .homepage-steps-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+  }
+  
+  .homepage-steps-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 3px;
+    transition: background 0.2s ease;
+  }
+  
+  /* 悬停时稍微加深滚动条 */
+  .homepage-steps-wrapper:hover::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.25);
+  }
+  
+  /* 滚动时加深滚动条 */
+  .homepage-steps-wrapper:active::-webkit-scrollbar-thumb,
+  .homepage-steps-wrapper:focus::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Firefox 滚动条样式 - 悬停和激活状态 */
+  .homepage-steps-wrapper:hover {
+    scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+  }
+  
+  .homepage-steps-wrapper:active,
+  .homepage-steps-wrapper:focus {
+    scrollbar-color: rgba(0, 0, 0, 0.3) transparent;
+  }
+  
+  .homepage-steps-wrapper .ant-steps {
+    min-width: max-content;
+    width: 100%;
+  }
+  
+  .homepage-step-title {
+    cursor: pointer;
+    word-break: break-word;
+    white-space: normal;
+  }
+  
+  .homepage-step-description {
+    word-break: break-word;
+    white-space: normal;
+    overflow-wrap: break-word;
+    max-width: 100%;
+  }
+  
+  .homepage-step-description .ant-typography {
+    margin: 0 !important;
+    word-break: break-word;
+    white-space: normal;
+  }
+  
+  /* 小屏幕优化 */
+  @media (max-width: 1200px) {
+    .homepage-steps-wrapper .ant-steps-item {
+      flex: 1 1 auto;
+      min-width: 120px;
+    }
+    
+    .homepage-step-description .ant-typography {
+      font-size: 11px;
+      line-height: 1.4;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .homepage-steps-wrapper .ant-steps {
+      flex-direction: column;
+    }
+    
+    .homepage-steps-wrapper .ant-steps-item {
+      width: 100%;
+      margin-bottom: 16px;
+    }
+    
+    .homepage-step-description .ant-typography {
+      font-size: 12px;
+    }
+  }
+  
+  /* 超小屏幕优化 */
+  @media (max-width: 480px) {
+    .homepage-step-description .ant-typography {
+      font-size: 11px;
+      line-height: 1.3;
+    }
+  }
+  
+  

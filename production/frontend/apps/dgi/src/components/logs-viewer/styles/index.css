@@ -1,0 +1,116 @@
+.logs-viewer-wrap-w2 {
+  position: relative;
+}
+
+.logs-viewer-wrap-w2 .pg {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  width: 40px;
+  height: 130px;
+}
+
+.logs-viewer-wrap-w2 .pg .pg-inner {
+  position: relative;
+}
+
+.logs-viewer-wrap-w2 .pg .pg-inner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -18px;
+  height: 185px;
+}
+
+.logs-viewer-wrap-w2 .pg .pg-inner::before:hover .pagination {
+  display: flex;
+}
+
+.logs-viewer-wrap-w2 .pg .pg-inner .pagination {
+  display: none;
+}
+
+.logs-viewer-wrap-w2 .pg .pg-inner:hover .pagination {
+  display: flex;
+}
+
+.logs-viewer-wrap-w2 .pg .pg-inner.at-top .pagination {
+  display: flex;
+}
+
+.logs-viewer-wrap-w2 .loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  padding-top: 100px;
+  display: flex;
+  justify-content: center;
+  background-color: var(--color-fill-spin-bg);
+}
+
+.logs-viewer-wrap-w2 .copy {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 100;
+}
+
+.logs-viewer-wrap-w2 .copy button {
+  color: rgba(255, 255, 255, 70%);
+  background-color: rgba(71, 71, 71, 100%);
+}
+
+.logs-viewer-wrap-w2 .copy button:hover {
+  color: rgba(255, 255, 255, 90%) !important;
+  background-color: rgba(71, 71, 71, 100%) !important;
+}
+
+.logs-viewer-wrap-w2 .wrap {
+  padding: 5px 0 2px 10px;
+  background-color: var(--color-logs-bg);
+  border-radius: var(--border-radius-mini);
+  font-family: monospace, Menlo, Courier, 'Courier New', Consolas, Monaco,
+    'Liberation Mono' !important;
+}
+
+.logs-viewer-wrap-w2 .wrap .content {
+  word-wrap: break-word;
+  height: 100%;
+  padding-right: 2px;
+  color: var(--color-logs-text);
+  font-size: var(--font-size-small);
+  line-height: 22px;
+  white-space: pre-wrap;
+  background-color: var(--color-logs-bg);
+}
+
+.logs-viewer-wrap-w2 .wrap .content.line-break {
+  word-wrap: break-word;
+}
+
+.logs-viewer-wrap-w2 .wrap .content .text {
+  min-height: 22px;
+}
+
+.logs-viewer-wrap-w2 .xterm .xterm-viewport {
+  overflow-y: auto !important;
+}
+
+.logs-viewer-wrap-w2 .xterm .xterm-viewport::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+.logs-viewer-wrap-w2 .xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  background-color: var(--color-scrollbar-thumb);
+  border-radius: 4px;
+}
+
+.logs-viewer-wrap-w2 .xterm .xterm-viewport::-webkit-scrollbar-track {
+  background-color: var(--color-scrollbar-track);
+  border-radius: 4px;
+}

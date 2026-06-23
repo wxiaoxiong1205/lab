@@ -1,0 +1,46 @@
+
+:root {
+  --lab-color-text-primary: rgba(24, 24, 25, 1);
+  --lab-color-text-secondary: rgba(31, 31, 31, 1);
+  --lab-color-text-muted: rgba(112, 118, 127, 1);
+  --lab-color-brand-primary: rgba(0, 71, 187, 1);
+  --lab-color-brand-border-active: rgba(0, 71, 187, 0.7);
+  --lab-color-surface-page: rgba(248, 249, 250, 1);
+  --lab-color-surface-elevated: rgba(255, 255, 255, 1);
+  --lab-color-surface-subtle: rgba(244, 246, 248, 1);
+  --lab-color-surface-muted: rgba(236, 238, 239, 1);
+  --lab-color-surface-readonly: rgba(250, 250, 250, 1);
+  --lab-color-divider: rgba(233, 236, 239, 1);
+  --lab-color-border-subtle: rgba(232, 232, 232, 1);
+  --lab-color-border-control: rgba(216, 217, 220, 1);
+  --lab-color-placeholder: rgba(157, 161, 167, 1);
+  --lab-color-danger: rgba(224, 32, 32, 1);
+  --lab-color-success: rgba(50, 190, 72, 1);
+  --lab-color-warning: rgba(250, 140, 22, 1);
+  --lab-color-project-folder: rgba(255, 210, 61, 1);
+  --lab-color-cyan: rgba(19, 194, 194, 1);
+  --lab-color-sky: rgba(22, 185, 250, 1);
+  --lab-color-purple: rgba(114, 46, 209, 1);
+  --lab-color-magenta: rgba(235, 47, 150, 1);
+  --lab-chart-run-1: rgba(136, 132, 216, 1);
+  --lab-chart-run-2: rgba(130, 202, 157, 1);
+  --lab-color-brand-selected-bg: rgba(238, 248, 255, 1);
+  --lab-color-brand-soft-bg: rgba(241, 247, 251, 1);
+  --lab-color-surface-control-muted: rgba(244, 246, 248, 1);
+  --lab-shadow-page-card: 0 2px 6px 0 rgba(0, 0, 0, 0.05);
+  --lab-shadow-card: 2px 2px 8px 0 rgba(0, 0, 0, 0.12);
+  --lab-shadow-soft: 0 0 4px 0 rgba(0, 0, 0, 0.1);
+  --lab-shadow-brand: 0 2px 4px 0 rgba(0, 71, 187, 0.12);
+  --lab-radius-xs: 2px;
+  --lab-radius-sm: 4px;
+  --lab-radius-md: 6px;
+  --lab-radius-lg: 8px;
+  --lab-radius-pill: 999px;
+  --lab-border-subtle: 1px solid var(--lab-color-divider);
+  --lab-border-control: 1px solid var(--lab-color-border-control);
+  --lab-space-xs: 4px;
+  --lab-space-sm: 8px;
+  --lab-space-md: 16px;
+  --lab-space-lg: 24px;
+  --lab-space-xl: 32px;
+}

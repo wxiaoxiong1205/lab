@@ -1,0 +1,9 @@
+/* 隐藏被禁用的父节点复选框 */
+.model-cascader-no-parent-checkbox .ant-cascader-checkbox-disabled {
+  display: none !important;
+}
+
+/* 调整没有复选框的菜单项，使文本左对齐 */
+.model-cascader-no-parent-checkbox .ant-cascader-menu-item-disabled .ant-cascader-checkbox + span {
+  margin-left: -24px;
+}

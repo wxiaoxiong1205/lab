@@ -1,0 +1,104 @@
+/* @ts-ingore */
+pre code.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 1em;
+}
+
+code.hljs {
+  padding: 3px 5px;
+}
+
+/*
+
+Atom One Light by Daniel Gamage
+Original One Light Syntax theme from https://github.com/atom/one-light-syntax
+
+base:    #fafafa
+mono-1:  #383a42
+mono-2:  #686b77
+mono-3:  #a0a1a7
+hue-1:   #0184bb
+hue-2:   #4078f2
+hue-3:   #a626a4
+hue-4:   #50a14f
+hue-5:   #e45649
+hue-5-2: #c91243
+hue-6:   #986801
+hue-6-2: #c18401
+
+*/
+.code-pre.light .hljs {
+  color: #383a42;
+  background: var(--color-editor-light);
+}
+
+.code-pre.light .hljs-comment,
+.code-pre.light .hljs-quote {
+  color: #a0a1a7;
+  font-style: italic;
+}
+
+.code-pre.light .hljs-doctag,
+.code-pre.light .hljs-keyword,
+.code-pre.light .hljs-formula {
+  color: #a626a4;
+}
+
+.code-pre.light .hljs-section,
+.code-pre.light .hljs-name,
+.code-pre.light .hljs-selector-tag,
+.code-pre.light .hljs-deletion,
+.code-pre.light .hljs-subst {
+  color: #e45649;
+}
+
+.code-pre.light .hljs-literal {
+  color: #0184bb;
+}
+
+.code-pre.light .hljs-string,
+.code-pre.light .hljs-regexp,
+.code-pre.light .hljs-addition,
+.code-pre.light .hljs-attribute,
+.code-pre.light .hljs-meta .hljs-string {
+  color: #50a14f;
+}
+
+.code-pre.light .hljs-attr,
+.code-pre.light .hljs-variable,
+.code-pre.light .hljs-template-variable,
+.code-pre.light .hljs-type,
+.code-pre.light .hljs-selector-class,
+.code-pre.light .hljs-selector-attr,
+.code-pre.light .hljs-selector-pseudo,
+.code-pre.light .hljs-number {
+  color: #986801;
+}
+
+.code-pre.light .hljs-symbol,
+.code-pre.light .hljs-bullet,
+.code-pre.light .hljs-link,
+.code-pre.light .hljs-meta,
+.code-pre.light .hljs-selector-id,
+.code-pre.light .hljs-title {
+  color: #4078f2;
+}
+
+.code-pre.light .hljs-built_in,
+.code-pre.light .hljs-title.class_,
+.code-pre.light .hljs-class .hljs-title {
+  color: #c18401;
+}
+
+.code-pre.light .hljs-emphasis {
+  font-style: italic;
+}
+
+.code-pre.light .hljs-strong {
+  font-weight: bold;
+}
+
+.code-pre.light .hljs-link {
+  text-decoration: underline;
+}

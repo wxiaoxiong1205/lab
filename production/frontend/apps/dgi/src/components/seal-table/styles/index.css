@@ -1,0 +1,90 @@
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin: 16px 0;
+}
+
+.seal-table-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.seal-table-container .header-row-wrapper {
+  height: 50px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 8px 8px 0 0;
+}
+
+.seal-table-container .header-row-wrapper .header-row-prefix-wrapper {
+  padding-left: 16px;
+}
+
+.seal-table-container .header-row-wrapper .row {
+  flex: 1;
+}
+
+.seal-table-container .row-box {
+  overflow: hidden;
+  border-bottom: 1px solid rgba(5, 5, 5, 0.06);
+}
+
+.seal-table-container .expanded-row {
+  padding: 16px;
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+}
+
+.seal-table-container .expanded-row .ant-empty-image {
+  height: 30px;
+}
+
+.seal-table-container .row-wrapper {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.seal-table-container .row-wrapper:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.seal-table-container .row-wrapper-selected {
+  transition: all 0.2s ease;
+}
+
+.seal-table-container .row-wrapper-selected:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.seal-table-container .row-wrapper .row-prefix-wrapper {
+  display: flex;
+  align-items: center;
+  padding-left: 16px;
+}
+
+.seal-table-container .seal-table-row {
+  flex: 1;
+}
+
+.seal-table-container .spin {
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 20px;
+  min-height: 100px;
+}
+
+.seal-table-container .empty-wrapper {
+  display: flex;
+  min-height: 160px;
+  justify-content: center;
+  align-items: center;
+}

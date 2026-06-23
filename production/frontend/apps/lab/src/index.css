@@ -1,0 +1,933 @@
+@import "tailwindcss";
+@import "@deep/theme/theme.css";
+@import "./styles/antd-overrides.css";
+@import "./styles/page-shell.css";
+@import "./styles/table.css";
+@import "./styles/form.css";
+@import "./styles/utilities.css";
+@config "../config/tailwind.config.js";
+
+/*!* 云平台设计规范：字阶与行高（Font Size / Line Height） *!*/
+:root {
+  /* 字阶与行高变量，供全局使用 */
+  --font-size-12: 12px;
+  --line-height-12: 20px;
+  --font-size-13: 13px;
+  --line-height-13: 22px;
+  --font-size-14: 14px;
+  --line-height-14: 22px;
+  --font-size-16: 16px;
+  --line-height-16: 24px;
+  --font-size-20: 20px;
+  --line-height-20: 28px;
+  --font-size-24: 24px;
+  --line-height-24: 32px;
+  --font-size-36: 36px;
+  --line-height-36: 44px;
+  --font-size-48: 48px;
+  --line-height-48: 56px;
+  --font-size-56: 56px;
+  --line-height-56: 64px;
+
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--lab-color-surface-page);
+}
+
+#root {
+  height: var(--mfe-height, 100vh);
+  overflow: hidden;
+  color: rgba(0, 0, 0, 0.85);
+  background-color: var(--lab-color-surface-page);
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-synthesis: none;
+  font-weight: 400;
+  line-height: 22px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html[data-embedding="mfe"],
+html[data-embedding="mfe"] body,
+html[data-embedding="mfe"] #root {
+  height: 100%;
+}
+
+html[data-embedding="mfe"] .ant-layout {
+  min-height: 0;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.lab-app-loading {
+  display: flex;
+  height: 100vh;
+  align-items: center;
+  justify-content: center;
+}
+
+.lab-app-loading-embedded {
+  height: 100%;
+}
+
+.lab-segmented-switch {
+  width: 182px;
+  height: 40px;
+  padding: 3px;
+  border-radius: 6px;
+  background: rgba(236, 238, 239, 1);
+}
+
+.lab-segmented-switch .ant-segmented-group {
+  height: 34px;
+}
+
+.lab-segmented-switch .ant-segmented-item {
+  width: 88px;
+  min-height: 34px;
+  border-radius: 6px;
+  color: var(--lab-color-text-primary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.lab-segmented-switch .ant-segmented-item-label {
+  min-height: 34px;
+  line-height: 34px;
+}
+
+.lab-segmented-switch .ant-segmented-item-selected {
+  background-color: rgba(255, 255, 255, 1);
+  box-shadow: 0px 0px 4px 0px rgba(0, 0, 0, 0.05);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 500;
+}
+
+.ant-progress .ant-progress-bg,
+.ant-progress.ant-progress-status-success .ant-progress-bg {
+  height: 6px !important;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(0, 84, 221, 1) 0%, rgba(82, 133, 247, 1) 100%) !important;
+}
+
+.ant-progress .ant-progress-inner {
+  background: rgba(244, 246, 248, 1);
+}
+
+/*a {*/
+/*  font-weight: 500;*/
+/*  color: #646cff;*/
+/*  text-decoration: inherit;*/
+/*}*/
+/*a:hover {*/
+/*  color: #535bf2;*/
+/*}*/
+
+/*body {*/
+/*  margin: 0;*/
+/*  font-family: "Helvetica Neue", Arial, sans-serif;*/
+/*  font-size: 14px;*/
+/*  line-height: 22px;*/
+/*  -webkit-font-smoothing: antialiased;*/
+/*  -moz-osx-font-smoothing: grayscale;*/
+/*  background-color: var(--lab-color-surface-page);*/
+/*}*/
+
+/*!* 标题沿用设计规范字阶与行高 *!*/
+/*h1 {*/
+/*  font-size: var(--font-size-36);*/
+/*  line-height: var(--line-height-36);*/
+/*}*/
+/*h2 {*/
+/*  font-size: var(--font-size-24);*/
+/*  line-height: var(--line-height-24);*/
+/*}*/
+/*h3 {*/
+/*  font-size: var(--font-size-20);*/
+/*  line-height: var(--line-height-20);*/
+/*}*/
+/*h4 {*/
+/*  font-size: var(--font-size-16);*/
+/*  line-height: var(--line-height-16);*/
+/*}*/
+
+/*.ant-layout {*/
+/*  min-height: 100vh;*/
+/*}*/
+
+.lab-main-header.ant-layout-header {
+  padding: 0;
+  background: var(--lab-color-surface-elevated);
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+}
+
+/*.ant-layout-sider {*/
+/*  box-shadow: 2px 0 8px 0 rgba(29, 35, 41, 0.05);*/
+/*}*/
+
+/*.site-layout-background {*/
+/*  background: var(--lab-color-surface-elevated);*/
+/*}*/
+/* 
+.ant-card {
+  box-shadow: 0 1px 1px -1px rgba(0, 0, 0, 0.12),
+    0 2px 4px 0 rgba(0, 0, 0, 0.08),
+    0 3px 8px 2px rgba(0, 0, 0, 0.06);
+} */
+
+/*.search-form {*/
+/*  padding: 24px;*/
+/*  background: #fbfbfb;*/
+/*  border: 1px solid #d9d9d9;*/
+/*  border-radius: 2px;*/
+/*  margin-bottom: 24px;*/
+/*}*/
+
+/*.table-operations {*/
+/*  margin-bottom: 16px;*/
+/*}*/
+
+/*.table-operations > button {*/
+/*  margin-right: 8px;*/
+/*}*/
+
+/*.ant-descriptions {*/
+/*  background: var(--lab-color-surface-elevated);*/
+/*  padding: 24px;*/
+/*  border-radius: 2px;*/
+/*}*/
+
+/*!* 表格分页：当前页码蓝色背景，白字，圆角 *!*/
+/*.ant-pagination-item-active {*/
+/*  background: #1890ff !important;*/
+/*  border-color: #1890ff !important;*/
+/*}*/
+/*.ant-pagination-item-active a {*/
+/*  color: var(--lab-color-surface-elevated) !important;*/
+/*}*/
+/*.ant-pagination-item-active:hover {*/
+/*  background: #40a9ff !important;*/
+/*  border-color: #40a9ff !important;*/
+/*}*/
+/*.ant-pagination-item-active:hover a {*/
+/*  color: var(--lab-color-surface-elevated) !important;*/
+/*}*/
+
+/*html, body {*/
+/*  height: 100vh;*/
+/*  background-color: var(--lab-color-surface-page);*/
+/*  overflow-x: hidden;*/
+/*  margin: 0;*/
+/*  padding: 0;*/
+/*}*/
+
+/*!* 隐藏整个页面的滚动条但保持滚动功能 *!*/
+/*html {*/
+/*  scrollbar-width: none; !* Firefox *!*/
+/*  -ms-overflow-style: none; !* IE and Edge *!*/
+/*}*/
+
+/*html::-webkit-scrollbar {*/
+/*  display: none; !* Chrome, Safari, Opera *!*/
+/*}*/
+
+/*!* 确保页面内容区域有正确的滚动行为 *!*/
+/*#root {*/
+/*  height: var(--mfe-height, 100vh);*/
+/*  overflow: hidden;*/
+/*}*/
+
+/*!* 嵌入（qiankun/无界）时使用 100% 高度填满容器，避免内容溢出被主应用 overflow-hidden 裁剪 *!*/
+/*html[data-embedding="mfe"] {*/
+/*  height: 100%;*/
+/*}*/
+/*html[data-embedding="mfe"] body {*/
+/*  height: 100%;*/
+/*}*/
+/*html[data-embedding="mfe"] #root {*/
+/*  height: 100%;*/
+/*}*/
+/*html[data-embedding="mfe"] .ant-layout {*/
+/*  min-height: 0;*/
+/*}*/
+
+/*.no-padding-expanded-row .ant-table-cell {*/
+/*  padding: 0 !important;*/
+/*}*/
+
+.ant-table-wrapper .ant-table-thead > tr {
+  height: 40px !important;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th,
+.ant-table-wrapper .ant-table-thead > tr > td {
+  background: var(--lab-color-surface-control-muted) !important;
+  border: none !important;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th {
+  color: var(--lab-color-text-primary) !important;
+  font-weight: 400 !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.ant-table-wrapper .ant-table-container table>thead>tr:first-child >*:first-child {
+    border-start-start-radius: 6px;
+    border-end-start-radius: 6px;
+}
+.ant-table-wrapper .ant-table-container table>thead>tr:first-child >*:last-child {
+    border-start-end-radius: 6px;
+    border-end-end-radius: 6px;
+}
+
+.ant-table-wrapper .ant-table{
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.ant-table-wrapper .ant-table-expanded-row > td {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr:not(.ant-table-measure-row):not(.ant-table-expanded-row) {
+    height: 50px !important;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr > td {
+    padding-bottom: 0 !important;
+    padding-top: 0 !important;
+}
+
+.ant-table-wrapper .ant-table-body {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(17, 24, 39, 0.24) transparent;
+}
+
+.ant-table-wrapper .ant-table-body::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.ant-table-wrapper .ant-table-body::-webkit-scrollbar-track {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.ant-table-wrapper .ant-table-body::-webkit-scrollbar-thumb {
+    background: rgba(17, 24, 39, 0.24);
+    border: none;
+    border-radius: 999px;
+}
+
+.ant-table-wrapper .ant-table-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(17, 24, 39, 0.36);
+}
+
+.ant-table-wrapper .ant-table-body,
+.ant-table-wrapper .ant-table-content {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(17, 24, 39, 0.24) transparent;
+}
+
+.ant-table-wrapper .ant-table-body::-webkit-scrollbar,
+.ant-table-wrapper .ant-table-content::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.ant-table-wrapper .ant-table-body::-webkit-scrollbar-track,
+.ant-table-wrapper .ant-table-content::-webkit-scrollbar-track {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.ant-table-wrapper .ant-table-body::-webkit-scrollbar-thumb,
+.ant-table-wrapper .ant-table-content::-webkit-scrollbar-thumb {
+    background: rgba(17, 24, 39, 0.24);
+    border: none;
+    border-radius: 999px;
+}
+
+.ant-table-wrapper .ant-table-body::-webkit-scrollbar-thumb:hover,
+.ant-table-wrapper .ant-table-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(17, 24, 39, 0.36);
+}
+
+.ant-table-wrapper .ant-table-sticky-scroll {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.ant-table-wrapper .ant-table-sticky-scroll-bar {
+    height: 10px !important;
+    background: rgba(17, 24, 39, 0.24) !important;
+    border-radius: 999px !important;
+}
+/* 隐藏滚动条但保持滚动功能 */
+/*.hide-scrollbar {*/
+/*  scrollbar-width: none; !* Firefox *!*/
+/*  -ms-overflow-style: none; !* IE and Edge *!*/
+/*}*/
+
+/*.hide-scrollbar::-webkit-scrollbar {*/
+/*  display: none; !* Chrome, Safari, Opera *!*/
+/*}*/
+
+/*!* 菜单滚动容器 - 隐藏滚动条但保持滚动功能 *!*/
+/*.menu-scroll-container {*/
+/*  scrollbar-width: none; !* Firefox *!*/
+/*  -ms-overflow-style: none; !* IE and Edge *!*/
+/*}*/
+
+/*.menu-scroll-container::-webkit-scrollbar {*/
+/*  display: none; !* Chrome, Safari, Opera *!*/
+/*}*/
+
+/*!* 统一菜单项样式，移除叶子节点的加粗效果 *!*/
+/*.ant-menu-item,*/
+/*.ant-menu-submenu-title {*/
+/*  font-weight: 400 !important;*/
+/*}*/
+
+/*.ant-menu-item a,*/
+/*.ant-menu-submenu-title span {*/
+/*  font-weight: 400 !important;*/
+/*}*/
+
+/*!* 菜单字体样式：一二级标题 14px 500（middle），三级标题 14px 400（Regular） *!*/
+/*!* 一级菜单 - 直接在根菜单下的菜单项 *!*/
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-submenu-title,*/
+/*.ant-menu-root > .ant-menu-item {*/
+/*  font-size: 14px !important;*/
+/*  font-weight: 500 !important;*/
+/*}*/
+
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-submenu-title span,*/
+/*.ant-menu-root > .ant-menu-item a,*/
+/*.ant-menu-root > .ant-menu-item span {*/
+/*  font-size: 14px !important;*/
+/*  font-weight: 500 !important;*/
+/*}*/
+
+/*!* 二级菜单 - 一级SubMenu的子菜单中的菜单项（.ant-menu-sub是Ant Design的子菜单容器类） *!*/
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-sub > .ant-menu-submenu > .ant-menu-submenu-title,*/
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-sub > .ant-menu-item {*/
+/*  font-size: 14px !important;*/
+/*  font-weight: 500 !important;*/
+/*}*/
+
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-sub > .ant-menu-submenu > .ant-menu-submenu-title span,*/
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-sub > .ant-menu-item a,*/
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-sub > .ant-menu-item span {*/
+/*  font-size: 14px !important;*/
+/*  font-weight: 500 !important;*/
+/*}*/
+
+/*!* 三级菜单 - 二级SubMenu的子菜单中的菜单项 *!*/
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-sub > .ant-menu-submenu > .ant-menu-sub > .ant-menu-item,*/
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-sub > .ant-menu-submenu > .ant-menu-sub > .ant-menu-submenu > .ant-menu-submenu-title {*/
+/*  font-size: 14px !important;*/
+/*  font-weight: 400 !important;*/
+/*}*/
+
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-sub > .ant-menu-submenu > .ant-menu-sub > .ant-menu-item a,*/
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-sub > .ant-menu-submenu > .ant-menu-sub > .ant-menu-item span,*/
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-sub > .ant-menu-submenu > .ant-menu-sub > .ant-menu-submenu > .ant-menu-submenu-title span {*/
+/*  font-size: 14px !important;*/
+/*  font-weight: 400 !important;*/
+/*}*/
+
+/*!* 修复三级菜单背景色，使其与二级菜单保持一致（白色背景） *!*/
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-sub > .ant-menu-submenu > .ant-menu-sub {*/
+/*  background: var(--lab-color-surface-elevated) !important;*/
+/*}*/
+
+/*!* 三级菜单项的背景色 *!*/
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-sub > .ant-menu-submenu > .ant-menu-sub > .ant-menu-item {*/
+/*  background: var(--lab-color-surface-elevated) !important;*/
+/*}*/
+
+/*!* 三级菜单项 hover 时的背景色 *!*/
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-sub > .ant-menu-submenu > .ant-menu-sub > .ant-menu-item:hover {*/
+/*  background: var(--lab-color-surface-page) !important;*/
+/*}*/
+
+/*!* 三级菜单项选中时的背景色 *!*/
+/*.ant-menu-root > .ant-menu-submenu > .ant-menu-sub > .ant-menu-submenu > .ant-menu-sub > .ant-menu-item-selected {*/
+/*  background: #e6f4ff !important;*/
+/*}*/
+
+/*!* 确保菜单滚动容器可以完全滚动到底部 *!*/
+/*.ant-menu-root {*/
+/*  padding-bottom: 32px !important;*/
+/*}*/
+
+/*!* 确保菜单在 flex 容器中正确显示和滚动 *!*/
+/*.ant-menu {*/
+/*  height: auto !important;*/
+/*  max-height: none !important;*/
+/*  min-height: auto !important;*/
+/*}*/
+
+/*!* 项目菜单滚动容器 - 确保滚动功能正常 *!*/
+/*.project-menu-scroll-container {*/
+/*  position: relative;*/
+/*  scrollbar-width: none; !* Firefox *!*/
+/*  -ms-overflow-style: none; !* IE and Edge *!*/
+/*  !* 确保可以滚动到底部，显示所有菜单项 *!*/
+/*  padding-bottom: 0;*/
+/*}*/
+
+/*.project-menu-scroll-container::-webkit-scrollbar {*/
+/*  display: none; !* Chrome, Safari, Opera *!*/
+/*}*/
+
+/*.project-menu-scroll-container .ant-menu {*/
+/*  width: 100%;*/
+/*  !* 确保菜单内容有足够的底部空间 *!*/
+/*  min-height: 100%;*/
+/*}*/
+
+/*!* 禁用项目菜单的展开/收起动画，避免空白闪顿 *!*/
+/*.project-menu-no-animation .ant-menu-submenu,*/
+/*.project-menu-no-animation .ant-menu-submenu-inline,*/
+/*.project-menu-no-animation .ant-menu-submenu-vertical {*/
+/*  transition: none !important;*/
+/*}*/
+
+/*.project-menu-no-animation .ant-menu-submenu > .ant-menu-submenu-title,*/
+/*.project-menu-no-animation .ant-menu-submenu-inline > .ant-menu-submenu-title {*/
+/*  transition: none !important;*/
+/*}*/
+
+/*!* 禁用所有子菜单相关的动画和过渡 *!*/
+/*.project-menu-no-animation .ant-menu-submenu .ant-menu,*/
+/*.project-menu-no-animation .ant-menu-submenu-inline .ant-menu,*/
+/*.project-menu-no-animation .ant-menu-submenu-vertical .ant-menu,*/
+/*.project-menu-no-animation .ant-menu-submenu .ant-menu-sub,*/
+/*.project-menu-no-animation .ant-menu-submenu-inline .ant-menu-sub {*/
+/*  transition: none !important;*/
+/*  animation: none !important;*/
+/*  -webkit-transition: none !important;*/
+/*  -moz-transition: none !important;*/
+/*  -o-transition: none !important;*/
+/*}*/
+
+/*!* 强制隐藏关闭状态的子菜单内容，避免空白闪顿 *!*/
+/*.project-menu-no-animation .ant-menu-submenu:not(.ant-menu-submenu-open) .ant-menu,*/
+/*.project-menu-no-animation .ant-menu-submenu:not(.ant-menu-submenu-open) .ant-menu-sub,*/
+/*.project-menu-no-animation .ant-menu-submenu-collapsed .ant-menu,*/
+/*.project-menu-no-animation .ant-menu-submenu-collapsed .ant-menu-sub {*/
+/*  display: none !important;*/
+/*  visibility: hidden !important;*/
+/*  height: 0 !important;*/
+/*  max-height: 0 !important;*/
+/*  overflow: hidden !important;*/
+/*  opacity: 0 !important;*/
+/*  margin: 0 !important;*/
+/*  padding: 0 !important;*/
+/*}*/
+
+/*!* 确保子菜单打开时正常显示 *!*/
+/*.project-menu-no-animation .ant-menu-submenu-open .ant-menu,*/
+/*.project-menu-no-animation .ant-menu-submenu-open .ant-menu-sub {*/
+/*  display: block !important;*/
+/*  visibility: visible !important;*/
+/*  opacity: 1 !important;*/
+/*}*/
+
+/*!* 保留菜单项的 hover 效果（这个很快，不会造成卡顿） *!*/
+/*.project-menu-no-animation .ant-menu-item,*/
+/*.project-menu-no-animation .ant-menu-submenu-title {*/
+/*  transition: background-color 0.15s ease !important;*/
+/*}*/
+
+/*!* 禁用项目菜单的展开/收起动画，避免卡顿 *!*/
+/*.project-menu-no-animation .ant-menu-submenu,*/
+/*.project-menu-no-animation .ant-menu-submenu-inline,*/
+/*.project-menu-no-animation .ant-menu-submenu-vertical {*/
+/*  transition: none !important;*/
+/*}*/
+
+/*.project-menu-no-animation .ant-menu-submenu > .ant-menu-submenu-title,*/
+/*.project-menu-no-animation .ant-menu-submenu-inline > .ant-menu-submenu-title {*/
+/*  transition: none !important;*/
+/*}*/
+
+/*.project-menu-no-animation .ant-menu-submenu .ant-menu,*/
+/*.project-menu-no-animation .ant-menu-submenu-inline .ant-menu {*/
+/*  transition: none !important;*/
+/*  animation: none !important;*/
+/*}*/
+
+/*.project-menu-no-animation .ant-menu-item,*/
+/*.project-menu-no-animation .ant-menu-submenu-title {*/
+/*  transition: background-color 0.15s ease !important;*/
+/*}*/
+
+/*!* 项目侧边菜单栏：一级间隔4px、图标16px、折叠箭头12px、每项40px *!*/
+/*.project-menu-scroll-container .ant-menu-root > .ant-menu-submenu,*/
+/*.project-menu-scroll-container .ant-menu-root > .ant-menu-item {*/
+/*  margin-bottom: 4px !important;*/
+/*}*/
+/*.project-menu-scroll-container .ant-menu-root > .ant-menu-submenu:last-child,*/
+/*.project-menu-scroll-container .ant-menu-root > .ant-menu-item:last-child {*/
+/*  margin-bottom: 0 !important;*/
+/*}*/
+/*.project-menu-scroll-container .ant-menu-item,*/
+/*.project-menu-scroll-container .ant-menu-submenu-title {*/
+/*  height: 40px !important;*/
+/*  line-height: 40px !important;*/
+/*}*/
+/*.project-menu-scroll-container .ant-menu-root > .ant-menu-submenu > .ant-menu-submenu-title .anticon,*/
+/*.project-menu-scroll-container .ant-menu-root > .ant-menu-item .anticon {*/
+/*  width: 16px !important;*/
+/*  height: 16px !important;*/
+/*  font-size: 16px !important;*/
+/*}*/
+/*.project-menu-scroll-container .ant-menu-submenu-expand-icon {*/
+/*  width: 12px !important;*/
+/*  height: 12px !important;*/
+/*  font-size: 12px !important;*/
+/*}*/
+
+/*!* 侧边栏折叠按钮hover效果 *!*/
+/*.sider-collapse-trigger:hover {*/
+/*  background-color: var(--lab-color-surface-page);*/
+/*}*/
+
+/*!* 分页器布局：共 N 条数据 → 每页条数选择器 → 页码 *!*/
+/*.ant-pagination {*/
+/*  display: flex;*/
+/*  flex-wrap: wrap;*/
+/*  align-items: center;*/
+/*}*/
+
+/*!* 总数显示在最左边 *!*/
+/*.ant-pagination-total-text {*/
+/*  order: 1;*/
+/*  margin-right: 16px;*/
+/*}*/
+
+/*!* 每页条数选择器在中间 *!*/
+/*.ant-pagination-options {*/
+/*  order: 2;*/
+/*  margin-right: 16px;*/
+/*}*/
+
+/*!* 页码跳转在右边 *!*/
+/*.ant-pagination-prev,*/
+/*.ant-pagination-item,*/
+/*.ant-pagination-jump-next,*/
+/*.ant-pagination-jump-prev,*/
+/*.ant-pagination-next {*/
+/*  order: 3;*/
+/*}*/
+
+/*!* 快速跳转在最右边（如果启用） *!*/
+/*.ant-pagination-options-quick-jumper {*/
+/*  order: 4;*/
+/*  margin-left: 8px;*/
+/*}*/
+
+/*.ant-affix{*/
+/*  z-index: 900 !important;*/
+/*}*/
+
+/* Project list pages: align with data annotation/data cleaning shell. */
+.lab-list-page-shell,
+.prompt-directory-management-container,
+.prompt-list-container,
+.metric-list-container {
+  height: calc(100% - 21px);
+  min-height: 830px;
+  margin: 0 10px 21px 0;
+  padding: 20px 20px 16px !important;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--lab-color-surface-elevated);
+  box-shadow: 0 2px 8px rgba(24, 24, 25, 0.06);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.lab-list-page-shell > .ant-card,
+.prompt-directory-management-container > .ant-card,
+.prompt-list-container > .ant-card,
+.metric-list-container > .ant-card {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.lab-list-page-shell > .ant-card > .ant-card-head,
+.prompt-directory-management-container > .ant-card > .ant-card-head,
+.prompt-list-container > .ant-card > .ant-card-head,
+.metric-list-container > .ant-card > .ant-card-head {
+  min-height: 0;
+  padding: 0 0 16px;
+  border-bottom: 0;
+}
+
+.lab-list-page-shell > .ant-card > .ant-card-body,
+.prompt-directory-management-container > .ant-card > .ant-card-body,
+.prompt-list-container > .ant-card > .ant-card-body,
+.metric-list-container > .ant-card > .ant-card-body {
+  padding: 0;
+}
+
+.lab-list-page-shell .ant-typography,
+.prompt-directory-management-container .ant-typography,
+.prompt-list-container .ant-typography,
+.metric-list-container .ant-typography {
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.lab-list-page-shell h1.ant-typography,
+.lab-list-page-shell h2.ant-typography,
+.lab-list-page-shell h3.ant-typography,
+.lab-list-page-shell h4.ant-typography,
+.prompt-directory-management-container h1.ant-typography,
+.prompt-directory-management-container h2.ant-typography,
+.prompt-directory-management-container h3.ant-typography,
+.prompt-directory-management-container h4.ant-typography,
+.prompt-list-container h1.ant-typography,
+.prompt-list-container h2.ant-typography,
+.prompt-list-container h3.ant-typography,
+.prompt-list-container h4.ant-typography,
+.metric-list-container h1.ant-typography,
+.metric-list-container h2.ant-typography,
+.metric-list-container h3.ant-typography,
+.metric-list-container h4.ant-typography {
+  height: 28px;
+  margin: 0 0 10px !important;
+  color: var(--lab-color-text-primary);
+  font-family: PingFangSC-Medium, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.lab-list-page-shell .ant-table-wrapper,
+.prompt-directory-management-container .ant-table-wrapper,
+.prompt-list-container .ant-table-wrapper,
+.metric-list-container .ant-table-wrapper {
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.lab-list-page-shell .ant-pagination,
+.prompt-directory-management-container .ant-pagination,
+.prompt-list-container .ant-pagination,
+.metric-list-container .ant-pagination {
+  display: flex;
+  align-items: center;
+  margin: 22px 0 0;
+  color: var(--lab-color-text-primary);
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.lab-list-page-shell .ant-pagination-total-text,
+.prompt-directory-management-container .ant-pagination-total-text,
+.prompt-list-container .ant-pagination-total-text,
+.metric-list-container .ant-pagination-total-text {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  margin-inline-end: 24px;
+  line-height: 32px;
+}
+
+.lab-list-page-shell .ant-pagination .ant-pagination-item,
+.lab-list-page-shell .ant-pagination .ant-pagination-prev,
+.lab-list-page-shell .ant-pagination .ant-pagination-next,
+.lab-list-page-shell .ant-pagination .ant-pagination-jump-prev,
+.lab-list-page-shell .ant-pagination .ant-pagination-jump-next,
+.prompt-directory-management-container .ant-pagination .ant-pagination-item,
+.prompt-directory-management-container .ant-pagination .ant-pagination-prev,
+.prompt-directory-management-container .ant-pagination .ant-pagination-next,
+.prompt-directory-management-container .ant-pagination .ant-pagination-jump-prev,
+.prompt-directory-management-container .ant-pagination .ant-pagination-jump-next,
+.prompt-list-container .ant-pagination .ant-pagination-item,
+.prompt-list-container .ant-pagination .ant-pagination-prev,
+.prompt-list-container .ant-pagination .ant-pagination-next,
+.prompt-list-container .ant-pagination .ant-pagination-jump-prev,
+.prompt-list-container .ant-pagination .ant-pagination-jump-next,
+.metric-list-container .ant-pagination .ant-pagination-item,
+.metric-list-container .ant-pagination .ant-pagination-prev,
+.metric-list-container .ant-pagination .ant-pagination-next,
+.metric-list-container .ant-pagination .ant-pagination-jump-prev,
+.metric-list-container .ant-pagination .ant-pagination-jump-next {
+  min-width: 32px;
+  height: 32px;
+  margin-inline-end: 8px;
+  border-radius: 6px;
+  line-height: 30px;
+}
+
+.lab-list-page-shell .ant-pagination .ant-pagination-item-active,
+.prompt-directory-management-container .ant-pagination .ant-pagination-item-active,
+.prompt-list-container .ant-pagination .ant-pagination-item-active,
+.metric-list-container .ant-pagination .ant-pagination-item-active {
+  background-color: var(--lab-color-surface-muted);
+  border-color: var(--lab-color-surface-muted);
+}
+
+.lab-list-page-shell .ant-pagination .ant-pagination-item-active a,
+.prompt-directory-management-container .ant-pagination .ant-pagination-item-active a,
+.prompt-list-container .ant-pagination .ant-pagination-item-active a,
+.metric-list-container .ant-pagination .ant-pagination-item-active a {
+  color: inherit;
+  font-weight: 400 !important;
+}
+
+.lab-list-page-shell .ant-pagination .ant-pagination-options,
+.prompt-directory-management-container .ant-pagination .ant-pagination-options,
+.prompt-list-container .ant-pagination .ant-pagination-options,
+.metric-list-container .ant-pagination .ant-pagination-options {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  margin-inline-start: 24px;
+}
+
+.lab-list-page-shell .ant-pagination .ant-select-selector,
+.lab-list-page-shell .ant-pagination .ant-pagination-options-quick-jumper input,
+.prompt-directory-management-container .ant-pagination .ant-select-selector,
+.prompt-directory-management-container .ant-pagination .ant-pagination-options-quick-jumper input,
+.prompt-list-container .ant-pagination .ant-select-selector,
+.prompt-list-container .ant-pagination .ant-pagination-options-quick-jumper input,
+.metric-list-container .ant-pagination .ant-select-selector,
+.metric-list-container .ant-pagination .ant-pagination-options-quick-jumper input {
+  box-sizing: border-box;
+  height: 32px !important;
+  border-color: var(--lab-color-border-control) !important;
+  border-radius: 6px;
+}
+
+.lab-table-action-cell,
+.table-action-column,
+.lab-list-page-shell .lab-table-action-cell,
+.lab-list-page-shell .table-action-column {
+  display: inline-flex;
+  width: 136px;
+  min-width: 136px;
+  max-width: 136px;
+  align-items: center;
+  gap: 8px;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.lab-table-action-cell .ant-btn,
+.table-action-column .ant-btn,
+.lab-list-page-shell .lab-table-action-cell .ant-btn,
+.lab-list-page-shell .table-action-column .ant-btn {
+  flex: 0 0 auto;
+}
+
+.lab-table-action-cell .ant-btn-link,
+.table-action-column .ant-btn-link,
+.lab-list-page-shell .ant-table-cell .ant-btn-link,
+.lab-list-page-shell .lab-table-action-link.ant-btn,
+.lab-table-action-link.ant-btn {
+  height: 20px;
+  padding: 0;
+  color: var(--lab-color-text-primary);
+  background: transparent;
+  border: none;
+  font-family: PingFangSC-Regular, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 20px;
+}
+
+.lab-table-action-cell .ant-btn-link .anticon,
+.table-action-column .ant-btn-link .anticon,
+.lab-list-page-shell .ant-table-cell .ant-btn-link .anticon,
+.lab-list-page-shell .lab-table-action-link.ant-btn .anticon,
+.lab-table-action-link.ant-btn .anticon {
+  color: var(--lab-color-text-primary);
+  font-size: 16px;
+}
+
+.lab-table-action-cell .ant-btn-link:hover,
+.lab-table-action-cell .ant-btn-link:hover .anticon,
+.table-action-column .ant-btn-link:hover,
+.table-action-column .ant-btn-link:hover .anticon,
+.lab-list-page-shell .ant-table-cell .ant-btn-link:hover,
+.lab-list-page-shell .ant-table-cell .ant-btn-link:hover .anticon,
+.lab-list-page-shell .lab-table-action-link.ant-btn:hover,
+.lab-list-page-shell .lab-table-action-link.ant-btn:hover .anticon,
+.lab-table-action-link.ant-btn:hover,
+.lab-table-action-link.ant-btn:hover .anticon {
+  color: var(--lab-color-brand-primary) !important;
+  background: transparent !important;
+}
+
+.lab-table-action-cell .ant-btn-link[disabled],
+.lab-table-action-cell .ant-btn-link[disabled] .anticon,
+.lab-table-action-cell .ant-btn-link.ant-btn-disabled,
+.lab-table-action-cell .ant-btn-link.ant-btn-disabled .anticon,
+.table-action-column .ant-btn-link[disabled],
+.table-action-column .ant-btn-link[disabled] .anticon,
+.table-action-column .ant-btn-link.ant-btn-disabled,
+.table-action-column .ant-btn-link.ant-btn-disabled .anticon,
+.lab-list-page-shell .ant-table-cell .ant-btn-link[disabled],
+.lab-list-page-shell .ant-table-cell .ant-btn-link[disabled] .anticon,
+.lab-list-page-shell .ant-table-cell .ant-btn-link.ant-btn-disabled,
+.lab-list-page-shell .ant-table-cell .ant-btn-link.ant-btn-disabled .anticon,
+.lab-list-page-shell .ant-table-cell .ant-btn-link.ant-btn-dangerous[disabled],
+.lab-list-page-shell .ant-table-cell .ant-btn-link.ant-btn-dangerous[disabled] .anticon,
+.lab-list-page-shell .ant-table-cell .ant-btn-link.ant-btn-dangerous.ant-btn-disabled,
+.lab-list-page-shell .ant-table-cell .ant-btn-link.ant-btn-dangerous.ant-btn-disabled .anticon {
+  color: var(--lab-color-placeholder) !important;
+}
+
+.lab-table-action-cell .ant-btn-link.ant-btn-dangerous:not([disabled]):not(.ant-btn-disabled),
+.lab-table-action-cell .ant-btn-link.ant-btn-dangerous:not([disabled]):not(.ant-btn-disabled) .anticon,
+.table-action-column .ant-btn-link.ant-btn-dangerous:not([disabled]):not(.ant-btn-disabled),
+.table-action-column .ant-btn-link.ant-btn-dangerous:not([disabled]):not(.ant-btn-disabled) .anticon,
+.lab-list-page-shell .ant-table-cell .ant-btn-link.ant-btn-dangerous:not([disabled]):not(.ant-btn-disabled),
+.lab-list-page-shell .ant-table-cell .ant-btn-link.ant-btn-dangerous:not([disabled]):not(.ant-btn-disabled) .anticon {
+  color: var(--lab-color-text-primary);
+}
+
+.lab-table-action-more.ant-btn,
+.lab-list-page-shell .lab-table-action-more.ant-btn {
+  width: 20px;
+  min-width: 20px;
+}
+
+.lab-table-action-more.ant-btn .anticon,
+.lab-list-page-shell .lab-table-action-more.ant-btn .anticon {
+  font-size: 18px;
+}
+
+.lab-table-action-more.ant-btn svg,
+.lab-list-page-shell .lab-table-action-more.ant-btn svg {
+  transform: rotate(90deg);
+}
