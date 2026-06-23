@@ -82,10 +82,10 @@ Done:
 - First GRPO production adaptation is complete for training method enum, frontend display, GRPO parameter fields, dataset filtering, and `additional_params.grpo_config` persistence.
 - Production backend has a dedicated `training_parameter_templates` ORM model, Alembic migration, and `/api/v1/training-parameter-templates` CRUD surface prepared for template persistence.
 - Production frontend system settings has a training-parameter-template tab wired to the production CRUD surface.
+- Production training creation now loads enabled RFT-GRPO templates, applies selected template parameters into the existing form, and submits a stable `additional_params.grpo_template_snapshot` with template id, name, YAML content, source params, and final applied GRPO params.
 
 Not done:
 
-- Training creation template selection and YAML snapshot payload.
 - Reward-function `.py` upload and template download.
 - GRPO version detail YAML display.
 - GRPO three-stage Hand/Work/Submit resource config.

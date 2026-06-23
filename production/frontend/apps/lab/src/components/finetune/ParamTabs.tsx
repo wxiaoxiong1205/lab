@@ -1,5 +1,10 @@
-import React from 'react'
-import { Col, Form, Input, InputNumber, Row, Select, Switch, Tabs } from 'antd'
+import React, { useEffect, useState } from 'react'
+import { Alert, Button, Col, Form, Input, InputNumber, Row, Select, Space, Switch, Tabs, message } from 'antd'
+import { ReloadOutlined } from '@ant-design/icons'
+import {
+  trainingParameterTemplateService,
+  type TrainingParameterTemplate,
+} from '@/services/trainingParameterTemplateService'
 
 const { Option } = Select
 
@@ -16,6 +21,75 @@ const normalizeTrainingMethodType = (value?: string) => {
     return 'sft'
 
   return normalized
+}
+
+const grpoTemplateParamFields = [
+  'learning_rate',
+  'num_train_epochs',
+  'per_device_train_batch_size',
+  'gradient_accumulation_steps',
+  'warmup_ratio',
+  'lr_scheduler_type',
+  'bf16',
+  'gradient_checkpointing',
+  'max_grad_norm',
+  'rope_scaling',
+  'seed',
+  'weight_decay',
+  'cutoff_len',
+  'preprocessing_num_workers',
+  'eval_strategy',
+  'eval_steps',
+  'greater_is_better',
+  'load_best_model_at_end',
+  'metric_for_best_model',
+  'per_device_eval_batch_size',
+  'save_strategy',
+  'save_steps',
+  'save_total_limit',
+  'logging_steps',
+  'num_generations',
+  'max_prompt_length',
+  'max_completion_length',
+  'temperature',
+  'top_p',
+  'top_k',
+  'repetition_penalty',
+  'kl_coefficient',
+  'clip_range',
+  'advantage_estimator',
+  'reward_normalization',
+  'reward_scale',
+  'lora_rank',
+  'lora_alpha',
+  'lora_dropout',
+]
+
+const normalizeTemplateParams = (template: TrainingParameterTemplate) => {
+  const params = template.params || {}
+  const nextValues: Record<string, unknown> = {
+    fine_tuning_type: template.fine_tune_type,
+    grpo_template_id: template.id,
+    grpo_template_name: template.name,
+    grpo_template_content: template.template_content,
+    grpo_template_params_json: JSON.stringify(params),
+  }
+
+  grpoTemplateParamFields.forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(params, field)) {
+      nextValues[field] = params[field]
+    }
+  })
+
+  const loraTargetModules = params.lora_target_modules
+  if (Array.isArray(loraTargetModules)) {
+    nextValues.lora_target = loraTargetModules.join(',')
+  }
+  else if (typeof loraTargetModules === 'string') {
+    nextValues.lora_target = loraTargetModules
+  }
+
+  return nextValues
 }
 
 interface ParamTabsProps {
@@ -35,7 +109,70 @@ const ParamTabs: React.FC<ParamTabsProps> = ({
   trainingMethod,
   SaveStrategyCategory,
 }) => {
+  const form = Form.useFormInstance()
   const effectiveTrainingMethod = normalizeTrainingMethodType(trainingMethod)
+  const [grpoTemplates, setGrpoTemplates] = useState<TrainingParameterTemplate[]>([])
+  const [grpoTemplatesLoading, setGrpoTemplatesLoading] = useState(false)
+
+  const loadGrpoTemplates = async () => {
+    if (effectiveTrainingMethod !== 'rft-grpo') {
+      return
+    }
+
+    setGrpoTemplatesLoading(true)
+    try {
+      const data = await trainingParameterTemplateService.list({
+        page: 1,
+        size: 100,
+        enabled: true,
+        training_method: 'rft-grpo',
+      })
+      setGrpoTemplates(data.items || [])
+    }
+    catch (error) {
+      console.error('Failed to load GRPO templates:', error)
+      message.error('训练参数模板加载失败')
+    }
+    finally {
+      setGrpoTemplatesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (effectiveTrainingMethod === 'rft-grpo') {
+      loadGrpoTemplates()
+      return
+    }
+
+    setGrpoTemplates([])
+    form.setFieldsValue({
+      grpo_template_id: undefined,
+      grpo_template_name: undefined,
+      grpo_template_content: undefined,
+      grpo_template_params_json: undefined,
+    })
+  }, [effectiveTrainingMethod])
+
+  const handleGrpoTemplateChange = (templateId?: number) => {
+    if (!templateId) {
+      form.setFieldsValue({
+        grpo_template_id: undefined,
+        grpo_template_name: undefined,
+        grpo_template_content: undefined,
+        grpo_template_params_json: undefined,
+      })
+      return
+    }
+
+    const template = grpoTemplates.find(item => item.id === templateId)
+    if (!template) {
+      return
+    }
+
+    form.setFieldsValue(normalizeTemplateParams(template))
+    message.success('已应用训练参数模板')
+  }
+
   const items = [
     {
       key: 'basic',
@@ -611,6 +748,48 @@ const ParamTabs: React.FC<ParamTabsProps> = ({
       forceRender: true,
       children: (
         <div className="param-config-container">
+          <div className="mb-4">
+            <Row gutter={[16, 12]} align="bottom">
+              <Col xs={24} md={16}>
+                <Form.Item
+                  name="grpo_template_id"
+                  label="训练参数模板"
+                  rules={[{ required: true, message: '请选择训练参数模板' }]}
+                >
+                  <Select
+                    allowClear
+                    loading={grpoTemplatesLoading}
+                    placeholder="选择已启用的 RFT-GRPO 训练参数模板"
+                    optionFilterProp="label"
+                    options={grpoTemplates.map(template => ({
+                      value: template.id,
+                      label: template.name,
+                    }))}
+                    onChange={handleGrpoTemplateChange}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Space>
+                  <Button
+                    icon={<ReloadOutlined />}
+                    loading={grpoTemplatesLoading}
+                    onClick={loadGrpoTemplates}
+                  >
+                    刷新模板
+                  </Button>
+                </Space>
+              </Col>
+            </Row>
+            {!grpoTemplatesLoading && grpoTemplates.length === 0 && (
+              <Alert
+                type="warning"
+                showIcon
+                message="暂无可用训练参数模板"
+                description="请先在系统配置的训练参数模板中新增并启用 RFT-GRPO 模板。"
+              />
+            )}
+          </div>
           <Row gutter={[16, 16]}>
             {[
               ['num_generations', '每题生成数量', '每个Prompt生成多个候选答案后参与奖励评分，数量越大训练开销越高。', { min: 1, max: 64, placeholder: '8' }],
@@ -656,6 +835,15 @@ const ParamTabs: React.FC<ParamTabsProps> = ({
             </Col>
           </Row>
           <Form.Item name="advantage_estimator" hidden initialValue="grpo">
+            <Input />
+          </Form.Item>
+          <Form.Item name="grpo_template_name" hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item name="grpo_template_content" hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item name="grpo_template_params_json" hidden>
             <Input />
           </Form.Item>
         </div>

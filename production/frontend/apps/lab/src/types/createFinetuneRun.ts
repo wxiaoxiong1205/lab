@@ -105,6 +105,10 @@ export interface FormValues {
   advantage_estimator: string
   reward_normalization: boolean
   reward_scale: number
+  grpo_template_id?: number
+  grpo_template_name?: string
+  grpo_template_content?: string
+  grpo_template_params_json?: string
   preference_prompt: string
   remove_unused_columns: boolean
   gradient_checkpointing_kwargs: string

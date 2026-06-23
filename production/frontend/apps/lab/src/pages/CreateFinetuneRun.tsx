@@ -126,6 +126,19 @@ const getTrainingMethodType = (trainingType?: any) => {
   return normalizeTrainingMethodType(trainingType?.train_method_type || trainingType?.training_method_type)
 }
 
+const parseGrpoTemplateParams = (value?: string) => {
+  if (!value) {
+    return {}
+  }
+
+  try {
+    return JSON.parse(value)
+  }
+  catch {
+    return {}
+  }
+}
+
 const CreateFinetuneRun: React.FC = () => {
   const navigate = useNavigate()
   const { projectId, experimentId } = useParams<{ projectId: string, experimentId: string }>()
@@ -321,6 +334,12 @@ const CreateFinetuneRun: React.FC = () => {
           reward_normalization: taskInfo.additional_params.grpo_config.reward_normalization,
           reward_scale: taskInfo.additional_params.grpo_config.reward_scale,
         }),
+        ...(taskInfo?.additional_params?.grpo_template_snapshot && {
+          grpo_template_id: taskInfo.additional_params.grpo_template_snapshot.template_id,
+          grpo_template_name: taskInfo.additional_params.grpo_template_snapshot.template_name,
+          grpo_template_content: taskInfo.additional_params.grpo_template_snapshot.template_content,
+          grpo_template_params_json: JSON.stringify(taskInfo.additional_params.grpo_template_snapshot.params || {}),
+        }),
 
         // 数据处理参数
         cutoff_len: taskInfo?.data_processing.cutoff_len,
@@ -475,6 +494,22 @@ const CreateFinetuneRun: React.FC = () => {
       const isBelleProvider = config?.PROVIDER_TYPE === providerType
 
       const datasetFormat = values.data_config.training_datasets?.[0]?.dataset_format || values.data_format
+      const grpoConfig = trainMethodType === 'rft-grpo'
+        ? {
+            num_generations: values.num_generations,
+            max_prompt_length: values.max_prompt_length,
+            max_completion_length: values.max_completion_length,
+            temperature: values.temperature,
+            top_p: values.top_p,
+            top_k: values.top_k,
+            repetition_penalty: values.repetition_penalty,
+            kl_coefficient: values.kl_coefficient,
+            clip_range: values.clip_range,
+            advantage_estimator: values.advantage_estimator,
+            reward_normalization: values.reward_normalization,
+            reward_scale: values.reward_scale,
+          }
+        : undefined
 
       const backendData = {
         name: values.name,
@@ -565,21 +600,19 @@ const CreateFinetuneRun: React.FC = () => {
         // 额外参数
         additional_params: {
           dataloader_num_workers: values.dataloader_num_workers,
-          ...(trainMethodType === 'rft-grpo' && {
-            grpo_config: {
-              num_generations: values.num_generations,
-              max_prompt_length: values.max_prompt_length,
-              max_completion_length: values.max_completion_length,
-              temperature: values.temperature,
-              top_p: values.top_p,
-              top_k: values.top_k,
-              repetition_penalty: values.repetition_penalty,
-              kl_coefficient: values.kl_coefficient,
-              clip_range: values.clip_range,
-              advantage_estimator: values.advantage_estimator,
-              reward_normalization: values.reward_normalization,
-              reward_scale: values.reward_scale,
-            },
+          ...(grpoConfig && {
+            grpo_config: grpoConfig,
+            ...(values.grpo_template_id && {
+              grpo_template_snapshot: {
+                template_id: values.grpo_template_id,
+                template_name: values.grpo_template_name,
+                training_method: 'rft-grpo',
+                fine_tune_type: values.fine_tuning_type,
+                template_content: values.grpo_template_content,
+                params: parseGrpoTemplateParams(values.grpo_template_params_json),
+                applied_params: grpoConfig,
+              },
+            }),
           }),
         },
         ...(trainMethodType === 'dpo' && {
