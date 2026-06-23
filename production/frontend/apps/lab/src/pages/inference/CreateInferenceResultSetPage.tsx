@@ -59,6 +59,69 @@ const { Option } = Select
 const TEXT_FILE_MAX_SIZE_MB = 500
 const IMAGE_FILE_MAX_SIZE_MB = 1024
 
+type ImportDataUsage = 'text-generation-sft' | 'text-generation-dpo' | 'text-generation-rft-grpo' | 'image-understanding'
+
+const COMPLETION_REWARD_FORMAT = 'completion-reward'
+
+const IMPORT_DATA_USAGE_OPTIONS: Array<{
+  value: ImportDataUsage
+  label: string
+  datasetType: 'text-generation' | 'image-understanding'
+  defaultFormat: string
+  formats: string[]
+  icon: React.ReactNode
+}> = [
+  {
+    value: 'text-generation-sft',
+    label: '文本生成 / SFT',
+    datasetType: 'text-generation',
+    defaultFormat: 'prompt-response',
+    formats: ['prompt-response', 'role-based'],
+    icon: <FileTextOutlined />,
+  },
+  {
+    value: 'text-generation-dpo',
+    label: '文本生成 / DPO',
+    datasetType: 'text-generation',
+    defaultFormat: 'alpaca',
+    formats: ['alpaca', 'role-based'],
+    icon: <FileTextOutlined />,
+  },
+  {
+    value: 'text-generation-rft-grpo',
+    label: '文本生成 / RFT-GRPO',
+    datasetType: 'text-generation',
+    defaultFormat: COMPLETION_REWARD_FORMAT,
+    formats: [COMPLETION_REWARD_FORMAT],
+    icon: <FileTextOutlined />,
+  },
+  {
+    value: 'image-understanding',
+    label: '图像理解',
+    datasetType: 'image-understanding',
+    defaultFormat: 'role-based',
+    formats: ['role-based'],
+    icon: <CloudUploadOutlined />,
+  },
+]
+
+function getImportUsageConfig(value: ImportDataUsage) {
+  return IMPORT_DATA_USAGE_OPTIONS.find(option => option.value === value) ?? IMPORT_DATA_USAGE_OPTIONS[0]
+}
+
+function getImportUsageByDataset(datasetType?: string, datasetFormat?: string): ImportDataUsage {
+  if (datasetType === 'image-understanding') {
+    return 'image-understanding'
+  }
+  if (datasetFormat === 'alpaca') {
+    return 'text-generation-dpo'
+  }
+  if (datasetFormat === COMPLETION_REWARD_FORMAT) {
+    return 'text-generation-rft-grpo'
+  }
+  return 'text-generation-sft'
+}
+
 // 映射项接口
 interface MappingItem {
   sourceField: string // 业务测试数据集字段
@@ -171,6 +234,7 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
   const [selectedDatasetVersionObj, setSelectedDatasetVersionObj] = useState<any | null>(null)
   const [uploadMethod, setUploadMethod] = useState<'local' | 'url'>('local')
   const [dataSource, setDataSource] = useState<string>('text-generation')
+  const [importDataUsage, setImportDataUsage] = useState<ImportDataUsage>('text-generation-sft')
   const [dataFormatOptions, setDataFormatOptions] = useState<DatasetEnumConfig | null>(null)
   const [chunkUploadId, setChunkUploadId] = useState<string | null>(null)
   const chunkUploaderRef = useRef<ChunkFileUploaderRef>(null)
@@ -742,9 +806,13 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
     }
   }
   const initImportForm = (data) => {
+    const nextImportDataUsage = getImportUsageByDataset(data.dataset_type, data.dataset_format)
+    const importUsageConfig = getImportUsageConfig(nextImportDataUsage)
+    setImportDataUsage(nextImportDataUsage)
+    setDataSource(importUsageConfig.datasetType)
     form.setFieldsValue({
       model_name: data.model_name,
-      dataFormat: data.dataset_format,
+      dataFormat: data.dataset_format || importUsageConfig.defaultFormat,
     })
     // 导入推理结果集：回显上传方式和文件URL
     if (data.file_url) {
@@ -833,7 +901,15 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
       const projectEnumValues = JSON.parse(localStorage.getItem('projectEnumValues') || '[]')
       if (projectEnumValues) {
         const formatOptions = projectEnumValues.all_enums.find((item: any) => item.enum_name === 'DatasetFormat')
-        formatOptions.options = formatOptions.options.filter((item: any) => !['business', 'prefix-suffix-middle', 'alpaca'].includes(item.value))
+        const normalizedOptions = formatOptions.options.filter((item: any) => !['business', 'prefix-suffix-middle'].includes(item.value))
+        if (!normalizedOptions.some((item: any) => item.value === COMPLETION_REWARD_FORMAT)) {
+          normalizedOptions.push({
+            name: 'Completion Reward',
+            value: COMPLETION_REWARD_FORMAT,
+            description: 'RFT-GRPO Completion + Reward 格式',
+          })
+        }
+        formatOptions.options = normalizedOptions
         setDataFormatOptions(formatOptions)
       }
     }
@@ -847,40 +923,23 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
     if (dataFormatOptions && dataFormatOptions.options && dataFormatOptions.options.length > 0) {
       const currentDataFormat = form.getFieldValue('dataFormat')
       // 如果数据格式未设置或者是 undefined/null，则根据数据源类型设置默认值
-      const availableDataFormats = dataFormatOptions.options.map((option) => option.value)
+      const importUsageConfig = getImportUsageConfig(importDataUsage)
+      const availableDataFormats = dataFormatOptions.options
+        .filter(option => importUsageConfig.formats.includes(option.value))
+        .map(option => option.value)
       if (!currentDataFormat || !availableDataFormats.includes(currentDataFormat)) {
-        if (dataSource === 'image-understanding') {
-          form.setFieldValue('dataFormat', 'role-based')
-        }
-        else if (dataSource === 'text-generation') {
-          form.setFieldValue('dataFormat', 'prompt-response')
-        }
-        else {
-          form.setFieldValue('dataFormat', dataFormatOptions.options[0].value)
-        }
+        form.setFieldValue('dataFormat', importUsageConfig.defaultFormat)
       }
     }
-  }, [form, dataSource, dataFormatOptions])
-
-  // 数据用途选项
-  const dataSourceOptions = [
-    { value: 'text-generation', label: '文本生成', disabled: false, icon: <FileTextOutlined /> },
-    { value: 'image-understanding', label: '图像理解', disabled: false, icon: <CloudUploadOutlined /> },
-    // { value: 'image-generation', label: '图像生成', disabled: true, icon: <DatabaseOutlined /> },
-  ]
+  }, [form, importDataUsage, dataFormatOptions])
 
   // 处理数据用途变化
   const handleDataSourceChange = (e: any) => {
-    const value = typeof e === 'string' ? e : e.target.value
-    setDataSource(value)
-    // 如果选择图像理解，自动设置数据格式为 role-based
-    if (value === 'image-understanding') {
-      form.setFieldValue('dataFormat', 'role-based')
-    }
-    else if (value === 'text-generation') {
-      // 如果选择文本生成，自动设置数据格式为 prompt-response
-      form.setFieldValue('dataFormat', 'prompt-response')
-    }
+    const value = (typeof e === 'string' ? e : e.target.value) as ImportDataUsage
+    const importUsageConfig = getImportUsageConfig(value)
+    setImportDataUsage(importUsageConfig.value)
+    setDataSource(importUsageConfig.datasetType)
+    form.setFieldValue('dataFormat', importUsageConfig.defaultFormat)
     // 切换数据用途时重置上传的文件
     setSelectedFile(null)
     setChunkUploadId(null)
@@ -895,7 +954,7 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
       return '.jsonl,.json,.xlsx,.csv'
     }
     else {
-      return '.jsonl,.json,.xlsx,.csv'
+      return '.jsonl,.json,.xlsx'
     }
   }
   const getMaxFileSizeMB = () => {
@@ -916,7 +975,7 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
       }
     }
     else {
-      // 文本生成类型支持 jsonl、json、xlsx、csv
+      // 文本生成类型支持 jsonl、json、xlsx；业务推理额外支持 csv
       const isJsonl = file.name.endsWith('.jsonl')
       const isJson = file.name.endsWith('.json') || file.type === 'application/json'
       const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.name.endsWith('.xlsx')
@@ -1735,10 +1794,12 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                 }
                 else if (newMethod === InferenceMethod.IMPORT) {
                   // 如果是导入推理结果集，设置数据用途和数据格式
-                  setDataSource('text-generation')
+                  const importUsageConfig = getImportUsageConfig('text-generation-sft')
+                  setImportDataUsage(importUsageConfig.value)
+                  setDataSource(importUsageConfig.datasetType)
                   // 如果数据格式选项已加载，设置默认数据格式
                   const defaultDataFormat = dataFormatOptions && dataFormatOptions.options && dataFormatOptions.options.length > 0
-                    ? 'prompt-response' // 文本生成的默认格式
+                    ? importUsageConfig.defaultFormat
                     : undefined
                   resetInferenceFormFields({
                     dataFormat: defaultDataFormat,
@@ -2068,11 +2129,11 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
               {usage !== 'business-inference' && (
                 <Form.Item label="数据用途">
                   <div className="mb-4">
-                    <Radio.Group onChange={handleDataSourceChange} value={dataSource}>
+                    <Radio.Group onChange={handleDataSourceChange} value={importDataUsage}>
                       <Space direction="horizontal">
-                        {dataSourceOptions.map((option) => (
-                          <Tooltip title={option.disabled ? '即将上线' : null} color="blue" key={option.value}>
-                            <Radio.Button disabled={option.disabled} value={option.value}>
+                        {IMPORT_DATA_USAGE_OPTIONS.map((option) => (
+                          <Tooltip title={null} color="blue" key={option.value}>
+                            <Radio.Button value={option.value}>
                               <Space>
                                 {option.icon}
                                 <span>{option.label}</span>
@@ -2100,20 +2161,13 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                     <Space direction="horizontal" size="middle">
                       {dataFormatOptions?.options
                         ?.filter((option) => {
-                          const isImageUnderstanding = dataSource === 'image-understanding'
-                          if (isImageUnderstanding && option.value === 'prompt-response') {
-                            return false
-                          }
-                          return true
+                          return getImportUsageConfig(importDataUsage).formats.includes(option.value)
                         })
                         ?.map((option) => {
                           const isImageUnderstanding = dataSource === 'image-understanding'
-                          const shouldDisable = isImageUnderstanding
-                            ? option.value !== 'role-based'
-                            : option.value === 'prefix-suffix-middle'
                           return (
                             <div key={option.value} className="create-inference-format-option">
-                              <Radio value={option.value} disabled={shouldDisable}>
+                              <Radio value={option.value}>
                                 <span className="create-inference-format-content">
                                   <span>{option.name}</span>
                                   {(option.value === 'role-based' || option.value === 'prompt-response') && (

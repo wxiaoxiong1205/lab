@@ -12,6 +12,7 @@ class DatasetFormat(str, Enum):
     PROMPT_RESPONSE = "prompt-response"  # 提示词+回复格式
     ALPACA = "alpaca"  # DPO Alpaca 偏好格式
     ROLE_BASED = "role-based"  # 基于角色的对话格式
+    COMPLETION_REWARD = "completion-reward"  # RFT-GRPO Completion + Reward 格式
     PREFIX_SUFFIX_MIDDLE = "prefix-suffix-middle"  # 前缀+后缀+中间格式
     # 添加了业务数据集的特殊格式business
     BUSINESS = "business"
@@ -62,13 +63,13 @@ class DatasetProcessingStatus(str, Enum):
     PENDING = "pending", "处理中"
     COMPLETED = "completed", "处理完成"
     FAILED = "failed", "处理失败"
-    
+
     def __new__(cls, value, description):
         obj = str.__new__(cls, value)
         obj._value_ = value
         obj._description = description
         return obj
-    
+
     @property
     def description(self) -> str:
         """返回中文描述"""
@@ -169,7 +170,7 @@ class TrainingDatasetSummaryResponse(BaseModel):
     created_at: datetime = Field(..., description="首次创建时间")
     updated_at: datetime = Field(..., description="最后更新时间")
     created_by: Optional[str] = Field(None, description="创建人")
-    
+
     class Config:
         from_attributes = True
         json_schema_extra = {
@@ -193,7 +194,7 @@ class DatasetSampleResponse(BaseModel):
     """数据集样本响应模型"""
     row_number: int = Field(..., description="行号（从1开始）")
     sample_data: Any = Field(..., description="样本数据（可以是字典、列表或其他JSON格式）")
-    
+
     class Config:
         from_attributes = True
         json_schema_extra = {
@@ -228,7 +229,7 @@ class DatasetSamplePageResponse(BaseModel):
     size: int = Field(..., description="每页显示条数")
     pages: int = Field(..., description="总页数")
     base_url: Optional[str] = Field(None, description="基础路径-用于拼接图片路径（仅图像理解数据集）")
-    
+
     class Config:
         from_attributes = True
 
@@ -240,7 +241,7 @@ class DatasetInUseResponse(BaseModel):
     task_id: Optional[int] = Field(None, description="使用中的任务ID")
     task_name: Optional[str] = Field(None, description="使用中的任务名称")
     version: str = Field(..., description="数据集版本")
-    
+
     class Config:
         json_schema_extra = {
             "examples": [
