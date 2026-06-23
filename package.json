@@ -1,0 +1,24 @@
+{
+  "name": "lab-coding",
+  "version": "1.0.0",
+  "description": "DeepexiLab 平台持续迭代开发工作仓库。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wxiaoxiong1205/lab.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/wxiaoxiong1205/lab/issues"
+  },
+  "homepage": "https://github.com/wxiaoxiong1205/lab#readme"
+}

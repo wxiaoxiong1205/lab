@@ -1,0 +1,1862 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DeepexiLab 2.0 Agent Native Production Prototype</title>
+  <style>
+    /*
+      PROTOTYPE ONLY - throwaway UI exploration.
+      Question: 按生产级主闭环重构 DeepexiLab 2.0 Agent Native 的设计评审原型。
+      Design note: 当前页以用户迭代需求为基线；报告详情已从“正文 + 证据宽栏 + URL 抽屉”
+      调整为“连续报告正文 + 浮动证据指针 + 本地状态抽屉”；本轮新增“实验报告未完成前
+      可观察实时指标走势、当前进程、预计进程和关键风险”。设计记录保留在源码层，
+      不在评审页面正文中展示。
+    */
+    :root {
+      --ink: #0f172a;
+      --ink-2: #334155;
+      --muted: #64748b;
+      --faint: #94a3b8;
+      --line: #e2e8f0;
+      --line-strong: #cbd5e1;
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --soft: #f1f5f9;
+      --blue: #2563eb;
+      --blue-700: #1d4ed8;
+      --green: #047857;
+      --orange: #b45309;
+      --red: #b91c1c;
+      --cyan: #0891b2;
+      --dark: #101828;
+      --dark-2: #182235;
+      --radius: 8px;
+      --radius-lg: 10px;
+      --shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
+      --shadow-sm: 0 8px 22px rgba(15, 23, 42, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 24px; line-height: 1.28; letter-spacing: 0; }
+    h2 { font-size: 18px; line-height: 1.35; letter-spacing: 0; }
+    h3 { font-size: 15px; line-height: 1.4; letter-spacing: 0; }
+    code {
+      padding: 1px 5px;
+      border-radius: 5px;
+      background: #eef2ff;
+      color: #3730a3;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .muted { color: var(--muted); }
+    .subtext { color: var(--muted); line-height: 1.65; }
+    .eyeline {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+    .inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .between { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .stack { display: grid; gap: 14px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+
+    .btn {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 7px 11px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: #fff;
+      color: var(--ink-2);
+      white-space: nowrap;
+    }
+    .btn:hover { background: #f8fafc; border-color: #94a3b8; }
+    .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+    .btn.primary:hover { background: var(--blue-700); border-color: var(--blue-700); }
+    .btn.dark { background: var(--dark); border-color: var(--dark); color: #fff; }
+    .btn.dark:hover { background: #1f2937; border-color: #1f2937; }
+    .btn.small { min-height: 28px; padding: 4px 8px; font-size: 12px; }
+    .icon-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink-2);
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink-2);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .tag.blue { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+    .tag.green { background: #ecfdf5; border-color: #bbf7d0; color: #047857; }
+    .tag.orange { background: #fff7ed; border-color: #fed7aa; color: #b45309; }
+    .tag.red { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+    .tag.cyan { background: #ecfeff; border-color: #a5f3fc; color: #0e7490; }
+
+    .app-top {
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.96);
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      font-weight: 700;
+    }
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: var(--dark);
+      color: #fff;
+      font-weight: 800;
+    }
+    .hamburger {
+      width: 28px;
+      color: #64748b;
+      font-size: 25px;
+      line-height: 1;
+    }
+    .deepexi-logo {
+      color: #0b56d9;
+      font-size: 30px;
+      font-weight: 900;
+      font-style: italic;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+    .lab-mark {
+      padding-left: 12px;
+      border-left: 1px solid var(--line);
+      color: #111827;
+      font-weight: 800;
+    }
+    .project-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 180px;
+      color: #111827;
+      font-weight: 520;
+    }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .top-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+      flex: 1;
+      margin-left: 18px;
+      justify-content: center;
+    }
+    .top-tab {
+      border: 0;
+      background: transparent;
+      color: var(--ink-2);
+      padding: 8px 18px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .top-tab.active {
+      background: #eff6ff;
+      color: #111827;
+      font-weight: 650;
+      box-shadow: inset 0 0 0 1px #bfdbfe, 0 4px 14px rgba(37, 99, 235, 0.16);
+    }
+
+    .platform-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: 58px 1fr;
+    }
+    .platform-body {
+      display: grid;
+      grid-template-columns: 216px minmax(0, 1fr);
+      min-height: 0;
+    }
+    .platform-sidebar {
+      border-right: 1px solid var(--line);
+      background: #f8fafc;
+      padding: 50px 14px 14px;
+    }
+    .nav-group-title {
+      color: var(--faint);
+      font-size: 12px;
+      margin: 14px 10px 7px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      width: 100%;
+      padding: 9px 10px;
+      border: 0;
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--ink-2);
+      text-align: left;
+    }
+    .nav-item.active { background: #eff6ff; color: var(--blue-700); font-weight: 650; }
+    .nav-item:hover { background: #f8fafc; }
+    .platform-main {
+      min-width: 0;
+      padding: 26px;
+    }
+    .page-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .filter-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: var(--radius-lg);
+      margin-bottom: 14px;
+    }
+    .input {
+      min-height: 34px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      padding: 7px 10px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: #fff;
+    }
+    .panel-pad { padding: 16px; }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 13px;
+    }
+    .metric-value { font-size: 22px; font-weight: 750; margin-top: 5px; }
+    .overview-band {
+      display: flex;
+      justify-content: flex-end;
+      gap: 34px;
+      margin: 4px 0 28px;
+    }
+    .overview-stat {
+      min-width: 190px;
+      display: grid;
+      grid-template-columns: 36px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+    }
+    .overview-stat.active {
+      border-color: #bfdbfe;
+      background: #eef4ff;
+      box-shadow: inset 3px 0 0 #2563eb;
+    }
+    .stat-icon {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: #eef4ff;
+      color: #2563eb;
+    }
+    .overview-card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      padding: 26px;
+      margin-bottom: 20px;
+    }
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 24px;
+    }
+    .status-card {
+      min-height: 120px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px 20px;
+      background: linear-gradient(180deg, #fff, #fbfdff);
+    }
+    .status-number {
+      margin-top: 10px;
+      font-size: 32px;
+      line-height: 1;
+      font-weight: 800;
+    }
+    .resource-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 18px;
+    }
+    .resource-pane {
+      padding: 24px;
+      background: #fff;
+    }
+    .resource-pane + .resource-pane { border-left: 1px solid var(--line); }
+    .usage-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+    .usage-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px 18px;
+      background: #fafcff;
+    }
+    .progress {
+      height: 6px;
+      border-radius: 999px;
+      background: #eef2f7;
+      overflow: hidden;
+      margin-top: 16px;
+    }
+    .progress > span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: #2563eb;
+    }
+    .progress-row {
+      display: grid;
+      grid-template-columns: 78px minmax(0, 1fr) 46px;
+      gap: 10px;
+      align-items: center;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .progress-row .progress { margin-top: 0; }
+    .table-wrap { overflow-x: auto; }
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      min-width: 820px;
+    }
+    .table th,
+    .table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    .table th {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      background: #f8fafc;
+      white-space: nowrap;
+    }
+    .table tr:last-child td { border-bottom: 0; }
+    .table-title { color: var(--ink); font-weight: 650; }
+
+    .workspace-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: 58px 1fr;
+    }
+    .workspace-body {
+      display: grid;
+      grid-template-columns: 236px minmax(0, 1fr);
+      min-height: calc(100vh - 58px);
+    }
+    .workspace-sidebar {
+      border-right: 1px solid #1f2937;
+      background: #0f172a;
+      color: #dbeafe;
+      padding: 14px 10px;
+    }
+    .workspace-sidebar .nav-group-title { color: #93c5fd; }
+    .workspace-sidebar .nav-item { color: #dbeafe; }
+    .workspace-sidebar .nav-item:hover { background: #172554; }
+    .workspace-sidebar .nav-item.active { background: #2563eb; color: #fff; }
+    .workspace-main {
+      min-width: 0;
+      padding: 22px;
+    }
+    .workspace-with-agent {
+      display: grid;
+      --drawer-w: 0px;
+      --drawer-gap: 0px;
+      grid-template-columns: minmax(0, 1fr) var(--drawer-w);
+      gap: var(--drawer-gap);
+      align-items: start;
+      transition: grid-template-columns 260ms cubic-bezier(.2,.8,.2,1), gap 260ms cubic-bezier(.2,.8,.2,1);
+    }
+    .workspace-with-agent.agent-open {
+      --drawer-w: min(392px, 32vw);
+      --drawer-gap: 18px;
+    }
+    .agent-drawer {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: #fff;
+      box-shadow: var(--shadow-sm);
+      position: sticky;
+      top: 76px;
+      overflow: hidden;
+      min-width: 0;
+      opacity: 1;
+      transform: translateX(0);
+      transition: opacity 220ms ease, transform 260ms cubic-bezier(.2,.8,.2,1);
+    }
+    .workspace-with-agent:not(.agent-open) .agent-drawer {
+      opacity: 0;
+      transform: translateX(16px);
+      pointer-events: none;
+    }
+    .agent-head {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--line);
+      background: #f8fafc;
+    }
+    .agent-body {
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+      max-height: calc(100vh - 180px);
+      overflow: auto;
+    }
+    .bubble {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+    .bubble.user { background: #eff6ff; border-color: #bfdbfe; }
+    .result-card {
+      padding: 13px;
+      border: 1px solid #bfdbfe;
+      border-left: 4px solid var(--blue);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+    .warning-card {
+      padding: 13px;
+      border: 1px solid #fed7aa;
+      border-left: 4px solid var(--orange);
+      border-radius: var(--radius);
+      background: #fff7ed;
+    }
+    .confirm-card {
+      padding: 13px;
+      border: 1px solid #cbd5e1;
+      border-left: 4px solid var(--dark);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+
+    .doc-layout {
+      position: relative;
+      max-width: 980px;
+      margin: 0 auto;
+    }
+    .doc-main {
+      display: grid;
+      gap: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: #fff;
+    }
+    .doc-block {
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1fr);
+      gap: 18px;
+      padding: 22px 28px;
+      border-bottom: 1px solid var(--line);
+    }
+    .doc-block:last-child { border-bottom: 0; }
+    .doc-no {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #bfdbfe;
+      border-radius: var(--radius);
+      background: #eff6ff;
+      color: var(--blue-700);
+      font-weight: 760;
+      font-size: 12px;
+    }
+    .doc-block h3 {
+      margin-bottom: 8px;
+      color: #111827;
+      font-size: 16px;
+    }
+    .doc-copy {
+      color: var(--ink-2);
+      line-height: 1.78;
+    }
+    .doc-copy ol {
+      margin: 0;
+      padding-left: 18px;
+    }
+    .doc-copy li + li { margin-top: 6px; }
+    .doc-note {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-left: 3px solid var(--blue);
+      background: #f8fafc;
+      color: var(--ink-2);
+    }
+    .doc-section {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: #fff;
+      padding: 16px;
+    }
+    .doc-section h2 { margin-bottom: 8px; }
+    .evidence-rail {
+      position: fixed;
+      right: 18px;
+      top: 142px;
+      z-index: 15;
+      display: grid;
+      gap: 8px;
+      width: 64px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: rgba(255,255,255,0.96);
+      box-shadow: var(--shadow-sm);
+      backdrop-filter: blur(12px);
+    }
+    .evidence-link {
+      display: grid;
+      place-items: center;
+      gap: 2px;
+      width: 46px;
+      min-height: 48px;
+      padding: 6px 4px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      color: var(--ink);
+      text-align: center;
+      font-size: 11px;
+      line-height: 1.2;
+    }
+    .evidence-link:hover { background: #eff6ff; border-color: #bfdbfe; color: var(--blue-700); }
+    .evidence-icon {
+      font-size: 15px;
+      line-height: 1;
+      color: var(--blue-700);
+    }
+
+    .chart-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: #fff;
+      padding: 14px;
+    }
+    .bar-chart {
+      height: 150px;
+      display: flex;
+      align-items: end;
+      gap: 26px;
+      padding: 20px 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .bar {
+      width: 42px;
+      border-radius: 7px 7px 0 0;
+      background: var(--blue);
+      position: relative;
+    }
+    .bar span {
+      position: absolute;
+      top: -24px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      color: var(--ink-2);
+      white-space: nowrap;
+    }
+    .chart-labels {
+      display: flex;
+      gap: 26px;
+      padding: 8px 12px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .chart-labels span { width: 42px; text-align: center; }
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 5px;
+    }
+    .trend {
+      width: 100%;
+      height: 190px;
+      display: block;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+    .live-panel {
+      border-bottom: 1px solid var(--line);
+      padding: 22px 28px;
+      background: linear-gradient(180deg, #f8fbff 0%, #ffffff 78%);
+    }
+    .live-panel h2 { margin-bottom: 8px; }
+    .live-kpis {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .live-kpi {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 12px;
+      min-height: 92px;
+    }
+    .live-kpi strong {
+      display: block;
+      margin-top: 6px;
+      color: var(--ink);
+      font-size: 20px;
+      line-height: 1.25;
+    }
+    .live-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.85fr);
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .timeline-mini {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 74px minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+    .timeline-item.active { border-color: #bfdbfe; background: #eff6ff; }
+    .timeline-item.blocked { border-color: #fed7aa; background: #fff7ed; }
+    .event-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .event-item {
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1fr);
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--ink-2);
+    }
+    .event-item:last-child { border-bottom: 0; }
+    .risk-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .risk-item {
+      border: 1px solid #fed7aa;
+      border-radius: var(--radius);
+      background: #fff7ed;
+      color: #9a3412;
+      padding: 9px 10px;
+      line-height: 1.5;
+    }
+    .delta-row {
+      display: grid;
+      grid-template-columns: 120px 1fr 58px;
+      gap: 10px;
+      align-items: center;
+      margin-top: 10px;
+    }
+    .delta-track {
+      height: 10px;
+      background: #f1f5f9;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .delta-fill { height: 100%; border-radius: 999px; background: var(--green); }
+    .delta-fill.down { background: var(--red); }
+
+    .log-viewer {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: #090d16;
+      color: #d1d5db;
+      overflow: hidden;
+    }
+    .log-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #111827;
+      border-bottom: 1px solid #1f2937;
+    }
+    .log-lines {
+      margin: 0;
+      padding: 12px 0;
+      max-height: 420px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.65;
+    }
+    .log-line {
+      display: grid;
+      grid-template-columns: 54px 1fr;
+      gap: 12px;
+      padding: 1px 14px;
+    }
+    .log-line .no { color: #64748b; text-align: right; user-select: none; }
+    .log-line.error { background: rgba(220, 38, 38, 0.15); color: #fecaca; }
+    .log-line.warn { background: rgba(217, 119, 6, 0.12); color: #fed7aa; }
+    .log-line.critical { background: rgba(185, 28, 28, 0.22); color: #fecaca; }
+    .log-line .critical-word { color: #fca5a5; font-weight: 800; }
+    .log-line .path-token { color: #93c5fd; }
+
+
+    .tabs {
+      display: flex;
+      gap: 6px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 14px;
+    }
+    .tab {
+      border: 0;
+      background: transparent;
+      padding: 10px 12px;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+    }
+    .tab.active {
+      color: var(--blue-700);
+      border-bottom-color: var(--blue);
+      font-weight: 650;
+    }
+    .command {
+      display: block;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #0b1220;
+      color: #d1d5db;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      overflow-x: auto;
+    }
+    .conversation-group {
+      display: grid;
+      gap: 6px;
+      margin: 6px 0 12px;
+    }
+    .conversation-item {
+      width: 100%;
+      border: 0;
+      border-radius: var(--radius);
+      background: transparent;
+      color: #dbeafe;
+      text-align: left;
+      padding: 8px 10px;
+      display: grid;
+      gap: 2px;
+    }
+    .conversation-item:hover,
+    .conversation-item.active {
+      background: #172554;
+    }
+    .conversation-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 620;
+    }
+    .conversation-meta {
+      color: #93c5fd;
+      font-size: 12px;
+    }
+    .composer-shell {
+      min-height: calc(100vh - 150px);
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 18px;
+      padding: 20px 0 70px;
+    }
+    .composer-box {
+      width: min(860px, 100%);
+      border: 1px solid var(--line-strong);
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+      padding: 14px;
+    }
+    .composer-textarea {
+      width: 100%;
+      min-height: 112px;
+      border: 0;
+      outline: 0;
+      resize: vertical;
+      color: var(--ink);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+    .conversation-thread {
+      max-width: 860px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+      min-height: calc(100vh - 84px);
+      align-content: start;
+      padding: 24px 0 110px;
+    }
+    .chat-topline {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .message-row {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+    .message-row.user {
+      grid-template-columns: minmax(0, 1fr) 34px;
+    }
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #111827;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .message-row.user .avatar {
+      background: #e5e7eb;
+      color: #374151;
+    }
+    .message {
+      display: grid;
+      gap: 10px;
+      color: var(--ink);
+      line-height: 1.65;
+      font-size: 14px;
+    }
+    .message-bubble {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 14px;
+    }
+    .message-row.user .message {
+      justify-items: end;
+    }
+    .message-row.user .message-bubble {
+      max-width: 680px;
+      background: #111827;
+      color: #fff;
+      border-color: #111827;
+    }
+    .assistant-artifact {
+      border: 1px solid var(--line-strong);
+      border-radius: 12px;
+      background: #fff;
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    }
+    .thread-composer {
+      position: sticky;
+      bottom: 0;
+      background: linear-gradient(180deg, rgba(246, 247, 251, 0), #f6f7fb 22%);
+      padding-top: 24px;
+    }
+
+    @media (max-width: 1120px) {
+      .workspace-with-agent,
+      .platform-body,
+      .workspace-body {
+        grid-template-columns: 1fr;
+      }
+      .workspace-with-agent.agent-open {
+        --drawer-w: 1fr;
+        --drawer-gap: 14px;
+      }
+      .platform-sidebar,
+      .workspace-sidebar {
+        display: none;
+      }
+      .agent-drawer {
+        position: static;
+      }
+      .workspace-with-agent:not(.agent-open) .agent-drawer {
+        display: none;
+      }
+      .doc-layout { max-width: none; }
+      .evidence-rail {
+        position: static;
+        width: auto;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin: 14px 0 0;
+      }
+      .evidence-link {
+        width: 100%;
+      }
+      .doc-block {
+        grid-template-columns: 1fr;
+      }
+      .live-kpis,
+      .live-grid,
+      .grid-2,
+      .grid-3,
+      .grid-4 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    const routes = {
+      platform: "平台基础页",
+      chat: "新对话",
+      conversations: "对话",
+      reports: "实验报告",
+      "report-detail": "报告详情",
+      data: "数据报告详情",
+      "data-detail": "数据报告详情",
+      compare: "实验对比详情",
+      "compare-detail": "实验对比详情",
+      logs: "实验日志详情",
+      "log-detail": "实验日志详情",
+      skillhub: "SkillHub",
+      mcp: "MCP"
+    };
+
+    const conversationItems = [
+      ["conv-dpo", "DPO 参数调优实验", "今天 10:18"],
+      ["conv-eval", "评估集适用性分析", "今天 09:35"],
+      ["conv-log", "训练失败原因定位", "昨天 18:20"]
+    ];
+
+    const archiveItems = [["reports", "实验报告"], ["data", "数据报告详情"], ["compare", "实验对比详情"], ["logs", "实验日志详情"]];
+    const toolItems = [["skillhub", "SkillHub"], ["mcp", "MCP"]];
+
+    const reports = [
+      ["DPO 参数调优实验", "run-4 正在评估，当前指标接近 run-3，但评估进度落后预计 9%。", "进行中", "V2", "Agent + CLI", "训练任务 4 / 评估任务 1"],
+      ["DPO 参数调优实验阶段结论", "run-3 稳定性最好，但评估日志缺段，需要补证后再交付。", "有风险", "V2", "Agent + CLI", "训练任务 3 / 评估任务 1"],
+      ["Qwen-7B 评估集适用性分析", "评估集覆盖指令遵循和事实一致性，安全拒答样本偏少。", "证据不足", "V1", "Notebook", "测试数据 v4"],
+      ["代码能力数据集筛选实验", "去重后困难样本质量提升，但长代码样本占比下降。", "可信", "V3", "Agent", "训练数据 v8 / 数据报告 2"],
+      ["训练失败原因定位与修复", "OOM 与 batch size、gradient checkpoint 配置有关。", "人工修订", "V2", "SSH + MCP", "日志详情 4"]
+    ];
+
+    const dataReports = [
+      ["偏好数据清洗与适用性分析", "去重 3.2%，困难样本占比下降 6.4%，适合 DPO 稳定性补证。", "可信", "数据处理", "数据集 pref-v8"],
+      ["评估集覆盖度分析", "安全拒答和长上下文样本不足，无法支撑交付结论。", "证据不足", "适用性分析", "测试集 eval-v4"],
+      ["代码样本分布变化", "Python 样本提升，SQL 与 JavaScript 样本下降。", "有风险", "数据对比", "训练集 code-v5"]
+    ];
+
+    const comparisons = [
+      ["DPO 三版本训练对比", "run-3 稳定性最好，run-2 收敛更快但波动较高。", "有风险", "训练对比", "dpo-run-0725-*"],
+      ["SFT 两组数据 mix 对比", "mix-b 在事实一致性上提升，安全能力轻微回退。", "可信", "数据/训练对比", "sft-run-0718-*"],
+      ["评估脚本版本差异对比", "v3 评估口径更严格，历史分数不可直接横比。", "证据不足", "评估对比", "eval-script v2/v3"]
+    ];
+
+    const logs = [
+      ["dpo-run-0725 评估日志追溯", "评估日志 18:42-18:51 存在缺段，需补采。", "有风险", "训练/评估日志", "/runs/dpo/0725/eval.log"],
+      ["sft-run-0718 OOM 日志", "exit 137 与显存峰值相关，已定位 batch size 配置。", "可信", "训练日志", "/runs/sft/0718/train.log"],
+      ["Notebook 数据处理日志", "清洗脚本执行完成，3 个样本解析失败。", "可信", "Notebook", "notebook://clean-pref-v8"]
+    ];
+
+    const localState = {
+      agentOpen: false,
+      agentDraft: "",
+      toolTabs: {
+        skillhub: "system",
+        mcp: "system"
+      }
+    };
+
+    function qs() {
+      return new URLSearchParams(location.search);
+    }
+
+    function route() {
+      return qs().get("route") || "platform";
+    }
+
+    function toolTab() {
+      const current = route();
+      return localState.toolTabs[current] || "system";
+    }
+
+    function go(next, extra = {}) {
+      localState.agentOpen = false;
+      const p = new URLSearchParams();
+      p.set("route", next);
+      Object.entries(extra).forEach(([k, v]) => p.set(k, v));
+      history.pushState(null, "", "?" + p.toString());
+      render();
+    }
+
+    function setTab(tab) {
+      const current = route();
+      localState.toolTabs[current] = tab === "mine" ? "mine" : "system";
+      render();
+    }
+
+    function setAgentDraft(value) {
+      localState.agentDraft = value;
+    }
+
+    function tagClass(status) {
+      if (status === "可信" || status === "已连接" || status === "已发布") return "green";
+      if (status === "有风险" || status === "权限失效" || status === "编辑中") return "orange";
+      if (status === "进行中" || status === "分析中") return "blue";
+      if (status === "证据不足" || status === "未配置" || status === "已禁用") return "cyan";
+      if (status === "生成失败" || status === "异常") return "red";
+      if (status === "人工修订") return "blue";
+      return "blue";
+    }
+
+    function topBar(kind = "workspace") {
+      if (kind === "platform") {
+        return `
+          <header class="app-top">
+            <div class="brand">
+              <span class="hamburger">☰</span>
+              <span class="deepexi-logo">deepexi</span>
+              <span class="lab-mark">LAB</span>
+              <span class="muted" style="font-size:22px">‹</span>
+              <span class="project-switch">📁 demo <span class="muted">⌄</span></span>
+            </div>
+            <nav class="top-tabs">
+              <button class="top-tab active">任务概览</button>
+              <button class="top-tab">数据服务</button>
+              <button class="top-tab">模型训练</button>
+              <button class="top-tab">模型评估</button>
+              <button class="top-tab">模型服务</button>
+            </nav>
+            <div class="top-actions">
+              <button class="btn dark" onclick="go('chat')">Lab Agent</button>
+              <span class="muted">⌕</span>
+              <span class="muted">▣</span>
+              <span>zh</span>
+              <span class="tag">平台管理员</span>
+            </div>
+          </header>
+        `;
+      }
+      return `
+        <header class="app-top">
+          <div class="brand"><div class="brand-mark">A</div><span>Lab Agent Workspace</span></div>
+          <div class="top-actions">
+            <button class="btn small" onclick="go('platform')">回到平台</button>
+            <button class="icon-btn" title="展开对话" onclick="toggleAgent()">◨</button>
+            <span class="tag blue">陈工</span>
+          </div>
+        </header>
+      `;
+    }
+
+    function platformSidebar() {
+      return `
+        <aside class="platform-sidebar">
+          <button class="nav-item active">▦ 任务概览</button>
+        </aside>
+      `;
+    }
+
+    function workspaceSidebar(active) {
+      return `
+        <aside class="workspace-sidebar">
+          <div class="brand" style="padding: 0 10px 12px"><span>Agent Native</span></div>
+          <button class="nav-item ${active === "chat" ? "active" : ""}" onclick="go('chat')">＋ 新对话</button>
+          <div class="nav-group-title">对话</div>
+          <div class="conversation-group">
+            ${conversationItems.map(([key, title, meta]) => `
+              <button class="conversation-item ${active === "conversations" && qs().get("conv") === key ? "active" : ""}" onclick="go('conversations', { conv: '${key}' })">
+                <span class="conversation-title">${title}</span>
+                <span class="conversation-meta">${meta}</span>
+              </button>
+            `).join("")}
+          </div>
+          <div class="nav-group-title">实验档案</div>
+          ${archiveItems.map(([key, label]) => `<button class="nav-item ${active === key ? "active" : ""}" onclick="go('${key}')">${label}</button>`).join("")}
+          <div class="nav-group-title">插件与工具</div>
+          ${toolItems.map(([key, label]) => `<button class="nav-item ${active === key ? "active" : ""}" onclick="go('${key}')">${label}</button>`).join("")}
+        </aside>
+      `;
+    }
+
+    function workspaceLayout(active, content, opts = {}) {
+      return `
+        <div class="workspace-shell">
+          ${topBar("workspace")}
+          <div class="workspace-body">
+            ${workspaceSidebar(active)}
+            <main class="workspace-main">
+              <div id="agentWorkspace" class="workspace-with-agent ${localState.agentOpen ? "agent-open" : ""}">
+                <div>${content}</div>
+                <aside id="agentDrawer" class="agent-drawer" aria-hidden="${localState.agentOpen ? "false" : "true"}">
+                  ${agentDrawer(opts.agentContext || routes[active] || "当前资产")}
+                </aside>
+              </div>
+            </main>
+          </div>
+        </div>
+      `;
+    }
+
+    function agentDrawer(context) {
+      return `
+        <div class="agent-head">
+          <div class="between">
+            <div><strong>Lab Agent</strong><div class="muted">上下文：${context}</div></div>
+            <button class="icon-btn" onclick="toggleAgent()">×</button>
+          </div>
+        </div>
+        <div class="agent-body">
+          <div class="bubble user">继续解释这份资产中最影响交付判断的风险。</div>
+          <div class="bubble">我会基于当前上下文回答，但不会自动写回报告。若需要更新报告，我会先给出报告更新卡片。</div>
+          <div class="result-card">
+            <div class="eyeline">报告更新建议</div>
+            <h3>建议补充评估日志缺段风险</h3>
+            <p class="subtext">将新增到“风险与证据不足”模块；不新增版本，除非你要求补证重新生成。</p>
+            <div class="inline" style="margin-top: 10px">
+              <button class="btn small primary">保存到报告</button>
+              <button class="btn small">仅保留对话</button>
+            </div>
+          </div>
+          <div class="confirm-card">
+            <div class="eyeline">动作确认面板</div>
+            <h3>准备创建评估任务</h3>
+            <p class="subtext">影响对象：测试集 eval-v4、模型版本 dpo-run-0725-3。提交前会复用平台原表单校验。</p>
+            <div class="inline" style="margin-top: 10px">
+              <button class="btn small">取消</button>
+              <button class="btn small dark">确认执行</button>
+            </div>
+          </div>
+          <div class="composer-box" style="box-shadow:none;border-color:var(--line);padding:10px">
+            <textarea class="composer-textarea" style="min-height:74px;font-size:14px" placeholder="针对当前资产继续追问，不会自动改写左侧报告" oninput="setAgentDraft(this.value)">${localState.agentDraft}</textarea>
+            <div class="between" style="border-top:1px solid var(--line);padding-top:10px"><span class="muted">本地追问上下文已隔离</span><button class="btn small dark">发送</button></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function toggleAgent() {
+      localState.agentOpen = !localState.agentOpen;
+      updateAgentVisibility();
+    }
+
+    function updateAgentVisibility() {
+      const workspace = document.getElementById("agentWorkspace");
+      const drawer = document.getElementById("agentDrawer");
+      if (!workspace || !drawer) return;
+      workspace.classList.toggle("agent-open", localState.agentOpen);
+      drawer.setAttribute("aria-hidden", localState.agentOpen ? "false" : "true");
+    }
+
+    function platformPage() {
+      return `
+        <div class="platform-shell">
+          ${topBar("platform")}
+          <div class="platform-body">
+            ${platformSidebar()}
+            <main class="platform-main">
+              <div class="page-head">
+                <div>
+                  <h1>任务概览</h1>
+                </div>
+              </div>
+
+              <div class="overview-band">
+                <div class="overview-stat">
+                  <div class="stat-icon">▦</div>
+                  <div><strong>全部任务</strong><div class="muted">当前视图</div></div>
+                  <div class="metric-value" style="color:#2563eb">1391</div>
+                </div>
+                <div class="overview-stat active">
+                  <div class="stat-icon">⌂</div>
+                  <div><strong>大模型</strong><div class="muted">筛选视图</div></div>
+                  <div class="metric-value" style="color:#2563eb">1334</div>
+                </div>
+                <div class="overview-stat">
+                  <div class="stat-icon" style="background:#ecfdf5;color:#047857">♜</div>
+                  <div><strong>机器学习</strong><div class="muted">筛选视图</div></div>
+                  <div class="metric-value" style="color:#0f766e">57</div>
+                </div>
+              </div>
+
+              <section class="overview-card">
+                <div class="between">
+                  <div>
+                    <div class="muted">当前视图</div>
+                    <h2>项目算力任务总览</h2>
+                    <p class="subtext">统计当前项目下大模型与机器学习中需要配置算力资源的任务。</p>
+                  </div>
+                  <span class="tag blue">大模型任务 · 1334</span>
+                </div>
+                <div class="status-grid">
+                  ${statusCard("已创建", "154", "#2563eb")}
+                  ${statusCard("定时待启动", "0", "#64748b")}
+                  ${statusCard("启动中", "8", "#2563eb")}
+                  ${statusCard("排队中", "0", "#0ea5e9")}
+                  ${statusCard("运行中", "1", "#047857")}
+                  ${statusCard("已终止", "45", "#64748b")}
+                  ${statusCard("已完成", "928", "#047857")}
+                  ${statusCard("失败", "198", "#b91c1c")}
+                </div>
+              </section>
+
+              <section class="overview-card">
+                <div class="between">
+                  <div>
+                    <h2>▦ 算力资源</h2>
+                    <p class="subtext">当前项目与绑定集群的算力使用放在同一模块中对比查看。</p>
+                  </div>
+                  <div class="inline"><span class="tag blue">GPU</span><span class="tag">CPU</span></div>
+                </div>
+                <div class="resource-grid">
+                  <div class="resource-pane">
+                    <h3><span style="color:#2563eb">●</span> 当前项目算力 <span class="tag blue">大模型任务</span></h3>
+                    <p class="subtext">当前范围内运行、启动中，分母为绑定集群总量</p>
+                    <div class="usage-grid">
+                      ${usageCard("已使用卡数", "0/1卡", 0, "#2563eb")}
+                      ${usageCard("已使用显存", "0/15GB", 0, "#2563eb")}
+                      ${usageCard("已使用 CPU", "0.5/8核", 12, "#2563eb")}
+                      ${usageCard("已使用内存", "0.5/25.14GB", 3, "#2563eb")}
+                    </div>
+                  </div>
+                  <div class="resource-pane">
+                    <h3><span style="color:#047857">●</span> 对应集群算力 <span class="tag green">集群总量</span></h3>
+                    <p class="subtext">集群整体资源使用：测试环境集群12，不受任务范围筛选影响</p>
+                    <div class="usage-grid">
+                      ${usageCard("已使用卡数", "1/1卡", 100, "#047857")}
+                      ${usageCard("已使用显存", "15/15GB", 100, "#047857")}
+                      ${usageCard("已使用 CPU", "4.29/8核", 54, "#047857")}
+                      ${usageCard("已使用内存", "5.87/25.14GB", 23, "#047857")}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </main>
+          </div>
+        </div>
+      `;
+    }
+
+    function statusCard(label, value, color) {
+      return `
+        <div class="status-card">
+          <div>${label}</div>
+          <div class="status-number" style="color:${color}">${value}<span class="muted" style="font-size:18px;font-weight:500">个</span></div>
+        </div>
+      `;
+    }
+
+    function usageCard(label, value, percent, color) {
+      return `
+        <div class="usage-card">
+          <div class="between"><span class="muted">${label}</span><strong style="color:${color}">${value}</strong></div>
+          <div class="progress"><span style="width:${percent}%;background:${color}"></span></div>
+        </div>
+      `;
+    }
+
+    function chatPage() {
+      const content = `
+        <section class="composer-shell">
+          <div style="text-align:center;display:grid;gap:8px">
+            <div class="eyeline">Lab Agent</div>
+            <h1>需要推进什么实验工作？</h1>
+            <p class="subtext">提交实验目标后，系统将基于当前项目资产发起分析流程；当结论、证据与风险满足归档条件时，生成或更新实验报告。</p>
+          </div>
+          <div class="composer-box">
+            <textarea class="composer-textarea" placeholder="输入实验目标，例如：对比 dpo-run-0725 的三次训练，判断哪一组可以进入交付"></textarea>
+            <div class="between" style="border-top:1px solid var(--line);padding-top:12px;justify-content:flex-end">
+              <button class="btn dark" onclick="go('conversations', { conv: 'conv-dpo' })">发送</button>
+            </div>
+          </div>
+        </section>
+      `;
+      return workspaceLayout("chat", content, { agentContext: "新对话" });
+    }
+
+    function conversationsPage() {
+      const conv = qs().get("conv") || "conv-dpo";
+      const titleMap = {
+        "conv-dpo": "DPO 参数调优实验",
+        "conv-eval": "评估集适用性分析",
+        "conv-log": "训练失败原因定位"
+      };
+      const content = `
+        <div class="conversation-thread">
+          <div class="chat-topline">
+            <span>${titleMap[conv] || titleMap["conv-dpo"]}</span>
+            <button class="btn small" onclick="go('chat')">新对话</button>
+          </div>
+          <div class="message-row user">
+            <div class="message">
+              <div class="message-bubble">对比 dpo-run-0725 的三次训练，判断哪一组可以进入交付，并输出风险与下一步建议。</div>
+            </div>
+            <div class="avatar">陈</div>
+          </div>
+          <div class="message-row">
+            <div class="avatar">A</div>
+            <div class="message">
+              <div>我会基于可用的训练、评估、数据和日志记录做对比。当前目标会保存在这条对话中；如果形成可复用结论，会沉淀为实验报告。</div>
+              <div>已完成初步对比：run-3 指标最稳定，但评估日志 18:42-18:51 存在缺段，进入交付前需要补采证据。</div>
+              <div class="assistant-artifact">
+                <div class="between">
+                  <div>
+                    <div class="eyeline">实验报告已生成</div>
+                    <h3>DPO 参数调优实验</h3>
+                    <p class="subtext">结论：run-3 稳定性最好，但需要补采评估日志后再进入交付。</p>
+                  </div>
+                  <span class="tag orange">有风险</span>
+                </div>
+                <div class="inline"><span class="tag blue">训练任务 3</span><span class="tag green">数据报告 1</span><span class="tag cyan">日志详情 1</span></div>
+                <div class="inline">
+                  <button class="btn primary" onclick="go('report-detail')">查看报告</button>
+                  <button class="btn">撤回本次追加</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="thread-composer">
+            <div class="composer-box">
+              <textarea class="composer-textarea" style="min-height:70px" placeholder="继续追问，或要求补充证据后重新生成报告"></textarea>
+              <div class="between" style="border-top:1px solid var(--line);padding-top:12px"><span class="muted">当前对话：DPO 参数调优实验</span><button class="btn dark">发送</button></div>
+            </div>
+          </div>
+        </div>
+      `;
+      return workspaceLayout("conversations", content, { agentContext: titleMap[conv] || titleMap["conv-dpo"] });
+    }
+
+    function listPage(active, title, desc, rows, detailRoute) {
+      const content = `
+        <div class="page-head">
+          <div>
+            <div class="eyeline">实验档案 / ${title}</div>
+            <h1>${title}</h1>
+            <p class="subtext">${desc}</p>
+          </div>
+          <button class="btn" onclick="go('chat')">新对话</button>
+        </div>
+        <div class="filter-row">
+          <input class="input" placeholder="搜索关键词" value="" />
+          <button class="btn small">创建人</button>
+          <button class="btn small">可靠性状态</button>
+          <button class="btn small">来源渠道</button>
+          <button class="btn small">时间范围</button>
+        </div>
+        <div class="panel table-wrap">
+          <table class="table">
+            <thead><tr><th>名称</th><th>主要结论</th><th>状态</th><th>版本/类型</th><th>来源/对象</th><th>操作</th></tr></thead>
+            <tbody>
+              ${rows.map((r, idx) => `
+                <tr>
+                  <td><div class="table-title">${r[0]}</div><div class="muted">创建人：${idx % 2 ? "李工" : "陈工"} / 更新：今天 ${idx === 0 ? "10:18" : "09:" + (42 - idx * 7)}</div></td>
+                  <td>${r[1]}</td>
+                  <td><span class="tag ${tagClass(r[2])}">${r[2]}</span></td>
+                  <td>${r[3]}</td>
+                  <td><div>${r[4]}</div><div class="muted">${r[5] || ""}</div></td>
+                  <td><button class="btn small" onclick="go('${detailRoute}')">查看详情</button></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+      return workspaceLayout(active, content);
+    }
+
+    function liveObservationPanel() {
+      return `
+        <section class="live-panel" aria-label="进行中实验实时观察">
+          <div class="between">
+            <div>
+              <div class="eyeline">进行中实验观察</div>
+              <h2>run-4 评估与报告生成进程</h2>
+              <p class="subtext">实时观察区只展示训练、评估、Notebook、CLI/MCP 和 Agent Bridge 已回流的事实数据；Agent 负责解释风险，不补造指标点。</p>
+            </div>
+            <span class="tag blue">快照更新：10:18:32</span>
+          </div>
+          <div class="live-kpis">
+            <div class="live-kpi"><div class="muted">当前阶段</div><strong>评估中</strong><div class="muted">benchmark 3/5</div></div>
+            <div class="live-kpi"><div class="muted">当前进度</div><strong>68%</strong><div class="muted">真实任务进度</div></div>
+            <div class="live-kpi"><div class="muted">预计进度</div><strong>77%</strong><div class="muted">按 ETA 与阶段权重估算</div></div>
+            <div class="live-kpi"><div class="muted">预计剩余</div><strong>18 分钟</strong><div class="muted">预计 10:36 完成</div></div>
+            <div class="live-kpi"><div class="muted">关键风险</div><strong style="color:var(--orange)">2 项</strong><div class="muted">进度滞后 / 日志缺段</div></div>
+          </div>
+          <div class="live-grid">
+            <section class="chart-card">
+              <h2>核心指标走势</h2>
+              <svg class="trend" viewBox="0 0 760 190" role="img" aria-label="进行中实验核心指标走势">
+                <line x1="40" y1="158" x2="720" y2="158" stroke="#e2e8f0" />
+                <line x1="40" y1="32" x2="40" y2="158" stroke="#e2e8f0" />
+                <line x1="40" y1="118" x2="720" y2="118" stroke="#f1f5f9" />
+                <line x1="40" y1="76" x2="720" y2="76" stroke="#f1f5f9" />
+                <polyline points="42,146 138,128 234,106 330,91 426,80 522,70 618,64 718,60" fill="none" stroke="#2563eb" stroke-width="4"/>
+                <polyline points="42,152 138,142 234,132 330,118 426,111 522,102 618,96 718,92" fill="none" stroke="#10b981" stroke-width="4"/>
+                <polyline points="42,132 138,116 234,105 330,98 426,110 522,94 618,104 718,96" fill="none" stroke="#f97316" stroke-width="4"/>
+                <text x="48" y="28" fill="#64748b" font-size="11">higher</text>
+                <text x="48" y="174" fill="#64748b" font-size="11">lower</text>
+                <text x="572" y="54" fill="#2563eb" font-size="12">loss 平滑下降</text>
+                <text x="560" y="112" fill="#b45309" font-size="12">win-rate 有波动</text>
+              </svg>
+              <div class="chart-legend">
+                <span><i class="legend-dot" style="background:#2563eb"></i>train loss</span>
+                <span><i class="legend-dot" style="background:#10b981"></i>stability</span>
+                <span><i class="legend-dot" style="background:#f97316"></i>win-rate</span>
+                <span><i class="legend-dot" style="background:#94a3b8"></i>F1 暂无数据</span>
+              </div>
+              <div class="progress-row"><span>当前</span><div class="progress"><span style="width:68%;background:#2563eb"></span></div><strong>68%</strong></div>
+              <div class="progress-row"><span>预计</span><div class="progress"><span style="width:77%;background:#94a3b8"></span></div><strong>77%</strong></div>
+            </section>
+            <section class="chart-card">
+              <h2>阶段时间线</h2>
+              <div class="timeline-mini">
+                <div class="timeline-item"><span class="tag green">已完成</span><div><strong>数据读取</strong><div class="muted">pref-v8 / eval-v4 已解析</div></div></div>
+                <div class="timeline-item"><span class="tag green">已完成</span><div><strong>训练运行</strong><div class="muted">run-4 checkpoint 已产出</div></div></div>
+                <div class="timeline-item active"><span class="tag blue">进行中</span><div><strong>自动评估</strong><div class="muted">benchmark 3/5，进度低于预计</div></div></div>
+                <div class="timeline-item blocked"><span class="tag orange">待补证</span><div><strong>日志分析</strong><div class="muted">18:42-18:51 缺段仍需补采</div></div></div>
+                <div class="timeline-item"><span class="tag">待开始</span><div><strong>报告生成</strong><div class="muted">评估结束后进入分析中</div></div></div>
+              </div>
+            </section>
+          </div>
+          <div class="grid-2" style="margin-top:14px">
+            <section class="chart-card">
+              <h2>最近事件</h2>
+              <div class="event-list">
+                <div class="event-item"><span class="muted">10:18</span><div>评估任务写回 win-rate=64.1，低于 run-3 阶段值 0.7。</div></div>
+                <div class="event-item"><span class="muted">10:12</span><div>CLI 追加 run-4 checkpoint 路径，关联到当前报告。</div></div>
+                <div class="event-item"><span class="muted">10:05</span><div>Notebook 回流训练曲线，loss 未出现 spike。</div></div>
+              </div>
+            </section>
+            <section class="chart-card">
+              <h2>关键风险</h2>
+              <div class="risk-list">
+                <div class="risk-item">当前进度 68%，低于预计 77%，若 benchmark 4 继续滞后，ETA 需要重新估算。</div>
+                <div class="risk-item">评估日志仍存在 18:42-18:51 缺段，报告结论暂不能进入交付锁定。</div>
+              </div>
+            </section>
+          </div>
+        </section>
+      `;
+    }
+
+    function reportDetail() {
+      const content = `
+        <div class="page-head">
+          <div>
+            <div class="eyeline">实验档案 / 实验报告 / 进行中</div>
+            <h1>DPO 参数调优实验</h1>
+            <div class="inline" style="margin-top:8px">
+              <span class="tag blue">进行中</span>
+              <span class="tag orange">进度滞后</span>
+              <span class="tag blue">当前版本 V2</span>
+              <span class="tag">创建人：陈工</span>
+              <span class="tag">来源：Agent + CLI</span>
+              <span class="tag">更新时间：2026-06-18 10:18:32</span>
+            </div>
+          </div>
+          <div class="inline">
+            <button class="btn">编辑</button>
+            <button class="btn">历史版本</button>
+            <button class="btn primary">保存阶段结论</button>
+          </div>
+        </div>
+        <div class="doc-layout">
+          ${evidenceRail()}
+          <main class="doc-main">
+            ${liveObservationPanel()}
+            ${docBlock("01", "原始需求", "对比 dpo-run-0725 的三次训练，判断哪一组可以进入交付，并输出风险与下一步建议。该目标来自项目对话，后续由平台补充评估日志路径。")}
+            ${docBlock("02", "变更记录", "V2 正在追加 run-4 训练与评估过程证据。实时观察区显示当前评估进度、指标走势、最近事件和关键风险；待评估结束后，系统进入分析中并组织正式结论。")}
+            ${docBlock("03", "当前阶段判断", "run-4 训练曲线暂时稳定，loss 未出现 spike；当前 win-rate 接近 run-3，但评估尚未完成，不能替代最终结论。进度低于预计 9%，且 run-3 的评估日志缺段风险仍未补齐。", "阶段状态：进行中。该判断只用于过程观察，不作为交付结论。")}
+            ${docBlock("04", "执行过程", "<ol><li>从平台训练任务列表带入 dpo-run-0725-1/2/3，并追加 CLI 回流的 run-4。</li><li>Notebook 回流 run-4 训练曲线和 checkpoint 路径。</li><li>评估任务持续写回 benchmark 进度和阶段指标。</li><li>Agent 观察进度滞后、日志缺段和指标波动，等待完整证据后再生成正式报告结论。</li></ol>")}
+            ${docBlock("05", "已沉淀证据", "训练曲线、checkpoint 路径、评估进度、部分 win-rate 与 stability 指标已进入事实层。证据明细通过右侧浮动指针进入数据报告、实验对比和日志详情；缺失的 F1 指标和日志缺段不会被 Agent 补造。")}
+            ${docBlock("06", "风险与证据不足", "当前进度低于预计，ETA 可能继续后移；run-3 评估日志 18:42-18:51 缺段仍未补采；F1 指标暂无真实采集值。当前报告可以用于过程评审，不建议作为最终交付材料。")}
+            ${docBlock("07", "下一步动作", "<ol><li>等待 benchmark 4/5 和 5/5 完成，确认 win-rate 波动是否收敛。</li><li>补采 run-3 评估日志，确认 metric sink 回放窗口是否完整。</li><li>评估完成后进入分析中，生成 run-3/run-4 对比摘要和 V3 阶段结论。</li></ol>")}
+          </main>
+        </div>
+      `;
+      return workspaceLayout("reports", content, { agentContext: "实验报告：DPO 参数调优实验" });
+    }
+
+    function evidenceRail() {
+      return `
+        <aside class="evidence-rail" aria-label="证据资产指针">
+          <button class="evidence-link" title="数据报告详情" onclick="go('data-detail')"><span class="evidence-icon">D</span><span>数据</span></button>
+          <button class="evidence-link" title="实验对比详情" onclick="go('compare-detail')"><span class="evidence-icon">C</span><span>对比</span></button>
+          <button class="evidence-link" title="实验日志详情" onclick="go('log-detail')"><span class="evidence-icon">L</span><span>日志</span></button>
+        </aside>
+      `;
+    }
+
+    function docBlock(no, title, body, note = "") {
+      return `
+        <section class="doc-block">
+          <div class="doc-no">${no}</div>
+          <div>
+            <h3>${title}</h3>
+            <div class="doc-copy">${body}</div>
+            ${note ? `<div class="doc-note">${note}</div>` : ""}
+          </div>
+        </section>
+      `;
+    }
+
+    function docSection(title, body) {
+      return `<section class="doc-section"><h2>${title}</h2><p class="subtext">${body}</p></section>`;
+    }
+
+    function dataDetail() {
+      const content = `
+        <div class="page-head">
+          <div>
+            <div class="eyeline">实验档案 / 数据报告详情</div>
+            <h1>偏好数据清洗与适用性分析</h1>
+            <div class="inline" style="margin-top:8px"><span class="tag green">可信</span><span class="tag">来源：Notebook + Agent</span><span class="tag">引用报告：DPO 参数调优实验</span></div>
+          </div>
+          <button class="btn" onclick="go('report-detail')">回到引用报告</button>
+        </div>
+        <div class="grid-4" style="margin-bottom:14px">
+          <div class="metric"><div class="muted">处理前样本</div><div class="metric-value">128,420</div></div>
+          <div class="metric"><div class="muted">处理后样本</div><div class="metric-value">124,310</div></div>
+          <div class="metric"><div class="muted">重复样本</div><div class="metric-value">3.2%</div></div>
+          <div class="metric"><div class="muted">困难样本变化</div><div class="metric-value">-6.4%</div></div>
+        </div>
+        <div class="grid-2">
+          <section class="doc-section"><h2>主要结论</h2><p class="subtext">pref-v8 去重后质量更稳定，适合用于 DPO 稳定性补证；但困难样本占比下降，可能削弱边界场景提升。</p></section>
+          <section class="doc-section"><h2>适用目标</h2><p class="subtext">适用于 DPO 参数调优实验中的稳定性复核，不建议单独作为安全能力补强数据。</p></section>
+          <section class="doc-section"><h2>数据变化</h2><p class="subtext">重复问答、低质量偏好对、格式异常样本被过滤。长回答偏好样本减少，需要在下一轮补充。</p></section>
+          <section class="doc-section"><h2>问题与建议</h2><p class="subtext">补充安全拒答和长上下文困难样本；保留清洗脚本版本和样本抽查记录，便于复现。</p></section>
+        </div>
+        <section class="panel panel-pad" style="margin-top:14px">
+          <h2>样本证据</h2>
+          <p class="subtext">这里只展示代表样本和分析结论；完整样本、字段和版本管理仍回到数据服务。</p>
+          <div class="inline" style="margin-top:10px"><span class="tag blue">样本片段 24</span><span class="tag green">清洗脚本 clean_pref_v8.py</span><span class="tag">数据服务 / pref-v8</span></div>
+        </section>
+      `;
+      return workspaceLayout("data", content, { agentContext: "数据报告详情：pref-v8" });
+    }
+
+    function compareDetail() {
+      const content = `
+        <div class="page-head">
+          <div>
+            <div class="eyeline">实验档案 / 实验对比详情</div>
+            <h1>DPO 三版本训练对比</h1>
+            <div class="inline" style="margin-top:8px"><span class="tag orange">有风险</span><span class="tag">对比对象：dpo-run-0725-1/2/3</span><span class="tag">引用报告：DPO 参数调优实验</span></div>
+          </div>
+          <button class="btn" onclick="go('report-detail')">回到引用报告</button>
+        </div>
+        <section class="doc-section">
+          <h2>推荐结论</h2>
+          <p class="subtext">run-3 是当前最稳妥候选，稳定性优于 run-2；run-2 指标略高但波动更大。由于日志缺段，推荐结论暂不进入交付锁定状态。</p>
+        </section>
+        <div class="grid-2" style="margin-top:14px">
+          <section class="chart-card">
+            <h2>Win-rate 核心指标</h2>
+            <div class="bar-chart">
+              <div class="bar" style="height:82px;background:#93c5fd"><span>62.3</span></div>
+              <div class="bar" style="height:118px;background:#60a5fa"><span>65.1</span></div>
+              <div class="bar" style="height:108px;background:#2563eb"><span>64.8</span></div>
+            </div>
+            <div class="chart-labels"><span>run-1</span><span>run-2</span><span>run-3</span></div>
+            <p class="subtext" style="margin-top:10px">run-2 指标最高，但后期波动放大；run-3 指标接近且稳定性更好。</p>
+          </section>
+          <section class="chart-card">
+            <h2>能力维度涨跌</h2>
+            ${delta("指令遵循", 82, "+4.2", false)}
+            ${delta("事实一致性", 68, "+2.1", false)}
+            ${delta("安全拒答", 36, "-1.8", true)}
+            ${delta("格式稳定性", 74, "+3.5", false)}
+          </section>
+        </div>
+        <section class="chart-card" style="margin-top:14px">
+          <h2>Loss / Win-rate / Stability 趋势</h2>
+          <svg class="trend" viewBox="0 0 760 190" role="img" aria-label="Loss、Win-rate 与稳定性趋势">
+            <line x1="40" y1="158" x2="720" y2="158" stroke="#e2e8f0" />
+            <line x1="40" y1="32" x2="40" y2="158" stroke="#e2e8f0" />
+            <line x1="40" y1="118" x2="720" y2="118" stroke="#f1f5f9" />
+            <line x1="40" y1="76" x2="720" y2="76" stroke="#f1f5f9" />
+            <polyline points="42,150 140,130 238,103 336,78 434,64 532,58 630,53 718,50" fill="none" stroke="#2563eb" stroke-width="4"/>
+            <polyline points="42,154 140,121 238,92 336,70 434,84 532,62 630,76 718,68" fill="none" stroke="#f97316" stroke-width="4"/>
+            <polyline points="42,160 140,142 238,118 336,96 434,74 532,64 630,58 718,55" fill="none" stroke="#10b981" stroke-width="4"/>
+            <text x="48" y="28" fill="#64748b" font-size="11">higher</text>
+            <text x="48" y="174" fill="#64748b" font-size="11">lower</text>
+            <text x="560" y="38" fill="#2563eb" font-size="12">run-3 loss 更平滑</text>
+            <text x="606" y="86" fill="#b45309" font-size="12">run-2 波动</text>
+          </svg>
+          <div class="chart-legend">
+            <span><i class="legend-dot" style="background:#2563eb"></i>run-3 loss 平滑下降</span>
+            <span><i class="legend-dot" style="background:#f97316"></i>run-2 win-rate 高但波动</span>
+            <span><i class="legend-dot" style="background:#10b981"></i>stability score 稳定提升</span>
+          </div>
+          <p class="subtext" style="margin-top:10px">折线仅表达评审原型中的审计趋势：run-3 更适合作为补证后交付候选，run-2 需要解释波动来源。</p>
+        </section>
+        <section class="panel table-wrap" style="margin-top:14px">
+          <table class="table">
+            <thead><tr><th>对象</th><th>数据集</th><th>关键参数</th><th>训练指标</th><th>评估指标</th><th>Agent 结论</th></tr></thead>
+            <tbody>
+              <tr><td>dpo-run-0725-1</td><td>pref-v6</td><td>lr 1e-5 / rank 16</td><td>loss 平滑</td><td>win-rate 62.3</td><td>基线稳定但收益不足</td></tr>
+              <tr><td>dpo-run-0725-2</td><td>pref-v7</td><td>lr 2e-5 / rank 32</td><td>前期收敛快，后期波动</td><td>win-rate 65.1</td><td>指标高但交付风险更大</td></tr>
+              <tr><td>dpo-run-0725-3</td><td>pref-v8</td><td>lr 1.5e-5 / rank 32</td><td>收敛平滑</td><td>win-rate 64.8</td><td>推荐补证后进入交付</td></tr>
+            </tbody>
+          </table>
+        </section>
+      `;
+      return workspaceLayout("compare", content, { agentContext: "实验对比详情：DPO 三版本" });
+    }
+
+    function delta(label, width, value, down) {
+      return `
+        <div class="delta-row">
+          <span>${label}</span>
+          <div class="delta-track"><div class="delta-fill ${down ? "down" : ""}" style="width:${width}%"></div></div>
+          <strong style="color:${down ? "var(--red)" : "var(--green)"}">${value}</strong>
+        </div>
+      `;
+    }
+
+    function logDetail() {
+      const lines = [
+        ["0001", "2026-06-18 18:39:21 eval worker started, model=dpo-run-0725-3"],
+        ["0002", "2026-06-18 18:40:02 loading dataset eval-v4, samples=3200"],
+        ["0003", "2026-06-18 18:41:17 benchmark instruction_following started"],
+        ["0004", "2026-06-18 18:42:03 <span class='critical-word'>[CRITICAL]</span> metric sink disconnected, checkpoint=<span class='path-token'>/runs/dpo/0725/eval</span>", "critical"],
+        ["0005", "2026-06-18 18:42:11 WARN missing heartbeat from eval shard 02", "warn"],
+        ["0006", "2026-06-18 18:51:44 <span class='critical-word'>[CRITICAL]</span> metric sink restored, replay window incomplete", "critical"],
+        ["0007", "2026-06-18 18:52:09 benchmark safety_refusal started"],
+        ["0008", "2026-06-18 18:57:32 safety_refusal score dropped by 1.8"],
+        ["0009", "2026-06-18 19:04:20 eval completed, win_rate=64.8"],
+        ["0010", "2026-06-18 19:04:33 artifact uploaded to <span class='path-token'>/runs/dpo/0725/eval</span>"]
+      ];
+      const content = `
+        <div class="page-head">
+          <div>
+            <div class="eyeline">实验档案 / 实验日志详情</div>
+            <h1>dpo-run-0725 评估日志追溯</h1>
+            <div class="inline" style="margin-top:8px"><span class="tag orange">有风险</span><span class="tag">来源：评估任务 + CLI</span><span class="tag">引用报告：DPO 参数调优实验</span></div>
+          </div>
+          <button class="btn" onclick="go('report-detail')">回到引用报告</button>
+        </div>
+        <div class="grid-3" style="margin-bottom:14px">
+          <div class="metric"><div class="muted">日志来源</div><div class="metric-value" style="font-size:16px">eval.log</div></div>
+          <div class="metric"><div class="muted">异常片段</div><div class="metric-value">2</div></div>
+          <div class="metric"><div class="muted">缺段窗口</div><div class="metric-value" style="font-size:16px">18:42-18:51</div></div>
+        </div>
+        <section class="doc-section">
+          <h2>日志结论</h2>
+          <p class="subtext">评估任务完成，但 metric sink 在 18:42-18:51 期间重连，回放窗口不完整。0004 与 0006 为关键证据行：该缺段不会直接证明指标无效，但足以让交付结论标记为有风险。</p>
+        </section>
+        <section class="log-viewer" style="margin-top:14px">
+          <div class="log-head"><strong>完整日志查看器</strong><div class="inline"><button class="btn small">复制异常片段</button><button class="btn small">定位来源</button></div></div>
+          <pre class="log-lines">${lines.map(([no, text, type]) => `<span class="log-line ${type || ""}"><span class="no">${no}</span><span>${text}</span></span>`).join("")}</pre>
+        </section>
+        <div class="grid-2" style="margin-top:14px">
+          <section class="doc-section"><h2>来源追溯</h2><p class="subtext">任务：dpo-run-0725-3 / 评估任务：eval-20260618-3 / 路径：/runs/dpo/0725/eval.log / 采集方式：平台自动采集。</p></section>
+          <section class="doc-section"><h2>引用关系</h2><p class="subtext">被实验报告“DPO 参数调优实验 V2”引用；被实验对比详情“DPO 三版本训练对比”引用。</p></section>
+        </div>
+      `;
+      return workspaceLayout("logs", content, { agentContext: "实验日志详情：eval.log" });
+    }
+
+    function toolsPage(kind) {
+      const tab = toolTab();
+      const isSkill = kind === "skillhub";
+      const title = isSkill ? "SkillHub" : "MCP";
+      const systemRows = isSkill
+        ? [
+            ["报告生成", "组织目标、证据、结论、风险和下一步", "已启用", "读平台对象 / 写实验报告"],
+            ["实验对比", "对比训练、评估、版本、数据和指标", "已启用", "读训练与评估"],
+            ["数据分析", "分析数据变化、适用性和风险", "已启用", "读数据集 / 写数据报告"],
+            ["日志与报错诊断", "识别异常片段、解释报错、给出修复建议", "已启用", "读日志 / 写日志详情"],
+            ["代码与参数检查", "检查配置、参数 diff、代码版本和复现风险", "已启用", "读代码元信息"]
+          ]
+        : [
+            ["平台能力连接", "项目、数据、训练、评估、Notebook、实验档案", "已连接", "系统连接"],
+            ["文档知识连接", "产品文档、使用手册和接口说明", "已连接", "系统连接"]
+          ];
+      const mineRows = isSkill
+        ? [
+            ["客户日志格式解析", "解析交付现场自定义日志字段", "编辑中", "读取文件 / 脚本执行"],
+            ["周会实验摘要", "按团队格式整理实验周报", "已发布", "读取报告 / 导出 Markdown"]
+          ]
+        : [
+            ["Notebook Context MCP", "Notebook 会话上下文", "已连接", "个人 MCP"],
+            ["Local File MCP", "日志路径与产物文件", "权限失效", "个人 MCP"],
+            ["Custom Tool MCP", "自定义工具连接", "未配置", "个人 MCP"]
+          ];
+      const rows = tab === "system" ? systemRows : mineRows;
+      const content = `
+        <div class="page-head">
+          <div>
+            <div class="eyeline">插件与工具 / ${title}</div>
+            <h1>${title}</h1>
+            <p class="subtext">${isSkill ? "展示 Agent 可使用的能力包和个人 Skill。" : "管理 Agent 可连接的系统能力和个人 MCP 连接。"}</p>
+          </div>
+          <button class="btn primary">${isSkill ? "导入 Skill" : "新增 MCP"}</button>
+        </div>
+        <div class="tabs">
+          <button class="tab ${tab === "system" ? "active" : ""}" onclick="setTab('system')">${isSkill ? "系统能力包" : "系统 MCP"}</button>
+          <button class="tab ${tab === "mine" ? "active" : ""}" onclick="setTab('mine')">${isSkill ? "我的 Skill" : "我的 MCP"}</button>
+        </div>
+        <div class="panel table-wrap">
+          <table class="table">
+            <thead><tr><th>名称</th><th>用途</th><th>状态</th><th>权限/类型</th><th>操作</th></tr></thead>
+            <tbody>
+              ${rows.map(row => `
+                <tr>
+                  <td><div class="table-title">${row[0]}</div><div class="muted">${isSkill ? "Agent 可按目标自动调用" : "用于 Agent 获取授权范围内的信息"}</div></td>
+                  <td>${row[1]}</td>
+                  <td><span class="tag ${tagClass(row[2])}">${row[2]}</span></td>
+                  <td>${row[3]}</td>
+                  <td><button class="btn small">查看详情</button></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+        ${isSkill ? "" : mcpNotice()}
+      `;
+      return workspaceLayout(kind, content, { agentContext: title });
+    }
+
+    function mcpNotice() {
+      return `
+        <section class="panel panel-pad stack" style="margin-top:14px">
+          <h2>连接说明</h2>
+          <p class="subtext">这里仅展示用户可管理的连接状态和授权范围。系统内置接入、协议细节和调用链路不在产品界面中展开。</p>
+        </section>
+      `;
+    }
+
+    function render() {
+      const table = {
+        platform: platformPage,
+        chat: chatPage,
+        conversations: conversationsPage,
+        reports: () => listPage("reports", "实验报告", "集中管理由实验目标沉淀的分析结论、证据引用、风险判断与后续动作，支持评审追溯和交付归档。", reports, "report-detail"),
+        "report-detail": reportDetail,
+        data: () => listPage("data", "数据报告详情", "数据处理、数据对比、数据适用性分析的证据资产。", dataReports, "data-detail"),
+        "data-detail": dataDetail,
+        compare: () => listPage("compare", "实验对比详情", "多训练、多评估、多版本、多数据之间的结构化对比证据资产。", comparisons, "compare-detail"),
+        "compare-detail": compareDetail,
+        logs: () => listPage("logs", "实验日志详情", "日志原文、异常片段、来源路径、采集方式和引用关系的追溯资产。", logs, "log-detail"),
+        "log-detail": logDetail,
+        skillhub: () => toolsPage("skillhub"),
+        mcp: () => toolsPage("mcp")
+      };
+      const current = route();
+      document.getElementById("app").innerHTML = (table[current] || platformPage)();
+    }
+
+    window.addEventListener("popstate", () => {
+      localState.agentOpen = false;
+      render();
+    });
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && localState.agentOpen) toggleAgent();
+    });
+    render();
+  </script>
+</body>
+</html>

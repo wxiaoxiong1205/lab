@@ -21,3 +21,4 @@ fastdata-llm-training-backup/
 fastdata-llm-training/server/data-service-db.json
 fastdata-llm-training/server/document-agent-db.json
 .vercel
+.superpowers/

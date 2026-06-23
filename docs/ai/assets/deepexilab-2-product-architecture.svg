@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="900" viewBox="0 0 1500 900">
+  <defs>
+    <style>
+      .bg { fill: #ffffff; }
+      .label { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #111827; font-size: 27px; font-weight: 700; }
+      .title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #111827; font-size: 18px; font-weight: 700; }
+      .text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #111827; font-size: 16px; font-weight: 550; }
+      .small { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #475569; font-size: 14px; font-weight: 500; }
+      .tiny { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #64748b; font-size: 13px; font-weight: 500; }
+      .entry-wrap { fill: #f8fbff; stroke: #4f7edb; stroke-width: 2.2; }
+      .entry-box { fill: #ffffff; stroke: #4f7edb; stroke-width: 2; }
+      .workspace-wrap { fill: #fff8e6; stroke: #d6a33a; stroke-width: 2.2; }
+      .workspace-box { fill: #ffffff; stroke: #d6a33a; stroke-width: 2; }
+      .archive-wrap { fill: #f2edff; stroke: #8b6bd6; stroke-width: 2.2; }
+      .archive-box { fill: #ffffff; stroke: #8b6bd6; stroke-width: 2; }
+      .platform-wrap { fill: #f0fdfa; stroke: #0f766e; stroke-width: 2.2; }
+      .platform-box { fill: #ffffff; stroke: #0f766e; stroke-width: 2; }
+      .base-wrap { fill: #e8eefc; stroke: #536fb3; stroke-width: 2.2; }
+      .base-box { fill: #ffffff; stroke: #536fb3; stroke-width: 2; }
+      .em { fill: #2563eb; font-weight: 750; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1500" height="900" />
+
+  <text class="label" x="56" y="60">入口与</text>
+  <text class="label" x="56" y="90">外部工作流</text>
+  <rect class="entry-wrap" x="245" y="26" width="1205" height="96" rx="8" />
+  <rect class="entry-box" x="270" y="42" width="214" height="64" rx="7" />
+  <rect class="entry-box" x="505" y="42" width="214" height="64" rx="7" />
+  <rect class="entry-box" x="740" y="42" width="214" height="64" rx="7" />
+  <rect class="entry-box" x="975" y="42" width="214" height="64" rx="7" />
+  <rect class="entry-box" x="1210" y="42" width="214" height="64" rx="7" />
+  <text class="text" x="377" y="76" text-anchor="middle">平台 Lab Agent</text>
+  <text class="small" x="377" y="95" text-anchor="middle">右上角统一入口</text>
+  <text class="text" x="612" y="76" text-anchor="middle">Notebook</text>
+  <text class="small" x="612" y="95" text-anchor="middle">实验过程回流</text>
+  <text class="text" x="847" y="76" text-anchor="middle">SSH / IDE</text>
+  <text class="small" x="847" y="95" text-anchor="middle">外部研发环境</text>
+  <text class="text" x="1082" y="76" text-anchor="middle">CLI / MCP</text>
+  <text class="small" x="1082" y="95" text-anchor="middle">受控平台能力</text>
+  <text class="text" x="1317" y="76" text-anchor="middle">外部 Agent</text>
+  <text class="small" x="1317" y="95" text-anchor="middle">通过 Bridge 接入</text>
+
+  <text class="label" x="56" y="226">2.0</text>
+  <text class="label" x="56" y="256">产品域</text>
+  <rect class="workspace-wrap" x="245" y="158" width="282" height="164" rx="8" />
+  <rect class="workspace-wrap" x="548" y="158" width="282" height="164" rx="8" />
+  <rect class="workspace-wrap" x="851" y="158" width="282" height="164" rx="8" />
+  <rect class="workspace-wrap" x="1154" y="158" width="296" height="164" rx="8" />
+  <text class="title" x="386" y="186" text-anchor="middle">Lab Agent Workspace</text>
+  <text class="title" x="689" y="186" text-anchor="middle">实验档案</text>
+  <text class="title" x="992" y="186" text-anchor="middle">插件与工具</text>
+  <text class="title" x="1302" y="186" text-anchor="middle">Agent Bridge</text>
+  <rect class="workspace-box" x="272" y="207" width="108" height="34" rx="6" /><text class="text" x="326" y="230" text-anchor="middle">新对话</text>
+  <rect class="workspace-box" x="392" y="207" width="108" height="34" rx="6" /><text class="text" x="446" y="230" text-anchor="middle">对话列表</text>
+  <rect class="workspace-box" x="272" y="257" width="228" height="38" rx="6" /><text class="text" x="386" y="282" text-anchor="middle">右侧上下文对话 / 确认面板</text>
+  <rect class="workspace-box" x="574" y="207" width="108" height="34" rx="6" /><text class="text" x="628" y="230" text-anchor="middle">实验报告</text>
+  <rect class="workspace-box" x="694" y="207" width="108" height="34" rx="6" /><text class="text" x="748" y="230" text-anchor="middle">数据报告</text>
+  <rect class="workspace-box" x="574" y="257" width="108" height="34" rx="6" /><text class="text" x="628" y="280" text-anchor="middle">实验对比</text>
+  <rect class="workspace-box" x="694" y="257" width="108" height="34" rx="6" /><text class="text" x="748" y="280" text-anchor="middle">实验日志</text>
+  <rect class="workspace-box" x="885" y="207" width="105" height="34" rx="6" /><text class="text" x="937" y="230" text-anchor="middle">SkillHub</text>
+  <rect class="workspace-box" x="1002" y="207" width="105" height="34" rx="6" /><text class="text" x="1055" y="230" text-anchor="middle">MCP 目录</text>
+  <rect class="workspace-box" x="885" y="257" width="222" height="38" rx="6" /><text class="text" x="996" y="282" text-anchor="middle">系统能力包 / 我的 Skill</text>
+  <rect class="workspace-box" x="1186" y="207" width="104" height="34" rx="6" /><text class="text" x="1238" y="230" text-anchor="middle">Lab CLI</text>
+  <rect class="workspace-box" x="1304" y="207" width="104" height="34" rx="6" /><text class="text" x="1356" y="230" text-anchor="middle">MCP Server</text>
+  <rect class="workspace-box" x="1186" y="257" width="222" height="38" rx="6" /><text class="text" x="1297" y="282" text-anchor="middle">Context Pack / 受控 API</text>
+
+  <text class="label" x="56" y="500">实验沉淀</text>
+  <text class="label" x="56" y="530">闭环</text>
+  <rect class="archive-wrap" x="245" y="370" width="1205" height="250" rx="10" />
+  <rect class="archive-wrap" x="275" y="405" width="265" height="178" rx="8" />
+  <rect class="archive-wrap" x="565" y="405" width="265" height="178" rx="8" />
+  <rect class="archive-wrap" x="855" y="405" width="265" height="178" rx="8" />
+  <rect class="archive-wrap" x="1145" y="405" width="265" height="178" rx="8" />
+  <text class="title" x="407" y="432" text-anchor="middle">实验报告</text>
+  <text class="title" x="697" y="432" text-anchor="middle">数据报告详情</text>
+  <text class="title" x="987" y="432" text-anchor="middle">实验对比详情</text>
+  <text class="title" x="1277" y="432" text-anchor="middle">实验日志详情</text>
+  <rect class="archive-box" x="300" y="454" width="100" height="34" rx="6" /><text class="text em" x="350" y="477" text-anchor="middle">实时观察</text>
+  <rect class="archive-box" x="414" y="454" width="100" height="34" rx="6" /><text class="text" x="464" y="477" text-anchor="middle">正式报告</text>
+  <rect class="archive-box" x="300" y="504" width="100" height="34" rx="6" /><text class="text" x="350" y="527" text-anchor="middle">版本追溯</text>
+  <rect class="archive-box" x="414" y="504" width="100" height="34" rx="6" /><text class="text" x="464" y="527" text-anchor="middle">导出交付</text>
+  <rect class="archive-box" x="592" y="454" width="98" height="34" rx="6" /><text class="text" x="641" y="477" text-anchor="middle">数据处理</text>
+  <rect class="archive-box" x="704" y="454" width="98" height="34" rx="6" /><text class="text" x="753" y="477" text-anchor="middle">数据对比</text>
+  <rect class="archive-box" x="592" y="504" width="210" height="34" rx="6" /><text class="text" x="697" y="527" text-anchor="middle">适用性分析 / 风险结论</text>
+  <rect class="archive-box" x="882" y="454" width="98" height="34" rx="6" /><text class="text" x="931" y="477" text-anchor="middle">多训练</text>
+  <rect class="archive-box" x="994" y="454" width="98" height="34" rx="6" /><text class="text" x="1043" y="477" text-anchor="middle">多评估</text>
+  <rect class="archive-box" x="882" y="504" width="210" height="34" rx="6" /><text class="text" x="987" y="527" text-anchor="middle">指标 / 曲线 / 对比矩阵</text>
+  <rect class="archive-box" x="1172" y="454" width="98" height="34" rx="6" /><text class="text" x="1221" y="477" text-anchor="middle">完整日志</text>
+  <rect class="archive-box" x="1284" y="454" width="98" height="34" rx="6" /><text class="text" x="1333" y="477" text-anchor="middle">异常片段</text>
+  <rect class="archive-box" x="1172" y="504" width="210" height="34" rx="6" /><text class="text" x="1277" y="527" text-anchor="middle">来源追溯 / 修复记录</text>
+  <text class="tiny" x="407" y="610" text-anchor="middle">按目标聚合，不按能力拆报告</text>
+  <text class="tiny" x="987" y="610" text-anchor="middle">详情资产承接证据明细，报告只保留摘要与结论</text>
+
+  <text class="label" x="56" y="720">平台对象</text>
+  <text class="label" x="56" y="750">与治理</text>
+  <rect class="platform-wrap" x="245" y="665" width="784" height="164" rx="8" />
+  <rect class="base-wrap" x="1052" y="665" width="398" height="164" rx="8" />
+  <text class="title" x="637" y="693" text-anchor="middle">平台原业务对象</text>
+  <rect class="platform-box" x="275" y="716" width="116" height="34" rx="6" /><text class="text" x="333" y="739" text-anchor="middle">数据服务</text>
+  <rect class="platform-box" x="405" y="716" width="116" height="34" rx="6" /><text class="text" x="463" y="739" text-anchor="middle">训练任务</text>
+  <rect class="platform-box" x="535" y="716" width="116" height="34" rx="6" /><text class="text" x="593" y="739" text-anchor="middle">评估任务</text>
+  <rect class="platform-box" x="665" y="716" width="116" height="34" rx="6" /><text class="text" x="723" y="739" text-anchor="middle">模型服务</text>
+  <rect class="platform-box" x="795" y="716" width="116" height="34" rx="6" /><text class="text" x="853" y="739" text-anchor="middle">Notebook</text>
+  <rect class="platform-box" x="275" y="772" width="160" height="34" rx="6" /><text class="text" x="355" y="795" text-anchor="middle">文件 / 产物路径</text>
+  <rect class="platform-box" x="455" y="772" width="160" height="34" rx="6" /><text class="text" x="535" y="795" text-anchor="middle">系统资源</text>
+  <rect class="platform-box" x="635" y="772" width="190" height="34" rx="6" /><text class="text" x="730" y="795" text-anchor="middle">文档中心 / 开放平台</text>
+  <text class="title" x="1251" y="693" text-anchor="middle">治理与基础能力</text>
+  <rect class="base-box" x="1088" y="716" width="128" height="34" rx="17" /><text class="text" x="1152" y="739" text-anchor="middle">权限</text>
+  <rect class="base-box" x="1230" y="716" width="128" height="34" rx="17" /><text class="text" x="1294" y="739" text-anchor="middle">确认</text>
+  <rect class="base-box" x="1088" y="766" width="128" height="34" rx="17" /><text class="text" x="1152" y="789" text-anchor="middle">审计</text>
+  <rect class="base-box" x="1230" y="766" width="128" height="34" rx="17" /><text class="text" x="1294" y="789" text-anchor="middle">版本冻结</text>
+  <text class="tiny" x="1251" y="818" text-anchor="middle">贯穿 Agent、Skill、MCP、CLI 和平台动作</text>
+</svg>
