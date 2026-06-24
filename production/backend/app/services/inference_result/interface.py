@@ -52,7 +52,8 @@ class InferenceResultDatasetService(ABC):
             current_user: JwtUserInfo,
             file_type: InferenceResultDatasetUploadType,
             dataset_type: TrainingTypeCategory,
-            dataset_format: DatasetFormat
+            dataset_format: DatasetFormat,
+            import_data_usage: Optional[str] = None,
     ) -> FileResponse:
         """下载推理结果样例数据集。根据 dataset_type、dataset_format、file_type 通过枚举配置动态解析路径与下载名。"""
         pass

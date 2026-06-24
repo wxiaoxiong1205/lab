@@ -51,6 +51,7 @@ async def download_sample_inference_result_dataset(
     file_type: InferenceResultDatasetUploadType = Query(..., description="样例文件类型（jsonl/json/xlsx/csv/zip，其中 zip 仅用于 image-understanding+role-based）"),
     dataset_type: TrainingTypeCategory = Query(..., description="数据集类型"),
     dataset_format: DatasetFormat = Query(..., description="数据格式，与 dataset_type 组合决定样例文件路径与下载名，见样例下载说明"),
+    import_data_usage: Optional[str] = Query(None, description="导入数据用途，用于区分同一 dataset_type/dataset_format 下的 SFT/DPO/RFT-GRPO 样例"),
     inference_result_service: InferenceResultDatasetService = Depends(Provide[AutoContainer.inference_result_dataset_service])
 ) -> FileResponse:
     """下载推理结果样例数据集
@@ -61,7 +62,9 @@ async def download_sample_inference_result_dataset(
     ## 支持的组合（详见样例下载说明）
     - **business** + **business**：jsonl/json/xlsx/csv → 业务数据集对话样例(business).{ext}
     - **text-generation** + **prompt-response**：jsonl/json/xlsx/csv → 文本生成对话样例(prompt-response).{ext}
-    - **text-generation** + **role-based**：jsonl/json/xlsx（zip）→ 文本生成对话样例{type}(role-based).zip
+    - **text-generation** + **role-based**：jsonl/json/xlsx（zip）→ 文本生成对话样例{type}(role-based).zip；`import_data_usage=text-generation-dpo` 时下载 DPO role-based 样例
+    - **text-generation** + **alpaca**：jsonl/json/xlsx → 文本生成 DPO 推理结果集样例(alpaca).{ext}
+    - **text-generation** + **completion-reward**：jsonl/json/xlsx → 文本生成 RFT-GRPO 推理结果集样例(completion-reward).{ext}
     - **image-understanding** + **role-based**：zip → 图像理解对话样例(role-based).zip
 
     ## 样例请求
@@ -75,7 +78,13 @@ async def download_sample_inference_result_dataset(
     Raises:
         HTTPException: 不支持的 type/format 组合或样例文件不存在
     """
-    return await inference_result_service.download_sample_dataset(current_user, file_type, dataset_type, dataset_format)
+    return await inference_result_service.download_sample_dataset(
+        current_user,
+        file_type,
+        dataset_type,
+        dataset_format,
+        import_data_usage,
+    )
 
 
 

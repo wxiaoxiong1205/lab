@@ -46,6 +46,12 @@ class InferenceResultSampleFileCategory(str, Enum):
     TEXT_GENERATION_ROLE_BASED_JSON = ("inference_text_generation_qa_role_based_json", "文本生成推理结果集样例json(role-based)")
     TEXT_GENERATION_ROLE_BASED_JSONL = ("inference_text_generation_qa_role_based_jsonl", "文本生成推理结果集样例jsonl(role-based)")
     TEXT_GENERATION_ROLE_BASED_XLSX = ("inference_text_generation_qa_role_based_xlsx", "文本生成推理结果集样例xlsx(role-based)")
+    TEXT_GENERATION_DPO_ALPACA = ("inference_text_generation_qa_dpo_alpaca", "文本生成 DPO 推理结果集样例(alpaca)")
+    TEXT_GENERATION_DPO_ROLE_BASED = ("inference_text_generation_qa_dpo_role_based", "文本生成 DPO 推理结果集样例(role-based)")
+    TEXT_GENERATION_DPO_ROLE_BASED_JSON = ("inference_text_generation_qa_dpo_role_based_json", "文本生成 DPO 推理结果集样例json(role-based)")
+    TEXT_GENERATION_DPO_ROLE_BASED_JSONL = ("inference_text_generation_qa_dpo_role_based_jsonl", "文本生成 DPO 推理结果集样例jsonl(role-based)")
+    TEXT_GENERATION_DPO_ROLE_BASED_XLSX = ("inference_text_generation_qa_dpo_role_based_xlsx", "文本生成 DPO 推理结果集样例xlsx(role-based)")
+    TEXT_GENERATION_COMPLETION_REWARD = ("inference_text_generation_qa_completion_reward", "文本生成 RFT-GRPO 推理结果集样例(completion-reward)")
     BUSINESS_TEST_BUSINESS = ("business_sample_dataset", "业务推理结果集样例(business)")
 
     def __new__(cls, value, description):

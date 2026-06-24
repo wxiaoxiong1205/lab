@@ -150,7 +150,8 @@ class DefaultInferenceResultDatasetService(InferenceResultDatasetService):
             self,
             dataset_type: TrainingTypeCategory,
             dataset_format: Optional[DatasetFormat],
-            file_type: InferenceResultDatasetUploadType
+            file_type: InferenceResultDatasetUploadType,
+            import_data_usage: Optional[str] = None
     ) -> str:
         # 计算样例文件基础路径
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -185,9 +186,25 @@ class DefaultInferenceResultDatasetService(InferenceResultDatasetService):
 
             elif dataset_format == DatasetFormat.ROLE_BASED:
                 # role_based
+                role_based_category = InferenceResultSampleFileCategory.TEXT_GENERATION_ROLE_BASED
+                if import_data_usage == "text-generation-dpo":
+                    role_based_category = InferenceResultSampleFileCategory.TEXT_GENERATION_DPO_ROLE_BASED
+
                 sample_path = os.path.join(
                     base_sample_dir,
-                    InferenceResultSampleFileCategory.TEXT_GENERATION_ROLE_BASED + "_" + file_type + ".zip"
+                    role_based_category + "_" + file_type + ".zip"
+                )
+
+            elif dataset_format == DatasetFormat.ALPACA:
+                sample_path = os.path.join(
+                    base_sample_dir,
+                    InferenceResultSampleFileCategory.TEXT_GENERATION_DPO_ALPACA + "." + file_type
+                )
+
+            elif dataset_format == DatasetFormat.COMPLETION_REWARD:
+                sample_path = os.path.join(
+                    base_sample_dir,
+                    InferenceResultSampleFileCategory.TEXT_GENERATION_COMPLETION_REWARD + "." + file_type
                 )
 
             else:
@@ -226,12 +243,13 @@ class DefaultInferenceResultDatasetService(InferenceResultDatasetService):
             current_user: JwtUserInfo,
             file_type: InferenceResultDatasetUploadType,
             dataset_type: TrainingTypeCategory,
-            dataset_format: DatasetFormat
+            dataset_format: DatasetFormat,
+            import_data_usage: Optional[str] = None,
     ) -> FileResponse:
         """下载样例数据集"""
         try:
             # 获取样例数据集文件路径
-            sample_path = self.get_sample_dataset_path(dataset_type, dataset_format, file_type)
+            sample_path = self.get_sample_dataset_path(dataset_type, dataset_format, file_type, import_data_usage)
 
             # 检查文件是否存在
             if not os.path.exists(sample_path):

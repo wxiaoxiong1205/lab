@@ -1612,6 +1612,7 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
         undefined,
         datasetFormat,
         datasetType,
+        importDataUsage,
       )
       message.success('示例文件下载成功')
     }

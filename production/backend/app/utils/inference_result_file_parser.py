@@ -443,6 +443,85 @@ class TextGenerationInferenceResultFileParser:
         return True, process_error_msg
 
     @staticmethod
+    def _is_dpo_role_based_item(item: Dict[str, Any]) -> bool:
+        return 'chosen' in item or 'rejected' in item
+
+    @staticmethod
+    def _validate_dpo_role_based_message_list(
+        messages: Any,
+        line_num: Optional[int] = None,
+        item_idx: Optional[int] = None,
+    ) -> None:
+        display_index = line_num or item_idx
+        if not isinstance(messages, list) or len(messages) == 0:
+            raise ValueError(f"第{display_index}个样本：messages必须是非空数组")
+
+        has_user = False
+        for msg_idx, message in enumerate(messages, start=1):
+            if not isinstance(message, dict):
+                raise ValueError(f"第{display_index}个样本第{msg_idx}个message必须是对象格式")
+            role = message.get('role')
+            if role not in ['user', 'assistant', 'system']:
+                raise ValueError(f"第{display_index}个样本第{msg_idx}个message的role必须是user、assistant或system")
+            content = message.get('content')
+            if role != 'system' and (not isinstance(content, str) or not content.strip()):
+                raise ValueError(f"第{display_index}个样本第{msg_idx}个message的content不能为空")
+            if role == 'user':
+                has_user = True
+
+        if not has_user:
+            raise ValueError(f"第{display_index}个样本：messages至少需要包含一条user消息")
+
+    @staticmethod
+    def _validate_dpo_role_based_response(
+        response: Any,
+        field_name: str,
+        line_num: Optional[int] = None,
+        item_idx: Optional[int] = None,
+    ) -> None:
+        display_index = line_num or item_idx
+        if not isinstance(response, dict):
+            raise ValueError(f"第{display_index}个样本：{field_name}必须是对象格式")
+        if response.get('role') != 'assistant':
+            raise ValueError(f"第{display_index}个样本：{field_name}.role必须是assistant")
+        content = response.get('content')
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError(f"第{display_index}个样本：{field_name}.content不能为空")
+
+    @staticmethod
+    def _validate_dpo_role_based_item(
+        item: Dict[str, Any],
+        line_num: Optional[int] = None,
+        item_idx: Optional[int] = None,
+    ) -> Tuple[bool, str]:
+        try:
+            for field_name in ['messages', 'chosen', 'rejected']:
+                if field_name not in item:
+                    display_index = line_num or item_idx
+                    return False, f"第{display_index}个样本：缺少{field_name}字段"
+            TextGenerationInferenceResultFileParser._validate_dpo_role_based_message_list(
+                item['messages'],
+                line_num=line_num,
+                item_idx=item_idx,
+            )
+            TextGenerationInferenceResultFileParser._validate_dpo_role_based_response(
+                item['chosen'],
+                'chosen',
+                line_num=line_num,
+                item_idx=item_idx,
+            )
+            TextGenerationInferenceResultFileParser._validate_dpo_role_based_response(
+                item['rejected'],
+                'rejected',
+                line_num=line_num,
+                item_idx=item_idx,
+            )
+        except ValueError as exc:
+            logger.warning(str(exc))
+            return False, str(exc)
+        return True, ""
+
+    @staticmethod
     def _parse_prompt_response_jsonl(content: bytes) -> List[Dict[str, Any]]:
         """
         解析JSONL文件（逐行解析）
@@ -821,6 +900,16 @@ class TextGenerationInferenceResultFileParser:
                 if not isinstance(messages, list) or len(messages) == 0:
                     raise ValueError(f"第{line_num}行messages必须是非空数组")
 
+                if TextGenerationInferenceResultFileParser._is_dpo_role_based_item(parsed_data):
+                    flag, process_error_msg = TextGenerationInferenceResultFileParser._validate_dpo_role_based_item(
+                        parsed_data,
+                        line_num=line_num,
+                    )
+                    if not flag:
+                        raise ValueError(process_error_msg)
+                    items.append(parsed_data)
+                    continue
+
                 # 验证每个 message
                 expected_role = None
                 for msg_idx, message in enumerate(messages):
@@ -924,6 +1013,16 @@ class TextGenerationInferenceResultFileParser:
                     messages = item['messages']
                     if not isinstance(messages, list) or len(messages) == 0:
                         raise ValueError(f"第{item_idx}个对象的messages必须是非空数组，跳过")
+
+                    if TextGenerationInferenceResultFileParser._is_dpo_role_based_item(item):
+                        flag, process_error_msg = TextGenerationInferenceResultFileParser._validate_dpo_role_based_item(
+                            item,
+                            item_idx=item_idx,
+                        )
+                        if not flag:
+                            raise ValueError(process_error_msg)
+                        items.append(item)
+                        continue
 
                     # 验证每个 message
                     expected_role = None
@@ -1049,6 +1148,35 @@ class TextGenerationInferenceResultFileParser:
             for cell in header_row:
                 header_value = str(cell.value).strip() if cell.value else ""
                 headers.append(header_value)
+
+            header_lookup = {header.lower(): idx for idx, header in enumerate(headers) if header}
+            if all(key in header_lookup for key in ["messages", "chosen", "rejected"]):
+                items = []
+                row_iter = iter(worksheet.rows)
+                next(row_iter)
+                for row_num, row in enumerate(row_iter, start=2):
+                    item = {}
+                    for key in ["messages", "chosen", "rejected"]:
+                        cell_index = header_lookup[key]
+                        raw_value = row[cell_index].value if cell_index < len(row) else None
+                        if raw_value is None:
+                            raise ValueError(f"第{row_num}行：{key}不能为空")
+                        try:
+                            item[key] = json.loads(str(raw_value).strip())
+                        except json.JSONDecodeError as exc:
+                            raise ValueError(f"第{row_num}行：{key}不是合法JSON - {str(exc)}")
+
+                    flag, process_error_msg = TextGenerationInferenceResultFileParser._validate_dpo_role_based_item(
+                        item,
+                        line_num=row_num,
+                    )
+                    if not flag:
+                        raise ValueError(process_error_msg)
+                    items.append(item)
+
+                if len(items) == 0:
+                    raise ValueError("Excel文件中没有找到有效的数据样本")
+                return items
 
             # 2. 判断是单轮还是多轮格式，并找到对应的列索引
             system_col = None
