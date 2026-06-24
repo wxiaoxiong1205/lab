@@ -27,3 +27,4 @@
 - `docs/migration/production-source-inventory.md`：生产代码来源。
 - `docs/migration/v1.14-coverage-matrix.md`：V1.14 覆盖盘点。
 - `docs/migration/repository-organization.md`：当前目录组织说明。
+- `docs/migration/production-baseline-readiness.md`：生产基线收口状态与 DeepexiLab 2.0 承接入口。
