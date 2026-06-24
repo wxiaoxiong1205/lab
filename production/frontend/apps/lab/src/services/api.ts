@@ -31,6 +31,7 @@ import type {
 } from '../types/dataset'
 import { downloadBlobFile } from '../utils/download'
 import { mockMenuData } from '../mock/mockMenuData'
+import { isLocalPreview, previewProjectList } from '../mock/localPreviewData'
 import apiClient from './apiClient'
 
 // 在types部分中添加PromptDirectory类型
@@ -214,10 +215,22 @@ export const projectApi = {
     page: number
     size: number
   }): Promise<ProjectListResponse> => {
-    const response = await api.get<ProjectListResponse>('/projects/list', {
-      params: data,
-    })
-    return response.data
+    try {
+      const response = await api.get<ProjectListResponse>('/projects/list', {
+        params: data,
+      })
+      if (isLocalPreview && (!Array.isArray(response.data?.items) || response.data.items.length === 0)) {
+        return previewProjectList(data.page, data.size)
+      }
+      return response.data
+    }
+    catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：项目列表获取失败，使用演示数据兜底。', error)
+        return previewProjectList(data.page, data.size)
+      }
+      throw error
+    }
   },
 
   /**

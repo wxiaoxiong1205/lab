@@ -9,6 +9,7 @@ import type {
   RegistryRepository,
 } from '../types'
 import apiClient from './apiClient'
+import { isLocalPreview, previewRegistryConfigList } from '@/mock/localPreviewData'
 
 // 后端分页响应格式
 interface PaginatedResponse<T> {
@@ -31,6 +32,12 @@ interface ClusterBinding {
   is_bound: boolean
 }
 
+const localRegistryTypeEnum = [
+  { label: 'Docker Hub', value: 'dockerhub' },
+  { label: 'Harbor', value: 'harbor' },
+  { label: '私有 Harbor', value: 'private_harbor' },
+]
+
 /**
  * 镜像仓库管理服务 - 对接后端真实API
  */
@@ -52,18 +59,46 @@ export const registryService = {
     if (auth_type) queryParams.auth_type = auth_type
     if (available) queryParams.available = available
 
-    const response = await apiClient.get('/repository', {
-      params: queryParams,
-    })
+    try {
+      const response = await apiClient.get('/repository', {
+        params: queryParams,
+      })
 
-    return response.data
+      if (isLocalPreview && (!Array.isArray(response.data?.items) || response.data.items.length === 0)) {
+        return previewRegistryConfigList(page, page_size)
+      }
+
+      return response.data
+    }
+    catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：镜像仓库列表获取失败，使用演示数据兜底。', error)
+        return previewRegistryConfigList(page, page_size)
+      }
+      throw error
+    }
   },
   /**
    * 获取仓库类型枚举
    */
   async getRegistryTypeEnum(): Promise<{ label: string, value: string }[]> {
-    const response = await apiClient.get('/repository/enums/type-list')
-    return response.data
+    try {
+      const response = await apiClient.get('/repository/enums/type-list')
+      if (Array.isArray(response.data)) {
+        return response.data
+      }
+      if (isLocalPreview) {
+        return localRegistryTypeEnum
+      }
+      return []
+    }
+    catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：仓库类型枚举获取失败，使用演示枚举兜底。', error)
+        return localRegistryTypeEnum
+      }
+      throw error
+    }
   },
 
   /**

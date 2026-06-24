@@ -11,6 +11,7 @@ import type {
   StorageConfigQueryParams,
 } from '../types'
 import apiClient from './apiClient'
+import { isLocalPreview, previewStorageConfigList } from '@/mock/localPreviewData'
 
 /**
  * 存储配置API服务 - 对接后端真实API
@@ -37,15 +38,30 @@ export const storageConfigService = {
     if (type) queryParams.type = type
     if (available) queryParams.available = available
 
-    const response = await apiClient.get('/storage', {
-      params: queryParams,
-    })
+    try {
+      const response = await apiClient.get('/storage', {
+        params: queryParams,
+      })
 
-    return {
-      items: response.data.items || [],
-      total: response.data.total || 0,
-      page: response.data.page || page,
-      page_size: response.data.size || page_size,
+      const result = {
+        items: response.data.items || [],
+        total: response.data.total || 0,
+        page: response.data.page || page,
+        page_size: response.data.size || page_size,
+      }
+
+      if (isLocalPreview && result.items.length === 0) {
+        return previewStorageConfigList(page, page_size)
+      }
+
+      return result
+    }
+    catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：存储配置列表获取失败，使用演示数据兜底。', error)
+        return previewStorageConfigList(page, page_size)
+      }
+      throw error
     }
   },
 

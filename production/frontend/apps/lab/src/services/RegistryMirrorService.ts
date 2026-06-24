@@ -3,6 +3,12 @@ import type {
 } from '../types'
 import apiClient from './apiClient'
 import type { GetTagsListTagsData } from '@/types/tags'
+import { isLocalPreview, previewRegistryImageList } from '@/mock/localPreviewData'
+
+const localImageTypeEnum = [
+  { label: 'Notebook 镜像', value: 11 },
+  { label: '部署镜像', value: 3 },
+]
 // 后端分页响应格式
 interface PaginatedResponse<T> {
   items: T[]
@@ -161,10 +167,22 @@ export const registryMirrorService = {
    * 获取已有镜像列表
    */
   async getRegistryMirrorConfigs(params: RegistryConfigQueryParams = {}): Promise<PaginatedResponse<RegistryMirrorImage>> {
-    const response = await apiClient.get('/repository_images/list', {
-      params,
-    })
-    return response.data
+    try {
+      const response = await apiClient.get('/repository_images/list', {
+        params,
+      })
+      if (isLocalPreview && (!Array.isArray(response.data?.items) || response.data.items.length === 0)) {
+        return previewRegistryImageList(params.page, params.page_size)
+      }
+      return response.data
+    }
+    catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：镜像列表获取失败，使用演示数据兜底。', error)
+        return previewRegistryImageList(params.page, params.page_size)
+      }
+      throw error
+    }
   },
   /**
    * 获取全部镜像列表/获取命名空间列表
@@ -187,8 +205,23 @@ export const registryMirrorService = {
    * @returns 仓库类型
    */
   async getRegistryTypeEnum(): Promise<{ label: string, value: number }[]> {
-    const response = await apiClient.get('/repository_images/enums/type-list')
-    return response.data
+    try {
+      const response = await apiClient.get('/repository_images/enums/type-list')
+      if (Array.isArray(response.data)) {
+        return response.data
+      }
+      if (isLocalPreview) {
+        return localImageTypeEnum
+      }
+      return []
+    }
+    catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：镜像类型枚举获取失败，使用演示枚举兜底。', error)
+        return localImageTypeEnum
+      }
+      throw error
+    }
   },
   /**
    * 创建镜像
@@ -219,8 +252,20 @@ export const registryMirrorService = {
    * @returns 镜像列表
    */
   async searchRegistryImages(projectId: number, type: number, query?: systemImageParamsType): Promise<RegistryMirrorImage[]> {
-    const response = await apiClient.get(`/repository_images/by_project/${projectId}/${type}`, { params: query })
-    return response.data
+    try {
+      const response = await apiClient.get(`/repository_images/by_project/${projectId}/${type}`, { params: query })
+      if (isLocalPreview && (!Array.isArray(response.data) || response.data.length === 0)) {
+        return previewRegistryImageList(query?.page, query?.size).items
+      }
+      return response.data
+    }
+    catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：项目镜像搜索失败，使用演示数据兜底。', error)
+        return previewRegistryImageList(query?.page, query?.size).items
+      }
+      throw error
+    }
   },
 
   /**
@@ -228,12 +273,25 @@ export const registryMirrorService = {
    */
   async getSystemImageList(projectId: number, type: number, query?: systemImageParamsType): Promise<PaginatedResponse<RegistryMirrorImage>> {
     let url = `/repository_images/by_project/${projectId}/${type}/page?`
-    if (query?.tag_element_ids) {
-      url += query.tag_element_ids.map((id) => `tag_element_ids=${id}`).join('&')
+    const params = { ...(query ?? {}) }
+    if (params.tag_element_ids) {
+      url += params.tag_element_ids.map((id) => `tag_element_ids=${id}`).join('&')
     }
-    delete query.tag_element_ids
-    const response = await apiClient.get(url, { params: query })
-    return response.data
+    delete params.tag_element_ids
+    try {
+      const response = await apiClient.get(url, { params })
+      if (isLocalPreview && (!Array.isArray(response.data?.items) || response.data.items.length === 0)) {
+        return previewRegistryImageList(params.page, params.size)
+      }
+      return response.data
+    }
+    catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：系统镜像列表获取失败，使用演示数据兜底。', error)
+        return previewRegistryImageList(params.page, params.size)
+      }
+      throw error
+    }
   },
 
   /**
@@ -259,8 +317,20 @@ export const registryMirrorService = {
       url += params.tag_element_ids.map((id) => `tag_element_ids=${id}`).join('&')
     }
     delete params.tag_element_ids
-    const response = await apiClient.get(url, { params })
-    return response.data
+    try {
+      const response = await apiClient.get(url, { params })
+      if (isLocalPreview && (!Array.isArray(response.data?.items) || response.data.items.length === 0)) {
+        return previewRegistryImageList(params.page, params.size)
+      }
+      return response.data
+    }
+    catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：自定义镜像列表获取失败，使用演示数据兜底。', error)
+        return previewRegistryImageList(params.page, params.size)
+      }
+      throw error
+    }
   },
 
   /**

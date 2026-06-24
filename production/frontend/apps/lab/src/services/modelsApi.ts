@@ -19,6 +19,7 @@ import type {
   ModelStatusOption,
   ModelVersionListResponse,
 } from '@/types/model'
+import { isLocalPreview, previewBaseModelList } from '@/mock/localPreviewData'
 
 const pickArray = <T>(value: unknown): T[] | null => {
   if (Array.isArray(value)) {
@@ -64,23 +65,47 @@ export const ModelService = {
    * @returns Promise<基础模型列表响应>
    */
   getBaseModels: async (params?: GetBaseModelsParams) => {
-    const response = await apiClient.get<BaseModelListResponse>('/models/base/list', {
-      params: {
-        model_type: params?.model_type || '',
-        model_provider: params?.model_provider || '',
-        ...(params?.is_available !== false ? { is_available: params?.is_available } : {}),
-        page: params?.page || 1,
-        size: params?.size || 50,
-        model_tags: params?.model_tags,
-      },
-    })
-    return response.data
+    try {
+      const response = await apiClient.get<BaseModelListResponse>('/models/base/list', {
+        params: {
+          model_type: params?.model_type || '',
+          model_provider: params?.model_provider || '',
+          ...(params?.is_available !== false ? { is_available: params?.is_available } : {}),
+          page: params?.page || 1,
+          size: params?.size || 50,
+          model_tags: params?.model_tags,
+        },
+      })
+      if (isLocalPreview && (!Array.isArray(response.data?.items) || response.data.items.length === 0)) {
+        return previewBaseModelList(params)
+      }
+      return response.data
+    }
+    catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：基础模型列表获取失败，使用演示数据兜底。', error)
+        return previewBaseModelList(params)
+      }
+      throw error
+    }
   },
   getBaseModelsByProjectId: async (projectId: number, params?: GetBaseModelsParams) => {
-    const response = await apiClient.get<BaseModelListResponse>(`/models/trained/project/${projectId}`, {
-      params,
-    })
-    return response.data
+    try {
+      const response = await apiClient.get<BaseModelListResponse>(`/models/trained/project/${projectId}`, {
+        params,
+      })
+      if (isLocalPreview && (!Array.isArray(response.data?.items) || response.data.items.length === 0)) {
+        return previewBaseModelList(params)
+      }
+      return response.data
+    }
+    catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：项目模型列表获取失败，使用演示数据兜底。', error)
+        return previewBaseModelList(params)
+      }
+      throw error
+    }
   },
   getMlModelList: async (projectId: number, params: { page: number, size: number }) => {
     const response = await apiClient.get<ModelListResponse>(`/models/ml/project/${projectId}`, { params })

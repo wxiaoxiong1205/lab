@@ -6,6 +6,7 @@ import type {
   KubernetesClusterBackend,
 } from '../types'
 import apiClient from './apiClient'
+import { isLocalPreview, previewKubernetesClusters } from '@/mock/localPreviewData'
 
 /**
  * 将后端集群数据转换为前端格式
@@ -93,19 +94,30 @@ export interface InstanceContainer {
  */
 export const getKubernetesClusters = async (params: PaginationParams = {}): Promise<KubernetesCluster[]> => {
   const { page = 1, size = 50 } = params
-  const response = await apiClient.get('/k8s/clusters', {
+  try {
+    const response = await apiClient.get('/k8s/clusters', {
 
-    params: { page, size },
-  })
+      params: { page, size },
+    })
 
-  // 如果后端返回分页格式，则返回items；否则直接返回data
-  if (response.data && Array.isArray(response.data.items)) {
-    return response.data.items.map((cluster: KubernetesClusterBackend) => transformClusterData(cluster))
+    // 如果后端返回分页格式，则返回items；否则直接返回data
+    if (response.data && Array.isArray(response.data.items)) {
+      const clusters = response.data.items.map((cluster: KubernetesClusterBackend) => transformClusterData(cluster))
+      return isLocalPreview && clusters.length === 0 ? previewKubernetesClusters : clusters
+    }
+
+    // 如果是直接返回数组格式
+    const backendClusters = Array.isArray(response.data) ? response.data as KubernetesClusterBackend[] : []
+    const clusters = backendClusters.map(transformClusterData)
+    return isLocalPreview && clusters.length === 0 ? previewKubernetesClusters : clusters
   }
-
-  // 如果是直接返回数组格式
-  const backendClusters = response.data as KubernetesClusterBackend[]
-  return backendClusters.map(transformClusterData)
+  catch (error) {
+    if (isLocalPreview) {
+      console.warn('本地预览：集群列表获取失败，使用演示数据兜底。', error)
+      return previewKubernetesClusters
+    }
+    throw error
+  }
 }
 /**
  * 获取可用Kubernetes集群列表（支持分页）
@@ -114,19 +126,30 @@ export const getKubernetesClusters = async (params: PaginationParams = {}): Prom
  */
 export const getCanUseKubernetesClusters = async (params: PaginationParams = {}): Promise<KubernetesCluster[]> => {
   const { page = 1, size = 50 } = params
-  const response = await apiClient.get('/k8s/available-clusters', {
+  try {
+    const response = await apiClient.get('/k8s/available-clusters', {
 
-    params: { page, size },
-  })
+      params: { page, size },
+    })
 
-  // 如果后端返回分页格式，则返回items；否则直接返回data
-  if (response.data && Array.isArray(response.data.items)) {
-    return response.data.items.map((cluster: KubernetesClusterBackend) => transformClusterData(cluster))
+    // 如果后端返回分页格式，则返回items；否则直接返回data
+    if (response.data && Array.isArray(response.data.items)) {
+      const clusters = response.data.items.map((cluster: KubernetesClusterBackend) => transformClusterData(cluster))
+      return isLocalPreview && clusters.length === 0 ? previewKubernetesClusters : clusters
+    }
+
+    // 如果是直接返回数组格式
+    const backendClusters = Array.isArray(response.data) ? response.data as KubernetesClusterBackend[] : []
+    const clusters = backendClusters.map(transformClusterData)
+    return isLocalPreview && clusters.length === 0 ? previewKubernetesClusters : clusters
   }
-
-  // 如果是直接返回数组格式
-  const backendClusters = response.data as KubernetesClusterBackend[]
-  return backendClusters.map(transformClusterData)
+  catch (error) {
+    if (isLocalPreview) {
+      console.warn('本地预览：可用集群列表获取失败，使用演示数据兜底。', error)
+      return previewKubernetesClusters
+    }
+    throw error
+  }
 }
 /**
  * 获取单个集群详情
