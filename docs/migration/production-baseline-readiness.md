@@ -47,6 +47,21 @@ Current conclusion:
 
 This is a product/backend design dependency, not an implementation item that can be safely completed by moving Demo code.
 
+## Local Preview Menu Boundary
+
+Production Lab does not keep the full tenant menu tree as static frontend code. In production, the backend `production/backend/app/api/v1/menu.py` reads the application menu from the external console/IAM endpoint `/v1/menu/{app_id}/appMenu`, then the frontend renders project-space, system-management, large-model, and machine-learning navigation from that response.
+
+The local preview environment has no real console/IAM token or tenant menu data, so `production/frontend/apps/lab/src/services/api.ts` falls back to `production/frontend/apps/lab/src/mock/mockMenuData.ts` when `/menu` is unavailable or malformed. That fallback menu must mirror the production route structure closely enough for local preview. If it is incomplete, modules can appear missing locally even when production frontend routes and backend APIs are present.
+
+Current local fallback coverage has been updated to include:
+
+- `首页`
+- `大模型`: task overview, data management, training/development, Notebook, preset model, data cleaning, model management, model/API services, evaluation, file management, prompt/config/chain-test, and OpenAPI AccessKey.
+- `机器学习`: task overview, dataset management, data annotation, online annotation service, Notebook, model deployment, and machine model management.
+- `系统管理`: platform, projects, users, members, storage, Kubernetes, registry, base model, and system settings.
+
+This fixes local preview navigation only. It does not replace the production IAM menu source, and it should not be treated as the authoritative production menu.
+
 ## Development Rules From Here
 
 - Treat `production/frontend` and `production/backend` as the only active application baselines.

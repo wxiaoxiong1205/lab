@@ -71,6 +71,7 @@ const iconMap: Record<string, React.ReactNode> = {
   DeploymentUnitOutlined: <DeploymentUnitOutlined />,
   RobotOutlined: <RobotOutlined />,
   SettingOutlined: <SettingOutlined />,
+  FolderFilled: <FolderFilled />,
 }
 /**
  * 根据菜单的 code 或 name 获取默认图标
