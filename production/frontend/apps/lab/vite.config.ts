@@ -99,6 +99,8 @@ export default defineConfig(({ mode, command }) => {
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src'),
+        '@antv/g-math': resolve(__dirname, '../../node_modules/.pnpm/@antv+g-math@0.1.9/node_modules/@antv/g-math'),
+        '@antv/util': resolve(__dirname, '../../node_modules/.pnpm/@antv+util@2.0.17/node_modules/@antv/util'),
         // 确保 @annotorious/openseadragon 能正确解析 peer 依赖
         'openseadragon': resolve(__dirname, 'node_modules/openseadragon'),
       },
