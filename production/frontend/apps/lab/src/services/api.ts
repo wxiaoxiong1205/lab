@@ -8,6 +8,7 @@ import type {
   LLMConfig,
   LoginRequest,
   LoginResponse,
+  MenuItem,
   PageUser,
   Page_PromptDirectoryResponse_,
   Page_PromptResponse_,
@@ -29,6 +30,7 @@ import type {
   Page_DatasetLogResponse_,
 } from '../types/dataset'
 import { downloadBlobFile } from '../utils/download'
+import { mockMenuData } from '../mock/mockMenuData'
 import apiClient from './apiClient'
 
 // 在types部分中添加PromptDirectory类型
@@ -44,6 +46,35 @@ export interface PromptDirectory {
 
 // 统一使用 apiClient 作为 axios 实例
 const api = apiClient
+
+const pickMenuArray = (value: unknown): MenuItem[] | null => {
+  if (Array.isArray(value)) {
+    return value as MenuItem[]
+  }
+
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const candidates = [
+    (value as any).data,
+    (value as any).menus,
+    (value as any).items,
+    (value as any).rows,
+    (value as any).result,
+    (value as any).data?.menus,
+    (value as any).data?.items,
+    (value as any).data?.rows,
+    (value as any).data?.result,
+  ]
+
+  const menuArray = candidates.find(Array.isArray)
+  return menuArray ? (menuArray as MenuItem[]) : null
+}
+
+const getLocalPreviewMenuData = (): MenuItem[] => {
+  return mockMenuData.map((item) => ({ ...item }))
+}
 
 // 认证相关API
 export const authApi = {
@@ -953,8 +984,29 @@ export const userApi = {
     // 用于测试菜单获取失败的情况
     // throw new Error('模拟菜单获取失败 - 用于测试错误处理功能');
 
-    const response = await api.get<any[]>('/menu')
-    return response.data
+    try {
+      const response = await api.get<unknown>('/menu')
+      const menus = pickMenuArray(response.data)
+
+      if (menus) {
+        return menus
+      }
+
+      if (import.meta.env.DEV) {
+        console.warn('本地预览：/menu 未返回菜单数组，使用预览菜单数据兜底。', response.data)
+        return getLocalPreviewMenuData()
+      }
+
+      return []
+    }
+    catch (error) {
+      if (import.meta.env.DEV) {
+        console.warn('本地预览：/menu 获取失败，使用预览菜单数据兜底。', error)
+        return getLocalPreviewMenuData()
+      }
+
+      throw error
+    }
   },
   /**
    * 获取指定用户信息 - 需要认证

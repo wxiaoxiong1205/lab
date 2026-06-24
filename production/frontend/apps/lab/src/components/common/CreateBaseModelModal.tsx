@@ -43,10 +43,20 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
 
   useEffect(() => {
     const projectEnumValues = JSON.parse(localStorage.getItem('projectEnumValues') || '{}')
-    const modelProvider = projectEnumValues?.all_enums?.find((item) => item.enum_name === 'ModelProvider')
-    const modelType = projectEnumValues?.all_enums?.find((item) => item.enum_name === 'ModelType')
-    setModelProviderEnumValues(modelProvider?.options)
-    setModelTypeList(modelType?.options)
+    const allEnums = Array.isArray(projectEnumValues?.all_enums) ? projectEnumValues.all_enums : []
+    const modelProvider = allEnums.find((item) => item.enum_name === 'ModelProvider')
+    const modelType = allEnums.find((item) => item.enum_name === 'ModelType')
+    const modelProviderOptions = Array.isArray(modelProvider?.options) ? modelProvider.options : [
+      { name: 'qwen', value: 'qwen', description: null },
+      { name: 'llama', value: 'llama', description: null },
+    ]
+    const modelTypeOptions = Array.isArray(modelType?.options) ? modelType.options : [
+      { name: 'text-generation', value: 'text-generation', description: null },
+      { name: 'image-understanding', value: 'image-understanding', description: null },
+    ]
+
+    setModelProviderEnumValues(modelProviderOptions)
+    setModelTypeList(modelTypeOptions)
   }, [])
 
   useEffect(() => {

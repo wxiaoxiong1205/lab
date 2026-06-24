@@ -65,7 +65,7 @@ const extractMenuCodes = (menus: MenuItem[]): Set<string> => {
       if (item.code) {
         codeSet.add(item.code)
       }
-      if (item.children && item.children.length > 0) {
+      if (Array.isArray(item.children) && item.children.length > 0) {
         traverse(item.children)
       }
     }
@@ -73,6 +73,10 @@ const extractMenuCodes = (menus: MenuItem[]): Set<string> => {
 
   traverse(menus)
   return codeSet
+}
+
+const normalizeMenus = (menus: unknown): MenuItem[] => {
+  return Array.isArray(menus) ? menus : []
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -93,7 +97,7 @@ export const useAuthStore = create<AuthState>()(
         tokenStorage.setToken(token)
 
         // 使用 setMenus 统一更新菜单和 menuCodeSet
-        get().setMenus(menus)
+        get().setMenus(normalizeMenus(menus))
 
         // 然后更新其他认证状态
         set({
@@ -105,9 +109,11 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setMenus: (menus: MenuItem[]) => {
+        const normalizedMenus = normalizeMenus(menus)
+
         set({
-          userMenus: menus,
-          menuCodeSet: extractMenuCodes(menus),
+          userMenus: normalizedMenus,
+          menuCodeSet: extractMenuCodes(normalizedMenus),
           menuLoadError: null,
           menuLoadAttempted: true,
         })
@@ -261,7 +267,11 @@ export const useAuthStore = create<AuthState>()(
         // 返回方法，在rehydrate后执行
         return (state) => {
           // 从 localStorage 恢复状态后，重建 menuCodeSet
-          if (state?.userMenus && Array.isArray(state.userMenus) && state.userMenus.length > 0) {
+          if (state) {
+            state.userMenus = normalizeMenus(state.userMenus)
+          }
+
+          if (state?.userMenus && state.userMenus.length > 0) {
             state.menuCodeSet = extractMenuCodes(state.userMenus)
           }
           else if (state) {
