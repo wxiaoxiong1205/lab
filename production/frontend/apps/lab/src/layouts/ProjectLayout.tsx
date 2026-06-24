@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { Alert, Button, Layout, Menu, Select, Spin } from 'antd'
-import { ApiOutlined, AppstoreOutlined, ArrowLeftOutlined, BoxPlotOutlined, CloudServerOutlined, ContainerOutlined, DatabaseOutlined, DeploymentUnitOutlined, ExperimentOutlined, FileSearchOutlined, FilterOutlined, FolderFilled, FormOutlined, HddOutlined, HomeOutlined, LineChartOutlined, ProjectOutlined, RadarChartOutlined, RobotOutlined, RocketOutlined, SettingOutlined, TagsOutlined, ThunderboltOutlined, UserOutlined } from '@ant-design/icons'
+import { ApiOutlined, AppstoreOutlined, ArrowLeftOutlined, BarcodeOutlined, BoxPlotOutlined, CloudServerOutlined, ContainerOutlined, DatabaseOutlined, DeploymentUnitOutlined, ExperimentOutlined, FileSearchOutlined, FilterOutlined, FolderFilled, FormOutlined, HddOutlined, HomeOutlined, LineChartOutlined, ProjectOutlined, RadarChartOutlined, RobotOutlined, RocketOutlined, SettingOutlined, TagsOutlined, ThunderboltOutlined, UserOutlined } from '@ant-design/icons'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { MenuProps } from 'antd'
 import { Suspense } from 'react'
@@ -72,6 +72,7 @@ const iconMap: Record<string, React.ReactNode> = {
   RobotOutlined: <RobotOutlined />,
   SettingOutlined: <SettingOutlined />,
   FolderFilled: <FolderFilled />,
+  BarcodeOutlined: <BarcodeOutlined />,
 }
 /**
  * 根据菜单的 code 或 name 获取默认图标

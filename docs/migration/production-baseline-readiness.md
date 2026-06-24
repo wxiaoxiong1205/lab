@@ -53,12 +53,12 @@ Production Lab does not keep the full tenant menu tree as static frontend code. 
 
 The local preview environment has no real console/IAM token or tenant menu data, so `production/frontend/apps/lab/src/services/api.ts` falls back to `production/frontend/apps/lab/src/mock/mockMenuData.ts` when `/menu` is unavailable or malformed. That fallback menu must mirror the production route structure closely enough for local preview. If it is incomplete, modules can appear missing locally even when production frontend routes and backend APIs are present.
 
-Current local fallback coverage has been updated to include:
+Current local fallback coverage has been aligned to the user-provided `菜单数据 (3).xlsx` export and includes:
 
 - `首页`
-- `大模型`: task overview, data management, training/development, Notebook, preset model, data cleaning, model management, model/API services, evaluation, file management, prompt/config/chain-test, and OpenAPI AccessKey.
-- `机器学习`: task overview, dataset management, data annotation, online annotation service, Notebook, model deployment, and machine model management.
-- `系统管理`: platform, projects, users, members, storage, Kubernetes, registry, base model, and system settings.
+- `大模型`: task overview, data services, data management, data processing, Notebook, large-model training, model management, model evaluation, and model services.
+- `机器学习`: task overview, data management, data annotation, model management, model deployment, Notebook, and online annotation service.
+- `系统管理`: projects, Kubernetes, storage, registry, model repository, and system settings.
 
 This fixes local preview navigation only. It does not replace the production IAM menu source, and it should not be treated as the authoritative production menu.
 
