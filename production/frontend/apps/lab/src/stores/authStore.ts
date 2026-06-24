@@ -75,6 +75,29 @@ const extractMenuCodes = (menus: MenuItem[]): Set<string> => {
   return codeSet
 }
 
+const normalizeMenus = (menus: unknown): MenuItem[] => {
+  if (Array.isArray(menus)) {
+    return menus
+  }
+
+  if (menus && typeof menus === 'object') {
+    const menuObject = menus as Record<string, unknown>
+    const candidates = [
+      menuObject.data,
+      menuObject.items,
+      menuObject.list,
+      menuObject.records,
+    ]
+
+    const nestedArray = candidates.find(Array.isArray)
+    if (Array.isArray(nestedArray)) {
+      return nestedArray as MenuItem[]
+    }
+  }
+
+  return []
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -93,7 +116,7 @@ export const useAuthStore = create<AuthState>()(
         tokenStorage.setToken(token)
 
         // 使用 setMenus 统一更新菜单和 menuCodeSet
-        get().setMenus(menus)
+        get().setMenus(normalizeMenus(menus))
 
         // 然后更新其他认证状态
         set({
@@ -105,9 +128,10 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setMenus: (menus: MenuItem[]) => {
+        const normalizedMenus = normalizeMenus(menus)
         set({
-          userMenus: menus,
-          menuCodeSet: extractMenuCodes(menus),
+          userMenus: normalizedMenus,
+          menuCodeSet: extractMenuCodes(normalizedMenus),
           menuLoadError: null,
           menuLoadAttempted: true,
         })
@@ -151,7 +175,7 @@ export const useAuthStore = create<AuthState>()(
           })
 
           // 使用 setMenus 统一更新菜单和 menuCodeSet
-          get().setMenus(response.data)
+          get().setMenus(normalizeMenus(response.data))
 
           // 请求成功后清除失败请求记录和错误信息
           set({
@@ -253,7 +277,7 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         token: state.token,
         isAuthenticated: state.isAuthenticated,
-        userMenus: state.userMenus,
+        userMenus: normalizeMenus(state.userMenus),
         isLoggingOut: state.isLoggingOut,
         menuLoadAttempted: state.menuLoadAttempted,
       }),
@@ -261,7 +285,11 @@ export const useAuthStore = create<AuthState>()(
         // 返回方法，在rehydrate后执行
         return (state) => {
           // 从 localStorage 恢复状态后，重建 menuCodeSet
-          if (state?.userMenus && Array.isArray(state.userMenus) && state.userMenus.length > 0) {
+          if (state) {
+            state.userMenus = normalizeMenus(state.userMenus)
+          }
+
+          if (state?.userMenus && state.userMenus.length > 0) {
             state.menuCodeSet = extractMenuCodes(state.userMenus)
           }
           else if (state) {

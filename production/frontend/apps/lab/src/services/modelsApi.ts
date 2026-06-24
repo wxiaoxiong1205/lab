@@ -20,6 +20,29 @@ import type {
   ModelVersionListResponse,
 } from '@/types/model'
 
+const normalizeOptionList = <T extends { label: string, value: string }>(payload: unknown): T[] => {
+  if (Array.isArray(payload)) {
+    return payload as T[]
+  }
+
+  if (payload && typeof payload === 'object') {
+    const payloadObject = payload as Record<string, unknown>
+    const candidates = [
+      payloadObject.data,
+      payloadObject.items,
+      payloadObject.list,
+      payloadObject.records,
+      payloadObject.rows,
+    ]
+    const nestedArray = candidates.find(Array.isArray)
+    if (Array.isArray(nestedArray)) {
+      return nestedArray as T[]
+    }
+  }
+
+  return []
+}
+
 export const ModelService = {
   /**
    * 获取基础模型列表
@@ -164,16 +187,16 @@ export const ModelService = {
    * @returns Promise<any[]> 模块来源枚举值
    */
   getMoudleSorceEnums: async () => {
-    const response = await apiClient.get<ModelSourceOption[]>('/models/enums/model-source')
-    return response.data
+    const response = await apiClient.get<unknown>('/models/enums/model-source')
+    return normalizeOptionList<ModelSourceOption>(response.data)
   },
 
   /**
    * 基础模型状态枚举
    */
   getBaseModelStatusEnums: async () => {
-    const response = await apiClient.get<ModelStatusOption[]>('/models/enums/model-status')
-    return response.data
+    const response = await apiClient.get<unknown>('/models/enums/model-status')
+    return normalizeOptionList<ModelStatusOption>(response.data)
   },
 
   /**

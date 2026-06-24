@@ -13,6 +13,7 @@ import { useConfigStore } from './stores/configStore'
 import { authApi, userApi } from './services/api'
 import configApi from './services/config'
 import { labAntdTheme } from './theme/antdTheme'
+import { mockMenuData } from './mock/mockMenuData'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +34,7 @@ function AppContent() {
   const [isInitializing, setIsInitializing] = useState(true)
   const tokenLoginProcessed = useRef(false)
   const pathFixApplied = useRef(false)
+  const localTenantAdminApplied = useRef(false)
 
   // 判断是否是 qiankun 子应用
   const isQiankun = qiankunWindow.__POWERED_BY_QIANKUN__
@@ -118,6 +120,35 @@ function AppContent() {
   }, [isQiankun])
 
   useEffect(() => {
+    if (!import.meta.env.DEV || isQiankun || localTenantAdminApplied.current) {
+      return
+    }
+
+    localTenantAdminApplied.current = true
+    const previewToken = 'local-tenant-admin-preview-token'
+    const previewUser = {
+      userId: 1,
+      username: 'tenant_admin_preview',
+      accountId: 1,
+      tenantId: 'local-preview-tenant',
+      enterpriseCode: 'local-preview',
+    }
+
+    tokenStorage.setToken(previewToken)
+    setAuth(previewUser, previewToken, mockMenuData)
+    localStorage.setItem('lab-local-role', 'tenant_admin')
+
+    const params = new URLSearchParams(location.search)
+    if (params.has('_local_role')) {
+      const cleanUrl = new URL(window.location.href)
+      cleanUrl.searchParams.delete('_local_role')
+      navigate(`${location.pathname}${cleanUrl.search}`, { replace: true })
+    }
+
+    setIsInitializing(false)
+  }, [isQiankun, location.pathname, location.search, navigate, setAuth])
+
+  useEffect(() => {
     if (isQiankun) {
       return
     }
@@ -127,8 +158,14 @@ function AppContent() {
       let token = params.get('_tk')
       const refreshToken = params.get('_rtk')
       const isLocalDev = import.meta.env.DEV
+      const isLocalTenantAdminPreview = isLocalDev && localStorage.getItem('lab-local-role') === 'tenant_admin'
       const localTestToken = import.meta.env.VITE_LOCAL_TEST_TOKEN
       const existingToken = tokenStorage.getToken()
+
+      if (isLocalTenantAdminPreview) {
+        setIsInitializing(false)
+        return
+      }
 
       if (!token && existingToken) {
         token = existingToken
@@ -225,6 +262,7 @@ function AppContent() {
 
     handleTokenLogin()
   }, [location.search, location.pathname, navigate, setAuth, handleMenuError])
+
 
   useEffect(() => {
     if (currentProject) {
