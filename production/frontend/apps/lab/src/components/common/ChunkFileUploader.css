@@ -1,0 +1,86 @@
+.chunk-file-uploader {
+  width: 100%;
+}
+
+.chunk-file-uploader--reserve-file-list {
+  min-height: 190px;
+}
+
+.chunk-file-uploader .ant-upload-wrapper {
+  width: 100%;
+}
+
+.chunk-file-uploader .ant-upload-wrapper .ant-upload-drag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 142px;
+  padding: 0;
+  background-color: rgba(241, 247, 251, 1);
+  border: 1px dashed rgba(0, 71, 187, 0.7);
+  border-radius: 6px;
+}
+
+.chunk-file-uploader .ant-upload-wrapper .ant-upload-drag .ant-upload {
+  padding: 0;
+}
+
+.chunk-file-uploader .ant-upload-drag-icon {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 12px !important;
+  color: rgba(24, 24, 25, 1) !important;
+  font-size: 18px !important;
+  line-height: 44px;
+  background-color: rgba(255, 255, 255, 1);
+  border-radius: 50%;
+}
+
+.chunk-file-uploader .ant-upload-drag-icon .anticon {
+  color: rgba(24, 24, 25, 1) !important;
+  font-size: 18px;
+}
+
+.chunk-file-uploader .ant-upload-text {
+  margin: 0;
+  color: rgba(24, 24, 25, 1);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.chunk-file-uploader .ant-upload-hint,
+.chunk-file-uploader .ant-upload-hint p {
+  margin: 6px 0 0;
+  color: rgba(112, 118, 127, 1) !important;
+  font-size: 12px !important;
+  line-height: 17px;
+}
+
+.chunk-file-uploader .ant-upload-wrapper .ant-upload-list {
+  margin-top: 10px;
+}
+
+.chunk-file-uploader__loading-file {
+  margin-top: 10px;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.chunk-file-uploader__uploading-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.chunk-file-uploader__uploading-origin {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.chunk-file-uploader__cancel-upload {
+  flex: 0 0 auto;
+  height: 24px;
+  padding: 0;
+}

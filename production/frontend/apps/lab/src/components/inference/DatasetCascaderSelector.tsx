@@ -46,6 +46,9 @@ const DatasetCascaderSelector: React.FC<DatasetCascaderSelectorProps> = ({ form,
       processing_status: statsQuery?.processing_status ?? 'completed',
       usage,
     }
+    if (!useInferenceResultApi) {
+      q.publish = 1
+    }
     if (statsQuery?.dataset_type?.length) {
       q.dataset_type = statsQuery.dataset_type
     }
@@ -59,7 +62,7 @@ const DatasetCascaderSelector: React.FC<DatasetCascaderSelectorProps> = ({ form,
       q.dataset_format = ['prompt-response', 'role-based']
     }
     return q
-  }, [includeAllStatsDatasetFormats, statsQuery, usageList])
+  }, [includeAllStatsDatasetFormats, statsQuery, usageList, useInferenceResultApi])
 
   /** 父组件通过 statsQuery 限定数据用途/格式时，弹窗内不再提供对应筛选，列表与 stats 与父选择一致 */
   const parentLocksDatasetTypeFilter = Boolean(statsQuery?.dataset_type?.length)
@@ -266,6 +269,7 @@ const DatasetCascaderSelector: React.FC<DatasetCascaderSelectorProps> = ({ form,
       size: pageSize,
       processing_status: 'completed',
       usage: listUsage ?? (usageFilter ?? ''),
+      publish: useInferenceResultApi ? undefined : 1,
       training_method_type: parentScopedTrainingMethod,
       dataset_type: hideStatsDatasetTypeAndFormatFilters
         ? (listDatasetType ?? '')
@@ -304,6 +308,7 @@ const DatasetCascaderSelector: React.FC<DatasetCascaderSelectorProps> = ({ form,
     statsQuery?.training_method_type,
     parentLocksDatasetTypeFilter,
     parentLocksDatasetFormatFilter,
+    useInferenceResultApi,
   ])
   const loadList = useCallback(async () => {
     if (!Number.isFinite(pid))
@@ -456,7 +461,7 @@ const DatasetCascaderSelector: React.FC<DatasetCascaderSelectorProps> = ({ form,
       return []
     setVersionsLoading((m) => ({ ...m, [rk]: true }))
     try {
-      const raw = await trainingDatasetService.detail(pid, name, usage, 'completed')
+      const raw = await trainingDatasetService.detail(pid, name, usage, 'completed', 1)
       const list = Array.isArray(raw) ? raw : [raw]
       const children = list.map((ver: any) => ({
         value: ver.version,

@@ -4,6 +4,7 @@ import { ArrowLeftOutlined, SendOutlined } from '@ant-design/icons'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { ColumnsType } from 'antd/es/table'
 import { getDisplayGroundTruth, getDisplayPrompt, getDisplaySystem, getNormalizedRawData, getRawDataImages, getRawDataMessages } from './multiLabelDataCompat'
+import { formatGrpoPrompt, formatGrpoValue, getGrpoRewardModel, getGrpoStringValue } from './grpoDisplay'
 import { labelTaskService } from '@/services/dataAnnotationService'
 import type { OverviewDataItem } from '@/services/dataAnnotationService'
 import { expandImageData } from '@/utils/imageUtils'
@@ -17,6 +18,11 @@ export interface OverviewDisplayItem extends OverviewDataItem {
   dataset_format?: string
   instruction?: string
   input?: string
+  data_source?: string
+  prompt?: string
+  ability?: string
+  reward_model?: string
+  extra_info?: string
   messages?: unknown[]
   chosen?: string
   rejected?: string
@@ -139,6 +145,20 @@ const AnnotationTaskDataList: React.FC = () => {
         } as OverviewDisplayItem
       }
 
+      if (currentTrainingMethodType === 'grpo' || currentDatasetFormat === 'grpo') {
+        return {
+          ...baseItem,
+          raw_data: raw,
+          data_source: getGrpoStringValue(raw.data_source),
+          prompt: formatGrpoPrompt(raw, baseUrl),
+          reward_model: getGrpoRewardModel(raw, annotation),
+          ability: getGrpoStringValue(raw.ability),
+          extra_info: formatGrpoValue(raw.extra_info),
+          _rawImages: getRawDataImages(raw),
+          base_url: baseUrl,
+        } as OverviewDisplayItem
+      }
+
       const messages = (item.annotation as Record<string, unknown> | undefined)?.messages
         ?? getRawDataMessages(raw)
       const isMessagesFormat = Array.isArray(messages) && messages.length > 0
@@ -172,6 +192,7 @@ const AnnotationTaskDataList: React.FC = () => {
   }, [dataList, baseUrl, datasetFormat, trainingMethodType])
   const isDpoLayout = formerListData?.training_method_type === 'dpo'
   const isDpoRoleBased = isDpoLayout && formerListData?.dataset_format === 'role-based'
+  const isGrpoLayout = formerListData?.training_method_type === 'grpo' || formerListData?.dataset_format === 'grpo'
   const isMessagesLayout = useMemo(() => {
     if (displayList.length === 0)
       return false
@@ -255,7 +276,7 @@ const AnnotationTaskDataList: React.FC = () => {
       dataIndex: isMessagesLayout ? '_systemMessage' : 'raw_data',
       key: 'system',
       align: 'left',
-      hidden: isDpoLayout,
+      hidden: isDpoLayout || isGrpoLayout,
       render: (_: unknown, record: OverviewDisplayItem) => {
         if (isMessagesLayout && record._systemMessage !== undefined) {
           const rowKey = record.item_id ?? String(record.row_number)
@@ -275,7 +296,7 @@ const AnnotationTaskDataList: React.FC = () => {
       title: isMessagesLayout ? 'User' : 'Prompt',
       key: isMessagesLayout ? 'user' : 'prompt',
       align: 'left',
-      hidden: isDpoLayout,
+      hidden: isDpoLayout || isGrpoLayout,
       render: (_: unknown, record: OverviewDisplayItem) => {
         if (isMessagesLayout && record._userMessages?.length) {
           const rowKey = record.item_id ?? String(record.row_number)
@@ -346,7 +367,7 @@ const AnnotationTaskDataList: React.FC = () => {
       key: isMessagesLayout ? 'assistant' : 'ground_truth',
       align: 'left',
       width: isMessagesLayout ? 420 : undefined,
-      hidden: isDpoLayout,
+      hidden: isDpoLayout || isGrpoLayout,
       render: (_: unknown, record: OverviewDisplayItem) => {
         if (isMessagesLayout && record._assistantMessages?.length) {
           const assistantMessages = record._assistantMessages ?? []
@@ -378,6 +399,72 @@ const AnnotationTaskDataList: React.FC = () => {
           </Tooltip>
         )
       },
+    },
+    {
+      title: 'data_source',
+      dataIndex: 'data_source',
+      key: 'data_source',
+      align: 'left',
+      width: 220,
+      hidden: !isGrpoLayout,
+      render: (text: string) => (
+        <div className="max-w-[220px] max-h-[160px] overflow-y-auto break-words whitespace-pre-wrap">
+          {text || '-'}
+        </div>
+      ),
+    },
+    {
+      title: 'prompt',
+      dataIndex: 'prompt',
+      key: 'grpo_prompt',
+      align: 'left',
+      width: 420,
+      hidden: !isGrpoLayout,
+      render: (text: string) => (
+        <div
+          className="max-w-[420px] max-h-[220px] overflow-y-auto break-words whitespace-pre-wrap [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded [&_img]:my-1"
+          dangerouslySetInnerHTML={{ __html: text || '-' }}
+        />
+      ),
+    },
+    {
+      title: 'reward_model',
+      dataIndex: 'reward_model',
+      key: 'reward_model',
+      align: 'left',
+      width: 280,
+      hidden: !isGrpoLayout,
+      render: (text: string) => (
+        <div className="max-w-[280px] max-h-[160px] overflow-y-auto break-words whitespace-pre-wrap">
+          {text || '-'}
+        </div>
+      ),
+    },
+    {
+      title: 'ability',
+      dataIndex: 'ability',
+      key: 'ability',
+      align: 'left',
+      width: 160,
+      hidden: !isGrpoLayout,
+      render: (text: string) => (
+        <div className="max-w-[160px] max-h-[160px] overflow-y-auto break-words whitespace-pre-wrap">
+          {text || '-'}
+        </div>
+      ),
+    },
+    {
+      title: 'extra_info',
+      dataIndex: 'extra_info',
+      key: 'extra_info',
+      align: 'left',
+      width: 260,
+      hidden: !isGrpoLayout,
+      render: (text: string) => (
+        <div className="max-w-[260px] max-h-[160px] overflow-y-auto break-words whitespace-pre-wrap">
+          {text || '-'}
+        </div>
+      ),
     },
     {
       title: 'Instruction',

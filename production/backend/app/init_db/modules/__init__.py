@@ -10,6 +10,7 @@ from .common_config import CommonConfigSeeder
 from .permission import PermissionSeeder
 from .benchmark_datasets import BenchmarkDatasetsSeeder
 from .example_notebook.seeder import ExampleNotebookSeeder
+from .advanced_templates import AdvancedTemplateSeeder
 
 # 所有可用的种子管理器（按执行顺序排列）
 SEEDERS = [
@@ -20,8 +21,10 @@ SEEDERS = [
     PermissionSeeder,  # 权限配置初始化
     BenchmarkDatasetsSeeder,
     ExampleNotebookSeeder,
+    AdvancedTemplateSeeder,
     ImageTagsSeeder,
 ]
 
 __all__ = ['SEEDERS', 'DataCleaningSeeder', 'ImageSeeder', 'EvaluationMetricsSeeder', 'CommonConfigSeeder',
-           'PermissionSeeder', 'BenchmarkDatasetsSeeder', 'ExampleNotebookSeeder', 'ImageTagsSeeder']
+           'PermissionSeeder', 'BenchmarkDatasetsSeeder', 'ExampleNotebookSeeder', 'AdvancedTemplateSeeder',
+           'ImageTagsSeeder']

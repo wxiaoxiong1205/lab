@@ -18,6 +18,7 @@ export interface BasicViewDataType {
   created_at: string
   usage: string
   dataset_type: string
+  publish_display?: string
   attr_values: Attribute[]
 }
 
@@ -29,9 +30,16 @@ const getFormatTag = (format: string, selectedVersion?: BasicViewDataType) => {
     'xlsx': { color: 'blue', text: 'Excel' },
     'alpaca': { color: 'blue', text: 'ALPACA' },
     'prompt-response': { color: 'blue', text: 'PROMPT_RESPONSE' },
+    'grpo': { color: 'blue', text: 'GRPO' },
   }
   const config = formatMap[format] || formatMap[selectedVersion?.dataset_format || ''] || { color: 'default', text: format || selectedVersion?.dataset_format || '未知格式' }
   return <Tag color={config.color}>{config.text}</Tag>
+}
+
+const getPublishTag = (data: BasicViewDataType) => {
+  const text = data.publish_display
+  const color = text === '已发布' ? 'green' : 'orange'
+  return <Tag color={color}>{text}</Tag>
 }
 
 const DatasetDetailBasicView = ({
@@ -112,6 +120,11 @@ const DatasetDetailBasicView = ({
       key: 'processing_status_display',
       label: '状态',
       children: <strong>{data.processing_status_display || '-'}</strong>,
+    },
+    {
+      key: 'publish_display',
+      label: '发布状态',
+      children: getPublishTag(data),
     },
     {
       key: 'file_size',

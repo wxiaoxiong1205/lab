@@ -121,11 +121,10 @@ const EnhancedDataConfig: React.FC<EnhancedDataConfigProps> = ({ onChange, value
     }
   }, [value, dataConfig])
   const effectiveTrainTypeCategory = trainTypeCategoryFromTask ?? trainTypeCategory
-  const supportedTrainingMethodTypes = ['sft', 'dpo', 'rft-grpo']
-  const watchedTrainingMethodType = typeof trainingMethodType === 'string' && supportedTrainingMethodTypes.includes(trainingMethodType)
+  const watchedTrainingMethodType = typeof trainingMethodType === 'string' && ['sft', 'dpo'].includes(trainingMethodType)
     ? trainingMethodType
     : undefined
-  const taskTrainingMethodType = typeof trainingMethodTypeFromTask === 'string' && supportedTrainingMethodTypes.includes(trainingMethodTypeFromTask)
+  const taskTrainingMethodType = typeof trainingMethodTypeFromTask === 'string' && ['sft', 'dpo'].includes(trainingMethodTypeFromTask)
     ? trainingMethodTypeFromTask
     : undefined
   const effectiveTrainingMethodType = watchedTrainingMethodType ?? taskTrainingMethodType

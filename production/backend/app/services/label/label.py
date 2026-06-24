@@ -577,7 +577,10 @@ class DefaultLabelService(LabelService):
                                     pass
                         if annotation and isinstance(annotation, dict):
                             item = self._merge_annotation_to_item(item, annotation, dataset.dataset_format)
-                        if dataset.dataset_type == LabelDatasetType.IMAGE_UNDERSTANDING.value:
+                        if (
+                            dataset.dataset_type == LabelDatasetType.IMAGE_UNDERSTANDING.value
+                            or dataset.dataset_format == LabelDatasetFormat.GRPO.value
+                        ):
                             merged_line = json.dumps(item, ensure_ascii=False)
                         else:
                             merged_line = '[' + json.dumps(item, ensure_ascii=False) + ']'
@@ -2799,6 +2802,32 @@ class DefaultLabelService(LabelService):
                 item['suffix'] = annotation['suffix']
             if 'middle' in annotation:
                 item['middle'] = annotation['middle']
+        elif dataset_format == LabelDatasetFormat.GRPO.value:
+            # GRPO 格式：保留原始样本结构，主要更新 reward_model.ground_truth。
+            for field_name in ('data_source', 'prompt', 'ability', 'extra_info'):
+                if field_name in annotation:
+                    item[field_name] = annotation[field_name]
+
+            if isinstance(annotation.get('reward_model'), dict):
+                current_reward_model = item.get('reward_model')
+                if not isinstance(current_reward_model, dict):
+                    current_reward_model = {}
+                current_reward_model.update(annotation['reward_model'])
+                item['reward_model'] = current_reward_model
+
+            ground_truth = None
+            ground_truth_set = False
+            for field_name in ('reward_model.ground_truth', 'ground_truth', 'answer', 'response'):
+                if field_name in annotation:
+                    ground_truth = annotation[field_name]
+                    ground_truth_set = True
+                    break
+            if ground_truth_set:
+                current_reward_model = item.get('reward_model')
+                if not isinstance(current_reward_model, dict):
+                    current_reward_model = {}
+                current_reward_model['ground_truth'] = ground_truth
+                item['reward_model'] = current_reward_model
         else:
             # 通用处理：直接合并标注内容
             item.update(annotation)
@@ -3352,6 +3381,32 @@ class DefaultLabelService(LabelService):
             if input_data.messages:
                 raw_data["messages"] = input_data.messages
             # 图像理解数据集：处理images字段
+            if input_data.images:
+                raw_data["images"] = input_data.images
+
+        elif dataset_format == LabelDatasetFormat.GRPO.value:
+            # GRPO 格式：prompt 使用 verl 所需的消息数组结构。
+            if input_data.messages:
+                raw_data["prompt"] = input_data.messages
+            elif input_data.prompt:
+                raw_data["prompt"] = [{"role": "user", "content": input_data.prompt}]
+            if input_data.system_prompt:
+                raw_data.setdefault("prompt", [])
+                raw_data["prompt"].insert(0, {"role": "system", "content": input_data.system_prompt})
+            if input_data.reward_model:
+                raw_data["reward_model"] = input_data.reward_model
+            if input_data.ground_truth is not None:
+                reward_model = raw_data.get("reward_model")
+                if not isinstance(reward_model, dict):
+                    reward_model = {}
+                reward_model["ground_truth"] = input_data.ground_truth
+                raw_data["reward_model"] = reward_model
+            if input_data.ability:
+                raw_data["ability"] = input_data.ability
+            if input_data.extra_info:
+                raw_data["extra_info"] = input_data.extra_info
+            if input_data.data_source:
+                raw_data["data_source"] = input_data.data_source
             if input_data.images:
                 raw_data["images"] = input_data.images
 

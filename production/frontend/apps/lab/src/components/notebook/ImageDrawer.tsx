@@ -169,13 +169,7 @@ export function ImageDrawer({ open, onClose, onSelect, gpuEnabled, gpuType, useC
             <div className="w-full h-full flex justify-center items-center">
               <Spin />
             </div>
-          ) : (
-            <TagsSelect
-              tags={(Array.isArray(tags?.data) ? tags.data : []).filter((tag) => tag.elements?.length > 0)}
-              value={selectedTags}
-              onChange={onTagsChange}
-            />
-          )}
+          ) : (<TagsSelect tags={tags?.data.filter((tag) => tag.elements?.length > 0)} value={selectedTags} onChange={onTagsChange} />)}
         </Flex>
 
         {/* 右侧镜像列表 */}

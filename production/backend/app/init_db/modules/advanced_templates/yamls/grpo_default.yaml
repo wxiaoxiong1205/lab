@@ -1,0 +1,106 @@
+data:
+  # @template type=int default=1 description="T4 LoRA 建议训练 batch size，需满足 train_batch_size * rollout.n 能被 agent.num_workers 整除"
+  train_batch_size: 1
+  # @template type=int default=512 description="最大 prompt 长度"
+  max_prompt_length: 512
+  # @template type=int default=512 description="最大 response 长度"
+  max_response_length: 512
+  # @template type=int default=2 description="DataLoader worker 数"
+  dataloader_num_workers: 2
+
+actor_rollout_ref:
+  model:
+    # @template type=bool default=true description="是否开启梯度检查点"
+    enable_gradient_checkpointing: true
+    # @template type=bool default=true description="是否移除 padding"
+    use_remove_padding: true
+    # @template type=int default=8 description="LoRA rank"
+    lora_rank: 8
+    # @template type=int default=16 description="LoRA alpha"
+    lora_alpha: 16
+    # @template type=string default=all-linear description="LoRA target modules"
+    target_modules: all-linear
+
+  actor:
+    # @template type=int default=1 description="PPO mini batch size"
+    ppo_mini_batch_size: 1
+    # @template type=int default=1 description="每 GPU PPO micro batch size"
+    ppo_micro_batch_size_per_gpu: 1
+    # @template type=bool default=false description="是否使用动态 batch size"
+    use_dynamic_bsz: false
+    # @template type=int default=1024 description="每 GPU 最大 token 数"
+    ppo_max_token_len_per_gpu: 1024
+    # @template type=bool default=true description="是否启用 actor KL loss"
+    use_kl_loss: true
+
+    fsdp_config:
+      # @template type=enum default=float16 enum_options=float16,bfloat16,float32 description="T4 不支持 bfloat16，使用 float16"
+      dtype: float16
+      # @template type=bool default=false description="T4 建议关闭 torch compile"
+      use_torch_compile: false
+
+  rollout:
+    # @template type=enum default=vllm enum_options=vllm,sglang required=true description="Rollout 后端"
+    name: vllm
+    # @template type=int default=2 description="每个 prompt 采样响应数"
+    n: 2
+    # @template type=enum default=float16 enum_options=float16,bfloat16,float32 description="T4 不支持 bfloat16，使用 float16"
+    dtype: float16
+    # @template type=bool default=true description="禁用 CUDA graph，T4 上更稳"
+    enforce_eager: true
+    # @template type=float default=0.4 description="T4 显存利用率"
+    gpu_memory_utilization: 0.4
+    # @template type=int default=1 description="张量并行大小"
+    tensor_model_parallel_size: 1
+    # @template type=int default=1 description="数据并行大小"
+    data_parallel_size: 1
+    # @template type=int default=1024 description="最大 batched tokens"
+    max_num_batched_tokens: 1024
+    # @template type=int default=128 description="最大序列数"
+    max_num_seqs: 128
+    # @template type=int default=1 description="log prob 每 GPU micro batch size"
+    log_prob_micro_batch_size_per_gpu: 1
+    # @template type=bool default=false description="log prob 是否使用动态 batch size"
+    log_prob_use_dynamic_bsz: false
+    # @template type=int default=1024 description="log prob 每 GPU 最大 token 数"
+    log_prob_max_token_len_per_gpu: 1024
+
+    agent:
+      # @template type=int default=1 description="Agent loop worker 数；需整除 train_batch_size * rollout.n"
+      num_workers: 1
+
+  ref:
+    # @template type=int default=1 description="Ref log prob 每 GPU micro batch size"
+    log_prob_micro_batch_size_per_gpu: 1
+    # @template type=bool default=false description="Ref log prob 是否使用动态 batch size"
+    log_prob_use_dynamic_bsz: false
+    # @template type=int default=1024 description="Ref log prob 每 GPU 最大 token 数"
+    log_prob_max_token_len_per_gpu: 1024
+
+critic:
+  # @template type=bool default=false description="GRPO 通常关闭 critic"
+  enable: false
+
+trainer:
+  # @template type=int default=1 description="总训练 epoch 数"
+  total_epochs: 1
+  # @template type=bool default=false description="T4 demo 建议不做训练前验证"
+  val_before_train: false
+  # @template type=int default=1 description="验证频率，-1 表示不验证"
+  test_freq: 1
++ray_kwargs:
+  ray_init:
+    runtime_env.env_vars:
+      # @template type=enum default="TORCH_SDPA" enum_options=TORCH_SDPA,FLASH_ATTIN,XFORMERS,ROCM_FLASH,FLASHINFER,FLASHMLA description="VLLM_ATTENTION_BACKEND"
+      VLLM_ATTENTION_BACKEND: TORCH_SDPA
+      # @template type=string default="1" description="验证频率，-1 表示不验证"
+      VLLM_USE_V1: "1"
++actor_rollout_ref:
+  model:
+    override_config: 
+      attn_implementation: sdpa
+  rollout:
+    engine_kwargs:
+      vllm:
+        hf_overrides:
+          attn_implementation: sdpa

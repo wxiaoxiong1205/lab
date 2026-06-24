@@ -44,6 +44,42 @@ class MachineLearningDatasetDataSource(str, Enum):
     NOTEBOOK_FETCH = "notebook_fetch"
 
 
+
+class MachineLearningDatasetProcessingStatus(str, Enum):
+    """机器学习数据集处理状态"""
+    PENDING = "pending", "处理中"
+    COMPLETED = "completed", "处理完成"
+    FAILED = "failed", "处理失败"
+
+    def __new__(cls, value, description):
+        obj = str.__new__(cls, value)
+        obj._value_ = value
+        obj._description = description
+        return obj
+
+    @property
+    def description(self) -> str:
+        return self._description
+
+
+class DatasetPublishStatus(int, Enum):
+    """机器学习数据集发布状态"""
+    UNPUBLISHED = 0, "未发布"
+    PUBLISHED = 1, "已发布"
+    PROCESSING = 2, "-"
+    FAILED = 3, "-"
+
+    def __new__(cls, value, description):
+        obj = int.__new__(cls, value)
+        obj._value_ = value
+        obj._description = description
+        return obj
+
+    @property
+    def description(self) -> str:
+        """返回中文描述"""
+        return self._description
+
 class MachineLearningDatasetAnnotationType(str, Enum):
     """标注类型；description 为中文展示文案。"""
 
@@ -354,6 +390,11 @@ class MachineLearningDatasetCreateResponse(BaseModelWithTimezone):
     label_schema_path: Optional[str] = Field(None, description="classname.json 路径")
     metadata_fields: Optional[List[str]] = Field(None, description="数据集字段元数据，上传解析完成后生成")
     sample_count: int = Field(..., description="样本数")
+    processing_status: MachineLearningDatasetProcessingStatus = Field(MachineLearningDatasetProcessingStatus.COMPLETED, description="处理状态：pending处理中, completed处理完成, failed处理失败")
+    processing_status_display: Optional[str] = Field(None, description="处理状态中文显示")
+    status_display: Optional[str] = Field(None, description="状态中文显示")
+    publish: int = Field(0, description="发布状态：0未发布, 1已发布, 2处理中展示-, 3处理失败展示-")
+    publish_display: Optional[str] = Field(None, description="发布状态中文显示")
     file_size: Optional[float] = Field(None, description="dataset.jsonl 大小(MB)")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
@@ -382,6 +423,11 @@ class MachineLearningDatasetResponse(BaseModelWithTimezone):
     source_type: MachineLearningDatasetSourceType = Field(..., description="上传源类型")
     metadata_fields: Optional[List[str]] = Field(None, description="数据集字段元数据，上传解析完成后生成")
     sample_count: int = Field(..., description="样本数")
+    processing_status: MachineLearningDatasetProcessingStatus = Field(MachineLearningDatasetProcessingStatus.COMPLETED, description="处理状态：pending处理中, completed处理完成, failed处理失败")
+    processing_status_display: Optional[str] = Field(None, description="处理状态中文显示")
+    publish: int = Field(0, description="发布状态：0未发布, 1已发布, 2处理中展示-, 3处理失败展示-")
+    publish_display: Optional[str] = Field(None, description="发布状态中文显示")
+    status_display: Optional[str] = Field(None, description="状态中文显示")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
     created_by: Optional[str] = Field(None, description="创建人")
@@ -403,13 +449,19 @@ class MachineLearningDatasetBasicInfoUpdate(BaseModel):
         return self
 
 
-class MachineLearningDatasetVersionMergeRequest(BaseModel):
-    """机器学习数据集版本合并请求模型"""
+class MachineLearningDatasetDeleteRowsRequest(BaseModel):
+    """机器学习数据集删除指定行请求模型"""
+    row_numbers: List[int] = Field(..., min_length=1, description="需要删除的全局行号列表，按详情接口返回的 row_number 传入，从 1 开始")
 
-    version: str = Field(..., min_length=1, max_length=50, description="合并后生成的新版本号")
-    source_version_ids: List[int] = Field(..., min_length=2, description="参与合并的数据集版本ID列表，至少选择两个")
-    description: Optional[str] = Field(None, max_length=1000, description="合并版本描述")
-
+    @model_validator(mode="after")
+    def validate_row_numbers(self):
+        unique_rows = sorted(set(self.row_numbers))
+        if not unique_rows:
+            raise ValueError("row_numbers 不能为空")
+        if any(row_number < 1 for row_number in unique_rows):
+            raise ValueError("row_numbers 中的行号必须大于等于 1")
+        self.row_numbers = unique_rows
+        return self
 
 class MachineLearningDatasetSampleResponse(BaseModelWithTimezone):
     row_number: int = Field(..., description="样本行号（从1开始）")

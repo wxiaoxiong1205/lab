@@ -12,22 +12,23 @@ from app.models.models import JwtUserInfo
 from app.schemas.machine_learning_dataset import (
     MachineLearningDatasetAnnotationType,
     MachineLearningDatasetBasicInfoUpdate,
+    DatasetPublishStatus,
     MachineLearningDatasetCreateResponse,
     MachineLearningDatasetDataSource,
     MachineLearningDatasetDataType,
     MachineLearningDatasetDetailResponse,
+    MachineLearningDatasetDeleteRowsRequest,
     MachineLearningDatasetResponse,
     MachineLearningDatasetSampleFileType,
     MachineLearningDatasetTaskType,
     MachineLearningDatasetTemplateType, ExportFormat, TASK_EXPORT_FORMATS,
-    MachineLearningDatasetVersionMergeRequest,
 )
 from app.services.machine_learning_dataset.interface import MachineLearningDatasetService
 from app.utils.dataset_metadata_repair_status import (
     REPAIR_KIND_MACHINE_LEARNING_DATASET,
-    get_metadata_fields_repair_status,
     mark_metadata_fields_repair_failed,
     mark_metadata_fields_repair_submitted,
+    refresh_metadata_fields_repair_status_from_celery,
 )
 from app.utils.dependencies import get_db_and_user
 
@@ -145,6 +146,7 @@ async def get_machine_learning_dataset_versions(
     project_id: int = Path(..., description="项目ID", gt=0),
     dataset_id: int = Path(..., description="数据集ID", gt=0),
     is_annotated: Optional[bool] = Query(None, description="是否已标注"),
+    publish: Optional[DatasetPublishStatus] = Query(None, description="发布状态：0未发布, 1已发布, 2处理中展示-, 3处理失败展示-"),
     deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
     machine_learning_dataset_service: MachineLearningDatasetService = Depends(
         Provide[AutoContainer.machine_learning_dataset_service]
@@ -155,7 +157,8 @@ async def get_machine_learning_dataset_versions(
     return await machine_learning_dataset_service.get_dataset_versions(
         project_id=project_id,
         dataset_id=dataset_id,
-        is_annotated=is_annotated
+        is_annotated=is_annotated,
+        publish=publish
     )
 
 
@@ -167,6 +170,7 @@ async def list_machine_learning_datasets(
     task_type: Optional[MachineLearningDatasetTaskType] = Query(None, description="标注类型/任务类型过滤"),
     template_type: Optional[MachineLearningDatasetTemplateType] = Query(None, description="标注模板筛选"),
     is_annotated: Optional[bool] = Query(None, description="是否已标注"),
+    publish: Optional[DatasetPublishStatus] = Query(None, description="发布状态：0未发布, 1已发布, 2处理中展示-, 3处理失败展示-"),
     params: Params = Depends(),
     deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
     machine_learning_dataset_service: MachineLearningDatasetService = Depends(
@@ -180,7 +184,8 @@ async def list_machine_learning_datasets(
         name=name,
         task_type=task_type,
         template_type=template_type,
-        is_annotated=is_annotated
+        is_annotated=is_annotated,
+        publish=publish
     )
 
 
@@ -217,34 +222,25 @@ async def update_machine_learning_dataset_basic_info(
     )
 
 
-@router.post(
-    "/dataset/{project_id}/{dataset_id}/merge-versions",
-    response_model=MachineLearningDatasetCreateResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+
+@router.patch("/dataset/{project_id}/{dataset_id}/publish", response_model=bool, status_code=status.HTTP_200_OK)
 @inject
-async def merge_machine_learning_dataset_versions(
+async def update_machine_learning_dataset_publish_status(
     project_id: int = Path(..., description="项目ID", gt=0),
-    dataset_id: int = Path(..., description="数据集ID，用于定位同名版本组", gt=0),
-    request: MachineLearningDatasetVersionMergeRequest = Body(..., description="机器学习数据集版本合并请求"),
+    dataset_id: int = Path(..., description="数据集ID", gt=0),
+    publish: DatasetPublishStatus = Body(..., embed=True, description="发布状态：仅允许 1（已发布），且 processing_status 必须为 completed（处理完成）"),
     deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
     machine_learning_dataset_service: MachineLearningDatasetService = Depends(
         Provide[AutoContainer.machine_learning_dataset_service]
     ),
-) -> MachineLearningDatasetCreateResponse:
-    """合并同一机器学习数据集下多个版本，生成新版本。
-
-    源版本不变；合并版本会重排 sample_id 并写入 source_version，避免多源版本样本 ID 冲突。
-    图片资产同名但内容不同会阻止合并。
-    """
-    _, current_user = deps
-    return await machine_learning_dataset_service.merge_dataset_versions(
-        current_user=current_user,
+) -> bool:
+    """修改机器学习数据集发布状态：仅允许处理完成且未发布的数据集改为已发布。"""
+    _ = deps
+    return await machine_learning_dataset_service.update_dataset_publish_status(
         project_id=project_id,
         dataset_id=dataset_id,
-        request=request,
+        publish=publish,
     )
-
 
 @router.get("/dataset/{project_id}/{dataset_id}", response_model=MachineLearningDatasetDetailResponse, status_code=status.HTTP_200_OK)
 @inject
@@ -267,6 +263,46 @@ async def get_machine_learning_dataset_detail(
     )
 
 
+
+@router.delete("/dataset/{project_id}/{dataset_id}/rows", response_model=bool, status_code=status.HTTP_200_OK)
+@inject
+async def delete_machine_learning_dataset_rows(
+    project_id: int = Path(..., description="项目ID", gt=0),
+    dataset_id: int = Path(..., description="数据集ID", gt=0),
+    request: MachineLearningDatasetDeleteRowsRequest = Body(..., description="删除指定行请求"),
+    deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
+    machine_learning_dataset_service: MachineLearningDatasetService = Depends(
+        Provide[AutoContainer.machine_learning_dataset_service]
+    ),
+) -> bool:
+    """同步删除机器学习数据集文件中的指定行。
+
+    前端需要传全局行号，不传当前页内序号；全局行号使用详情接口返回的 `row_number`。
+    例如详情接口当前页返回 row_number 为 21、22、23，用户选中第 1、3 条时，传 `[21, 23]`。
+
+    处理规则：
+    - 仅 `publish = 0` 未发布的数据集允许删除；
+    - 接口会同步处理文件；
+    - 如果当前 `processing_status = pending`，说明数据集有任务正在处理，需要前端刷新后重试；
+    - 删除成功后会更新样本数和文件大小，并清理导出缓存。
+
+    请求示例：
+    ```json
+    DELETE /api/v1/machine-learning-datasets/dataset/35/1001/rows
+    {
+      "row_numbers": [21, 23]
+    }
+    ```
+    """
+    _ = deps
+    return await machine_learning_dataset_service.delete_dataset_rows(
+        project_id=project_id,
+        dataset_id=dataset_id,
+        row_numbers=request.row_numbers,
+    )
+
+
+
 @router.get("/dataset/{project_id}/{dataset_id}/metadata-fields", response_model=List[str], status_code=status.HTTP_200_OK)
 @inject
 async def get_machine_learning_dataset_metadata_fields(
@@ -284,18 +320,20 @@ async def get_machine_learning_dataset_metadata_fields(
 
 @router.post("/metadata-fields/repair", response_model=Dict[str, Any], status_code=status.HTTP_200_OK)
 @inject
-async def repair_machine_learning_dataset_metadata_fields() -> Dict[str, Any]:
+async def repair_machine_learning_dataset_metadata_fields(
+    force: bool = Query(False, description="是否强制重刷已有 metadata_fields 的数据集"),
+) -> Dict[str, Any]:
     """提交或查询历史机器学习数据集 metadata_fields 异步回填任务。"""
     from app.tasks.dataset_processing_tasks import (
         repair_machine_learning_dataset_metadata_fields as repair_metadata_fields_task,
     )
 
     tenant_id: Optional[str] = None
-    existing_status = await get_metadata_fields_repair_status(
+    existing_status = await refresh_metadata_fields_repair_status_from_celery(
         REPAIR_KIND_MACHINE_LEARNING_DATASET,
         tenant_id,
     )
-    if existing_status:
+    if existing_status and (not force or existing_status.get("status") in {"submitted", "running"}):
         return existing_status
 
     celery_task_id = str(uuid4())
@@ -303,10 +341,11 @@ async def repair_machine_learning_dataset_metadata_fields() -> Dict[str, Any]:
         REPAIR_KIND_MACHINE_LEARNING_DATASET,
         tenant_id,
         celery_task_id,
-        nx=True,
+        force=force,
+        nx=not force,
     )
     if not claimed:
-        existing_status = await get_metadata_fields_repair_status(
+        existing_status = await refresh_metadata_fields_repair_status_from_celery(
             REPAIR_KIND_MACHINE_LEARNING_DATASET,
             tenant_id,
         )
@@ -315,7 +354,7 @@ async def repair_machine_learning_dataset_metadata_fields() -> Dict[str, Any]:
 
     try:
         repair_metadata_fields_task.apply_async(
-            kwargs={"tenant_id": tenant_id},
+            kwargs={"tenant_id": tenant_id, "force": force},
             task_id=celery_task_id,
         )
     except Exception as exc:
@@ -327,16 +366,55 @@ async def repair_machine_learning_dataset_metadata_fields() -> Dict[str, Any]:
         )
         raise HTTPException(status_code=500, detail=f"提交机器学习数据集 metadata_fields 修复任务失败: {exc}") from exc
 
-    return await get_metadata_fields_repair_status(
+    return await refresh_metadata_fields_repair_status_from_celery(
         REPAIR_KIND_MACHINE_LEARNING_DATASET,
         tenant_id,
     ) or {
         "success": True,
         "status": "submitted",
         "celery_task_id": celery_task_id,
+        "force": force,
         "message": "机器学习数据集 metadata_fields 修复任务已提交",
     }
 
+
+
+@router.delete("/dataset/{project_id}/{dataset_id}/rows", response_model=bool, status_code=status.HTTP_200_OK)
+@inject
+async def delete_machine_learning_dataset_rows(
+    project_id: int = Path(..., description="项目ID", gt=0),
+    dataset_id: int = Path(..., description="数据集ID", gt=0),
+    request: MachineLearningDatasetDeleteRowsRequest = Body(..., description="删除指定行请求"),
+    deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
+    machine_learning_dataset_service: MachineLearningDatasetService = Depends(
+        Provide[AutoContainer.machine_learning_dataset_service]
+    ),
+) -> bool:
+    """同步删除机器学习数据集文件中的指定行。
+
+    前端需要传全局行号，不传当前页内序号；全局行号使用详情接口返回的 `row_number`。
+    例如详情接口当前页返回 row_number 为 21、22、23，用户选中第 1、3 条时，传 `[21, 23]`。
+
+    处理规则：
+    - 仅 `publish = 0` 未发布的数据集允许删除；
+    - 接口会同步处理文件；
+    - 如果当前 `processing_status = pending`，说明数据集有任务正在处理，需要前端刷新后重试；
+    - 删除成功后会更新样本数和文件大小，并清理导出缓存。
+
+    请求示例：
+    ```json
+    DELETE /api/v1/machine-learning-datasets/dataset/35/1001/rows
+    {
+      "row_numbers": [21, 23]
+    }
+    ```
+    """
+    _ = deps
+    return await machine_learning_dataset_service.delete_dataset_rows(
+        project_id=project_id,
+        dataset_id=dataset_id,
+        row_numbers=request.row_numbers,
+    )
 
 @router.delete("/dataset/{project_id}/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
 @inject

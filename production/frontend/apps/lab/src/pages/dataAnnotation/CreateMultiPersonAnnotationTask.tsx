@@ -200,6 +200,8 @@ const CreateMultiPersonAnnotationTask: React.FC<CreateMultiPersonAnnotationTaskP
           taskType,
           undefined,
           templateType,
+          undefined,
+          1,
         )
         const items = response.items ?? []
         targetOption.children = items.length
@@ -220,7 +222,7 @@ const CreateMultiPersonAnnotationTask: React.FC<CreateMultiPersonAnnotationTaskP
         const dataset = targetOption.dataset
         if (!dataset) return
 
-        const versions = await machineDatamanagement.getDatasetVersion(projectIdNum, dataset.id)
+        const versions = await machineDatamanagement.getDatasetVersion(projectIdNum, dataset.id, undefined, 1)
         targetOption.children = versions.length
           ? versions.map((item) => ({
               value: item.id,

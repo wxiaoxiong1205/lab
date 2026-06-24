@@ -381,7 +381,7 @@ export const inferenceResultSetService = {
    * @param datasetType 数据集类型（可选）
    * @returns 下载结果响应
    */
-  downloadSample: async (fileType: 'jsonl' | 'csv' | 'xlsx' | 'json' | 'zip' = 'jsonl', datasetFormat?: string, datasetType?: string, importDataUsage?: string) => {
+  downloadSample: async (fileType: 'jsonl' | 'csv' | 'xlsx' | 'json' | 'zip' = 'jsonl', datasetFormat?: string, datasetType?: string) => {
     const response = await apiClient.get<any>(
       `/inference-result-datasets/sample/download`,
       {
@@ -389,7 +389,6 @@ export const inferenceResultSetService = {
           file_type: fileType,
           ...(datasetFormat && { dataset_format: datasetFormat }),
           ...(datasetType && { dataset_type: datasetType }),
-          ...(importDataUsage && { import_data_usage: importDataUsage }),
         },
         responseType: 'blob',
       },

@@ -73,8 +73,7 @@ const ProjectSpacePage = () => {
       || project.description?.toLowerCase().includes(normalizedKeyword))
   }, [keyword, projects])
   const workspaceRootMenus = useMemo(() => {
-    const menus = Array.isArray(userMenus) ? userMenus : []
-    return menus
+    return userMenus
       .filter((item) => item.code !== HOME_MENU_CODE)
       .filter((item) => !isSystemMenu(item))
   }, [userMenus])

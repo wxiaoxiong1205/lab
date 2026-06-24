@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { Table, Typography } from 'antd'
+import { Button, Popconfirm, Table, Typography } from 'antd'
 import { renderEntityRecognitionText } from './renderEntityRecognitionText'
 import type {
   Annotation,
@@ -17,6 +17,9 @@ interface TextTabDetailsProps {
   pageSize: number
   total: number
   onPageChange: (page: number) => void
+  canDeleteRows?: boolean
+  deletingRowNumber?: number | null
+  onDeleteRow?: (record: ItemDetail) => void | Promise<void>
 }
 
 /** 判断是否为实体识别的 annotations 结构（Annotation[]，每项含 offset、tag） */
@@ -76,6 +79,9 @@ const TextTabDetails: React.FC<TextTabDetailsProps> = ({
   pageSize,
   total,
   onPageChange,
+  canDeleteRows,
+  deletingRowNumber,
+  onDeleteRow,
 }) => {
   const isEntityRecognition
     = taskType === 'text_entity_recognition' || taskType === 'entity_recognition'
@@ -148,7 +154,42 @@ const TextTabDetails: React.FC<TextTabDetailsProps> = ({
     render: (label: string) => <Typography.Text>{label || '-'}</Typography.Text>,
   }
 
-  const columns = isEntityRecognition ? baseColumns : [...baseColumns, labelColumn]
+  const actionColumn = {
+    title: '操作',
+    key: 'action',
+    width: 100,
+    align: 'center' as const,
+    render: (_: unknown, record: ItemDetail) => {
+      const rowNumber = Number((record as any)?.row_number)
+      const canDelete = Number.isFinite(rowNumber) && !!onDeleteRow
+      return (
+        <Popconfirm
+          title="确认删除"
+          description="确定要删除该行数据吗？删除后将无法恢复。"
+          okText="确认删除"
+          cancelText="取消"
+          okButtonProps={{ danger: true }}
+          disabled={!canDelete}
+          onConfirm={() => onDeleteRow?.(record)}
+        >
+          <Button
+            type="link"
+            danger
+            size="small"
+            disabled={!canDelete}
+            loading={deletingRowNumber === rowNumber}
+          >
+            删除
+          </Button>
+        </Popconfirm>
+      )
+    },
+  }
+
+  const columns = [
+    ...(isEntityRecognition ? baseColumns : [...baseColumns, labelColumn]),
+    ...(canDeleteRows ? [actionColumn] : []),
+  ]
 
   return (
     <Table

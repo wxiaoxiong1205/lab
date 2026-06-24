@@ -14,7 +14,8 @@ from app.schemas.chunk_upload import (
     ChunkUploadMergeResponse,
     ChunkUploadProgressRequest,
     ChunkUploadProgressResponse,
-    ChunkUploadFileUsage
+    ChunkUploadFileUsage,
+    ChunkUploadFileInfoResponse
 )
 from app.services.chunk_upload.interface import ChunkUploadService
 from app.utils.dependencies import get_db_and_user
@@ -317,6 +318,41 @@ async def get_progress(
         return StandardResponse(
             code=500,
             message=f"查询上传进度失败: {str(e)}",
+            result=None
+        )
+
+
+@router.get("/file-info", response_model=StandardResponse[ChunkUploadFileInfoResponse], status_code=status.HTTP_200_OK)
+@inject
+async def get_file_info(
+    uploadId: str = Query(..., description="上传会话ID"),
+    deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
+    chunk_upload_service: ChunkUploadService = Depends(Provide[AutoContainer.chunk_upload_service])
+) -> StandardResponse[ChunkUploadFileInfoResponse]:
+    """查询上传文件信息
+
+    ## 功能说明
+    通过上传会话ID查询文件元信息，不读取文件内容。返回文件名、文件大小、文件地址、上传完成状态等信息。
+    """
+    db, current_user = deps
+    try:
+        response = await chunk_upload_service.get_file_info_by_upload_id(uploadId)
+        return StandardResponse(
+            code=0,
+            message="success",
+            result=response
+        )
+    except HTTPException as e:
+        return StandardResponse(
+            code=e.status_code,
+            message=e.detail if isinstance(e.detail, str) else str(e.detail),
+            result=None
+        )
+    except Exception as e:
+        logger.error(f"查询上传文件信息失败: {str(e)}", exc_info=True)
+        return StandardResponse(
+            code=500,
+            message=f"查询上传文件信息失败: {str(e)}",
             result=None
         )
 

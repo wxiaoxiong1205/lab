@@ -8,6 +8,7 @@ import { useAiAnnotation } from './useAiAnnotation'
 import type { AnnotationDataItem } from './annotationDetail.shared'
 import type { AnnotationConfig } from './components/AnnotationConfigModal'
 import type { AnnotationFilter } from './components/AnnotationDetailSections.types'
+import { formatGrpoPrompt, formatGrpoValue } from './grpoDisplay'
 import {
   getDisplayGroundTruth,
   getDisplayPrompt,
@@ -15,6 +16,7 @@ import {
   getNormalizedRawData,
   getRawDataImages,
   getRawDataMessages,
+  getRewardModelStyle,
 } from './multiLabelDataCompat'
 
 type TaskQueryParams = {
@@ -29,6 +31,7 @@ type TaskLayoutMeta = {
   isTextWithMessages: boolean
   useMessagesLayout: boolean
   isDpoType: boolean
+  isGrpoType: boolean
   dpoFormat: 'alpaca' | 'role-based' | ''
 }
 
@@ -89,6 +92,7 @@ const getTaskLayoutMeta = (
   const normalizedTrainingMethodType = String(trainingMethodType || '').toLowerCase()
   const normalizedDatasetFormat = String(datasetFormat || '').toLowerCase()
   const isDpoType = normalizedTrainingMethodType === 'dpo'
+  const isGrpoType = normalizedTrainingMethodType === 'grpo' || normalizedDatasetFormat === 'grpo'
   const isImageType = contentTab === 'image' || hasRawImages
   const isTextWithMessages = !isImageType
     && rawMessages.length > 0
@@ -96,8 +100,9 @@ const getTaskLayoutMeta = (
   return {
     isImageType,
     isTextWithMessages,
-    useMessagesLayout: !isDpoType && (isImageType || isTextWithMessages),
+    useMessagesLayout: !isDpoType && !isGrpoType && (isImageType || isTextWithMessages),
     isDpoType,
+    isGrpoType,
     dpoFormat: isDpoType && normalizedDatasetFormat === 'role-based' ? 'role-based' : (isDpoType ? 'alpaca' : ''),
   }
 }
@@ -156,7 +161,50 @@ const buildTextTableData = (item: any, page: number): AnnotationDataItem<string>
   audit_result: item.audit_result,
   audit_reason: item.audit_reason,
   annotation: item.annotation || null,
+  rewardModelStyle: getRewardModelStyle(item.raw_data, item.annotation),
 }]
+
+const buildGrpoTableData = (
+  item: any,
+  page: number,
+  baseUrl: string,
+  trainingMethodType?: string,
+  datasetFormat?: string,
+): AnnotationDataItem<string>[] => {
+  const rawData = getNormalizedRawData(item.raw_data)
+  const annotationRewardModel = item.annotation?.reward_model && typeof item.annotation.reward_model === 'object'
+    ? item.annotation.reward_model
+    : null
+  const rewardModel = rawData.reward_model && typeof rawData.reward_model === 'object'
+    ? rawData.reward_model as Record<string, unknown>
+    : {}
+  const style = getStringValue(annotationRewardModel?.style) || getStringValue(rewardModel.style) || 'rule'
+  const groundTruth = getDisplayGroundTruth(rawData, item.annotation)
+
+  return [{
+    id: Number(item.item_id) || page,
+    row_number: item.row_number || page,
+    training_method_type: trainingMethodType,
+    dataset_format: datasetFormat,
+    data_source: getStringValue(rawData.data_source),
+    prompt: formatGrpoPrompt(rawData, baseUrl),
+    ability: getStringValue(rawData.ability),
+    reward_model: {
+      style,
+      ground_truth: groundTruth,
+    },
+    rewardModelStyle: style,
+    extra_info: formatGrpoValue(rawData.extra_info),
+    is_annotated: item.is_annotated,
+    status: item.status,
+    audit_result: item.audit_result,
+    audit_reason: item.audit_reason,
+    annotation: item.annotation || null,
+    base_url: baseUrl,
+    _rawData: rawData,
+    _rawImages: getRawDataImages(rawData),
+  }]
+}
 
 const buildDpoTableData = (
   item: any,
@@ -200,6 +248,10 @@ const buildTaskTableData = (
   trainingMethodType?: string,
   datasetFormat?: string,
 ): AnnotationDataItem<string>[] => {
+  if (layout.isGrpoType) {
+    return buildGrpoTableData(item, page, baseUrl, trainingMethodType, datasetFormat)
+  }
+
   if (layout.isDpoType) {
     return buildDpoTableData(item, page, layout.dpoFormat || 'alpaca', trainingMethodType, datasetFormat)
   }
@@ -679,6 +731,40 @@ export function useAnnotationDetailController() {
     return { chosen, rejected }
   }
 
+  const buildGrpoAnnotationData = () => {
+    const currentData = dataList[0]
+    if (!currentData) return null
+
+    const content = manualContent ?? streamingContent ?? ''
+    if (!content || content.trim() === '') {
+      return null
+    }
+
+    const rawData = currentData._rawData || {}
+    const annotationData = currentData.annotation && typeof currentData.annotation === 'object'
+      ? currentData.annotation as Record<string, unknown>
+      : {}
+    const baseData = {
+      ...rawData,
+      ...annotationData,
+    }
+    const rawRewardModel = rawData.reward_model && typeof rawData.reward_model === 'object'
+      ? rawData.reward_model as Record<string, unknown>
+      : {}
+    const annotationRewardModel = annotationData.reward_model && typeof annotationData.reward_model === 'object'
+      ? annotationData.reward_model as Record<string, unknown>
+      : {}
+    return {
+      ...baseData,
+      reward_model: {
+        ...rawRewardModel,
+        ...annotationRewardModel,
+        style: currentData.rewardModelStyle || 'rule',
+        ground_truth: content,
+      },
+    }
+  }
+
   const handleSaveDraft = async () => {
     if (!taskId) return
     const currentItem = dataList[0]
@@ -700,7 +786,16 @@ export function useAnnotationDetailController() {
     try {
       let annotationData: any = {}
 
-      if (currentItem?.training_method_type === 'dpo' || formerListData?.training_method_type === 'dpo') {
+      if (currentItem?.training_method_type === 'grpo' || formerListData?.training_method_type === 'grpo' || currentItem?.dataset_format === 'grpo' || formerListData?.dataset_format === 'grpo') {
+        const grpoAnnotationData = buildGrpoAnnotationData()
+        if (!grpoAnnotationData) {
+          message.warning('Ground Truth 不能为空，请先输入标注内容')
+          setSavingDraft(false)
+          return
+        }
+        annotationData = grpoAnnotationData
+      }
+      else if (currentItem?.training_method_type === 'dpo' || formerListData?.training_method_type === 'dpo') {
         const dpoAnnotationData = buildDpoAnnotationData()
         if (!dpoAnnotationData) {
           message.warning('Chosen 和 Rejected 均不能为空，请先输入标注内容')
@@ -1036,6 +1131,26 @@ export function useAnnotationDetailController() {
             instruction,
             input,
           })
+        }
+      }
+      else if (currentData.training_method_type === 'grpo' || currentData.dataset_format === 'grpo') {
+        const rawData = currentData._rawData || {}
+        const rawPrompt = Array.isArray(rawData.prompt) ? rawData.prompt : []
+        const rawImages = currentData._rawImages || []
+
+        if (rawPrompt.length > 0 && rawImages.length > 0) {
+          await startAnnotation(Number(taskId), undefined, {
+            messages: rawPrompt,
+            images: rawImages,
+          })
+        }
+        else {
+          const prompt = currentData.prompt || ''
+          if (!prompt) {
+            message.error('当前 GRPO 数据缺少 prompt 字段')
+            return
+          }
+          await startAnnotation(Number(taskId), prompt)
         }
       }
       else if (isImageAnnotation) {

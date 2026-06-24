@@ -12,8 +12,8 @@ class DatasetFormat(str, Enum):
     PROMPT_RESPONSE = "prompt-response"  # 提示词+回复格式
     ALPACA = "alpaca"  # DPO Alpaca 偏好格式
     ROLE_BASED = "role-based"  # 基于角色的对话格式
-    COMPLETION_REWARD = "completion-reward"  # RFT-GRPO Completion + Reward 格式
     PREFIX_SUFFIX_MIDDLE = "prefix-suffix-middle"  # 前缀+后缀+中间格式
+    GRPO = "grpo"  # GRPO verl JSONL格式
     # 添加了业务数据集的特殊格式business
     BUSINESS = "business"
 
@@ -63,9 +63,28 @@ class DatasetProcessingStatus(str, Enum):
     PENDING = "pending", "处理中"
     COMPLETED = "completed", "处理完成"
     FAILED = "failed", "处理失败"
-
+    
     def __new__(cls, value, description):
         obj = str.__new__(cls, value)
+        obj._value_ = value
+        obj._description = description
+        return obj
+    
+    @property
+    def description(self) -> str:
+        """返回中文描述"""
+        return self._description
+
+
+class DatasetPublishStatus(int, Enum):
+    """数据集发布状态"""
+    UNPUBLISHED = 0, "未发布"
+    PUBLISHED = 1, "已发布"
+    PROCESSING = 2, "-"
+    FAILED = 3, "-"
+
+    def __new__(cls, value, description):
+        obj = int.__new__(cls, value)
         obj._value_ = value
         obj._description = description
         return obj
@@ -96,7 +115,10 @@ class TrainingDatasetResponse(BaseModelWithTimezone):
     dataset_path: str = Field(..., description="数据集文件路径（系统自动生成）")
     processing_status: DatasetProcessingStatus = Field(..., description="处理状态：pending处理中, completed处理完成, failed处理失败")
     processing_status_display: Optional[str] = Field(None, description="处理状态中文显示")
+    status_display: Optional[str] = Field(None, description="状态中文显示")
     processing_error: Optional[str] = Field(None, description="处理失败时的错误信息")
+    publish: int = Field(0, description="发布状态：0未发布, 1已发布, 2处理中展示-, 3处理失败展示-")
+    publish_display: Optional[str] = Field(None, description="发布状态中文显示")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
     created_by: Optional[str] = Field(None, description="创建人")
@@ -123,11 +145,25 @@ class TrainingDatasetResponse(BaseModelWithTimezone):
                 "total_characters": 5000000,
                 "file_size": 25.5,
                 "dataset_path": "/data/datasets/project_1/chinese_dialogue_001.json",
+                "publish": 0,
                 "created_at": "2024-01-01T00:00:00Z",
                 "updated_at": "2024-01-01T00:00:00Z"
             }
         }
 
+class TrainingDatasetDeleteRowsRequest(BaseModel):
+    """训练数据集删除指定行请求模型"""
+    row_numbers: List[int] = Field(..., min_length=1, description="需要删除的行号列表，按预览接口返回的 row_number 传入，从 1 开始")
+
+    @model_validator(mode="after")
+    def validate_row_numbers(self):
+        unique_rows = sorted(set(self.row_numbers))
+        if not unique_rows:
+            raise ValueError("row_numbers 不能为空")
+        if any(row_number < 1 for row_number in unique_rows):
+            raise ValueError("row_numbers 中的行号必须大于等于 1")
+        self.row_numbers = unique_rows
+        return self
 
 class TrainingDatasetBasicInfoUpdate(BaseModel):
     """训练数据集基础信息编辑请求模型"""
@@ -142,13 +178,6 @@ class TrainingDatasetBasicInfoUpdate(BaseModel):
         if "description" in self.model_fields_set and self.dataset_id is None:
             raise ValueError("修改 description 时必须传 dataset_id")
         return self
-
-
-class DatasetVersionMergeRequest(BaseModel):
-    """数据集版本合并请求模型"""
-    new_version: str = Field(..., min_length=1, max_length=50, description="合并后生成的新版本号")
-    source_version_ids: List[int] = Field(..., min_length=2, description="参与合并的数据集版本ID列表，至少选择两个")
-    description: Optional[str] = Field(None, max_length=1000, description="合并版本描述")
 
 
 class TrainingDatasetSummaryResponse(BaseModel):
@@ -167,10 +196,12 @@ class TrainingDatasetSummaryResponse(BaseModel):
     processing_status_display: Optional[str] = Field(None, description="最新版本的处理状态中文显示")
     processing_error: Optional[str] = Field(None, description="最新版本的处理错误信息")
     metadata_fields: Optional[List[str]] = Field(None, description="最新版本的数据集字段元数据")
+    publish: int = Field(0, description="最新版本的发布状态：0未发布, 1已发布, 2处理中展示-, 3处理失败展示-")
+    publish_display: Optional[str] = Field(None, description="最新版本的发布状态中文显示")
     created_at: datetime = Field(..., description="首次创建时间")
     updated_at: datetime = Field(..., description="最后更新时间")
     created_by: Optional[str] = Field(None, description="创建人")
-
+    
     class Config:
         from_attributes = True
         json_schema_extra = {
@@ -194,7 +225,7 @@ class DatasetSampleResponse(BaseModel):
     """数据集样本响应模型"""
     row_number: int = Field(..., description="行号（从1开始）")
     sample_data: Any = Field(..., description="样本数据（可以是字典、列表或其他JSON格式）")
-
+    
     class Config:
         from_attributes = True
         json_schema_extra = {
@@ -229,7 +260,7 @@ class DatasetSamplePageResponse(BaseModel):
     size: int = Field(..., description="每页显示条数")
     pages: int = Field(..., description="总页数")
     base_url: Optional[str] = Field(None, description="基础路径-用于拼接图片路径（仅图像理解数据集）")
-
+    
     class Config:
         from_attributes = True
 
@@ -241,7 +272,7 @@ class DatasetInUseResponse(BaseModel):
     task_id: Optional[int] = Field(None, description="使用中的任务ID")
     task_name: Optional[str] = Field(None, description="使用中的任务名称")
     version: str = Field(..., description="数据集版本")
-
+    
     class Config:
         json_schema_extra = {
             "examples": [

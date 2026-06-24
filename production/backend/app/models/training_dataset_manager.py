@@ -1,6 +1,5 @@
 from typing import Dict, Optional, List
-
-from sqlalchemy import Column, Integer, String, JSON, Index, Float
+from sqlalchemy import Column, Integer, SmallInteger, String, JSON, Index, Float
 from sqlalchemy.orm import Mapped
 
 from app.models.models import baseModel
@@ -43,6 +42,12 @@ class TrainingDataset(baseModel):
         String(1000), 
         nullable=True, 
         comment="处理失败时的错误信息"
+    )
+    publish: Mapped[int] = Column(
+        SmallInteger,
+        nullable=False,
+        default=0,
+        comment="发布状态：0未发布, 1已发布, 2处理中展示-, 3处理失败展示-"
     )
     temp_file_path: Mapped[Optional[str]] = Column(
         String(500), 

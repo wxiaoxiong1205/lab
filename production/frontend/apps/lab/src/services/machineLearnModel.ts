@@ -13,11 +13,12 @@ export interface ItemList {
   description?: string
   project_id: number
   version: string
+  publish_display?: string
+  status_display?: string
+  is_published?: boolean
+  processing_status_display?: string
   dataset_category: string
   task_type: string
-  data_type?: string
-  annotation_type?: string
-  template_type?: string
   source_type: string
   sample_count: number
   created_at: string
@@ -41,12 +42,6 @@ export interface CreateDatasetRequest {
   notebook_id?: number // Notebook ID
   notebook_name?: string // Notebook 名称
   notebook_path?: string // Notebook 路径
-}
-
-export interface MergeMachineDatasetVersionsRequest {
-  version: string
-  source_version_ids: number[]
-  description?: string
 }
 // 下载机器学习样例数据集 请求体定义
 export interface DownloadDatasetRequest {
@@ -97,6 +92,10 @@ export interface DatasetDetailsResponse {
   page: number
   size: number
   pages: number
+  publish_display: string
+  status_display: string
+  is_published?: boolean
+  processing_status_display?: string
 }
 export interface ItemDetail {
   row_number: number

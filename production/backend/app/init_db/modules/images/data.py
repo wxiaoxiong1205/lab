@@ -124,6 +124,16 @@ def get_image_data() -> List[Dict[str, Any]]:
             "python_version": None,
         },
         {
+            "image": "verl:v0.8.0-vllm",
+            "type": ImageType.TEXT_GENERATION_GRPO,
+            "sub_type": None,
+            "describe": f"{ImageType.TEXT_GENERATION_GRPO.desc}（默认GPU镜像）",
+            "card_category": CardType.GPU.value,
+            "card_model": None,
+            "cuda_version": None,
+            "python_version": None,
+        },
+        {
             "image": "vllm-openai:v0.11.2",
             "type": ImageType.INFERENCE,
             "sub_type": BackendEnum.VLLM.value,

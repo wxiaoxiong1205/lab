@@ -1,13 +1,16 @@
-import React, { useEffect, useState } from 'react'
-import { Alert, Button, Col, Form, Input, InputNumber, Row, Select, Space, Switch, Tabs, message } from 'antd'
-import { DownloadOutlined, ExclamationCircleOutlined, ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
-import {
-  trainingParameterTemplateService,
-  type TrainingParameterTemplate,
-} from '@/services/trainingParameterTemplateService'
-import ChunkFileUploader from '@/components/common/ChunkFileUploader'
+import React from 'react'
+import { Col, Empty, Form, Input, InputNumber, Row, Select, Spin, Tabs, Typography } from 'antd'
+import type { FormInstance } from 'antd'
+import { useQuery } from '@tanstack/react-query'
+import { DynamicFieldForm } from '@/components/common/DynamicFieldForm'
+import { SegmentedRadioButton, SegmentedRadioGroup } from '@/components/common/SegmentedRadio'
+import { advancedTemplateService } from '@/services/advancedTemplateService'
 
 const { Option } = Select
+const { Text } = Typography
+
+const TEMPLATE_DOMAIN = 'llm_training'
+const TEMPLATE_TYPE = 'grpo'
 
 const normalizeTrainingMethodType = (value?: string) => {
   if (typeof value !== 'string')
@@ -16,306 +19,202 @@ const normalizeTrainingMethodType = (value?: string) => {
   const normalized = value.toLowerCase()
   if (normalized.includes('dpo'))
     return 'dpo'
-  if (normalized.includes('grpo'))
-    return 'rft-grpo'
   if (normalized.includes('sft'))
     return 'sft'
+  if (normalized.includes('grpo') || normalized.includes('rft'))
+    return 'grpo'
 
   return normalized
 }
 
-const grpoTemplateParamFields = [
-  'learning_rate',
-  'num_train_epochs',
-  'per_device_train_batch_size',
-  'gradient_accumulation_steps',
-  'warmup_ratio',
-  'lr_scheduler_type',
-  'bf16',
-  'gradient_checkpointing',
-  'max_grad_norm',
-  'rope_scaling',
-  'seed',
-  'weight_decay',
-  'cutoff_len',
-  'preprocessing_num_workers',
-  'eval_strategy',
-  'eval_steps',
-  'greater_is_better',
-  'load_best_model_at_end',
-  'metric_for_best_model',
-  'per_device_eval_batch_size',
-  'save_strategy',
-  'save_steps',
-  'save_total_limit',
-  'logging_steps',
-  'num_generations',
-  'max_prompt_length',
-  'max_completion_length',
-  'temperature',
-  'top_p',
-  'top_k',
-  'repetition_penalty',
-  'kl_coefficient',
-  'clip_range',
-  'advantage_estimator',
-  'reward_normalization',
-  'reward_scale',
-  'lora_rank',
-  'lora_alpha',
-  'lora_dropout',
-]
-
-const normalizeTemplateParams = (template: TrainingParameterTemplate) => {
-  const params = template.params || {}
-  const nextValues: Record<string, unknown> = {
-    fine_tuning_type: template.fine_tune_type,
-    grpo_template_id: template.id,
-    grpo_template_name: template.name,
-    grpo_template_content: template.template_content,
-    grpo_template_params_json: JSON.stringify(params),
-  }
-
-  grpoTemplateParamFields.forEach((field) => {
-    if (Object.prototype.hasOwnProperty.call(params, field)) {
-      nextValues[field] = params[field]
-    }
-  })
-
-  const loraTargetModules = params.lora_target_modules
-  if (Array.isArray(loraTargetModules)) {
-    nextValues.lora_target = loraTargetModules.join(',')
-  }
-  else if (typeof loraTargetModules === 'string') {
-    nextValues.lora_target = loraTargetModules
-  }
-
-  return nextValues
-}
-
-const CUSTOM_REWARD_TEMPLATE = `import os
-
-import torch
-
-
-def reward_func(queries, prompts, labels):
-    """
-    Calculate rewards based on model outputs and labels.
-
-    Args:
-        queries (list[str]): prompts + model responses.
-        prompts (list[str]): original model prompts.
-        labels (list[str]): reference answers or labels.
-
-    Returns:
-        torch.Tensor: float reward tensor, one value per sample.
-    """
-    outputs = []
-    max_prompt_len = int(os.environ.get("MAX_PROMPT_LEN", "1024"))
-
-    for query, prompt in zip(queries, prompts):
-        max_len = min(len(prompt), max_prompt_len)
-        outputs.append(query[max_len:].strip())
-
-    rewards = process(outputs, labels)
-    return torch.tensor(rewards, dtype=torch.float)
-`
-
-const downloadRewardTemplate = () => {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  const blob = new Blob([CUSTOM_REWARD_TEMPLATE], { type: 'text/x-python;charset=utf-8' })
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = 'grpo-custom-reward-template.py'
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  window.URL.revokeObjectURL(url)
-}
-
 interface ParamTabsProps {
+  form: FormInstance
   MonitoringConfigCategory: any
   EvalStrategyCategory: any
   LrSchedulerTypeCategory: any
   trainingType: any
   trainingMethod?: string
   SaveStrategyCategory: any
-  projectId?: string
 }
 
 const ParamTabs: React.FC<ParamTabsProps> = ({
+  form,
   MonitoringConfigCategory,
   EvalStrategyCategory,
   LrSchedulerTypeCategory,
   trainingType,
   trainingMethod,
   SaveStrategyCategory,
-  projectId,
 }) => {
-  const form = Form.useFormInstance()
   const effectiveTrainingMethod = normalizeTrainingMethodType(trainingMethod)
-  const [grpoTemplates, setGrpoTemplates] = useState<TrainingParameterTemplate[]>([])
-  const [grpoTemplatesLoading, setGrpoTemplatesLoading] = useState(false)
+  const selectedTemplateId = Form.useWatch('advanced_template_id', form)
+  const selectedTemplateMode = Form.useWatch('advanced_template_mode', form) || 'template'
 
-  const loadGrpoTemplates = async () => {
-    if (effectiveTrainingMethod !== 'rft-grpo') {
-      return
-    }
+  const templatesQuery = useQuery({
+    queryKey: ['advanced-templates', TEMPLATE_DOMAIN, TEMPLATE_TYPE, 'enabled'],
+    queryFn: () => advancedTemplateService.list({
+      domain: TEMPLATE_DOMAIN,
+      template_type: TEMPLATE_TYPE,
+      status: 'enabled',
+      page: 1,
+      size: 100,
+    }),
+    enabled: effectiveTrainingMethod === 'grpo',
+    staleTime: 0,
+    refetchOnMount: 'always',
+  })
 
-    setGrpoTemplatesLoading(true)
-    try {
-      const data = await trainingParameterTemplateService.list({
-        page: 1,
-        size: 100,
-        enabled: true,
-        training_method: 'rft-grpo',
-      })
-      setGrpoTemplates(data.items || [])
-    }
-    catch (error) {
-      console.error('Failed to load GRPO templates:', error)
-      message.error('训练参数模板加载失败')
-    }
-    finally {
-      setGrpoTemplatesLoading(false)
-    }
-  }
+  const templates = templatesQuery.data?.items ?? []
+  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId)
+  const selectedTemplateDynamicFormKey = React.useMemo(() => {
+    if (!selectedTemplate)
+      return undefined
 
-  useEffect(() => {
-    if (effectiveTrainingMethod === 'rft-grpo') {
-      loadGrpoTemplates()
-      return
-    }
-
-    setGrpoTemplates([])
-    form.setFieldsValue({
-      grpo_template_id: undefined,
-      grpo_template_name: undefined,
-      grpo_template_content: undefined,
-      grpo_template_params_json: undefined,
-      grpo_reward_function_upload_id: undefined,
-      grpo_reward_function_file_name: undefined,
-      grpo_reward_function_file_url: undefined,
+    return JSON.stringify({
+      id: selectedTemplate.id,
+      updated_at: selectedTemplate.updated_at,
+      fields: selectedTemplate.fields?.map((group) => ({
+        category: group.category,
+        fields: group.fields?.map((field) => ({
+          id: field.id,
+          field_name: field.field_name,
+          field_type: field.field_type,
+          enum_options: field.enum_options,
+          default_value: field.default_value,
+          required: field.required,
+          enabled: field.enabled,
+          sort_order: field.sort_order,
+          updated_at: field.updated_at,
+        })),
+      })),
     })
-  }, [effectiveTrainingMethod])
+  }, [selectedTemplate])
 
-  const handleGrpoTemplateChange = (templateId?: number) => {
-    if (!templateId) {
-      form.setFieldsValue({
-        grpo_template_id: undefined,
-        grpo_template_name: undefined,
-        grpo_template_content: undefined,
-        grpo_template_params_json: undefined,
-      })
+  React.useEffect(() => {
+    if (effectiveTrainingMethod !== 'grpo')
       return
-    }
 
-    const template = grpoTemplates.find(item => item.id === templateId)
-    if (!template) {
+    if (!form.getFieldValue('advanced_template_mode'))
+      form.setFieldValue('advanced_template_mode', 'template')
+  }, [effectiveTrainingMethod, form])
+
+  React.useEffect(() => {
+    if (effectiveTrainingMethod !== 'grpo' || templates.length === 0)
       return
-    }
 
-    form.setFieldsValue(normalizeTemplateParams(template))
-    message.success('已应用训练参数模板')
+    const currentTemplateId = form.getFieldValue('advanced_template_id')
+    const currentTemplate = templates.find((template) => template.id === currentTemplateId)
+    const nextTemplate = currentTemplate ?? templates[0]
+
+    form.setFieldsValue({
+      advanced_template_id: nextTemplate.id,
+      advanced_template_name: nextTemplate.name,
+      advanced_template_yaml: nextTemplate.yaml_content || '',
+    })
+  }, [effectiveTrainingMethod, form, templates])
+
+  const handleTemplateChange = (templateId: number) => {
+    const template = templates.find((item) => item.id === templateId)
+    form.setFieldsValue({
+      advanced_template_id: template?.id,
+      advanced_template_name: template?.name,
+      advanced_template_yaml: template?.yaml_content || '',
+      advanced_template_params: {},
+    })
   }
 
-  const rewardFunctionSection = effectiveTrainingMethod === 'rft-grpo' && (
-    <div className="param-config-container mb-4">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <SafetyCertificateOutlined style={{ color: 'var(--lab-color-primary)' }} />
-        <span className="param-name">奖励规则配置</span>
-      </div>
-      <Space direction="vertical" size={12} style={{ width: '100%' }}>
-        <Alert
-          type="info"
-          showIcon
-          icon={<ExclamationCircleOutlined />}
-          message="自定义奖励函数要求"
-          description={(
-            <ul style={{ margin: '4px 0 0', paddingLeft: 16, fontSize: 12, color: '#64748b', lineHeight: 1.8 }}>
-              <li>
-                函数名必须为
-                {' '}
-                <code>reward_func(queries, prompts, labels)</code>
-              </li>
-              <li>
-                返回类型必须为
-                {' '}
-                <code>torch.Tensor</code>
-                ，且每条样本对应一个奖励值
-              </li>
-              <li>当前只支持单个 Python .py 文件</li>
-            </ul>
-          )}
-        />
-        <Form.Item name="grpo_reward_function_upload_id" hidden>
-          <Input />
-        </Form.Item>
-        <Form.Item name="grpo_reward_function_file_name" hidden>
-          <Input />
-        </Form.Item>
-        <Form.Item name="grpo_reward_function_file_url" hidden>
-          <Input />
-        </Form.Item>
-        <ChunkFileUploader
-          accept=".py"
-          maxCount={1}
-          projectId={projectId}
-          usage="training-reward-function"
-          hintText="仅支持上传单个 .py 文件；上传完成后会随本次 RFT-GRPO 训练任务保存引用"
-          beforeUpload={(file) => {
-            if (!file.name.toLowerCase().endsWith('.py')) {
-              message.error('请上传 .py 格式的奖励函数文件')
-              return false
-            }
-            return true
-          }}
-          onSuccess={({ fileUrl, uploadId, file }) => {
-            form.setFieldsValue({
-              grpo_reward_function_upload_id: uploadId,
-              grpo_reward_function_file_name: file?.name,
-              grpo_reward_function_file_url: fileUrl,
-            })
-          }}
-          onFileChange={(file) => {
-            if (!file) {
-              form.setFieldsValue({
-                grpo_reward_function_upload_id: undefined,
-                grpo_reward_function_file_name: undefined,
-                grpo_reward_function_file_url: undefined,
-              })
-            }
-          }}
-        />
-        <div
-          style={{
-            padding: '12px 14px',
-            borderRadius: 8,
-            border: '1px solid var(--lab-color-border)',
-            background: 'var(--lab-color-bg-container)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 16,
-          }}
+  const renderGrpoTemplateConfig = () => (
+    <div className="training-template-config">
+      <Form.Item
+        name="advanced_template_mode"
+        label="训练参数配置"
+        rules={[{ required: true, message: '请选择训练参数配置方式' }]}
+      >
+        <SegmentedRadioGroup
+          value={selectedTemplateMode}
+          onChange={(event) => form.setFieldValue('advanced_template_mode', event.target.value)}
         >
-          <Space direction="vertical" size={2}>
-            <span style={{ fontWeight: 600 }}>参考模板</span>
-            <span style={{ fontSize: 12, color: 'var(--lab-color-text-secondary)' }}>
-              下载 Python 模板后补充奖励逻辑，再上传为本次任务的自定义奖励函数。
-            </span>
-          </Space>
-          <Button icon={<DownloadOutlined />} onClick={downloadRewardTemplate}>
-            下载模板
-          </Button>
-        </div>
-      </Space>
+          <SegmentedRadioButton value="template">模板管理</SegmentedRadioButton>
+          <SegmentedRadioButton value="custom">自定义参数</SegmentedRadioButton>
+        </SegmentedRadioGroup>
+      </Form.Item>
+
+      {selectedTemplateMode === 'template' && (
+        <>
+          <Form.Item
+            name="advanced_template_id"
+            label="模板管理"
+            rules={[{ required: true, message: '请选择参数模板' }]}
+          >
+            <Select
+              showSearch
+              placeholder="请选择参数模板"
+              loading={templatesQuery.isLoading}
+              optionFilterProp="label"
+              options={templates.map((template) => ({
+                label: template.name,
+                value: template.id,
+              }))}
+              onDropdownVisibleChange={(open) => {
+                if (open)
+                  void templatesQuery.refetch()
+              }}
+              onChange={handleTemplateChange}
+              notFoundContent={templatesQuery.isLoading ? <Spin size="small" /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无启用模板" />}
+            />
+          </Form.Item>
+          <Form.Item name="advanced_template_name" hidden>
+            <Input />
+          </Form.Item>
+
+          <Spin spinning={templatesQuery.isLoading}>
+            {selectedTemplate ? (
+              <>
+                {/* {selectedTemplate.description && (
+                  <Text type="secondary" className="mb-3 block">
+                    {selectedTemplate.description}
+                  </Text>
+                )} */}
+                <DynamicFieldForm
+                  key={selectedTemplateDynamicFormKey}
+                  form={form}
+                  namePrefix="advanced_template_params"
+                  fieldGroups={selectedTemplate.fields}
+                  resetKey={selectedTemplateDynamicFormKey}
+                  resetOnFieldGroupsChange
+                  className="training-template-dynamic-form"
+                  emptyDescription="当前模板暂无动态表单配置"
+                />
+              </>
+            ) : (
+              <div className="flex min-h-[220px] items-center justify-center rounded-md border border-dashed border-[#d9e1ec]">
+                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择参数模板" />
+              </div>
+            )}
+          </Spin>
+        </>
+      )}
+
+      {selectedTemplateMode === 'custom' && (
+        <Form.Item
+          name="advanced_template_yaml"
+          label="参数模板"
+          rules={[{ required: true, message: '请输入 YAML 参数' }]}
+        >
+          <Input.TextArea
+            rows={18}
+            spellCheck={false}
+            placeholder="请输入 YAML 参数"
+            className="training-template-yaml-editor"
+          />
+        </Form.Item>
+      )}
     </div>
   )
+
+  if (effectiveTrainingMethod === 'grpo') {
+    return renderGrpoTemplateConfig()
+  }
 
   const items = [
     {
@@ -886,113 +785,6 @@ const ParamTabs: React.FC<ParamTabsProps> = ({
         </div>
       ),
     }] : []),
-    ...(effectiveTrainingMethod === 'rft-grpo' ? [{
-      key: 'grpo',
-      label: 'GRPO配置',
-      forceRender: true,
-      children: (
-        <div className="param-config-container">
-          <div className="mb-4">
-            <Row gutter={[16, 12]} align="bottom">
-              <Col xs={24} md={16}>
-                <Form.Item
-                  name="grpo_template_id"
-                  label="训练参数模板"
-                  rules={[{ required: true, message: '请选择训练参数模板' }]}
-                >
-                  <Select
-                    allowClear
-                    loading={grpoTemplatesLoading}
-                    placeholder="选择已启用的 RFT-GRPO 训练参数模板"
-                    optionFilterProp="label"
-                    options={grpoTemplates.map(template => ({
-                      value: template.id,
-                      label: template.name,
-                    }))}
-                    onChange={handleGrpoTemplateChange}
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={8}>
-                <Space>
-                  <Button
-                    icon={<ReloadOutlined />}
-                    loading={grpoTemplatesLoading}
-                    onClick={loadGrpoTemplates}
-                  >
-                    刷新模板
-                  </Button>
-                </Space>
-              </Col>
-            </Row>
-            {!grpoTemplatesLoading && grpoTemplates.length === 0 && (
-              <Alert
-                type="warning"
-                showIcon
-                message="暂无可用训练参数模板"
-                description="请先在系统配置的训练参数模板中新增并启用 RFT-GRPO 模板。"
-              />
-            )}
-          </div>
-          <Row gutter={[16, 16]}>
-            {[
-              ['num_generations', '每题生成数量', '每个Prompt生成多个候选答案后参与奖励评分，数量越大训练开销越高。', { min: 1, max: 64, placeholder: '8' }],
-              ['max_completion_length', 'Completion最大长度', '限制模型生成答案的最大长度，避免单次采样占用过多上下文和显存。', { min: 1, max: 32768, placeholder: '1024' }],
-              ['temperature', '采样温度', '温度越高生成越发散，温度越低生成越稳定。', { min: 0, max: 2, step: 0.01, placeholder: '0.9' }],
-              ['top_p', 'Top-p', '仅在累计概率范围内采样候选Token，通常与温度一起控制探索范围。', { min: 0, max: 1, step: 0.01, placeholder: '0.95' }],
-              ['top_k', 'Top-k', '仅从概率最高的Top-k个Token中采样，0表示不限制。', { min: 0, max: 1000, placeholder: '50' }],
-              ['repetition_penalty', '重复惩罚', '用于减少重复生成，值越大惩罚越强。', { min: 0.1, max: 5, step: 0.01, placeholder: '1.05' }],
-              ['kl_coefficient', 'KL系数', 'KL系数越高，训练越倾向保持原模型分布。', { min: 0, max: 10, step: 0.01, placeholder: '0.04' }],
-              ['clip_range', '裁剪范围', '限制单次策略更新幅度，降低强化训练震荡风险。', { min: 0, max: 1, step: 0.01, placeholder: '0.2' }],
-              ['reward_scale', '奖励缩放系数', '用于统一调整奖励信号强度。', { min: 0, max: 100, step: 0.1, placeholder: '1' }],
-            ].map(([name, label, description, inputProps]) => (
-              <Col span={12} key={name as string}>
-                <div className="param-item">
-                  <div className="param-header">
-                    <span className="param-name">{label as string}</span>
-                  </div>
-                  <div className="param-content">
-                    <div className="param-control">
-                      <Form.Item name={name as string} className="m-0">
-                        <InputNumber {...(inputProps as Record<string, number | string>)} className="w-full" />
-                      </Form.Item>
-                    </div>
-                    <div className="param-description">{description as string}</div>
-                  </div>
-                </div>
-              </Col>
-            ))}
-            <Col span={12}>
-              <div className="param-item">
-                <div className="param-header">
-                  <span className="param-name">奖励归一化</span>
-                </div>
-                <div className="param-content">
-                  <div className="param-control">
-                    <Form.Item name="reward_normalization" className="m-0" valuePropName="checked">
-                      <Switch checkedChildren="开启" unCheckedChildren="关闭" />
-                    </Form.Item>
-                  </div>
-                  <div className="param-description">对奖励分数做归一化处理，减少不同样本间奖励尺度差异。</div>
-                </div>
-              </div>
-            </Col>
-          </Row>
-          <Form.Item name="advantage_estimator" hidden initialValue="grpo">
-            <Input />
-          </Form.Item>
-          <Form.Item name="grpo_template_name" hidden>
-            <Input />
-          </Form.Item>
-          <Form.Item name="grpo_template_content" hidden>
-            <Input />
-          </Form.Item>
-          <Form.Item name="grpo_template_params_json" hidden>
-            <Input />
-          </Form.Item>
-        </div>
-      ),
-    }] : []),
     {
       key: 'save',
       label: '保存配置',
@@ -1089,15 +881,12 @@ const ParamTabs: React.FC<ParamTabsProps> = ({
   ]
 
   return (
-    <>
-      {rewardFunctionSection}
-      <Tabs
-        defaultActiveKey="basic"
-        type="card"
-        size="small"
-        items={items}
-      />
-    </>
+    <Tabs
+      defaultActiveKey="basic"
+      type="card"
+      size="small"
+      items={items}
+    />
   )
 }
 

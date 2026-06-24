@@ -313,19 +313,17 @@ export async function downloadDatasetExample(
  * @param onError 错误处理回调函数
  * @param datasetFormat 数据集格式（可选）
  * @param datasetType 数据集类型（可选）
- * @param importDataUsage 导入数据用途（可选，用于区分 DPO/RFT-GRPO 样例）
  */
 export async function downloadInferenceResultSetSample(
   fileType: 'jsonl' | 'csv' | 'xlsx' | 'json' | 'zip',
-  downloadSampleService: (fileType: 'jsonl' | 'csv' | 'xlsx' | 'json' | 'zip', datasetFormat?: string, datasetType?: string, importDataUsage?: string) => Promise<{ data: any, headers: any }>,
+  downloadSampleService: (fileType: 'jsonl' | 'csv' | 'xlsx' | 'json' | 'zip', datasetFormat?: string, datasetType?: string) => Promise<{ data: any, headers: any }>,
   onError?: (error: any) => void,
   datasetFormat?: string,
   datasetType?: string,
-  importDataUsage?: string,
 ): Promise<void> {
   try {
     // 调用API获取数据
-    const response = await downloadSampleService(fileType, datasetFormat, datasetType, importDataUsage)
+    const response = await downloadSampleService(fileType, datasetFormat, datasetType)
     const data = response.data
 
     // 从响应头中提取文件名和内容类型

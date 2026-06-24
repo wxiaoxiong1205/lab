@@ -184,6 +184,8 @@ const MachineAnnotation: React.FC = () => {
           taskType,
           undefined,
           templateType,
+          undefined,
+          1,
         )
         const items = response.items ?? []
         targetOption.children = items.length
@@ -204,7 +206,7 @@ const MachineAnnotation: React.FC = () => {
         const dataset = targetOption.dataset
         if (!dataset) return
 
-        const versions = await machineDatamanagement.getDatasetVersion(projectIdNum, dataset.id)
+        const versions = await machineDatamanagement.getDatasetVersion(projectIdNum, dataset.id, undefined, 1)
         targetOption.children = versions.length ? versions.map((item) => ({ value: item.id, label: item.version || `版本 ${item.id}`, isLeaf: true, versionItem: item })) : [{ value: '__no_version__', label: '暂无可用版本', isLeaf: true, disabled: true }]
       }
       else {
@@ -665,7 +667,7 @@ const MachineAnnotation: React.FC = () => {
     }
 
     try {
-      const versions = await machineDatamanagement.getDatasetVersion(projectIdNum, dataset.id)
+      const versions = await machineDatamanagement.getDatasetVersion(projectIdNum, dataset.id, undefined, 1)
       setSelectedOnlineDataset(buildSelectedDataset(
         String(taskTypeOption.value),
         String(templateTypeOption.value),

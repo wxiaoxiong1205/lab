@@ -60,6 +60,13 @@ async def init_example_notebook() -> bool:
     return result["success"]
 
 
+async def init_advanced_templates() -> bool:
+    """仅初始化高级模板数据"""
+    manager = SeedManager()
+    result = await manager.run_single("advanced_templates")
+    return result["success"]
+
+
 async def main():
     """主函数 - 用于直接运行此脚本"""
     if len(sys.argv) > 1:
@@ -74,6 +81,8 @@ async def main():
             success = await init_common_config()
         elif arg == "example_notebook":
             success = await init_example_notebook()
+        elif arg == "advanced_templates":
+            success = await init_advanced_templates()
         elif arg == "all":
             success = await init_all()
         else:

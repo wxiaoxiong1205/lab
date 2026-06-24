@@ -1,4 +1,4 @@
-import { type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { Button, Dropdown, Layout, message } from 'antd'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -16,20 +16,66 @@ import { useAuthStore } from '../stores/authStore'
 import { useConfigStore } from '../stores/configStore'
 import { useProjectStore } from '../stores/projectStore'
 import ProfileModal from '../components/ProfileModal'
-import DesignDocFab from '../components/DesignDoc/DesignDocFab'
-import DesignDocPanel from '../components/DesignDoc/DesignDocPanel'
-import DesignDocReviewCenter from '../components/DesignDoc/DesignDocReviewCenter'
 import useI18n from '../hooks/useI18n'
 import { getProjectEnum } from '@/services/api'
 import logo from '@/assets/images/logo.png'
-import { GLOBAL_DESIGN_DOC_PATH, getGlobalDesignDoc, getPageDesignDoc, shouldUseGlobalDesignDocOnly } from '../docs/pageDocs'
+import DesignDocFab from '@/components/DesignDoc/DesignDocFab'
+import DesignDocPanel from '@/components/DesignDoc/DesignDocPanel'
+import DesignDocReviewCenter from '@/components/DesignDoc/DesignDocReviewCenter'
+import { getGlobalDesignDoc, getPageDesignDoc, GLOBAL_DESIGN_DOC_PATH, shouldUseGlobalDesignDocOnly } from '@/docs/pageDocs'
 import './MainLayout.css'
-import '../components/DesignDoc/DesignDoc.css'
+import './DesignDoc.css'
 
 const { Header } = Layout
-const DOC_PANEL_MIN_WIDTH = 420
-const DOC_PANEL_MAX_WIDTH = 760
-const DOC_PANEL_DEFAULT_WIDTH = 460
+
+function normalizeDesignDocPath(pathname: string): string {
+  const cleanPath = pathname.replace(/\/+$/, '') || '/'
+
+  if (cleanPath === '/' || cleanPath === '/home') {
+    return '/workspace'
+  }
+
+  if (cleanPath.startsWith('/project/admin')) {
+    return cleanPath.replace('/project', '') || '/admin'
+  }
+
+  const projectDetailMatch = cleanPath.match(/^\/project\/([^/]+)(\/.*)?$/)
+  if (projectDetailMatch) {
+    return projectDetailMatch[2] || '/workspace'
+  }
+
+  if (cleanPath === '/project') {
+    return '/workspace'
+  }
+
+  return cleanPath
+}
+
+function getCurrentProjectRouteBase(pathname: string): string {
+  const match = pathname.match(/^\/project\/([^/]+)/)
+
+  if (!match || match[1] === 'admin') {
+    return '/project'
+  }
+
+  return `/project/${match[1]}`
+}
+
+function toAppRoutePath(pagePath: string, currentPathname: string): string | null {
+  if (pagePath === GLOBAL_DESIGN_DOC_PATH) {
+    return null
+  }
+
+  if (pagePath === '/workspace') {
+    return '/home'
+  }
+
+  if (pagePath.startsWith('/admin')) {
+    return `/project${pagePath}`
+  }
+
+  return `${getCurrentProjectRouteBase(currentPathname)}${pagePath}`
+}
 
 /**
  * 主布局头部组件
@@ -51,53 +97,24 @@ const MainLayout = ({
   const { clearProject } = useProjectStore()
   const [profileModalVisible, setProfileModalVisible] = useState(false)
   const [apiAccessKeySlot, setApiAccessKeySlot] = useState<HTMLElement | null>(null)
+  const [designDocOpen, setDesignDocOpen] = useState(false)
+  const [designDocDisplayMode, setDesignDocDisplayMode] = useState<'side' | 'fullscreen'>('side')
+  const [activeRequirementVersion, setActiveRequirementVersion] = useState<string | null>('V1.14')
+  const [designDocScope, setDesignDocScope] = useState<'page' | 'global'>('page')
+  const [currentPageHasRequirements, setCurrentPageHasRequirements] = useState(false)
   const apiAccessKeySlotRef = useRef<HTMLElement | null>(null)
-  const [docPanelOpen, setDocPanelOpen] = useState(() => {
-    if (typeof window === 'undefined') {
-      return false
-    }
-    return window.localStorage.getItem('design-doc-panel-open') === 'true'
-  })
-  const [docPanelDisplayMode, setDocPanelDisplayMode] = useState<'side' | 'fullscreen'>('side')
-  const [docPanelWidth, setDocPanelWidth] = useState(() => {
-    if (typeof window === 'undefined') {
-      return DOC_PANEL_DEFAULT_WIDTH
-    }
-    const storedWidth = Number(window.localStorage.getItem('design-doc-panel-width'))
-    if (Number.isFinite(storedWidth) && storedWidth > 0) {
-      const maxWidth = Math.max(320, Math.min(DOC_PANEL_MAX_WIDTH, window.innerWidth - 64))
-      const minWidth = Math.min(DOC_PANEL_MIN_WIDTH, maxWidth)
-      return Math.min(Math.max(storedWidth, minWidth), maxWidth)
-    }
-    return DOC_PANEL_DEFAULT_WIDTH
-  })
-  const [docScope, setDocScope] = useState<'page' | 'global'>('page')
-  const [docTargetVersion, setDocTargetVersion] = useState<string | null>(null)
-  const [currentPageHasReviewRequirements, setCurrentPageHasReviewRequirements] = useState(false)
+  const designDocPath = normalizeDesignDocPath(location.pathname)
+  const effectiveDesignDocScope = shouldUseGlobalDesignDocOnly(designDocPath) ? 'global' : designDocScope
+  const activeDesignDoc = effectiveDesignDocScope === 'global'
+    ? getGlobalDesignDoc()
+    : getPageDesignDoc(designDocPath)
+  const designDocRightOffset = designDocOpen && designDocDisplayMode === 'side' ? 484 : 24
 
   // 判断是否是 qiankun 子应用
   const isQiankun = qiankunWindow.__POWERED_BY_QIANKUN__
   // 判断是否是无界微前端
   const isWujie = window.__POWERED_BY_WUJIE__
   const isBelleProvider = config?.PROVIDER_TYPE === providerType
-  const designDocPathname = useMemo(() => {
-    const projectMatch = location.pathname.match(/^\/project\/\d+(\/.*)?$/)
-    if (projectMatch) {
-      return projectMatch[1] || '/home'
-    }
-    if (location.pathname.startsWith('/project/')) {
-      return location.pathname.replace(/^\/project/, '') || '/home'
-    }
-    return location.pathname
-  }, [location.pathname])
-  const isDocsRoute = designDocPathname.startsWith('/docs') || location.pathname.startsWith('/docs')
-  const useGlobalDocOnly = shouldUseGlobalDesignDocOnly(designDocPathname)
-  const effectiveDocScope = useGlobalDocOnly ? 'global' : docScope
-  const currentDoc = getPageDesignDoc(designDocPathname)
-  const activeDoc = effectiveDocScope === 'global' ? getGlobalDesignDoc() : currentDoc
-  const shouldShowDesignDoc = !isDocsRoute
-  const docFabRightOffset = docPanelOpen && docPanelDisplayMode === 'side' ? docPanelWidth + 24 : 24
-  const reviewCenterRightOffset = docFabRightOffset + 132
 
   // 组件挂载时获取项目枚举值并存储到本地
   useEffect(() => {
@@ -178,6 +195,23 @@ const MainLayout = ({
   const handleDocCenterClick = () => {
     navigate('/docs')
   }
+
+  const handleOpenRequirementPage = useCallback((pagePath: string, versionName: string) => {
+    setActiveRequirementVersion(versionName)
+    setDesignDocOpen(true)
+
+    if (pagePath === GLOBAL_DESIGN_DOC_PATH) {
+      setDesignDocScope('global')
+      return
+    }
+
+    setDesignDocScope('page')
+    const targetRoute = toAppRoutePath(pagePath, location.pathname)
+
+    if (targetRoute && targetRoute !== location.pathname) {
+      navigate(targetRoute)
+    }
+  }, [location.pathname, navigate])
 
   const getDocCenterPageUrl = useCallback(() => {
     const baseUrl = isQiankun
@@ -398,188 +432,10 @@ const MainLayout = ({
     }
   }, [handleOpenApiAccessKey, isQiankun])
 
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
-    window.localStorage.setItem('design-doc-panel-open', String(docPanelOpen))
-  }, [docPanelOpen])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
-    window.localStorage.setItem('design-doc-panel-width', String(docPanelWidth))
-  }, [docPanelWidth])
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search)
-    const shouldOpenDoc = params.get('docOpen') === '1'
-    const versionName = params.get('docVersion')
-    const displayMode = params.get('docMode') === 'fullscreen' ? 'fullscreen' : 'side'
-
-    if (versionName) {
-      setDocTargetVersion(versionName)
-    }
-    setDocScope(params.get('docScope') === 'global' ? 'global' : 'page')
-
-    if (shouldOpenDoc && shouldShowDesignDoc) {
-      setDocPanelOpen(true)
-      setDocPanelDisplayMode(displayMode)
-    }
-  }, [location.search, shouldShowDesignDoc])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
-    const handleResize = () => {
-      setDocPanelWidth(previous => {
-        const maxWidth = Math.max(320, Math.min(DOC_PANEL_MAX_WIDTH, window.innerWidth - 64))
-        const minWidth = Math.min(DOC_PANEL_MIN_WIDTH, maxWidth)
-        return Math.min(Math.max(previous, minWidth), maxWidth)
-      })
-    }
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-  useEffect(() => {
-    if (isDocsRoute) {
-      setDocPanelOpen(false)
-      setDocPanelDisplayMode('side')
-    }
-  }, [isDocsRoute])
-
-  const handleStartDocPanelResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (docPanelDisplayMode === 'fullscreen' || typeof window === 'undefined') {
-      return
-    }
-    event.preventDefault()
-
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      const maxWidth = Math.max(320, Math.min(DOC_PANEL_MAX_WIDTH, window.innerWidth - 64))
-      const minWidth = Math.min(DOC_PANEL_MIN_WIDTH, maxWidth)
-      const nextWidth = window.innerWidth - moveEvent.clientX
-      setDocPanelWidth(Math.min(Math.max(nextWidth, minWidth), maxWidth))
-    }
-    const handlePointerUp = () => {
-      document.body.classList.remove('app-shell--resizing-doc-panel')
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-    }
-
-    document.body.classList.add('app-shell--resizing-doc-panel')
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp, { once: true })
-  }
-
-  const getDesignDocRoute = useCallback((pagePath: string) => {
-    const projectMatch = location.pathname.match(/^\/project\/\d+/)
-    if (projectMatch && !pagePath.startsWith('/project') && pagePath !== GLOBAL_DESIGN_DOC_PATH) {
-      return `${projectMatch[0]}${pagePath === '/home' ? '/home' : pagePath}`
-    }
-    return pagePath
-  }, [location.pathname])
-
-  const openReviewDocPage = (pagePath: string, versionName: string) => {
-    setDocTargetVersion(versionName)
-    setDocPanelOpen(true)
-    setDocPanelDisplayMode('side')
-
-    if (pagePath === GLOBAL_DESIGN_DOC_PATH) {
-      setDocScope('global')
-      navigate(`${location.pathname}?docOpen=1&docVersion=${encodeURIComponent(versionName)}&docScope=global`)
-      return
-    }
-
-    setDocScope('page')
-    navigate(`${getDesignDocRoute(pagePath)}?docOpen=1&docVersion=${encodeURIComponent(versionName)}`)
-  }
-
-  const handleDocScopeChange = (scope: 'page' | 'global') => {
-    setDocScope(scope)
-    if (!docPanelOpen) {
-      setDocPanelOpen(true)
-    }
-  }
-
-  const toggleDocPanel = () => {
-    setDocPanelOpen(previous => {
-      if (previous) {
-        setDocPanelDisplayMode('side')
-      }
-      return !previous
-    })
-  }
-
-  const closeDocPanel = () => {
-    setDocPanelOpen(false)
-    setDocPanelDisplayMode('side')
-  }
-
   // 子应用嵌入时：占满容器且参与 flex 收缩，避免内容溢出被裁剪
   const layoutStyle: CSSProperties = (isQiankun || isWujie)
     ? { height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }
     : { minHeight: '100vh' }
-
-  const contentWithDesignDoc = (
-    <div className={`design-doc-shell ${docPanelOpen ? 'design-doc-shell--open' : ''} ${docPanelDisplayMode === 'fullscreen' ? 'design-doc-shell--fullscreen' : ''}`}>
-      <div className="design-doc-shell__main">
-        {(isQiankun || isWujie) ? (
-          <div className="flex min-h-0 flex-1 flex-col">
-            {children}
-          </div>
-        ) : (
-          children
-        )}
-      </div>
-
-      {shouldShowDesignDoc && (
-        <>
-          <div
-            className={`design-doc-shell__rail ${docPanelOpen ? 'design-doc-shell__rail--open' : ''} ${docPanelDisplayMode === 'fullscreen' ? 'design-doc-shell__rail--fullscreen' : ''}`}
-            style={{ '--design-doc-panel-width': `${docPanelWidth}px` } as CSSProperties}
-          >
-            {docPanelOpen && docPanelDisplayMode === 'side' ? (
-              <div
-                className="design-doc-shell__resizer"
-                role="separator"
-                aria-label="拖拽调整需求文档宽度"
-                aria-orientation="vertical"
-                onPointerDown={handleStartDocPanelResize}
-              />
-            ) : null}
-            <DesignDocPanel
-              doc={activeDoc}
-              open={docPanelOpen}
-              displayMode={docPanelDisplayMode}
-              onDisplayModeChange={setDocPanelDisplayMode}
-              activeVersionName={docTargetVersion}
-              onActiveVersionChange={setDocTargetVersion}
-              docScope={effectiveDocScope}
-              onDocScopeChange={useGlobalDocOnly ? undefined : handleDocScopeChange}
-              onClose={closeDocPanel}
-            />
-          </div>
-          <DesignDocReviewCenter
-            selectedVersionName={docTargetVersion}
-            currentPagePath={useGlobalDocOnly ? GLOBAL_DESIGN_DOC_PATH : currentDoc.pagePath}
-            rightOffset={reviewCenterRightOffset}
-            onVersionChange={setDocTargetVersion}
-            onOpenPage={openReviewDocPage}
-            onCurrentPageHasRequirementsChange={setCurrentPageHasReviewRequirements}
-          />
-          <DesignDocFab
-            open={docPanelOpen}
-            onToggle={toggleDocPanel}
-            rightOffset={docFabRightOffset}
-            highlighted={currentPageHasReviewRequirements}
-          />
-        </>
-      )}
-    </div>
-  )
 
   return (
     <Layout style={layoutStyle}>
@@ -646,7 +502,39 @@ const MainLayout = ({
         </Header>
       )}
 
-      {contentWithDesignDoc}
+      {(isQiankun || isWujie) ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          {children}
+        </div>
+      ) : (
+        children
+      )}
+
+      <DesignDocPanel
+        doc={activeDesignDoc}
+        open={designDocOpen}
+        onClose={() => setDesignDocOpen(false)}
+        displayMode={designDocDisplayMode}
+        onDisplayModeChange={setDesignDocDisplayMode}
+        activeVersionName={activeRequirementVersion}
+        onActiveVersionChange={setActiveRequirementVersion}
+        docScope={effectiveDesignDocScope}
+        onDocScopeChange={setDesignDocScope}
+      />
+      <DesignDocFab
+        open={designDocOpen}
+        onToggle={() => setDesignDocOpen(open => !open)}
+        rightOffset={designDocRightOffset}
+        highlighted={currentPageHasRequirements}
+      />
+      <DesignDocReviewCenter
+        selectedVersionName={activeRequirementVersion}
+        currentPagePath={activeDesignDoc.pagePath}
+        rightOffset={24}
+        onVersionChange={setActiveRequirementVersion}
+        onOpenPage={handleOpenRequirementPage}
+        onCurrentPageHasRequirementsChange={setCurrentPageHasRequirements}
+      />
 
       {/* 个人信息弹窗 */}
       <ProfileModal

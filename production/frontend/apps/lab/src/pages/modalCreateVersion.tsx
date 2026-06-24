@@ -13,6 +13,16 @@ import CreateFormPageHeader from '@/components/common/CreateFormPageHeader'
 import { useConfigStore } from '@/stores/configStore'
 /** 根据任务/模型保存的 graphics_card_resource 反填表单（与 CreateModelPage 一致） */
 const pickBelleResourceValue = (...values: any[]) => values.find((value) => value !== undefined && value !== null && value !== '' && value !== 0)
+const getTrainingMethodType = (task: any) => String(
+  task?.training_method_type
+  ?? task?.train_method_type
+  ?? task?.training_type?.training_method_type
+  ?? task?.training_type?.train_method_type
+  ?? '',
+).toLowerCase()
+const isLoraTrainingTask = (task: any) => task?.training_type?.fine_tuning_type?.toLowerCase() === 'lora'
+const needsResourceConfig = (task: any) => isLoraTrainingTask(task) || getTrainingMethodType(task) === 'grpo'
+const needsResourceConfigFromTasks = (...tasks: any[]) => tasks.some(needsResourceConfig)
 
 function applyGraphicsResourceToForm(form: ReturnType<typeof Form.useForm>[0], resource: any, isBelleProvider = false) {
   if (!resource)
@@ -375,9 +385,9 @@ const CreateVersionPage: React.FC = () => {
     const scheduleAt = values.schedule_enabled && values.schedule_date && values.schedule_time
       ? `${dayjs(values.schedule_date).format('YYYY-MM-DD')}T${dayjs(values.schedule_time).format('HH:mm:ss')}`
       : undefined
-    const isLora = selectedModelDetailInfo?.training_type?.fine_tuning_type?.toLowerCase() === 'lora'
+    const taskNeedsResourceConfig = needsResourceConfigFromTasks(selectedModelDetailInfo, lastModelDetailInfo)
     const graphics_card_resource = buildGraphicsCardResourceForSubmit(values, !!selectedModelDetailInfo?.id, isBelleProvider, allocatableResources)
-    if (isLora && selectedModelDetailInfo?.id && (!graphics_card_resource || !graphics_card_resource.card_model || !graphics_card_resource.card_memory)) {
+    if (taskNeedsResourceConfig && selectedModelDetailInfo?.id && (!graphics_card_resource || !graphics_card_resource.card_model || !graphics_card_resource.card_memory)) {
       message.warning('请先选择显卡类型及型号，并确保资源配置完整后再提交')
       return
     }
@@ -415,9 +425,9 @@ const CreateVersionPage: React.FC = () => {
     const scheduleAt = values.schedule_enabled && values.schedule_date && values.schedule_time
       ? `${dayjs(values.schedule_date).format('YYYY-MM-DD')}T${dayjs(values.schedule_time).format('HH:mm:ss')}`
       : undefined
-    const isLora = selectedModelDetailInfo?.training_type?.fine_tuning_type?.toLowerCase() === 'lora'
+    const taskNeedsResourceConfig = needsResourceConfig(selectedModelDetailInfo)
     const graphics_card_resource = buildGraphicsCardResourceForSubmit(values, !!selectedModelDetailInfo?.id, isBelleProvider, allocatableResources)
-    if (isLora && selectedModelDetailInfo?.id && (!graphics_card_resource || !graphics_card_resource.card_model || !graphics_card_resource.card_memory)) {
+    if (taskNeedsResourceConfig && selectedModelDetailInfo?.id && (!graphics_card_resource || !graphics_card_resource.card_model || !graphics_card_resource.card_memory)) {
       message.warning('请先选择显卡类型及型号，并确保资源配置完整后再提交')
       return
     }
@@ -469,6 +479,12 @@ const CreateVersionPage: React.FC = () => {
       onCreateVersion(values)
     }
   }
+  const taskNeedsResourceConfig = isEditMode
+    ? needsResourceConfigFromTasks(selectedModelDetailInfo, lastModelDetailInfo)
+    : needsResourceConfig(selectedModelDetailInfo)
+  const taskSupportsSchedule = isEditMode
+    ? isLoraTrainingTask(selectedModelDetailInfo) || isLoraTrainingTask(lastModelDetailInfo)
+    : isLoraTrainingTask(selectedModelDetailInfo)
   return (
     <div className="create-form-page">
       <section className="create-form-card">
@@ -533,7 +549,7 @@ const CreateVersionPage: React.FC = () => {
                   />
                 </Form.Item>
 
-                {selectedModelDetailInfo?.training_type?.fine_tuning_type?.toLowerCase() === 'lora' && (
+                {taskNeedsResourceConfig && (
                   <Form.Item label="资源配置" className="mb-0">
                     <ResourceConfig
                       projectId={projectId ? Number(projectId) : undefined}
@@ -544,7 +560,7 @@ const CreateVersionPage: React.FC = () => {
                   </Form.Item>
                 )}
 
-                {selectedModelDetailInfo?.training_type?.fine_tuning_type?.toLowerCase() === 'lora' && (
+                {taskSupportsSchedule && (
                   <Form.Item label="定时配置">
                     <Space direction="vertical" className="w-full">
                       <Form.Item name="schedule_enabled" valuePropName="checked" className="mb-0" initialValue={false}>

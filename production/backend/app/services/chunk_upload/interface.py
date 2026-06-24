@@ -10,7 +10,8 @@ from app.schemas.chunk_upload import (
     ChunkUploadMergeRequest,
     ChunkUploadMergeResponse,
     ChunkUploadProgressRequest,
-    ChunkUploadProgressResponse
+    ChunkUploadProgressResponse,
+    ChunkUploadFileInfoResponse
 )
 from app.services.storage.interface import StorageService
 
@@ -56,6 +57,14 @@ class ChunkUploadService(ABC):
         request: ChunkUploadProgressRequest
     ) -> ChunkUploadProgressResponse:
         """查询上传进度"""
+        pass
+
+    @abstractmethod
+    async def get_file_info_by_upload_id(
+        self,
+        upload_id: str
+    ) -> ChunkUploadFileInfoResponse:
+        """通过upload_id查询上传文件信息"""
         pass
     
     @abstractmethod

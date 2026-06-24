@@ -1,12 +1,30 @@
-import React, { useEffect } from 'react'
-import { Alert, Card, Col, Descriptions, Row, Spin, Table, Tabs, Tag, Typography } from 'antd'
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import React from 'react'
+import { Alert, Card, Col, Row, Spin, Table, Tabs, Tag, Typography } from 'antd'
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { finetuneTaskService } from '@/services/FinetuneTrainingServices'
 import { formatNumberForChart, formatNumberForTable } from '@/utils/numberFormatter'
 
-const { Title, Text } = Typography
+const { Text } = Typography
+
+const MLFLOW_CARD_MAX_HEIGHT = 800
+
+const TRAINING_METRIC_ORDER = [
+  'loss',
+  'eval_loss',
+  'train_loss',
+  'perplexity',
+  'eval_perplexity',
+  'accuracy',
+  'eval_accuracy',
+  'learning_rate',
+  'grad_norm',
+  'epoch',
+  'eval_runtime',
+  'eval_samples_per_second',
+  'eval_steps_per_second',
+]
 
 interface MLflowInfoProps {
   runDetail: any
@@ -52,7 +70,7 @@ const MLflowInfo: React.FC<MLflowInfoProps> = ({ runDetail }) => {
     data: mlflowData,
     isLoading: loading,
     error: queryError,
-  } = useQuery({
+  } = useQuery<MLflowData>({
     queryKey: ['mlflowInfo', projectId, runDetail?.name, version],
     queryFn: async () => {
       if (!projectId || !runDetail?.name || !version) {
@@ -74,6 +92,39 @@ const MLflowInfo: React.FC<MLflowInfoProps> = ({ runDetail }) => {
 
   // 处理错误状态
   const error = queryError ? '获取MLflow信息失败，请稍后重试' : null
+
+  const normalizeMetricData = (data: MetricDataPoint[]) => {
+    if (!Array.isArray(data)) return []
+
+    return data
+      .map((point, index) => ({
+        value: Number(point.value),
+        timestamp: Number(point.timestamp),
+        step: Number.isFinite(Number(point.step)) ? Number(point.step) : index,
+      }))
+      .filter((point) => Number.isFinite(point.value) && Number.isFinite(point.step))
+      .sort((a, b) => a.step - b.step)
+  }
+
+  const getTrainingMetrics = () => {
+    if (!mlflowData?.metrics) return []
+
+    return Object.entries(mlflowData.metrics)
+      .map(([metricName, metricData]) => ({
+        metricName,
+        data: normalizeMetricData(metricData),
+      }))
+      .filter((metric) => metric.data.length > 0)
+      .sort((a, b) => {
+        const aIndex = TRAINING_METRIC_ORDER.indexOf(a.metricName)
+        const bIndex = TRAINING_METRIC_ORDER.indexOf(b.metricName)
+        const aOrder = aIndex === -1 ? TRAINING_METRIC_ORDER.length : aIndex
+        const bOrder = bIndex === -1 ? TRAINING_METRIC_ORDER.length : bIndex
+
+        if (aOrder !== bOrder) return aOrder - bOrder
+        return a.metricName.localeCompare(b.metricName)
+      })
+  }
 
   // 格式化时间戳
   const formatTimestamp = (timestamp: number) => {
@@ -268,16 +319,14 @@ const MLflowInfo: React.FC<MLflowInfoProps> = ({ runDetail }) => {
 
   // 渲染单个指标图表
   const renderMetricChart = (metricName: string, data: MetricDataPoint[]) => {
-    if (!data || data.length === 0) return null
-
-    // 按step排序
-    const sortedData = [...data].sort((a, b) => a.step - b.step)
+    const sortedData = normalizeMetricData(data)
+    if (sortedData.length === 0) return null
 
     return (
       <Card
         title={metricName}
         size="small"
-        className="mb-4"
+        className="h-full"
         styles={
           { header: { backgroundColor: '#fafafa', borderBottom: '1px solid #f0f0f0' },
             body: { padding: '12px', height: 'calc(100% - 57px)' },
@@ -327,50 +376,40 @@ const MLflowInfo: React.FC<MLflowInfoProps> = ({ runDetail }) => {
 
   // 渲染训练曲线
   const renderTrainingCurves = () => {
-    if (!mlflowData?.metrics || Object.keys(mlflowData.metrics).length === 0) {
+    const availableMetrics = getTrainingMetrics()
+
+    if (availableMetrics.length === 0) {
       return (
         <Card
           title="训练曲线"
           size="small"
-          className="h-full"
+          className="h-full overflow-hidden"
+          styles={
+            { header: { backgroundColor: '#fafafa', borderBottom: '1px solid #f0f0f0' },
+              body: { maxHeight: MLFLOW_CARD_MAX_HEIGHT - 57, overflow: 'auto', padding: '12px' },
+            }
+          }
         >
           <Alert message="暂无训练指标数据" type="info" showIcon />
         </Card>
       )
     }
 
-    // 定义需要显示的指标及其顺序
-    const orderedMetrics = [
-      'loss',
-      'eval_loss',
-      'epoch',
-      'learning_rate',
-      'grad_norm',
-      'eval_runtime',
-      'eval_samples_per_second',
-      'eval_steps_per_second',
-    ]
-
-    // 过滤出存在的指标并按指定顺序排序
-    const availableMetrics = orderedMetrics.filter((metricName) =>
-      mlflowData.metrics[metricName] && mlflowData.metrics[metricName].length > 0,
-    )
-
     return (
       <Card
         title="训练曲线"
         size="small"
-        className="h-full"
+        className="h-full overflow-hidden"
         styles={
           { header: { backgroundColor: '#fafafa', borderBottom: '1px solid #f0f0f0' },
-            body: { padding: '12px', height: '100%', overflow: 'auto' },
+            body: { maxHeight: MLFLOW_CARD_MAX_HEIGHT - 57, overflow: 'auto', padding: '12px' },
           }
         }
       >
         <Row gutter={[16, 16]}>
-          {availableMetrics.map((metricName) => (
+          {availableMetrics.map(({ metricName, data }) => (
             <Col key={metricName} xs={24} sm={12} lg={12}>
-              {renderMetricChart(metricName, mlflowData.metrics[metricName])}
+              {renderMetricChart(metricName, data)}
             </Col>
           ))}
         </Row>
@@ -456,15 +495,15 @@ const MLflowInfo: React.FC<MLflowInfoProps> = ({ runDetail }) => {
       <Card
         title="基本信息汇总"
         size="small"
-        className="max-h-[800px]"
+        className="h-full overflow-hidden"
         styles={
           { header: { backgroundColor: '#fafafa', borderBottom: '1px solid #f0f0f0' },
-            body: { padding: '12px', height: 'calc(100% - 57px)', overflow: 'auto' },
+            body: { maxHeight: MLFLOW_CARD_MAX_HEIGHT - 57, overflow: 'auto', padding: '12px' },
           }
         }
       >
         <Tabs
-          defaultActiveKey="info"
+          defaultActiveKey="metrics"
           size="small"
           items={metricsTab}
           tabPosition="top"
@@ -474,7 +513,7 @@ const MLflowInfo: React.FC<MLflowInfoProps> = ({ runDetail }) => {
   }
 
   return (
-    <Row gutter={16} className="h-full">
+    <Row gutter={16} className="h-full max-h-[800px]">
       <Col span={10}>
         {renderInfoTabs()}
       </Col>

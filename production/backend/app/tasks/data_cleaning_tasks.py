@@ -6,10 +6,9 @@ import os
 import json
 import uuid
 import yaml
-import shutil
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, List, Optional, Set
 from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
@@ -26,6 +25,7 @@ from app.database.database_depends import Database, run_async_in_celery
 from app.utils.storage_enum import StoragePath
 from app.utils.k8s_launcher import K8sLauncher
 from app.core.config import settings
+from app.utils.json_path import iter_json_path_values
 
 
 def get_storage_service() -> DefaultStorageService:
@@ -33,6 +33,64 @@ def get_storage_service() -> DefaultStorageService:
     db = Database()
     storage_mapper = StorageMapper(db=db)
     return DefaultStorageService(mapper=storage_mapper)
+
+
+def _looks_like_grpo_record(data: Dict[str, Any]) -> bool:
+    """GRPO samples keep prompt/reward metadata in nested JSON fields."""
+    return isinstance(data.get("prompt"), list) and isinstance(data.get("reward_model"), dict)
+
+
+def _selected_json_paths(data: Dict[str, Any], selected_fields: Set[str]) -> List[str]:
+    if selected_fields:
+        paths: List[str] = []
+        for field in sorted(selected_fields):
+            if field == "prompt" and isinstance(data.get("prompt"), list):
+                paths.append("prompt.content")
+            elif field == "reward_model" and isinstance(data.get("reward_model"), dict):
+                paths.append("reward_model.ground_truth")
+            else:
+                paths.append(field)
+        return paths
+
+    if _looks_like_grpo_record(data):
+        return ["prompt.content", "reward_model.ground_truth"]
+    return []
+
+
+def _build_json_field_rows(
+    data: Dict[str, Any],
+    group_id: str,
+    selected_fields: Set[str],
+) -> List[Dict[str, Any]]:
+    """Flatten selected nested JSON scalar fields into text rows for data-juicer."""
+    paths = _selected_json_paths(data, selected_fields)
+    if not paths:
+        return []
+
+    has_nested_selection = any("." in path for path in paths)
+    if not has_nested_selection and not _looks_like_grpo_record(data):
+        return []
+
+    rows: List[Dict[str, Any]] = []
+    original_item = json.dumps(data, ensure_ascii=False)
+    for path in paths:
+        for concrete_path, value in iter_json_path_values(data, path):
+            if isinstance(value, (dict, list)) or value is None:
+                continue
+            rows.append({
+                "text": str(value),
+                "_group": group_id,
+                "_segment": "field",
+                "_field_path": concrete_path,
+                "_turn_idx": len(rows),
+                "_cleaning_id": f"{group_id}_{concrete_path.replace('.', '_')}",
+                "_original_item": original_item,
+            })
+
+    total_selected = len(rows)
+    for row in rows:
+        row["_total_selected"] = total_selected
+    return rows
 
 
 @celery_app.task(
@@ -80,6 +138,16 @@ async def update_data_cleaning_task_status(task: TaskBase, *, task_id: int, stat
                 task._log_warning(f"未找到数据清洗任务: {task_id}")
     except Exception as e:
         task._log_error(f"更新数据清洗任务状态失败: {str(e)}", error=e)
+
+
+def _extract_jsonl_object(line: str) -> Optional[dict[str, Any]]:
+    """读取项目数据集兼容的 JSONL 行：支持对象或单元素对象数组。"""
+    parsed = json.loads(line)
+    if isinstance(parsed, dict):
+        return parsed
+    if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict):
+        return parsed[0]
+    return None
 
 
 async def _execute_data_cleaning_task(
@@ -199,7 +267,10 @@ async def _execute_data_cleaning_task(
                 task._log_info("开始转换文件格式：从数组格式 [{}] 转换为标准 JSONL 格式 {}，并处理多轮会话数据")
                 converted_lines = 0
                 skipped_lines = 0
+                valid_source_lines = 0
+                unmatched_selected_field_lines = 0
                 flattened_conversations = 0
+                flattened_json_fields = 0
 
                 # 用户选择的字段（用于按角色提取）
                 _selected_fields = set(cleaning_task.selected_fields) if cleaning_task.selected_fields else set()
@@ -225,6 +296,14 @@ async def _execute_data_cleaning_task(
                     - conversations: [{"from": "...", "value": "..."}]  （Qwen 格式）
                     - dialogue: [{"speaker": "...", "text": "..."}]
                     """
+
+                    def _has_nested_field(item: dict, field_path: str) -> bool:
+                        current = item
+                        for part in field_path.split("."):
+                            if not isinstance(current, dict) or part not in current:
+                                return False
+                            current = current[part]
+                        return True
 
                     def _build_rows(turns: list, role_key: str, content_key: str) -> list:
                         """通用拆行逻辑"""
@@ -314,7 +393,14 @@ async def _execute_data_cleaning_task(
                     if "dialogue" in data and isinstance(data["dialogue"], list):
                         return _build_rows(data["dialogue"], role_key="speaker", content_key="text")
 
+                    # GRPO/复杂 JSON 字段：把选中的点路径字段拆成 text 行，清洗后按 _field_path 回写。
+                    field_rows = _build_json_field_rows(data, group_id, _selected_fields)
+                    if field_rows:
+                        return field_rows
+
                     # 普通平铺格式，直接返回原数据行
+                    if _selected_fields and not any(_has_nested_field(data, field_name) for field_name in _selected_fields):
+                        return []
                     item = data.copy()
                     if "_cleaning_id" not in item:
                         item["_cleaning_id"] = group_id
@@ -328,23 +414,14 @@ async def _execute_data_cleaning_task(
                                 continue
 
                             try:
-                                parsed = json.loads(line)
+                                item = _extract_jsonl_object(line)
                                 group_id = f"row_{line_num}"
 
-                                # 数组格式 [{}]：取第一个对象
-                                if isinstance(parsed, list):
-                                    if parsed and isinstance(parsed[0], dict):
-                                        item = parsed[0]
-                                    else:
-                                        task._log_warning(f"第 {line_num} 行：数组为空或元素不是对象，跳过")
-                                        skipped_lines += 1
-                                        continue
-                                elif isinstance(parsed, dict):
-                                    item = parsed
-                                else:
-                                    task._log_warning(f"第 {line_num} 行：不支持的数据类型 {type(parsed).__name__}，跳过")
+                                if item is None:
+                                    task._log_warning(f"第 {line_num} 行：不是对象或单元素对象数组，跳过")
                                     skipped_lines += 1
                                     continue
+                                valid_source_lines += 1
 
                                 rows = _extract_rows(item, group_id)
                                 is_conversation = (
@@ -352,8 +429,10 @@ async def _execute_data_cleaning_task(
                                 )
                                 if is_conversation and rows and "_group" in rows[0]:
                                     flattened_conversations += 1
+                                elif rows and rows[0].get("_segment") == "field":
+                                    flattened_json_fields += 1
                                 if not rows:
-                                    skipped_lines += 1
+                                    unmatched_selected_field_lines += 1
                                     continue
 
                                 for row in rows:
@@ -367,12 +446,22 @@ async def _execute_data_cleaning_task(
                                 task._log_warning(f"第 {line_num} 行：处理失败: {e}，跳过")
                                 skipped_lines += 1
 
-                task._log_info(f"文件格式转换完成：转换 {converted_lines} 行，跳过 {skipped_lines} 行")
+                task._log_info(
+                    f"文件格式转换完成：有效源数据 {valid_source_lines} 行，转换 {converted_lines} 行，"
+                    f"未命中选中字段 {unmatched_selected_field_lines} 行，跳过无效行 {skipped_lines} 行"
+                )
                 if flattened_conversations > 0:
                     task._log_info(f"已按消息拆行的会话数: {flattened_conversations} 条（清洗完成后将按 _group 重组为 messages 格式）")
-                
+                if flattened_json_fields > 0:
+                    task._log_info(f"已按字段路径拆行的复杂 JSON 样本数: {flattened_json_fields} 条（清洗完成后将按 _field_path 回写原结构）")
+
                 if converted_lines == 0:
-                    raise ValueError(f"文件格式转换失败：没有成功转换任何行，请检查文件格式")
+                    if valid_source_lines == 0:
+                        raise ValueError(f"文件格式转换失败：没有成功转换任何行，请检查文件格式")
+                    raise ValueError(
+                        f"选中清洗字段未命中任何有效数据行，请检查字段元数据或重新执行 metadata_fields 修复: "
+                        f"selected_fields={cleaning_task.selected_fields}"
+                    )
                 
                 # 验证目标文件是否存在且不为空
                 if not jfs.exists(input_mount_file):
@@ -565,7 +654,7 @@ def _generate_data_juicer_config(
     _internal_fields = {
         "_cleaning_id", "_group", "_role", "_turn_idx", "_other_turns",
         "_segment", "_messages_original", "_chosen_original", "_rejected_original",
-        "_total_selected",
+        "_total_selected", "_field_path", "_original_item",
     }
     
     # 获取选择的字段，如果未选择则使用默认字段
@@ -579,10 +668,10 @@ def _generate_data_juicer_config(
     is_flattened_conversation = (
         bool(actual_dataset_fields)
         and "text" in actual_dataset_fields
-        and any(field in actual_dataset_fields for field in ("_group", "_segment", "_messages_original"))
+        and any(field in actual_dataset_fields for field in ("_group", "_segment", "_messages_original", "_field_path"))
     )
 
-    # role-based 会话会被拆成 text 行，所有算子都只能处理这个字符串字段。
+    # role-based 会话和 GRPO/复杂 JSON 字段会被拆成 text 行，所有算子都只能处理这个字符串字段。
     if is_flattened_conversation:
         text_keys = ["text"]
 

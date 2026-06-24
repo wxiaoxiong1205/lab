@@ -51,6 +51,7 @@ PUBLIC_PATHS = [
     r"^/api/v1/training-datasets/metadata-fields/repair$",
     r"^/api/v1/machine-learning-datasets/metadata-fields/repair$",
     r"^/api/v1/config$",
+    r"^/api/v1/rewards/score$",
 ]
 
 # HTTP Bearer认证方案

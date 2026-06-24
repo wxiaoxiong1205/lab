@@ -2,6 +2,33 @@
   vertical-align: top !important;
 }
 
+.dataset-detail-preview-table .ant-table-tbody > tr > td.dataset-detail-action-cell {
+  vertical-align: middle !important;
+  text-align: center;
+}
+
+.dataset-detail-preview-table .dataset-detail-action-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 32px;
+}
+
+.dataset-detail-preview-table .dataset-detail-action-delete.ant-btn.ant-btn-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0;
+  line-height: 22px;
+  color: black;
+}
+
+.dataset-detail-preview-table .dataset-detail-action-delete.ant-btn.ant-btn-link:hover {
+  color: #0d4f9f;
+}
+
 .dataset-detail-preview-table .ant-table-thead > tr > th {
   text-align: center !important;
   vertical-align: middle !important;

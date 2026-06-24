@@ -31,6 +31,7 @@ class ImageType(IntEnum):
     CUSTOM_ML_NOTEBOOK = ("机器学习-notebook自定义镜像", 10, False)
     LLM_NOTEBOOK = ("大模型-在线notebook", 11, True)
     ML_NOTEBOOK = ("机器学习-在线notebook", 12, True)
+    TEXT_GENERATION_GRPO = ("text_generation_grpo", 13, False)
 
 
 class CardType(str, Enum):

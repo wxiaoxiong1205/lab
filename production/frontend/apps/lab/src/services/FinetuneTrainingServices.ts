@@ -167,4 +167,18 @@ export const finetuneTaskService = {
   stopTask: async (projectId: number, taskId: number): Promise<void> => {
     await apiClient.post(`/training_tasks/project/${projectId}/task/${taskId}/stop`)
   },
+
+  /**
+   * 下载 GRPO 奖励函数样例
+   * GET /training_tasks/grpo/reward-function/sample
+   */
+  downloadGrpoRewardFunctionSample: async () => {
+    const response = await apiClient.get('/training_tasks/grpo/reward-function/sample', {
+      responseType: 'blob',
+    })
+    return {
+      data: response.data,
+      headers: response.headers,
+    }
+  },
 }

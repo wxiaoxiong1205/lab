@@ -54,6 +54,7 @@ class K8sLauncher:
         self.v1 = get_k8s_api(config_dict, client.CoreV1Api)
         self.apps_v1 = get_k8s_api(config_dict, client.AppsV1Api)
         self.batch_v1 = get_k8s_api(config_dict, client.BatchV1Api)
+        self.custom_objects = get_k8s_api(config_dict, client.CustomObjectsApi)
 
     async def create_app(self,
                          namespace: str,
@@ -1119,6 +1120,86 @@ class K8sLauncher:
         except Exception as e:
             logger.error(f"删除 Job {job_name} 时发生错误: {e}", exc_info=True)
             return False
+
+    async def create_ray_job(self, namespace: str, ray_job_name: str, body: Dict[str, Any]) -> Dict[str, Any]:
+        """创建 KubeRay RayJob CRD。"""
+        await self._delete_ray_job_if_exists(namespace=namespace, ray_job_name=ray_job_name)
+        result = await k8s_call(
+            self.custom_objects.create_namespaced_custom_object,
+            group="ray.io",
+            version="v1",
+            namespace=namespace,
+            plural="rayjobs",
+            body=body
+        )
+        logger.info(f"RayJob {ray_job_name} 创建成功")
+        return result
+
+    async def delete_ray_job(self, namespace: str, ray_job_name: str) -> bool:
+        """删除 KubeRay RayJob CRD。"""
+        try:
+            await k8s_call(
+                self.custom_objects.delete_namespaced_custom_object,
+                group="ray.io",
+                version="v1",
+                namespace=namespace,
+                plural="rayjobs",
+                name=ray_job_name,
+                propagation_policy="Background"
+            )
+            logger.info(f"RayJob {ray_job_name} 删除成功")
+            return True
+        except client.exceptions.ApiException as e:
+            if e.status == 404:
+                logger.warning(f"RayJob {ray_job_name} 不存在，可能已被删除")
+                return True
+            logger.error(f"删除 RayJob {ray_job_name} 失败: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"删除 RayJob {ray_job_name} 时发生错误: {e}", exc_info=True)
+            return False
+
+    async def _delete_ray_job_if_exists(self, namespace: str, ray_job_name: str) -> None:
+        try:
+            await k8s_call(
+                self.custom_objects.get_namespaced_custom_object,
+                group="ray.io",
+                version="v1",
+                namespace=namespace,
+                plural="rayjobs",
+                name=ray_job_name
+            )
+        except client.exceptions.ApiException as e:
+            if e.status == 404:
+                return
+            raise
+
+        await k8s_call(
+            self.custom_objects.delete_namespaced_custom_object,
+            group="ray.io",
+            version="v1",
+            namespace=namespace,
+            plural="rayjobs",
+            name=ray_job_name,
+            propagation_policy="Background"
+        )
+        logger.info(f"命名空间 {namespace} 下已存在 RayJob {ray_job_name}，已先删除")
+        for _ in range(30):
+            try:
+                await k8s_call(
+                    self.custom_objects.get_namespaced_custom_object,
+                    group="ray.io",
+                    version="v1",
+                    namespace=namespace,
+                    plural="rayjobs",
+                    name=ray_job_name
+                )
+            except client.exceptions.ApiException as e:
+                if e.status == 404:
+                    return
+                raise
+            await asyncio.sleep(1)
+        logger.warning(f"等待 RayJob {ray_job_name} 删除超时，仍尝试继续创建")
 
     async def _delete_job_if_exists(self, namespace: str, job_name: str) -> None:
         """

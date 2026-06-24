@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeftOutlined, DeleteOutlined, DownOutlined, DownloadOutlined } from '@ant-design/icons'
-import { Button, Card, Descriptions, Dropdown, Popconfirm, Spin, Typography, message } from 'antd'
+import { Button, Card, Descriptions, Dropdown, Popconfirm, Spin, Tag, Typography, message } from 'antd'
 import type { MenuProps } from 'antd'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useQuery } from '@tanstack/react-query'
@@ -9,10 +9,9 @@ import TextTabDetails from './TextTabDetails'
 import ImageTabDetails from './ImageTabDetails'
 import AddVersionModal from './AddVersionModal'
 import type { AddVersionFormValues } from './AddVersionModal'
-import DatasetVersionMergeModal from '@/components/dataset/DatasetVersionMergeModal'
 import { machineDatamanagement } from '@/services/machineDatamanagement'
 import { downloadBlobFile, extractFilenameFromHeaders, getContentType, processFilenameExtension } from '@/utils/download'
-import type { CreateDatasetRequest, DatasetAsyncExportResponse, DatasetDetailsResponse, ItemList } from '@/services/machineLearnModel'
+import type { CreateDatasetRequest, DatasetAsyncExportResponse, DatasetDetailsResponse, ItemDetail, ItemList } from '@/services/machineLearnModel'
 import { DATASET_CATEGORY_MAP, TASK_TYPE_MAP, TEMPLATE_TYPE_MAP } from '@/services/machineLearnModel'
 
 const PAGE_SIZE = 10
@@ -29,8 +28,9 @@ const MachineDatasetDetails: React.FC = () => {
   const [selectedVersionId, setSelectedVersionId] = useState<number>(datasetIdNum)
   const [page, setPage] = useState<number>(1)
   const [addVersionModalOpen, setAddVersionModalOpen] = useState(false)
-  const [mergeVersionModalOpen, setMergeVersionModalOpen] = useState(false)
   const [editingBasicField, setEditingBasicField] = useState<'name' | 'description' | null>(null)
+  const [publishingVersionId, setPublishingVersionId] = useState<number | null>(null)
+  const [deletingRowNumber, setDeletingRowNumber] = useState<number | null>(null)
   // 拉取版本列表时使用的 id（删除当前版本后改为剩余版本 id，避免用已删除 id 请求报错）
   const [versionListKeyId, setVersionListKeyId] = useState<number>(datasetIdNum)
 
@@ -103,6 +103,43 @@ const MachineDatasetDetails: React.FC = () => {
   })
   const createdAtLabel = localDateStr || '-'
   const descriptionLabel = datasetDetail?.description || '-'
+  const publishDisplay = datasetDetail?.publish_display || '-'
+  const isSelectedVersionUnpublished = Boolean(publishDisplay && publishDisplay !== '已发布')
+
+  const isVersionUnpublished = (versionItem: Pick<ItemList, 'publish_display' | 'status_display'> | DatasetDetailsResponse | undefined) => {
+    if (!versionItem) return false
+    const display = versionItem.status_display || versionItem.publish_display
+    if (display !== undefined && display !== null && display !== '') {
+      return display !== '已发布'
+    }
+    return false
+  }
+
+  const renderPublishStatusBadge = (versionItem: Pick<ItemList, 'publish_display' | 'status_display'> | DatasetDetailsResponse | undefined) => {
+    const display = versionItem?.status_display
+    if (!display) return null
+
+    const colorClass = isVersionUnpublished(versionItem)
+      ? 'bg-orange-50 text-orange-500'
+      : 'bg-green-50 text-green-600'
+
+    return (
+      <span className={`absolute right-3 top-2 rounded-full px-3 py-[2px] text-xs leading-5 font-medium ${colorClass}`}>
+        {display}
+      </span>
+    )
+  }
+
+  const getPublishStatusTag = () => {
+    const display = publishDisplay || '-'
+    return <Tag color={isSelectedVersionUnpublished ? 'orange' : 'green'}>{display}</Tag>
+  }
+
+  const canDeletePreviewRows = () => {
+    const processingStatus = datasetDetail?.processing_status_display
+    return isVersionUnpublished(datasetDetail)
+      && (!processingStatus || processingStatus === '处理完成')
+  }
 
   const handleBack = () => {
     if (!projectId) return
@@ -161,6 +198,64 @@ const MachineDatasetDetails: React.FC = () => {
     }
     finally {
       setDownloadLoading(false)
+    }
+  }
+
+  const handlePublishVersion = async () => {
+    if (!projectIdNum || !selectedVersionId || Number.isNaN(projectIdNum)) return
+
+    setPublishingVersionId(selectedVersionId)
+    try {
+      await machineDatamanagement.publish(projectIdNum, selectedVersionId, 1)
+      message.success('发布成功')
+      queryClient.invalidateQueries({ queryKey: ['machine-dataset-list'] })
+      queryClient.invalidateQueries({ queryKey: ['machine-dataset-versions', projectIdNum, versionListKeyId] })
+      await refetchDatasetDetail()
+    }
+    catch (e: unknown) {
+      message.error((e as Error)?.message || '发布失败')
+    }
+    finally {
+      setPublishingVersionId(null)
+    }
+  }
+
+  const getPreviewRowNumber = (record: ItemDetail) => {
+    const rowNumber = record?.row_number ?? (record as any)?.rowNumber
+    const normalized = Number(rowNumber)
+    return Number.isFinite(normalized) ? normalized : undefined
+  }
+
+  const handleDeletePreviewRow = async (record: ItemDetail) => {
+    if (!projectIdNum || !selectedVersionId || Number.isNaN(projectIdNum)) return
+
+    const rowNumber = getPreviewRowNumber(record)
+    if (!rowNumber) {
+      message.error('无法获取行号，删除失败')
+      return
+    }
+
+    setDeletingRowNumber(rowNumber)
+    try {
+      await machineDatamanagement.deleteRow(projectIdNum, selectedVersionId, [rowNumber])
+      message.success('删除成功')
+
+      const nextPage = items.length <= 1 && page > 1 ? page - 1 : page
+      if (nextPage !== page) {
+        setPage(nextPage)
+      }
+      else {
+        await refetchDatasetDetail()
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['machine-dataset-list'] })
+      queryClient.invalidateQueries({ queryKey: ['machine-dataset-versions', projectIdNum, versionListKeyId] })
+    }
+    catch (e: unknown) {
+      message.error((e as Error)?.message || '删除失败')
+    }
+    finally {
+      setDeletingRowNumber(null)
     }
   }
 
@@ -262,28 +357,6 @@ const MachineDatasetDetails: React.FC = () => {
     },
   })
 
-  const mergeVersionMutation = useMutation({
-    mutationFn: (params: { sourceVersionIds: number[], description?: string }) =>
-      machineDatamanagement.mergeMachineDatasetVersions(projectIdNum, selectedVersionId, {
-        version: nextVersionLabel,
-        source_version_ids: params.sourceVersionIds,
-        description: params.description,
-      }),
-    onSuccess: (createdVersion: ItemList) => {
-      message.success('版本合并成功')
-      setMergeVersionModalOpen(false)
-      setSelectedVersionId(createdVersion.id)
-      setVersionListKeyId(createdVersion.id)
-      setPage(1)
-      queryClient.invalidateQueries({ queryKey: ['machine-dataset-list'] })
-      queryClient.invalidateQueries({ queryKey: ['machine-dataset-versions', projectIdNum, versionListKeyId] })
-      queryClient.invalidateQueries({ queryKey: ['machine-dataset-details', projectIdNum] })
-    },
-    onError: (e: Error) => {
-      message.error(e?.message || '版本合并失败')
-    },
-  })
-
   const handleAddVersionConfirm = async (values: AddVersionFormValues) => {
     const datasetName = datasetDetail?.name
     if (!datasetName) {
@@ -334,6 +407,16 @@ const MachineDatasetDetails: React.FC = () => {
           返回
         </Button>
         <div className="flex items-center gap-2">
+          {isSelectedVersionUnpublished && (
+            <Button
+              type="primary"
+              loading={publishingVersionId === selectedVersionId}
+              disabled={detailsLoading || deleteVersionMutation.isPending}
+              onClick={handlePublishVersion}
+            >
+              发布
+            </Button>
+          )}
           <Dropdown
             menu={{ items: downloadMenuItems }}
             disabled={detailsLoading || !downloadMenuItems?.length}
@@ -373,14 +456,6 @@ const MachineDatasetDetails: React.FC = () => {
             >
               新增版本
             </Button>
-            <Button
-              className="mt-2"
-              block
-              disabled={!versions || versions.length < 2}
-              onClick={() => setMergeVersionModalOpen(true)}
-            >
-              合并版本
-            </Button>
           </div>
           {/* <Card loading={versionsLoading}> */}
           <div className="space-y-2">
@@ -389,12 +464,13 @@ const MachineDatasetDetails: React.FC = () => {
               return (
                 <div
                   key={v.id}
-                  className={`px-3 py-2 rounded cursor-pointer border-l-4 transition-colors ${isActive
+                  className={`relative px-3 py-2 pr-[76px] rounded cursor-pointer border-l-4 transition-colors ${isActive
                     ? 'bg-blue-50 border-blue-500 text-blue-600 font-medium'
                     : 'bg-white border-transparent text-gray-700 hover:bg-gray-50'
                   }`}
                   onClick={() => handleVersionClick(v.id)}
                 >
+                  {renderPublishStatusBadge(v)}
                   {v.version || '-'}
                 </div>
               )
@@ -444,6 +520,9 @@ const MachineDatasetDetails: React.FC = () => {
                 <Descriptions.Item label="数据标注状态">
                   {datasetDetail?.is_annotated ? '有标注信息' : '无标注信息'}
                 </Descriptions.Item>
+                <Descriptions.Item label="发布状态">
+                  {getPublishStatusTag()}
+                </Descriptions.Item>
                 {datasetDetail?.is_annotated && (
                   <Descriptions.Item label="标签">
                     {labelSchemaKeys.length ? labelSchemaKeys.join(', ') : '-'}
@@ -492,6 +571,9 @@ const MachineDatasetDetails: React.FC = () => {
                 onPageChange={(p) => setPage(p)}
                 storagePath={datasetDetail?.storage_path}
                 datasetPath={datasetDetail?.dataset_path}
+                canDeleteRows={canDeletePreviewRows()}
+                deletingRowNumber={deletingRowNumber}
+                onDeleteRow={handleDeletePreviewRow}
               />
             ) : (
               <TextTabDetails
@@ -503,6 +585,9 @@ const MachineDatasetDetails: React.FC = () => {
                 pageSize={PAGE_SIZE}
                 total={total}
                 onPageChange={(p) => setPage(p)}
+                canDeleteRows={canDeletePreviewRows()}
+                deletingRowNumber={deletingRowNumber}
+                onDeleteRow={handleDeletePreviewRow}
               />
             )}
           </Card>
@@ -522,24 +607,6 @@ const MachineDatasetDetails: React.FC = () => {
         historyVersions={versions ?? []}
         onCancel={() => setAddVersionModalOpen(false)}
         onConfirm={handleAddVersionConfirm}
-      />
-      <DatasetVersionMergeModal
-        open={mergeVersionModalOpen}
-        loading={mergeVersionMutation.isPending}
-        datasetName={datasetDetail?.name || ''}
-        nextVersion={nextVersionLabel}
-        versions={(versions ?? []).map(version => ({
-          id: version.id,
-          version: version.version,
-          processing_status: 'completed',
-          processing_status_display: '处理完成',
-          total_samples: version.sample_count,
-          created_by: version.created_by,
-          created_at: version.created_at,
-          dataset_type: version.data_type,
-        }))}
-        onCancel={() => setMergeVersionModalOpen(false)}
-        onSubmit={(sourceVersionIds, description) => mergeVersionMutation.mutate({ sourceVersionIds, description })}
       />
     </div>
   )

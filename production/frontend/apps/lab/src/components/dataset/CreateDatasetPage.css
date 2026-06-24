@@ -233,80 +233,6 @@
   margin-top: 8px;
 }
 
-.create-dataset-usage-option.ant-radio-button-wrapper {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100px;
-  height: 40px;
-  padding: 0 10px;
-  color: rgba(24, 24, 25, 1);
-  font-size: 14px;
-  line-height: 20px;
-  border: 1px solid rgba(216, 217, 220, 1);
-  border-radius: 6px;
-}
-
-.create-dataset-usage-option.ant-radio-button-wrapper > span:last-child {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 20px;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
-.create-dataset-usage-option .ant-space {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: nowrap;
-  height: 20px;
-  gap: 4px !important;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
-.create-dataset-usage-option .ant-space-item {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 20px;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
-.create-dataset-usage-option .anticon {
-  width: 16px;
-  height: 16px;
-  color: rgba(24, 24, 25, 1);
-  font-size: 16px;
-  line-height: 16px;
-}
-
-.create-dataset-usage-option span:not(.anticon) {
-  display: inline-flex;
-  align-items: center;
-  height: 20px;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
-.create-dataset-usage-option.ant-radio-button-wrapper::before,
-.create-dataset-format-option.ant-radio-button-wrapper::before,
-.create-dataset-source-option.ant-radio-button-wrapper::before {
-  display: none;
-}
-
-.create-dataset-usage-option.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
-.create-dataset-format-option.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
-.create-dataset-source-option.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) {
-  color: rgba(24, 24, 25, 1);
-  background-color: rgba(238, 248, 255, 1.0);
-  border: 1px solid rgba(0, 71, 187, 0.7);
-  box-shadow: none;
-}
-
 .create-dataset-readonly-option {
   display: inline-flex;
   align-items: center;
@@ -353,28 +279,6 @@
 
 .create-dataset-format-field {
   margin-top: 24px;
-}
-
-.create-dataset-format-option.ant-radio-button-wrapper {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 40px;
-  padding: 0 16px;
-  color: rgba(24, 24, 25, 1);
-  font-size: 14px;
-  line-height: 20px;
-  border: 1px solid rgba(216, 217, 220, 1);
-  border-radius: 6px;
-}
-
-.create-dataset-format-option.ant-radio-button-wrapper > span:not(.ant-radio-button) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 20px;
-  white-space: nowrap;
-  line-height: 20px;
 }
 
 .create-dataset-format-option-prompt-response.ant-radio-button-wrapper {
@@ -472,18 +376,6 @@
 
 .create-dataset-source-field .ant-form-item-control {
   margin-top: 14px;
-}
-
-.create-dataset-source-option.ant-radio-button-wrapper {
-  width: 88px;
-  height: 40px;
-  padding: 0;
-  color: rgba(24, 24, 25, 1);
-  font-size: 14px;
-  line-height: 38px;
-  text-align: center;
-  border: 1px solid rgba(216, 217, 220, 1);
-  border-radius: 6px;
 }
 
 .create-dataset-upload-section {

@@ -14,9 +14,10 @@ from sqlalchemy import select
 from app.core.logging import logger
 from app.database.database_depends import run_async_in_celery
 from app.models.training_dataset_manager import TrainingDataset
+from app.schemas.training_dataset import DatasetProcessingStatus, TrainingDatasetExportTypeCategory, DatasetUsage, DatasetPublishStatus
 from app.repository.base_mapper import BaseMapper
 from app.repository.training_dataset_mapper import TrainingDatasetMapper
-from app.schemas.training_dataset import DatasetProcessingStatus, TrainingDatasetExportTypeCategory, DatasetUsage
+from app.services.storage.interface import StorageService
 from app.services.chunk_upload.interface import ChunkUploadService
 from app.services.storage.interface import StorageService
 from app.tasks import TaskBase
@@ -26,6 +27,7 @@ from app.utils.dataset_file_parser import (
     analyze_export_dataset_file_single,
     analyze_save_dataset_file_multi,
     generate_image_folder_path,
+    get_index_cache_path,
 )
 from app.utils.dataset_metadata_repair_status import (
     REPAIR_KIND_MACHINE_LEARNING_DATASET,
@@ -48,6 +50,12 @@ async def update_status_async(training_dataset_mapper: TrainingDatasetMapper, da
         )
         if dataset:
             dataset.processing_status = status
+            if status == DatasetProcessingStatus.COMPLETED.value:
+                dataset.publish = DatasetPublishStatus.UNPUBLISHED.value
+            elif status == DatasetProcessingStatus.PENDING.value:
+                dataset.publish = DatasetPublishStatus.PROCESSING.value
+            elif status == DatasetProcessingStatus.FAILED.value:
+                dataset.publish = DatasetPublishStatus.FAILED.value
             if error:
                 dataset.processing_error = error[:1000]  # 限制错误信息长度
             await training_dataset_mapper.commit()
@@ -73,33 +81,6 @@ async def _cleanup_temp_files_wrapper(chunk_upload_ids: Optional[List[str]], sto
         app_runtime_context.set_tenant_id(tenant_id)
     jfs = await storage_service.JUICEFS_CLIENT()
     await cleanup_temp_files_async(jfs, chunk_upload_ids, chunk_upload_service)
-
-
-def _merge_jsonl_files(jfs, source_paths: List[str], target_path: str) -> Dict[str, int]:
-    """按行合并多个 JSONL 文件，保留源版本全部样本。"""
-    JFSUtils.ensure_parent_dir(jfs, target_path)
-    total_samples = 0
-    total_characters = 0
-
-    with jfs.open(target_path, "w", encoding="utf-8") as target_file:
-        for source_path in source_paths:
-            if not jfs.exists(source_path):
-                raise FileNotFoundError(f"源版本文件不存在: {source_path}")
-
-            with jfs.open(source_path, "r", encoding="utf-8") as source_file:
-                for raw_line in source_file:
-                    line = raw_line.rstrip("\r\n")
-                    if not line:
-                        continue
-                    target_file.write(line)
-                    target_file.write("\n")
-                    total_samples += 1
-                    total_characters += len(line)
-
-    return {
-        "total_samples": total_samples,
-        "total_characters": total_characters,
-    }
 
 # ========== Celery 任务 ==========
 
@@ -421,6 +402,7 @@ async def _process_dataset_version_inheritance_async_impl(
             dataset.dataset_path = target_dataset_path
 
         dataset.processing_status = DatasetProcessingStatus.COMPLETED.value
+        dataset.publish = DatasetPublishStatus.UNPUBLISHED.value
         dataset.processing_error = None
         dataset.temp_file_path = None
         await training_dataset_mapper.commit()
@@ -456,110 +438,6 @@ async def _process_dataset_version_inheritance_async_impl(
                 await training_dataset_mapper.close()
         except Exception as close_error:
             logger.error(f"关闭数据库会话失败: {str(close_error)}")
-
-
-@celery_app.task(base=TaskBase, bind=True)
-def process_dataset_version_merge(
-    self: TaskBase,
-    dataset_id: int,
-    source_dataset_ids: List[int],
-    target_dataset_path: str,
-) -> Dict:
-    """异步合并多个训练/测试数据集版本为一个新版本。"""
-    return run_async_in_celery(
-        _process_dataset_version_merge_async_impl(
-            self,
-            dataset_id=dataset_id,
-            source_dataset_ids=source_dataset_ids,
-            target_dataset_path=target_dataset_path,
-        )
-    )
-
-
-async def _process_dataset_version_merge_async_impl(
-    self: TaskBase,
-    dataset_id: int,
-    source_dataset_ids: List[int],
-    target_dataset_path: str,
-) -> Dict:
-    from app.core.depend_manager import AutoContainer
-
-    container = AutoContainer()
-    storage_service: StorageService = container.storage_service()
-    training_dataset_mapper: TrainingDatasetMapper = container.training_dataset_mapper()
-    tenant_id = None
-    jfs = None
-
-    try:
-        dataset = await training_dataset_mapper.query_one(
-            select(TrainingDataset).filter(TrainingDataset.id == dataset_id)
-        )
-        if not dataset:
-            raise ValueError(f"数据集不存在: dataset_id={dataset_id}")
-
-        tenant_id = dataset.tenant_id
-        if not tenant_id:
-            raise ValueError(f"数据集没有租户ID: dataset_id={dataset_id}")
-
-        app_runtime_context.set_tenant_id(tenant_id)
-        if dataset.processing_status != DatasetProcessingStatus.PENDING.value:
-            raise ValueError(f"数据集当前状态不允许处理: dataset_id={dataset_id}, status={dataset.processing_status}")
-
-        source_datasets = await training_dataset_mapper.query(
-            select(TrainingDataset).filter(TrainingDataset.id.in_(source_dataset_ids))
-        )
-        source_by_id = {item.id: item for item in source_datasets}
-        ordered_sources = [source_by_id.get(source_id) for source_id in source_dataset_ids]
-        missing_ids = [source_id for source_id, item in zip(source_dataset_ids, ordered_sources) if item is None]
-        if missing_ids:
-            raise ValueError(f"源版本不存在: {missing_ids}")
-
-        source_paths = [item.dataset_path for item in ordered_sources if item and item.dataset_path]
-        if len(source_paths) != len(source_dataset_ids):
-            raise ValueError("源版本原始文件不完整，不允许合并")
-
-        jfs = await storage_service.JUICEFS_CLIENT()
-        merge_result = await asyncio.to_thread(_merge_jsonl_files, jfs, source_paths, target_dataset_path)
-
-        dataset.total_samples = merge_result["total_samples"]
-        dataset.total_characters = merge_result["total_characters"]
-        try:
-            dataset.file_size = jfs.stat(target_dataset_path).st_size / (1024 * 1024)
-        except Exception:
-            dataset.file_size = sum((item.file_size or 0) for item in ordered_sources if item)
-        dataset.dataset_path = target_dataset_path
-        metadata_fields = []
-        for source in ordered_sources:
-            for field in (source.metadata_fields or []):
-                if field not in metadata_fields:
-                    metadata_fields.append(field)
-        dataset.metadata_fields = metadata_fields
-        dataset.processing_status = DatasetProcessingStatus.COMPLETED.value
-        dataset.processing_error = None
-        dataset.temp_file_path = None
-        await training_dataset_mapper.commit()
-
-        logger.info(f"合并版本异步处理完成: dataset_id={dataset_id}, sources={source_dataset_ids}")
-        return {"success": True, "dataset_id": dataset_id}
-
-    except Exception as e:
-        logger.error(f"合并版本异步处理失败: dataset_id={dataset_id}, error={str(e)}", exc_info=True)
-        try:
-            await update_status_async(training_dataset_mapper, dataset_id, DatasetProcessingStatus.FAILED.value, str(e))
-        except Exception as update_error:
-            logger.error(f"更新合并版本失败状态失败: {str(update_error)}")
-
-        if jfs is not None:
-            await asyncio.to_thread(JFSUtils.cleanup_path, jfs, target_dataset_path)
-
-        raise
-    finally:
-        try:
-            if training_dataset_mapper is not None:
-                await training_dataset_mapper.close()
-        except Exception as close_error:
-            logger.error(f"关闭数据库会话失败: {str(close_error)}")
-
 
 @celery_app.task(base=TaskBase, bind=True)
 def process_dataset_file(
@@ -778,6 +656,7 @@ async def _process_dataset_file_async(
         dataset.dataset_path = result["dataset_path"]
         dataset.metadata_fields = result.get("metadata_fields") or []
         dataset.processing_status = DatasetProcessingStatus.COMPLETED.value
+        dataset.publish = DatasetPublishStatus.UNPUBLISHED.value
         dataset.processing_error = None
         dataset.temp_file_path = None  # 清空临时文件路径
         
@@ -800,16 +679,18 @@ async def _process_dataset_file_async(
 def repair_training_dataset_metadata_fields(
     self: TaskBase,
     tenant_id: Optional[str] = None,
+    force: bool = False,
 ) -> Dict:
     """异步回填历史训练数据集 metadata_fields，避免在 API 服务进程内长时间扫描文件。"""
     return run_async_in_celery(
-        _repair_training_dataset_metadata_fields_async(self, tenant_id)
+        _repair_training_dataset_metadata_fields_async(self, tenant_id, force)
     )
 
 
 async def _repair_training_dataset_metadata_fields_async(
     task: TaskBase,
     tenant_id: Optional[str],
+    force: bool,
 ) -> Dict:
     from app.core.depend_manager import AutoContainer
 
@@ -826,10 +707,11 @@ async def _repair_training_dataset_metadata_fields_async(
     container = AutoContainer()
     service = container.training_dataset_service()
     try:
-        result = await service.repair_metadata_fields()
+        result = await service.repair_metadata_fields(force=force)
         result.update({
             "success": True,
             "celery_task_id": celery_task_id,
+            "force": force,
         })
         await mark_metadata_fields_repair_completed(
             REPAIR_KIND_TRAINING_DATASET,
@@ -856,16 +738,18 @@ async def _repair_training_dataset_metadata_fields_async(
 def repair_machine_learning_dataset_metadata_fields(
     self: TaskBase,
     tenant_id: Optional[str] = None,
+    force: bool = False,
 ) -> Dict:
     """异步回填历史机器学习数据集 metadata_fields，避免在 API 服务进程内长时间扫描文件。"""
     return run_async_in_celery(
-        _repair_machine_learning_dataset_metadata_fields_async(self, tenant_id)
+        _repair_machine_learning_dataset_metadata_fields_async(self, tenant_id, force)
     )
 
 
 async def _repair_machine_learning_dataset_metadata_fields_async(
     task: TaskBase,
     tenant_id: Optional[str],
+    force: bool,
 ) -> Dict:
     from app.core.depend_manager import AutoContainer
 
@@ -882,10 +766,11 @@ async def _repair_machine_learning_dataset_metadata_fields_async(
     container = AutoContainer()
     service = container.machine_learning_dataset_service()
     try:
-        result = await service.repair_metadata_fields()
+        result = await service.repair_metadata_fields(force=force)
         result.update({
             "success": True,
             "celery_task_id": celery_task_id,
+            "force": force,
         })
         await mark_metadata_fields_repair_completed(
             REPAIR_KIND_MACHINE_LEARNING_DATASET,
@@ -906,3 +791,175 @@ async def _repair_machine_learning_dataset_metadata_fields_async(
         mapper = getattr(service, "machine_learning_dataset_mapper", None)
         if mapper:
             await mapper.close()
+
+
+@celery_app.task(base=TaskBase, bind=True)
+def delete_training_dataset_rows(
+    self: TaskBase,
+    dataset_id: int,
+    row_numbers: List[int],
+) -> Dict:
+    """异步删除训练数据集文件中的指定行。"""
+    return run_async_in_celery(
+        _delete_training_dataset_rows_async(
+            self,
+            dataset_id=dataset_id,
+            row_numbers=row_numbers,
+        )
+    )
+
+
+async def _delete_training_dataset_rows_async(
+    task: TaskBase,
+    dataset_id: int,
+    row_numbers: List[int],
+) -> Dict:
+    from app.core.depend_manager import AutoContainer
+
+    container = AutoContainer()
+    storage_service: StorageService = container.storage_service()
+    training_dataset_mapper: TrainingDatasetMapper = container.training_dataset_mapper()
+    row_number_set = set(row_numbers or [])
+    temp_path = None
+    backup_path = None
+    jfs = None
+
+    try:
+        if not row_number_set:
+            raise ValueError("删除行号不能为空")
+        if any(row_number < 1 for row_number in row_number_set):
+            raise ValueError("删除行号必须大于等于 1")
+
+        dataset = await training_dataset_mapper.query_one(
+            select(TrainingDataset).filter(TrainingDataset.id == dataset_id)
+        )
+        if not dataset:
+            raise ValueError(f"数据集不存在: dataset_id={dataset_id}")
+        if not dataset.tenant_id:
+            raise ValueError(f"数据集没有租户ID: dataset_id={dataset_id}")
+
+        app_runtime_context.set_tenant_id(dataset.tenant_id)
+        if dataset.processing_status != DatasetProcessingStatus.PENDING.value:
+            raise ValueError(f"数据集当前状态不允许删除行: dataset_id={dataset_id}, status={dataset.processing_status}")
+        if not dataset.dataset_path:
+            raise ValueError("数据集文件路径为空")
+
+        sample_count = int(dataset.total_samples or 0)
+        if max(row_number_set) > sample_count:
+            raise ValueError(f"删除行号超出数据集范围: {max(row_number_set)}")
+        if len(row_number_set) >= sample_count:
+            raise ValueError("删除后数据集至少需要保留一行数据")
+
+        jfs = await storage_service.JUICEFS_CLIENT()
+        if not jfs.exists(dataset.dataset_path):
+            raise FileNotFoundError(f"数据集文件不存在: {dataset.dataset_path}")
+
+        temp_path = f"{dataset.dataset_path}.delete_rows_{task.request.id}.tmp"
+        backup_path = f"{dataset.dataset_path}.delete_rows_{task.request.id}.bak"
+        total_valid_rows = 0
+        removed_count = 0
+        matched_rows = set()
+        kept_samples = 0
+        total_characters = 0
+        file_size_bytes = 0
+
+        with jfs.open(dataset.dataset_path, "rb") as source_file:
+            with jfs.open(temp_path, "wb") as target_file:
+                while True:
+                    line_bytes = source_file.readline()
+                    if not line_bytes:
+                        break
+
+                    line_text = line_bytes.decode("utf-8", errors="ignore")
+                    stripped = line_text.strip()
+                    if not stripped or stripped.startswith("#"):
+                        target_file.write(line_bytes)
+                        file_size_bytes += len(line_bytes)
+                        continue
+
+                    total_valid_rows += 1
+                    if total_valid_rows in row_number_set:
+                        matched_rows.add(total_valid_rows)
+                        removed_count += 1
+                        continue
+
+                    target_file.write(line_bytes)
+                    kept_samples += 1
+                    total_characters += len(stripped)
+                    file_size_bytes += len(line_bytes)
+
+        missing_rows = sorted(row_number_set - matched_rows)
+        if missing_rows:
+            raise ValueError(f"删除行号超出数据集范围: {missing_rows}")
+        if removed_count == 0:
+            raise ValueError("未匹配到需要删除的行")
+        if kept_samples < 1:
+            raise ValueError("删除后数据集至少需要保留一行数据")
+
+        jfs.rename(dataset.dataset_path, backup_path)
+        try:
+            jfs.rename(temp_path, dataset.dataset_path)
+        except Exception:
+            if jfs.exists(backup_path):
+                jfs.rename(backup_path, dataset.dataset_path)
+            raise
+
+        JFSUtils.cleanup_path(jfs, backup_path)
+        temp_path = None
+        backup_path = None
+
+        JFSUtils.cleanup_path(jfs, get_index_cache_path(dataset.dataset_path))
+        dataset_dir = os.path.dirname(dataset.dataset_path.rstrip("/")).replace("\\", "/")
+        JFSUtils.cleanup_path(jfs, f"{dataset_dir}/exports/dataset_{dataset.id}")
+
+        latest_dataset = await training_dataset_mapper.query_one(
+            select(TrainingDataset).filter(TrainingDataset.id == dataset_id)
+        )
+        if latest_dataset:
+            latest_dataset.total_samples = kept_samples
+            latest_dataset.total_characters = total_characters
+            latest_dataset.file_size = file_size_bytes / (1024 * 1024)
+            latest_dataset.processing_status = DatasetProcessingStatus.COMPLETED.value
+            latest_dataset.publish = DatasetPublishStatus.UNPUBLISHED.value
+            latest_dataset.processing_error = None
+            await training_dataset_mapper.commit()
+
+        task._log_complete(f"训练数据集删除行完成: dataset_id={dataset_id}, removed={removed_count}")
+        return {
+            "success": True,
+            "dataset_id": dataset_id,
+            "removed_count": removed_count,
+            "total_samples": kept_samples,
+        }
+    except Exception as exc:
+        logger.error(f"训练数据集删除行失败: dataset_id={dataset_id}, error={str(exc)}", exc_info=True)
+        try:
+            if jfs is not None:
+                if temp_path:
+                    JFSUtils.cleanup_path(jfs, temp_path)
+                if backup_path and jfs.exists(backup_path):
+                    original_dataset = await training_dataset_mapper.query_one(
+                        select(TrainingDataset).filter(TrainingDataset.id == dataset_id)
+                    )
+                    if original_dataset and not jfs.exists(original_dataset.dataset_path):
+                        jfs.rename(backup_path, original_dataset.dataset_path)
+                    else:
+                        JFSUtils.cleanup_path(jfs, backup_path)
+        except Exception as cleanup_error:
+            logger.warning(f"清理删除行临时文件失败: dataset_id={dataset_id}, error={str(cleanup_error)}")
+
+        try:
+            await update_status_async(
+                training_dataset_mapper,
+                dataset_id,
+                DatasetProcessingStatus.FAILED.value,
+                str(exc),
+            )
+        except Exception as update_error:
+            logger.error(f"更新删除行失败状态失败: dataset_id={dataset_id}, error={str(update_error)}")
+        raise
+    finally:
+        try:
+            await training_dataset_mapper.close()
+        except Exception as close_error:
+            logger.error(f"关闭数据库会话失败: {str(close_error)}")

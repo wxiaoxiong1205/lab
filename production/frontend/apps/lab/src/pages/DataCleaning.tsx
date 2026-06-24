@@ -37,15 +37,6 @@ import './DataCleaning.css'
 const { Title, Text } = Typography
 const { Option } = Select
 
-const defaultCleaningTaskStatus = [
-  { label: '已创建', value: '已创建' },
-  { label: '排队中', value: '排队中' },
-  { label: '运行中', value: '运行中' },
-  { label: '已完成', value: '已完成' },
-  { label: '失败', value: '失败' },
-  { label: '已终止', value: '已终止' },
-]
-
 const cleaningSteps = [
   {
     title: '选择数据集',
@@ -118,20 +109,8 @@ const DataCleaning: React.FC = () => {
 
   useEffect(() => {
     const value = localStorage.getItem('projectEnumValues')
-    if (!value) {
-      setCleaningTaskStatus(defaultCleaningTaskStatus)
-      return
-    }
-
-    try {
-      const enumValues = JSON.parse(value)
-      const statusOptions = enumValues?.all_enums?.find((item: any) => item.enum_name === 'TrainingTaskStatus')?.options
-      setCleaningTaskStatus(Array.isArray(statusOptions) && statusOptions.length > 0
-        ? statusOptions
-        : defaultCleaningTaskStatus)
-    }
-    catch {
-      setCleaningTaskStatus(defaultCleaningTaskStatus)
+    if (value) {
+      setCleaningTaskStatus(JSON.parse(value).all_enums.find((item) => item.enum_name === 'TrainingTaskStatus').options)
     }
   }, [])
   const numericProjectId = projectId ? Number(projectId) : currentProject?.id

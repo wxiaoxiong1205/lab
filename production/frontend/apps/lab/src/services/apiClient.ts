@@ -14,7 +14,6 @@ import { copyToClipboard } from '../utils/clipboard'
 import { tokenStorage, useAuthStore } from '../stores/authStore'
 import { getBackendConfig, getBackendURLFromParams, sstBackendConfig } from '../utils/getBackendURL'
 import { useIamLogin as iamLogin } from '@/hooks/use-iam-login'
-import { createLocalPreviewResponse, getLocalPreviewData, isLocalPreviewApiEnabled } from './localPreviewApi'
 
 declare module 'axios' {
   interface AxiosRequestConfig {
@@ -85,11 +84,6 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`
     }
 
-    const localPreviewData = getLocalPreviewData(config)
-    if (localPreviewData !== undefined) {
-      config.adapter = async () => createLocalPreviewResponse(config, localPreviewData)
-    }
-
     return config
   },
   (error: AxiosError) => {
@@ -103,13 +97,6 @@ const handleResponseError = (error: any) => {
   // 如果是取消请求，不显示错误提示
   if (axios.isCancel(error) || error?.code === 'ERR_CANCELED') {
     return Promise.reject(error)
-  }
-
-  if (isLocalPreviewApiEnabled()) {
-    const localPreviewData = getLocalPreviewData(error?.config || {})
-    if (localPreviewData !== undefined) {
-      return Promise.resolve(createLocalPreviewResponse(error.config, localPreviewData))
-    }
   }
 
   // 401 自动登出

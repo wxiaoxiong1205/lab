@@ -27,10 +27,17 @@ const StatusIndicator: React.FC<{
   )
 }
 // 可启动的状态：已创建、定时待启动、失败、已终止、创建、待运行、已取消、已停止
-const STARTABLE_STATUSES = ['已创建']
+const STATABLE_STATUSES = ['已创建']
 // 可终止的状态：排队中、运行中、准备中
 const STOPPABLE_STATUSES = ['排队中', '运行中']
 const CAN_DELETE_STATUSES = ['已创建', '定时待启动', '已完成', '失败', '已终止', '终止']
+const getTrainingMethodType = (record: any) => String(
+  record?.training_method_type
+  ?? record?.train_method_type
+  ?? record?.training_type?.training_method_type
+  ?? record?.training_type?.train_method_type
+  ?? '',
+).toLowerCase()
 /**
  * 训练任务详情页面
  * 显示任务基本信息和版本管理
@@ -181,10 +188,11 @@ const TrainingTaskDetail: React.FC = () => {
       render: (_, record) => {
         const status = record.status
         const type = record.training_type?.fine_tuning_type
+        const trainingMethodType = getTrainingMethodType(record)
         const isStartLoading = startLoadingRows[record.id]
         const isStopLoading = stopLoadingRows[record.id]
         const isDeleteLoading = deleteLoadingRows[record.id]
-        const canStart = status && STARTABLE_STATUSES.includes(status) && type === 'lora'
+        const canStart = status && STATABLE_STATUSES.includes(status) && (type === 'lora' || trainingMethodType === 'grpo')
         const canStop = status && STOPPABLE_STATUSES.includes(status) && type === 'lora'
         const canDelete = CAN_DELETE_STATUSES.includes(status)
         const showLogs = record.id && projectId && type === 'lora' && ['运行中', '已完成', '失败', '已终止', '终止'].includes(status)

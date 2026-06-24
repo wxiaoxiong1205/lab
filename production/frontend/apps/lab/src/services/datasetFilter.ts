@@ -28,6 +28,8 @@ export interface DatasetStatsQuery {
   dataset_type?: string[]
   /** 如 ['role-based'] 仅统计 role-based 格式的筛选项 */
   dataset_format?: string[]
+  /** 发布状态：0未发布, 1已发布 */
+  publish?: number
 }
 
 export interface Options {
@@ -41,6 +43,7 @@ export interface Options {
   page?: number
   size?: number
   processing_status?: string
+  publish?: number // 发布状态：0未发布 1已发布
 }
 
 /** stats 请求 query：与后端约定 usage / dataset_type / dataset_format 可重复出现 */
@@ -61,6 +64,9 @@ function buildStatsQueryParams(query?: DatasetStatsQuery): Record<string, unknow
   }
   if (query?.dataset_format?.length) {
     params.dataset_format = query.dataset_format
+  }
+  if (query?.publish !== undefined) {
+    params.publish = query.publish
   }
   return params
 }
@@ -116,6 +122,9 @@ function serializeStatsQueryParams(p: Record<string, unknown>): string {
       }
     }
   }
+  if (p.publish !== undefined) {
+    result.set('publish', String(p.publish))
+  }
   return result.toString()
 }
 
@@ -143,6 +152,9 @@ function buildFilteredListParams(params: Options): Record<string, string | numbe
   if (params.attr_name !== undefined && params.option_value !== undefined) {
     flat.attr_name = params.attr_name
     flat.option_value = params.option_value
+  }
+  if (params.publish !== undefined) {
+    flat.publish = params.publish
   }
   return flat
 }

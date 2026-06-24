@@ -850,24 +850,22 @@ const CreateNotebook: React.FC = () => {
               </Paragraph>
               <Form.Item name="is_ssh" label="启用 SSH" valuePropName="checked">
                 <Switch
-                  onChange={(checked) => {
-                    if (!checked) {
-                      form.setFields([
-                        { name: 'ssh_username', errors: [] },
-                        { name: 'ssh_password', errors: [] },
-                      ])
-                    }
+                  onChange={() => {
+                    form.setFields([
+                      { name: 'ssh_username', errors: [] },
+                      { name: 'ssh_password', errors: [] },
+                    ])
                   }}
                 />
               </Form.Item>
               <Row gutter={16}>
                 <Col span={12}>
-                  <Form.Item name="ssh_username" label="用户名" dependencies={['ssh_password', 'is_ssh']} rules={[{ validator: validateSshUsername }]}>
+                  <Form.Item name="ssh_username" label="用户名" rules={[{ validator: validateSshUsername }]}>
                     <Input maxLength={64} allowClear placeholder="请输入 SSH 用户名" disabled={!sshEnabled} />
                   </Form.Item>
                 </Col>
                 <Col span={12}>
-                  <Form.Item name="ssh_password" label="密码" dependencies={['ssh_username', 'is_ssh']} rules={[{ validator: validateSshPassword }]}>
+                  <Form.Item name="ssh_password" label="密码" rules={[{ validator: validateSshPassword }]}>
                     <Input.Password
                       maxLength={128}
                       allowClear

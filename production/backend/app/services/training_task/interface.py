@@ -1,6 +1,7 @@
 from typing import List, Optional, Tuple, Dict, Any
 from datetime import datetime
 from abc import ABC, abstractmethod
+from fastapi.responses import FileResponse
 from fastapi_pagination import Page
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +13,8 @@ from app.services.storage.interface import StorageService
 from app.schemas.training_task import (
     TrainingTaskCreate, TrainingTaskResponse, TrainingTaskSummaryResponse,
     TrainingTaskCreatedResponse, MLflowTaskResponse, TrainingTaskLogResponse,
-    TrainingTypeCategory, TrainingMethodType, CheckpointInfo
+    TrainingTypeCategory, TrainingMethodType, CheckpointInfo,
+    GrpoRewardFunctionValidateRequest, GrpoRewardFunctionValidateResponse
 )
 
 
@@ -55,6 +57,18 @@ class TrainingTaskService(ABC):
             self, project_id: int, task_id: int
     ) -> None:
         """终止训练任务并删除对应 K8s Job 资源"""
+        pass
+
+    @abstractmethod
+    async def validate_grpo_reward_function(
+            self, current_user: JwtUserInfo, request: GrpoRewardFunctionValidateRequest
+    ) -> GrpoRewardFunctionValidateResponse:
+        """校验GRPO奖励函数上传文件"""
+        pass
+
+    @abstractmethod
+    async def download_grpo_reward_function_sample(self) -> FileResponse:
+        """下载GRPO奖励函数样例"""
         pass
 
     @abstractmethod

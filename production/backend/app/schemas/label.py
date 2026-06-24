@@ -29,6 +29,7 @@ class LabelDatasetFormat(str, Enum):
     ALPACA = "alpaca"
     ROLE_BASED = "role-based"
     PREFIX_SUFFIX_MIDDLE = "prefix-suffix-middle"
+    GRPO = "grpo"
 
 
 class LabelTaskType(str, Enum):
@@ -322,6 +323,13 @@ class AIAnnotationInput(BaseModel):
     
     # role-based格式
     messages: Optional[List[Dict[str, Any]]] = Field(None, description="对话消息列表（role-based格式）")
+
+    # grpo格式
+    reward_model: Optional[Dict[str, Any]] = Field(None, description="奖励模型信息（grpo格式）")
+    ground_truth: Optional[Any] = Field(None, description="标准答案（grpo格式）")
+    ability: Optional[str] = Field(None, description="能力分类（grpo格式）")
+    extra_info: Optional[Dict[str, Any]] = Field(None, description="额外信息（grpo格式）")
+    data_source: Optional[str] = Field(None, description="数据来源（grpo格式）")
     
     # prefix-suffix-middle格式
     prefix: Optional[str] = Field(None, description="前缀（prefix-suffix-middle格式）")

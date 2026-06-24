@@ -3,7 +3,7 @@ from typing import Dict, Optional, List, Any
 
 from pydantic import BaseModel
 from sqlalchemy import Column, Integer, String, DateTime, JSON, Index, Text, Boolean, UniqueConstraint, Numeric, \
-    event, BigInteger, text, Float
+    event, BigInteger, text, Float, SmallInteger
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, Session
@@ -973,6 +973,8 @@ class MachineLearningDataset(baseModel):
     metadata_fields: Mapped[Optional[List[str]]] = Column(JSON, nullable=True, comment="数据集字段元数据，上传解析完成后生成")
     sample_count: Mapped[int] = Column(Integer, nullable=False, default=0, comment="样本数量")
     file_size: Mapped[Optional[float]] = Column(Float, nullable=True, comment="dataset.jsonl 大小(MB)")
+    processing_status: Mapped[str] = Column(String(20), nullable=False, default="completed", comment="处理状态：pending处理中, completed处理完成, failed处理失败")
+    publish: Mapped[int] = Column(SmallInteger, nullable=False, default=0, comment="发布状态：0未发布, 1已发布, 2处理中展示-, 3处理失败展示-")
 
     __table_args__ = (
         Index("idx_ml_datasets_project", "project_id"),

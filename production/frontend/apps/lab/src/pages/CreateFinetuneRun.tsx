@@ -3,6 +3,7 @@ import {
   Button,
   Form,
   Row,
+  Steps,
   message,
 } from 'antd'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -17,7 +18,7 @@ import BasicConfig from '@/components/finetune/BasicConfig'
 import ModelConfig from '@/components/finetune/ModelConfig'
 import TrainingConfig from '@/components/finetune/TrainingConfig'
 import ResourceConfig from '@/components/finetune/ResourceConfig'
-import GrpoStageResourceConfig from '@/components/finetune/GrpoStageResourceConfig'
+import GrpoRayResourceConfig from '@/components/finetune/GrpoRayResourceConfig'
 import { finetuneTaskService } from '@/services/FinetuneTrainingServices'
 import { getProjectEnum } from '@/services/api'
 import { useConfigStore } from '@/stores/configStore'
@@ -27,6 +28,48 @@ import CreateFormPageHeader from '@/components/common/CreateFormPageHeader'
  * 创建训练运行页面 - 单页面多模块设计
  * 在特定实验下创建新的训练运行
  */
+
+const createDefaultRayNodeResource = (overrides: Partial<{
+  card_selector: string[]
+  card_type: string
+  card_model: string
+  count: number | null
+  card_memory: string | null
+  k8s_resource_type: string | null
+  cpu_request: number
+  cpu_limit: number
+  memory_request: number
+  memory_limit: number
+}> = {}) => ({
+  card_selector: overrides.card_selector,
+  card_type: overrides.card_type,
+  card_model: overrides.card_model,
+  count: overrides.count ?? null,
+  card_memory: null,
+  k8s_resource_type: null,
+  cpu_request: 0.5,
+  cpu_limit: 16,
+  memory_request: 0.5,
+  memory_limit: 16,
+  ...overrides,
+})
+
+const createDefaultRayCpuNodeResource = () =>
+  createDefaultRayNodeResource({
+    card_selector: ['CPU', 'CPU'],
+    card_type: 'CPU',
+    card_model: 'CPU',
+    count: 0,
+    card_memory: null,
+    k8s_resource_type: null,
+  })
+
+const createDefaultGraphicsCardResource = () => ({
+  cpu_request: 0.5,
+  cpu_limit: 16,
+  memory_request: 0.5,
+  memory_limit: 16,
+})
 
 const defaultValues = {
   base_provider: 'Qwen', // 默认选择Qwen
@@ -52,17 +95,6 @@ const defaultValues = {
   loss_type: 'mse',
   label_smoothing: 0.1,
   max_prompt_length: 4096,
-  max_completion_length: 1024,
-  num_generations: 8,
-  temperature: 0.9,
-  top_p: 0.95,
-  top_k: 50,
-  repetition_penalty: 1.05,
-  kl_coefficient: 0.04,
-  clip_range: 0.2,
-  advantage_estimator: 'grpo',
-  reward_normalization: true,
-  reward_scale: 1,
   max_length: 4096,
   remove_unused_columns: false,
   cutoff_len: 4096,
@@ -96,8 +128,44 @@ const defaultValues = {
   deepspeed_enabled: true,
   deepspeed: 'ZeRO-0',
   gpu_count: null,
+  graphics_card_resource: createDefaultGraphicsCardResource(),
   schedule_enabled: false,
+  advanced_template_mode: 'template',
+  advanced_template_params: {},
+  advanced_template_yaml: '',
+  ray_resource_config: {
+    submit_graphics_card_resource: createDefaultRayCpuNodeResource(),
+    head_graphics_card_resource: createDefaultRayCpuNodeResource(),
+    worker_replicas: 1,
+    worker_graphics_card_resource: createDefaultRayNodeResource(),
+  },
 }
+
+const buildRayNodeResourceFormValue = (resource?: {
+  card_type?: string | null
+  card_model?: string | null
+  count?: number | null
+  card_memory?: string | null
+  k8s_resource_type?: string | null
+  cpu_request?: number | null
+  cpu_limit?: number | null
+  memory_request?: number | null
+  memory_limit?: number | null
+}) => ({
+  ...createDefaultRayNodeResource(),
+  card_selector: resource?.card_type && resource?.card_model
+    ? [resource.card_type, resource.card_model]
+    : undefined,
+  card_type: resource?.card_type ?? undefined,
+  card_model: resource?.card_model ?? undefined,
+  count: resource?.count ?? null,
+  card_memory: resource?.card_memory ?? null,
+  k8s_resource_type: resource?.k8s_resource_type ?? null,
+  cpu_request: resource?.cpu_request ?? 0.5,
+  cpu_limit: resource?.cpu_limit ?? 16,
+  memory_request: resource?.memory_request ?? 0.5,
+  memory_limit: resource?.memory_limit ?? 16,
+})
 
 const createEmptyDataConfig = () => ({
   training_datasets: [],
@@ -115,61 +183,16 @@ const normalizeTrainingMethodType = (value?: unknown) => {
   const normalized = value.toLowerCase()
   if (normalized.includes('dpo'))
     return 'dpo'
-  if (normalized.includes('grpo'))
-    return 'rft-grpo'
   if (normalized.includes('sft'))
     return 'sft'
+  if (normalized.includes('grpo'))
+    return 'grpo'
 
   return normalized
 }
 
 const getTrainingMethodType = (trainingType?: any) => {
   return normalizeTrainingMethodType(trainingType?.train_method_type || trainingType?.training_method_type)
-}
-
-const parseGrpoTemplateParams = (value?: string) => {
-  if (!value) {
-    return {}
-  }
-
-  try {
-    return JSON.parse(value)
-  }
-  catch {
-    return {}
-  }
-}
-
-const normalizeGrpoResourceConfig = (value?: any) => {
-  if (!value || typeof value !== 'object') {
-    return undefined
-  }
-
-  const normalizeStage = (stage: any, includeGpu: boolean) => {
-    if (!stage || typeof stage !== 'object') {
-      return undefined
-    }
-
-    return {
-      ...(includeGpu && {
-        gpu_type: stage.gpu_type,
-        gpu_model: stage.gpu_model,
-        gpu_memory: stage.gpu_memory,
-        gpu_count: stage.gpu_count,
-        k8s_resource_type: stage.k8s_resource_type,
-      }),
-      cpu_request: stage.cpu_request,
-      cpu_limit: stage.cpu_limit,
-      memory_request: stage.memory_request,
-      memory_limit: stage.memory_limit,
-    }
-  }
-
-  return {
-    hand: normalizeStage(value.hand, true),
-    work: normalizeStage(value.work, true),
-    submit: normalizeStage(value.submit, false),
-  }
 }
 
 const CreateFinetuneRun: React.FC = () => {
@@ -186,11 +209,13 @@ const CreateFinetuneRun: React.FC = () => {
   const [validationDatasets, setValidationDatasets] = useState<LocalValidationDataset[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [resourceConfigLoading, setResourceConfigLoading] = useState(Boolean(taskName && !isEditMode))
+  const [currentStep, setCurrentStep] = useState(0)
   const [modelVersions, setModelVersions] = useState([])
   const [dataConfigResetKey, setDataConfigResetKey] = useState(0)
   const [forcedTrainingMethodType, setForcedTrainingMethodType] = useState<string | undefined>()
   const baseProvider = Form.useWatch('base_provider', form)
   const trainTypeCategory = Form.useWatch('train_type_category', form)
+  const watchedTrainingMethod = Form.useWatch('training_type', form)
   const [dataConfig, setDataConfig] = useState<any>(createEmptyDataConfig())
   /**
    * 组件挂载时获取项目枚举值并存储到本地
@@ -214,9 +239,8 @@ const CreateFinetuneRun: React.FC = () => {
   const [taskInfo, setTaskInfo] = useState<any>(null)
   const [allocatableResources, setAllocatableResources] = useState<any>(undefined)
   const { config, providerType } = useConfigStore()
-  const submitDisabled = submitting || resourceConfigLoading
-  const watchedTrainingMethod = Form.useWatch('training_type', form)
-  const currentTrainingMethodType = forcedTrainingMethodType || normalizeTrainingMethodType(watchedTrainingMethod) || getTrainingMethodType(taskInfo?.training_type)
+  const effectiveTrainingMethod = watchedTrainingMethod || forcedTrainingMethodType || getTrainingMethodType(taskInfo?.training_type)
+  const isGrpoResourceMode = normalizeTrainingMethodType(effectiveTrainingMethod) === 'grpo' || effectiveTrainingMethod === 'rft'
   useEffect(() => {
     const fetchProjectEnumValues = async () => {
       let cachedEnumValues = JSON.parse(localStorage.getItem('projectEnumValues') || '{}')
@@ -282,11 +306,18 @@ const CreateFinetuneRun: React.FC = () => {
 
       const trainingItems = Array.isArray(taskInfo?.dataset_items) ? [...taskInfo.dataset_items] : []
       const evalItems = Array.isArray(taskInfo?.eval_dataset_items) ? [...taskInfo.eval_dataset_items] : []
-      const validationType: 'split' | 'platform' = taskInfo?.evaluation?.eval_use_split ? 'split' : 'platform'
+      const isGrpoTask = normalizeTrainingMethodType(taskTrainingMethod) === 'grpo'
+      const validationType: 'split' | 'platform' = isGrpoTask
+        ? 'split'
+        : taskInfo?.evaluation?.eval_use_split === false && evalItems.length > 0
+          ? 'platform'
+          : 'split'
+      const rewardRuleUploadId = taskInfo?.reward_function_upload_id ?? taskInfo?.grpo_config?.reward_rule_upload_id
+      const rewardRuleFileName = taskInfo?.reward_function_file_name ?? taskInfo?.grpo_config?.reward_rule_file_name
 
       const data_config = {
         training_datasets: trainingItems,
-        validation_datasets: evalItems,
+        validation_datasets: validationType === 'platform' ? evalItems : [],
         validation_config: {
           type: validationType,
           ...(taskInfo?.evaluation?.eval_split_ratio !== undefined && taskInfo?.evaluation?.eval_split_ratio !== null && {
@@ -305,10 +336,11 @@ const CreateFinetuneRun: React.FC = () => {
         ] : undefined,
         // 显卡资源配置
         graphics_card_resource: {
-          cpu_request: taskInfo?.graphics_card_resource?.cpu_request,
-          cpu_limit: taskInfo?.graphics_card_resource?.cpu_limit,
-          memory_request: taskInfo?.graphics_card_resource?.memory_request,
-          memory_limit: taskInfo?.graphics_card_resource?.memory_limit,
+          ...createDefaultGraphicsCardResource(),
+          cpu_request: taskInfo?.graphics_card_resource?.cpu_request ?? 0.5,
+          cpu_limit: taskInfo?.graphics_card_resource?.cpu_limit ?? 16,
+          memory_request: taskInfo?.graphics_card_resource?.memory_request ?? 0.5,
+          memory_limit: taskInfo?.graphics_card_resource?.memory_limit ?? 16,
         },
         description: taskInfo.description,
         // 定时任务配置（加载时回填，展示在任务描述前）
@@ -355,33 +387,18 @@ const CreateFinetuneRun: React.FC = () => {
         ...(taskInfo?.dpo_config && {
           beta: taskInfo.dpo_config.pref_beta,
         }),
-        ...(taskInfo?.additional_params?.grpo_config && {
-          num_generations: taskInfo.additional_params.grpo_config.num_generations,
-          max_prompt_length: taskInfo.additional_params.grpo_config.max_prompt_length,
-          max_completion_length: taskInfo.additional_params.grpo_config.max_completion_length,
-          temperature: taskInfo.additional_params.grpo_config.temperature,
-          top_p: taskInfo.additional_params.grpo_config.top_p,
-          top_k: taskInfo.additional_params.grpo_config.top_k,
-          repetition_penalty: taskInfo.additional_params.grpo_config.repetition_penalty,
-          kl_coefficient: taskInfo.additional_params.grpo_config.kl_coefficient,
-          clip_range: taskInfo.additional_params.grpo_config.clip_range,
-          advantage_estimator: taskInfo.additional_params.grpo_config.advantage_estimator,
-          reward_normalization: taskInfo.additional_params.grpo_config.reward_normalization,
-          reward_scale: taskInfo.additional_params.grpo_config.reward_scale,
+        ...(isGrpoTask && {
+          advanced_template_mode: taskInfo?.advanced_template_id ? 'template' : 'custom',
+          advanced_template_id: taskInfo?.advanced_template_id,
+          advanced_template_name: taskInfo?.advanced_template_name,
+          advanced_template_yaml: taskInfo?.advanced_template_yaml || '',
+          advanced_template_params: taskInfo?.additional_params || {},
         }),
-        ...(taskInfo?.additional_params?.grpo_template_snapshot && {
-          grpo_template_id: taskInfo.additional_params.grpo_template_snapshot.template_id,
-          grpo_template_name: taskInfo.additional_params.grpo_template_snapshot.template_name,
-          grpo_template_content: taskInfo.additional_params.grpo_template_snapshot.template_content,
-          grpo_template_params_json: JSON.stringify(taskInfo.additional_params.grpo_template_snapshot.params || {}),
-        }),
-        ...(taskInfo?.additional_params?.grpo_reward_function && {
-          grpo_reward_function_upload_id: taskInfo.additional_params.grpo_reward_function.upload_id,
-          grpo_reward_function_file_name: taskInfo.additional_params.grpo_reward_function.file_name,
-          grpo_reward_function_file_url: taskInfo.additional_params.grpo_reward_function.file_url,
-        }),
-        ...(taskInfo?.additional_params?.grpo_resource_config && {
-          grpo_resource_config: taskInfo.additional_params.grpo_resource_config,
+        ...(rewardRuleUploadId && {
+          reward_rule_upload_id: rewardRuleUploadId,
+          reward_rule_file: rewardRuleFileName
+            ? [{ name: rewardRuleFileName }]
+            : undefined,
         }),
 
         // 数据处理参数
@@ -410,13 +427,27 @@ const CreateFinetuneRun: React.FC = () => {
 
         // 额外参数
         dataloader_num_workers: taskInfo?.additional_params?.dataloader_num_workers,
+        ...(taskInfo?.ray_resource_config && {
+          ray_resource_config: {
+            submit_graphics_card_resource: buildRayNodeResourceFormValue(taskInfo.ray_resource_config.submit_graphics_card_resource),
+            head_graphics_card_resource: buildRayNodeResourceFormValue(taskInfo.ray_resource_config.head_graphics_card_resource),
+            worker_replicas: taskInfo.ray_resource_config.worker_replicas ?? 1,
+            worker_graphics_card_resource: buildRayNodeResourceFormValue(taskInfo.ray_resource_config.worker_graphics_card_resource),
+          },
+        }),
 
         // 数据集参数
         data_config,
 
       }
       setDataConfig(data_config)
+      setDataConfigResetKey((key) => key + 1)
       form.setFieldsValue(taskValues)
+      if (rewardRuleUploadId) {
+        form.setFields([
+          { name: 'reward_rule_upload_id', value: rewardRuleUploadId, errors: [] },
+        ])
+      }
     }
     else {
       setForcedTrainingMethodType(undefined)
@@ -534,171 +565,163 @@ const CreateFinetuneRun: React.FC = () => {
       const trainMethodType = taskName
         ? getTrainingMethodType(taskInfo?.training_type)
         : values.training_type
+      const normalizedTrainMethodType = normalizeTrainingMethodType(trainMethodType)
+      const isGrpoTraining = normalizedTrainMethodType === 'grpo' || trainMethodType === 'rft'
       const isBelleProvider = config?.PROVIDER_TYPE === providerType
 
       const datasetFormat = values.data_config.training_datasets?.[0]?.dataset_format || values.data_format
-      const grpoConfig = trainMethodType === 'rft-grpo'
-        ? {
-            num_generations: values.num_generations,
-            max_prompt_length: values.max_prompt_length,
-            max_completion_length: values.max_completion_length,
-            temperature: values.temperature,
-            top_p: values.top_p,
-            top_k: values.top_k,
-            repetition_penalty: values.repetition_penalty,
-            kl_coefficient: values.kl_coefficient,
-            clip_range: values.clip_range,
-            advantage_estimator: values.advantage_estimator,
-            reward_normalization: values.reward_normalization,
-            reward_scale: values.reward_scale,
-          }
-        : undefined
-      const grpoResourceConfig = trainMethodType === 'rft-grpo'
-        ? normalizeGrpoResourceConfig(values.grpo_resource_config)
-        : undefined
-      const grpoWorkResource = grpoResourceConfig?.work
+      const buildRayResource = (resource?: {
+        card_selector?: (string | number)[]
+        card_type?: string | null
+        card_model?: string | null
+        count?: number | null
+        card_memory?: string | null
+        k8s_resource_type?: string | null
+        cpu_request?: number
+        cpu_limit?: number
+        memory_request?: number
+        memory_limit?: number
+      }) => ({
+        card_type: resource?.card_type ?? (resource?.card_selector?.[0] != null ? String(resource.card_selector[0]) : undefined),
+        card_model: resource?.card_model ?? (resource?.card_selector?.[1] != null ? String(resource.card_selector[1]) : undefined),
+        count: resource?.count,
+        card_memory: resource?.card_memory ?? null,
+        k8s_resource_type: resource?.k8s_resource_type ?? null,
+        cpu_request: resource?.cpu_request,
+        cpu_limit: resource?.cpu_limit,
+        memory_request: resource?.memory_request,
+        memory_limit: resource?.memory_limit,
+      })
+      const workerGraphicsCardResource = {
+        card_type: values.gpu_type?.[0],
+        card_model: isBelleProvider ? allocatableResources?.gpu_model : values.gpu_model,
+        count: values.gpu_count,
+        card_memory: values.gpu_memory,
+        k8s_resource_type: isBelleProvider ? values.gpu_type?.[0] : values.k8s_resource_type,
+        ...(isBelleProvider && allocatableResources && {
+          cpu: values.graphics_card_resource?.cpu_limit,
+          memory: values.graphics_card_resource?.memory_limit,
+          queue_group_id: allocatableResources.queue_group_id,
+        }),
+        cpu_request: values.graphics_card_resource?.cpu_request,
+        cpu_limit: values.graphics_card_resource?.cpu_limit,
+        memory_request: values.graphics_card_resource?.memory_request,
+        memory_limit: values.graphics_card_resource?.memory_limit,
+      }
 
-      const backendData = {
+      const commonBackendData = {
         name: values.name,
         description: values.description,
         project_id: Number(projectId),
-        gpu_count: grpoWorkResource?.gpu_count ?? values.gpu_count,
-        ...(values.deepspeed_enabled && values.deepspeed ? { deepspeed: values.deepspeed } : {}),
-        template: values.template,
         ...(scheduleAt && { schedule_at: scheduleAt }),
         version: values.version,
-        // 训练类型配置
         training_type: {
-          fine_tuning_type: values.fine_tuning_type,
+          ...({ fine_tuning_type: isGrpoTraining ? 'full' : values.fine_tuning_type }),
           train_method_type: trainMethodType,
           train_type_category: values.train_type_category,
-          ...(datasetFormat ? { dataset_format: datasetFormat } : {}),
+          ...(!isGrpoTraining && datasetFormat ? { dataset_format: datasetFormat } : {}),
         },
-
-        // 基础模型配置
         base_model: {
           base_model_id: values.base_model_id, // 需要从表单中获取
           base_model_name: values.base_model_name,
           model_provider: values.base_provider,
           template: values.template || '',
         },
-
-        // 基础训练参数
-        basic: {
-          bf16: values.bf16,
-          gradient_accumulation_steps: values.gradient_accumulation_steps,
-          learning_rate: values.learning_rate,
-          lr_scheduler_type: values.lr_scheduler_type,
-          num_train_epochs: values.num_train_epochs,
-          per_device_train_batch_size: values.per_device_train_batch_size,
-          warmup_ratio: values.warmup_ratio,
-        },
-
-        // 高级参数
-        advanced: {
-          gradient_checkpointing: values.gradient_checkpointing,
-          max_grad_norm: values.max_grad_norm,
-          rope_scaling: values.rope_scaling,
-          seed: values.seed || values.random_seed,
-          weight_decay: values.weight_decay,
-        },
-
-        // LoRA配置 - 仅在非full微调时包含
-        ...(values.fine_tuning_type !== 'full' && {
-          lora_config: {
-            lora_alpha: values.lora_alpha,
-            lora_dropout: values.lora_dropout,
-            lora_rank: values.lora_rank,
-            lora_target: values.lora_target,
-          },
-        }),
-
-        // 数据处理配置
-        data_processing: {
-          cutoff_len: values.cutoff_len || values.max_length,
-          preprocessing_num_workers: values.preprocessing_num_workers,
-        },
-
-        // 评估配置
-        evaluation: {
-          ...(values.data_config.validation_config.split_ratio !== undefined && values.data_config.validation_config.split_ratio !== null && {
-            eval_split_ratio: values.data_config.validation_config.split_ratio / 100,
-          }),
-          eval_steps: values.eval_steps,
-          eval_strategy: values.eval_strategy,
-          eval_use_split: values.data_config.validation_config.type === 'split',
-          greater_is_better: values.greater_is_better,
-          load_best_model_at_end: values.load_best_model_at_end,
-          metric_for_best_model: values.metric_for_best_model,
-          per_device_eval_batch_size: values.per_device_eval_batch_size,
-        },
-        // 监控配置
-        monitor: {
-          logging_steps: values.logging_steps || values.logging_interval,
-        },
-
-        // 保存配置
-        save: {
-          save_steps: values.save_steps,
-          save_strategy: values.save_strategy,
-          save_total_limit: values.save_total_limit,
-        },
-
-        // 额外参数
-        additional_params: {
-          dataloader_num_workers: values.dataloader_num_workers,
-          ...(grpoConfig && {
-            grpo_config: grpoConfig,
-            ...(values.grpo_template_id && {
-              grpo_template_snapshot: {
-                template_id: values.grpo_template_id,
-                template_name: values.grpo_template_name,
-                training_method: 'rft-grpo',
-                fine_tune_type: values.fine_tuning_type,
-                template_content: values.grpo_template_content,
-                params: parseGrpoTemplateParams(values.grpo_template_params_json),
-                applied_params: grpoConfig,
-              },
-            }),
-            ...(values.grpo_reward_function_upload_id && {
-              grpo_reward_function: {
-                upload_id: values.grpo_reward_function_upload_id,
-                file_name: values.grpo_reward_function_file_name,
-                file_url: values.grpo_reward_function_file_url,
-                source: 'custom-python',
-                template_name: 'grpo-custom-reward-template.py',
-              },
-            }),
-            ...(grpoResourceConfig && {
-              grpo_resource_config: grpoResourceConfig,
-            }),
-          }),
-        },
-        ...(trainMethodType === 'dpo' && {
-          dpo_config: {
-            pref_beta: values.beta,
-          },
-        }),
-        graphics_card_resource: {
-          card_type: values.gpu_type[0],
-          card_model: isBelleProvider ? allocatableResources?.gpu_model : values.gpu_model,
-          count: grpoWorkResource?.gpu_count ?? values.gpu_count,
-          card_memory: values.gpu_memory,
-          k8s_resource_type: isBelleProvider ? values.gpu_type[0] : values.k8s_resource_type,
-          ...(isBelleProvider && allocatableResources && {
-            cpu: grpoWorkResource?.cpu_limit ?? values.graphics_card_resource?.cpu_limit,
-            memory: grpoWorkResource?.memory_limit ?? values.graphics_card_resource?.memory_limit,
-            queue_group_id: allocatableResources.queue_group_id,
-          }),
-          cpu_request: grpoWorkResource?.cpu_request ?? values.graphics_card_resource?.cpu_request,
-          cpu_limit: grpoWorkResource?.cpu_limit ?? values.graphics_card_resource?.cpu_limit,
-          memory_request: grpoWorkResource?.memory_request ?? values.graphics_card_resource?.memory_request,
-          memory_limit: grpoWorkResource?.memory_limit ?? values.graphics_card_resource?.memory_limit,
-        },
-        // 数据集配置
         dataset_items: datasetItems,
         eval_dataset_items: evalDatasetItems,
       }
+
+      const backendData = isGrpoTraining
+        ? {
+            ...commonBackendData,
+            advanced_template_id: values.advanced_template_mode === 'template' ? values.advanced_template_id : undefined,
+            additional_params: values.advanced_template_params || {},
+            reward_function_upload_id: values.reward_rule_upload_id || taskInfo?.reward_function_upload_id,
+            ray_resource_config: {
+              submit_graphics_card_resource: buildRayResource(values.ray_resource_config?.submit_graphics_card_resource),
+              head_graphics_card_resource: buildRayResource(values.ray_resource_config?.head_graphics_card_resource),
+              worker_replicas: values.ray_resource_config?.worker_replicas,
+              worker_graphics_card_resource: buildRayResource(values.ray_resource_config?.worker_graphics_card_resource),
+            },
+          }
+        : {
+            ...commonBackendData,
+            gpu_count: values.gpu_count,
+            ...(values.deepspeed_enabled && values.deepspeed ? { deepspeed: values.deepspeed } : {}),
+            template: values.template,
+
+            // 基础训练参数
+            basic: {
+              bf16: values.bf16,
+              gradient_accumulation_steps: values.gradient_accumulation_steps,
+              learning_rate: values.learning_rate,
+              lr_scheduler_type: values.lr_scheduler_type,
+              num_train_epochs: values.num_train_epochs,
+              per_device_train_batch_size: values.per_device_train_batch_size,
+              warmup_ratio: values.warmup_ratio,
+            },
+
+            // 高级参数
+            advanced: {
+              gradient_checkpointing: values.gradient_checkpointing,
+              max_grad_norm: values.max_grad_norm,
+              rope_scaling: values.rope_scaling,
+              seed: values.seed || values.random_seed,
+              weight_decay: values.weight_decay,
+            },
+
+            // LoRA配置 - 仅在非full微调时包含
+            ...(values.fine_tuning_type !== 'full' && {
+              lora_config: {
+                lora_alpha: values.lora_alpha,
+                lora_dropout: values.lora_dropout,
+                lora_rank: values.lora_rank,
+                lora_target: values.lora_target,
+              },
+            }),
+
+            // 数据处理配置
+            data_processing: {
+              cutoff_len: values.cutoff_len || values.max_length,
+              preprocessing_num_workers: values.preprocessing_num_workers,
+            },
+
+            // 评估配置
+            evaluation: {
+              ...(values.data_config.validation_config.split_ratio !== undefined && values.data_config.validation_config.split_ratio !== null && {
+                eval_split_ratio: values.data_config.validation_config.split_ratio / 100,
+              }),
+              eval_steps: values.eval_steps,
+              eval_strategy: values.eval_strategy,
+              eval_use_split: values.data_config.validation_config.type === 'split',
+              greater_is_better: values.greater_is_better,
+              load_best_model_at_end: values.load_best_model_at_end,
+              metric_for_best_model: values.metric_for_best_model,
+              per_device_eval_batch_size: values.per_device_eval_batch_size,
+            },
+            // 监控配置
+            monitor: {
+              logging_steps: values.logging_steps || values.logging_interval,
+            },
+
+            // 保存配置
+            save: {
+              save_steps: values.save_steps,
+              save_strategy: values.save_strategy,
+              save_total_limit: values.save_total_limit,
+            },
+
+            // 额外参数
+            additional_params: {
+              dataloader_num_workers: values.dataloader_num_workers,
+            },
+            ...(trainMethodType === 'dpo' && {
+              dpo_config: {
+                pref_beta: values.beta,
+              },
+            }),
+            graphics_card_resource: workerGraphicsCardResource,
+          }
 
       if (taskName) {
         backendData.base_model = taskInfo.base_model
@@ -725,11 +748,63 @@ const CreateFinetuneRun: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['finetuneRuns', projectId] })
     }
     catch (error) {
-      // message.error('创建训练运行失败');
+      message.error('创建训练运行失败')
       console.error('Failed to create experiment run:', error)
     }
     finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleSubmitFailed = ({ errorFields }: { errorFields?: { name: (string | number)[], errors: string[] }[] }) => {
+    const firstError = errorFields?.[0]
+    message.error(firstError?.errors?.[0] || '请检查必填项配置')
+    if (firstError?.name) {
+      setCurrentStep(getStepIndexByField(firstError.name))
+      setTimeout(() => {
+        form.scrollToField(firstError.name, { block: 'center' })
+      })
+    }
+  }
+
+  const handleSubmitButtonClick = () => {
+    form
+      .validateFields()
+      .then((values) => handleSubmit(values))
+      .catch(handleSubmitFailed)
+  }
+
+  const getStepIndexByField = (name: (string | number)[]) => {
+    const firstName = String(name[0] ?? '')
+    const isModelStepVisible = !taskName
+    const trainingStepIndex = isModelStepVisible ? 2 : 1
+    const dataStepIndex = isModelStepVisible ? 3 : 2
+    const resourceStepIndex = isModelStepVisible ? 4 : 3
+
+    if (['name', 'version', 'schedule_enabled', 'schedule_date', 'schedule_time', 'description'].includes(firstName))
+      return 0
+    if (['base_provider', 'base_model_id', 'base_model_name'].includes(firstName))
+      return isModelStepVisible ? 1 : 0
+    if (firstName === 'data_config')
+      return dataStepIndex
+    if (
+      ['gpu_type', 'gpu_count', 'gpu_model', 'gpu_memory', 'k8s_resource_type', 'graphics_card_resource', 'ray_resource_config'].includes(firstName)
+    ) {
+      return resourceStepIndex
+    }
+
+    return trainingStepIndex
+  }
+
+  const validateStepFields = async (fields: (string | (string | number)[])[]) => {
+    if (!fields.length)
+      return
+    try {
+      await form.validateFields(fields)
+    }
+    catch (error: any) {
+      handleSubmitFailed({ errorFields: error?.errorFields })
+      throw error
     }
   }
 
@@ -740,24 +815,173 @@ const CreateFinetuneRun: React.FC = () => {
     form.setFieldsValue({ data_config: emptyDataConfig })
   }
 
+  const dataConfigContent = (
+    <>
+      <Form.Item
+        noStyle
+        name="data_config"
+        rules={[
+          { required: true, message: '请配置训练数据集' },
+          {
+            validator: async (_, value: DataConfigValue) => {
+              if (!value?.training_datasets?.length) {
+                throw new Error('请至少选择一个训练数据集')
+              }
+
+              const totalRatio = value.training_datasets.reduce((sum, d) => sum + (d.weight_in_total || 0), 0)
+              if (totalRatio !== 100) {
+                throw new Error('训练数据集比例总和必须等于100%')
+              }
+
+              if (value.validation_config.type === 'platform') {
+                if (!value.validation_datasets || value.validation_datasets.length === 0) {
+                  throw new Error('选择验证数据集模式时，请至少选择一个验证数据集')
+                }
+
+                const validationTotalRatio = value.validation_datasets.reduce((sum, d) => sum + (d.weight_in_total || 0), 0)
+                if (validationTotalRatio !== 100) {
+                  throw new Error('验证数据集比例总和必须等于100%')
+                }
+              }
+            },
+          },
+        ]}
+      >
+        <EnhancedDataConfig
+          key={dataConfigResetKey}
+          form={form}
+          availableTrainingDatasets={datasets}
+          availableValidationDatasets={validationDatasets}
+          disabled={submitting}
+          projectId={projectId ? parseInt(projectId) : undefined}
+          dataConfig={dataConfig}
+          trainTypeCategoryFromTask={taskName ? taskInfo?.training_type?.train_type_category : undefined}
+          trainingMethodTypeFromTask={forcedTrainingMethodType || getTrainingMethodType(taskInfo?.training_type)}
+        />
+      </Form.Item>
+      <Form.Item noStyle shouldUpdate>
+        {() => (
+          <Form.ErrorList errors={form.getFieldError('data_config')} />
+        )}
+      </Form.Item>
+    </>
+  )
+
+  const resourceConfigContent = isGrpoResourceMode ? (
+    <GrpoRayResourceConfig
+      projectId={projectId ? parseInt(projectId) : undefined}
+      SupportedGpuCategory={SupportedGpuCategory}
+      onAllocatableResourcesChange={setAllocatableResources}
+      onResourceLoadingChange={setResourceConfigLoading}
+      preserveResourceValuesOnAllocatableChange={isEditMode || !!taskName}
+    />
+  ) : (
+    <ResourceConfig
+      projectId={projectId ? parseInt(projectId) : undefined}
+      SupportedGpuCategory={SupportedGpuCategory}
+      onAllocatableResourcesChange={setAllocatableResources}
+      onResourceLoadingChange={setResourceConfigLoading}
+      preserveResourceValuesOnAllocatableChange={isEditMode || !!taskName}
+    />
+  )
+
+  const stepConfigs = [
+    {
+      title: '基础配置',
+      validateFields: ['name', 'version', 'schedule_date', 'schedule_time'],
+      content: <BasicConfig form={form} datainfo={taskInfo} taskName={taskName} />,
+    },
+    ...(!taskName
+      ? [{
+          title: '模型配置',
+          validateFields: ['base_provider', 'base_model_id', 'base_model_name'],
+          content: (
+            <ModelConfig
+              form={form}
+              ModelProviderCategory={ModelProviderCategory}
+              modelVersions={modelVersions}
+            />
+          ),
+        }]
+      : []),
+    {
+      title: '训练配置',
+      validateFields: [
+        'train_type_category',
+        'training_type',
+        'fine_tuning_type',
+        'reward_rule_upload_id',
+        'deepspeed',
+      ],
+      content: (
+        <TrainingConfig
+          form={form}
+          TrainingTypeCategory={TrainingTypeCategory}
+          TrainingMethodCategory={TrainingMethodCategory}
+          MonitoringConfigCategory={MonitoringConfigCategory}
+          type={taskInfo?.training_type?.fine_tuning_type}
+          EvalStrategyCategory={EvalStrategyCategory}
+          LrSchedulerTypeCategory={LrSchedulerTypeCategory}
+          SaveStrategyCategory={SaveStrategyCategory}
+          taskName={taskName}
+          trainingMethodType={forcedTrainingMethodType || getTrainingMethodType(taskInfo?.training_type)}
+          onTrainingMethodChange={resetSelectedDatasets}
+        />
+      ),
+    },
+    {
+      title: '数据配置',
+      validateFields: ['data_config'],
+      content: dataConfigContent,
+    },
+    {
+      title: isGrpoResourceMode ? '资源配置' : '显卡资源配置',
+      validateFields: [isGrpoResourceMode ? 'ray_resource_config' : 'gpu_type', isGrpoResourceMode ? 'ray_resource_config' : 'gpu_count'],
+      content: resourceConfigContent,
+    },
+  ]
+  const activeStep = Math.min(currentStep, stepConfigs.length - 1)
+  const isLastStep = activeStep === stepConfigs.length - 1
+  const handlePrevStep = () => {
+    setCurrentStep((step) => Math.max(step - 1, 0))
+  }
+  const handleNextStep = async () => {
+    await validateStepFields(stepConfigs[activeStep].validateFields)
+    setCurrentStep((step) => Math.min(step + 1, stepConfigs.length - 1))
+  }
+
   return (
     <div className="create-form-page create-finetune-run-page">
       <section className="create-form-card w-full min-w-0">
         <CreateFormPageHeader
-          title={taskName ? '创建训练版本' : isEditMode ? '编辑训练任务' : '创建训练任务'}
+          title={isEditMode ? '编辑训练任务' : taskName ? '创建训练版本' : '创建训练任务'}
           onBack={handleCancel}
           actions={(
             <>
-              <Button className="create-form-cancel" onClick={handleCancel}>取消</Button>
-              <Button
-                className="create-form-submit"
-                type="primary"
-                loading={submitting}
-                disabled={submitDisabled}
-                onClick={() => form.submit()}
-              >
-                提交
-              </Button>
+              {activeStep > 0 && (
+                <Button className="create-form-cancel" onClick={handlePrevStep}>
+                  上一步
+                </Button>
+              )}
+              {!isLastStep ? (
+                <Button
+                  className="create-form-submit"
+                  type="primary"
+                  onClick={handleNextStep}
+                >
+                  下一步
+                </Button>
+              ) : (
+                <Button
+                  className="create-form-submit"
+                  type="primary"
+                  loading={submitting}
+                  disabled={submitting}
+                  onClick={handleSubmitButtonClick}
+                >
+                  提交
+                </Button>
+              )}
             </>
           )}
         />
@@ -769,93 +993,24 @@ const CreateFinetuneRun: React.FC = () => {
               className="w-full min-w-0"
               layout="vertical"
               onFinish={handleSubmit}
+              onFinishFailed={handleSubmitFailed}
             >
-              {/* 基础配置模块 */}
-              <BasicConfig form={form} datainfo={taskInfo} taskName={taskName} />
-
-              {/* 训练配置模块 */}
-              <TrainingConfig
-                form={form}
-                TrainingTypeCategory={TrainingTypeCategory}
-                TrainingMethodCategory={TrainingMethodCategory}
-                MonitoringConfigCategory={MonitoringConfigCategory}
-                type={taskInfo?.training_type?.fine_tuning_type}
-                EvalStrategyCategory={EvalStrategyCategory}
-                LrSchedulerTypeCategory={LrSchedulerTypeCategory}
-                SaveStrategyCategory={SaveStrategyCategory}
-                taskName={taskName}
-                projectId={projectId}
-                trainingMethodType={forcedTrainingMethodType || getTrainingMethodType(taskInfo?.training_type)}
-                onTrainingMethodChange={resetSelectedDatasets}
+              <Steps
+                className="!mb-6"
+                current={activeStep}
+                items={stepConfigs.map((step) => ({ title: step.title }))}
+                onChange={setCurrentStep}
               />
 
-              {/* 模型配置模块 */}
-              {!taskName && (
-                <ModelConfig
-                  form={form}
-                  ModelProviderCategory={ModelProviderCategory}
-                  modelVersions={modelVersions}
-                />
-              )}
-              {/* 数据配置模块 */}
-              <Form.Item
-                noStyle
-                name="data_config"
-                rules={[
-                  { required: true, message: '请配置训练数据集' },
-                  {
-                    validator: async (_, value: DataConfigValue) => {
-                      if (!value?.training_datasets?.length) {
-                        throw new Error('请至少选择一个训练数据集')
-                      }
+              {stepConfigs.map((step, index) => (
+                <div
+                  key={step.title}
+                  style={{ display: activeStep === index ? undefined : 'none' }}
+                >
+                  {step.content}
+                </div>
+              ))}
 
-                      const totalRatio = value.training_datasets.reduce((sum, d) => sum + (d.weight_in_total || 0), 0)
-                      if (totalRatio !== 100) {
-                        throw new Error('训练数据集比例总和必须等于100%')
-                      }
-
-                      if (value.validation_config.type === 'platform') {
-                        if (!value.validation_datasets || value.validation_datasets.length === 0) {
-                          throw new Error('选择验证数据集模式时，请至少选择一个验证数据集')
-                        }
-
-                        const validationTotalRatio = value.validation_datasets.reduce((sum, d) => sum + (d.weight_in_total || 0), 0)
-                        if (validationTotalRatio !== 100) {
-                          throw new Error('验证数据集比例总和必须等于100%')
-                        }
-                      }
-                    },
-                  },
-                ]}
-              >
-                <EnhancedDataConfig
-                  key={dataConfigResetKey}
-                  form={form}
-                  availableTrainingDatasets={datasets}
-                  availableValidationDatasets={validationDatasets}
-                  disabled={submitting}
-                  projectId={projectId ? parseInt(projectId) : undefined}
-                  dataConfig={dataConfig}
-                  trainTypeCategoryFromTask={taskName ? taskInfo?.training_type?.train_type_category : undefined}
-                  trainingMethodTypeFromTask={forcedTrainingMethodType || getTrainingMethodType(taskInfo?.training_type)}
-                />
-              </Form.Item>
-              <Form.Item noStyle shouldUpdate>
-                {() => (
-                  <Form.ErrorList errors={form.getFieldError('data_config')} />
-                )}
-              </Form.Item>
-              {/* 资源配置模块 */}
-              <ResourceConfig
-                projectId={projectId ? parseInt(projectId) : undefined}
-                SupportedGpuCategory={SupportedGpuCategory}
-                onAllocatableResourcesChange={setAllocatableResources}
-                onResourceLoadingChange={setResourceConfigLoading}
-                preserveResourceValuesOnAllocatableChange={isEditMode || !!taskName}
-              />
-              {currentTrainingMethodType === 'rft-grpo' && (
-                <GrpoStageResourceConfig />
-              )}
             </Form>
           </Row>
         </div>

@@ -410,6 +410,19 @@ class TextGenerationDatasetFileParser:
                     logger.error(f"当前数据集格式暂不支持：{file_type}")
                     raise ValueError("文件格式错误")
 
+            elif dataset_format == DatasetFormat.GRPO.value:
+                if training_method_type != TrainingMethodType.GRPO.value:
+                    logger.error(f"grpo 数据集格式仅支持 grpo 训练方法，当前为: {training_method_type}")
+                    raise ValueError("文件格式错误")
+                if file_type == 'json':
+                    return await self.analyze_grpo_json_content(file_content)
+                elif file_type == 'jsonl':
+                    return await self.analyze_grpo_jsonl_content(file_content)
+                elif file_type == 'xlsx':
+                    return await self.analyze_grpo_xlsx_content(file_content)
+                logger.error(f"GRPO 数据集仅支持 json/jsonl/xlsx 格式，当前为: {file_type}")
+                raise ValueError("文件格式错误")
+
         except ValueError:
             raise
         except Exception as e:
@@ -437,6 +450,132 @@ class TextGenerationDatasetFileParser:
         if "input" in item and item["input"] is not None and not isinstance(item["input"], str):
             logger.error(f"{prefix}：input 必须是字符串")
             raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+    @staticmethod
+    def _validate_grpo_item(item: Dict[str, Any], line_num: int) -> None:
+        prefix = f"第{line_num}行"
+        for field_name in ("data_source", "prompt", "reward_model"):
+            if field_name not in item:
+                logger.error(f"{prefix}：缺少必需字段 {field_name}")
+                raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+        if not isinstance(item["data_source"], str) or not item["data_source"].strip():
+            logger.error(f"{prefix}：data_source 必须是非空字符串")
+            raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+        prompt = item["prompt"]
+        if not isinstance(prompt, list) or not prompt:
+            logger.error(f"{prefix}：prompt 必须是非空数组")
+            raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+        for msg_idx, message in enumerate(prompt):
+            if not isinstance(message, dict):
+                logger.error(f"{prefix} prompt[{msg_idx}]：必须是对象")
+                raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+            role = message.get("role")
+            if role not in ("system", "user", "assistant"):
+                logger.error(f"{prefix} prompt[{msg_idx}]：role 必须是 system/user/assistant")
+                raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+            content = message.get("content")
+            if not isinstance(content, str) or not content.strip():
+                logger.error(f"{prefix} prompt[{msg_idx}]：content 必须是非空字符串")
+                raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+        reward_model = item["reward_model"]
+        if not isinstance(reward_model, dict):
+            logger.error(f"{prefix}：reward_model 必须是对象")
+            raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+        for field_name in ("style", "ground_truth"):
+            if field_name not in reward_model:
+                logger.error(f"{prefix}：reward_model 缺少必需字段 {field_name}")
+                raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+        if not isinstance(reward_model["style"], str) or not reward_model["style"].strip():
+            logger.error(f"{prefix}：reward_model.style 必须是非空字符串")
+            raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+        if reward_model["ground_truth"] is None:
+            logger.error(f"{prefix}：reward_model.ground_truth 不能为空")
+            raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+        if "extra_info" in item and item["extra_info"] is not None and not isinstance(item["extra_info"], dict):
+            logger.error(f"{prefix}：extra_info 必须是对象")
+            raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+    @staticmethod
+    def _parse_grpo_json_cell(value: Any, field_name: str, line_num: int, expected_type: type | tuple[type, ...]) -> Any:
+        if isinstance(value, expected_type):
+            return value
+        if value is None:
+            logger.error(f"第{line_num}行：{field_name} 不能为空")
+            raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+        if not isinstance(value, str):
+            logger.error(f"第{line_num}行：{field_name} 必须是JSON字符串")
+            raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+        value = value.strip()
+        if not value:
+            logger.error(f"第{line_num}行：{field_name} 不能为空")
+            raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+        try:
+            parsed_value = json.loads(value)
+        except json.JSONDecodeError as e:
+            logger.error(f"第{line_num}行：{field_name} JSON格式错误: {str(e)}")
+            raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+        if not isinstance(parsed_value, expected_type):
+            logger.error(f"第{line_num}行：{field_name} JSON类型错误")
+            raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+        return parsed_value
+
+    @staticmethod
+    def _set_nested_value(target: Dict[str, Any], dotted_key: str, value: Any) -> None:
+        current = target
+        parts = dotted_key.split(".")
+        for part in parts[:-1]:
+            if part not in current or not isinstance(current[part], dict):
+                current[part] = {}
+            current = current[part]
+        current[parts[-1]] = value
+
+    def _normalize_grpo_xlsx_row(self, row_data: Dict[str, Any], line_num: int) -> Dict[str, Any]:
+        item: Dict[str, Any] = {}
+
+        if row_data.get("data_source") is not None:
+            item["data_source"] = str(row_data["data_source"]).strip()
+        if row_data.get("prompt") is not None:
+            item["prompt"] = self._parse_grpo_json_cell(row_data["prompt"], "prompt", line_num, list)
+        if row_data.get("ability") is not None:
+            item["ability"] = str(row_data["ability"]).strip()
+
+        if row_data.get("reward_model") is not None:
+            item["reward_model"] = self._parse_grpo_json_cell(row_data["reward_model"], "reward_model", line_num, dict)
+        else:
+            reward_model: Dict[str, Any] = {}
+            if row_data.get("reward_model.style") is not None:
+                reward_model["style"] = str(row_data["reward_model.style"]).strip()
+            elif row_data.get("reward_style") is not None:
+                reward_model["style"] = str(row_data["reward_style"]).strip()
+            if row_data.get("reward_model.ground_truth") is not None:
+                reward_model["ground_truth"] = row_data["reward_model.ground_truth"]
+            elif row_data.get("ground_truth") is not None:
+                reward_model["ground_truth"] = row_data["ground_truth"]
+            if reward_model:
+                item["reward_model"] = reward_model
+
+        if row_data.get("extra_info") is not None:
+            item["extra_info"] = self._parse_grpo_json_cell(row_data["extra_info"], "extra_info", line_num, dict)
+
+        for key, value in row_data.items():
+            if value is None or value == "":
+                continue
+            if key.startswith("extra_info."):
+                if "extra_info" not in item:
+                    item["extra_info"] = {}
+                self._set_nested_value(item["extra_info"], key.removeprefix("extra_info."), value)
+            elif key.startswith("reward_model.") and key not in ("reward_model.style", "reward_model.ground_truth"):
+                if "reward_model" not in item:
+                    item["reward_model"] = {}
+                self._set_nested_value(item["reward_model"], key.removeprefix("reward_model."), value)
+            elif key == "images":
+                item["images"] = self._parse_grpo_json_cell(value, "images", line_num, list)
+
+        self._validate_grpo_item(item, line_num)
+        return item
 
     @staticmethod
     def _validate_role_based_messages(
@@ -795,6 +934,170 @@ class TextGenerationDatasetFileParser:
         except Exception as e:
             logger.error(f"解析文件失败: {str(e)}")
             raise ValueError("文件解析服务异常")
+
+    async def analyze_grpo_jsonl_content(self, file_content: bytes) -> TextGenerationParseResult:
+        """解析 GRPO JSONL 文件，校验 verl 所需字段并原样保存。"""
+        total_samples = 0
+        total_characters = 0
+        normalized_lines: List[str] = []
+
+        try:
+            content_str = file_content.decode('utf-8')
+            lines = content_str.splitlines()
+
+            for line_num, line in enumerate(lines, 1):
+                line = line.strip()
+                if not line or line.lstrip().startswith('#'):
+                    continue
+
+                try:
+                    parsed_data = json.loads(line)
+                except json.JSONDecodeError as e:
+                    logger.error(f"第{line_num}行JSON格式错误: {str(e)}")
+                    raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+                if not isinstance(parsed_data, dict):
+                    logger.error(f"第{line_num}行：GRPO样本必须是JSON对象")
+                    raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+                self._validate_grpo_item(parsed_data, line_num)
+                jsonl_line = json.dumps(parsed_data, ensure_ascii=False)
+                normalized_lines.append(jsonl_line)
+                total_samples += 1
+                total_characters += len(jsonl_line)
+
+            if total_samples == 0:
+                raise ValueError("无有效数据")
+
+            return TextGenerationParseResult(
+                total_rows=total_samples,
+                skip_rows=0,
+                processed_rows=total_samples,
+                total_characters=total_characters,
+                convert_file_content="\n".join(normalized_lines).encode("utf-8"),
+            )
+        except UnicodeDecodeError as e:
+            logger.error(f"文件编码错误: {str(e)}")
+            raise ValueError("文件格式错误")
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"解析GRPO JSONL文件失败: {str(e)}")
+            raise ValueError("文件解析服务异常")
+
+    async def analyze_grpo_json_content(self, file_content: bytes) -> TextGenerationParseResult:
+        """解析 GRPO JSON 文件，支持单对象或对象数组，内部转换为 JSONL。"""
+        try:
+            json_str = file_content.decode("utf-8")
+            data = json.loads(json_str)
+
+            if isinstance(data, dict):
+                data = [data]
+            if not isinstance(data, list):
+                raise ValueError("字段/格式错误")
+
+            normalized_lines = []
+            total_characters = 0
+            for index, item in enumerate(data, 1):
+                if not isinstance(item, dict):
+                    raise ValueError(f"第 {index} 个样本：字段/格式错误")
+                self._validate_grpo_item(item, index)
+                jsonl_line = json.dumps(item, ensure_ascii=False)
+                normalized_lines.append(jsonl_line)
+                total_characters += len(jsonl_line)
+
+            if not normalized_lines:
+                raise ValueError("无有效数据")
+
+            return TextGenerationParseResult(
+                total_rows=len(data),
+                processed_rows=len(normalized_lines),
+                skip_rows=0,
+                total_characters=total_characters,
+                convert_file_content="\n".join(normalized_lines).encode("utf-8"),
+            )
+        except UnicodeDecodeError as e:
+            logger.error(f"文件编码错误: {str(e)}")
+            raise ValueError("文件格式错误")
+        except json.JSONDecodeError as e:
+            logger.error(f"文件JSON格式异常: {str(e)}")
+            raise ValueError("文件格式错误")
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"解析GRPO JSON文件失败: {str(e)}")
+            raise ValueError("文件解析服务异常")
+
+    async def analyze_grpo_xlsx_content(self, file_content: bytes) -> TextGenerationParseResult:
+        """解析 GRPO XLSX 文件，复杂字段使用 JSON 字符串，内部转换为 JSONL。"""
+
+        def _parse_xlsx_sync() -> TextGenerationParseResult:
+            try:
+                file_stream = io.BytesIO(file_content)
+                workbook = load_workbook(
+                    filename=file_stream,
+                    read_only=True,
+                    data_only=True,
+                )
+                worksheet = workbook.active
+                if worksheet is None or worksheet.max_row < 2:
+                    raise ValueError("无有效数据")
+
+                row_iter = worksheet.iter_rows(values_only=True)
+                raw_headers = next(row_iter)
+                headers = [str(cell).strip() if cell is not None else "" for cell in raw_headers]
+                if not any(headers):
+                    raise ValueError("无有效数据")
+
+                normalized_lines: List[str] = []
+                total_rows = worksheet.max_row - 1
+                processed_rows = 0
+                skip_rows = 0
+                total_characters = 0
+
+                for row_index, row in enumerate(row_iter, 2):
+                    row_data = {
+                        headers[col_index]: value
+                        for col_index, value in enumerate(row)
+                        if col_index < len(headers)
+                        and headers[col_index]
+                        and value is not None
+                    }
+                    if not row_data:
+                        skip_rows += 1
+                        continue
+
+                    item = self._normalize_grpo_xlsx_row(row_data, row_index)
+                    jsonl_line = json.dumps(item, ensure_ascii=False)
+                    normalized_lines.append(jsonl_line)
+                    processed_rows += 1
+                    total_characters += len(jsonl_line)
+
+                if processed_rows == 0:
+                    raise ValueError("无有效数据")
+
+                return TextGenerationParseResult(
+                    total_rows=total_rows,
+                    processed_rows=processed_rows,
+                    skip_rows=skip_rows,
+                    total_characters=total_characters,
+                    convert_file_content="\n".join(normalized_lines).encode("utf-8"),
+                )
+            except InvalidFileException as e:
+                logger.error(f"转换GRPO Excel文件失败: {str(e)}")
+                raise ValueError("文件格式错误")
+            except ValueError:
+                raise
+            except Exception as e:
+                logger.error(f"转换GRPO Excel文件失败: {str(e)}")
+                raise ValueError("文件解析服务异常")
+
+        current_loop = asyncio.get_running_loop()
+        result = await current_loop.run_in_executor(self.executor, _parse_xlsx_sync)
+        logger.info(
+            f"文件总共处理：{result.total_rows}行\n其中：{result.skip_rows}行有误被跳过\n剩余{result.processed_rows}行转换成功"
+        )
+        return result
 
     async def analyze_dpo_prompt_response_json_content(self, file_content: bytes) -> TextGenerationParseResult:
         """解析 DPO prompt-response JSON 文件。"""
@@ -2515,7 +2818,12 @@ class ImageUnderstandingDatasetFileParser:
             candidates.add(os.path.basename(relative_path))
         return {candidate for candidate in candidates if candidate}
 
-    async def process_image_understanding_file(self, file_content: bytes) -> ImageUnderstandingParseResult:
+    async def process_image_understanding_file(
+            self,
+            file_content: bytes,
+            dataset_format: Optional[str] = None,
+            training_method_type: Optional[str] = None,
+    ) -> ImageUnderstandingParseResult:
         """
         处理图像理解数据集的zip文件
 
@@ -2592,7 +2900,12 @@ class ImageUnderstandingDatasetFileParser:
                     os.unlink(tmp_file_path)
 
             # 验证 jsonl 内容格式
-            total_samples, total_characters = await self.analyze_jsonl_content(jsonl_content, images)
+            total_samples, total_characters = await self.analyze_jsonl_content(
+                jsonl_content,
+                images,
+                dataset_format=dataset_format,
+                training_method_type=training_method_type,
+            )
 
             return ImageUnderstandingParseResult(
                 jsonl_content=jsonl_content,
@@ -2610,7 +2923,13 @@ class ImageUnderstandingDatasetFileParser:
             logger.error(f"处理zip文件失败: {str(e)}")
             raise ValueError("文件解析服务异常")
 
-    async def analyze_jsonl_content(self, jsonl_content: bytes, images: Dict[str, bytes]) -> Tuple[int, int]:
+    async def analyze_jsonl_content(
+            self,
+            jsonl_content: bytes,
+            images: Dict[str, bytes],
+            dataset_format: Optional[str] = None,
+            training_method_type: Optional[str] = None,
+    ) -> Tuple[int, int]:
         """
         验证图像理解数据集的jsonl格式
 
@@ -2644,6 +2963,22 @@ class ImageUnderstandingDatasetFileParser:
                     if not isinstance(parsed_data, dict):
                         logger.error(f"第{line_num}行：数据应是JSON对象格式")
                         raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+                    is_grpo_format = (
+                        dataset_format == DatasetFormat.GRPO.value
+                        or training_method_type == TrainingMethodType.GRPO.value
+                        or (
+                            dataset_format is None
+                            and training_method_type is None
+                            and "prompt" in parsed_data
+                            and "reward_model" in parsed_data
+                        )
+                    )
+                    if is_grpo_format:
+                        self._validate_grpo_image_item(parsed_data, line_num, images)
+                        total_samples += 1
+                        total_characters += len(line)
+                        continue
 
                     # 验证 messages 字段
                     if 'messages' not in parsed_data:
@@ -2741,6 +3076,35 @@ class ImageUnderstandingDatasetFileParser:
             logger.error(f"解析文件失败: {str(e)}")
             raise ValueError("文件解析服务异常")
 
+    def _validate_grpo_image_item(self, item: Dict[str, Any], line_num: int, images: Dict[str, bytes]) -> None:
+        TextGenerationDatasetFileParser._validate_grpo_item(item, line_num)
+
+        images_list = item.get("images", [])
+        if not isinstance(images_list, list):
+            logger.error(f"第{line_num}行：images字段必须是数组")
+            raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+        image_tag_count = 0
+        for message in item.get("prompt", []):
+            content = message.get("content", "")
+            if isinstance(content, str):
+                image_tag_count += content.count("<image>")
+
+        if image_tag_count != len(images_list):
+            logger.error(f"第{line_num}行：prompt中的<image>标签数量必须等于images数组长度")
+            raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+        if image_tag_count == 0:
+            logger.error(f"第{line_num}行：图像理解GRPO样本必须包含至少一个<image>标签")
+            raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+        for img_name in images_list:
+            if not isinstance(img_name, str) or not img_name.strip():
+                logger.error(f"第{line_num}行：images数组中的元素必须是非空字符串")
+                raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+            if img_name.replace("images/", "") not in images:
+                logger.error(f"第{line_num}行：images中引用的图片在zip中不存在: {img_name}")
+                raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
 async def analyze_text_generation_dataset_file_content(
     file_content: bytes,
     file_type: str,
@@ -2788,7 +3152,12 @@ async def analyze_business_dataset_file_content(file_content: bytes, file_type: 
     finally:
         parser.executor.shutdown(wait=False)  # 清理资源
 
-async def analyze_image_understanding_dataset_file_content(file_content: bytes, file_type: str) -> ImageUnderstandingParseResult:
+async def analyze_image_understanding_dataset_file_content(
+        file_content: bytes,
+        file_type: str,
+        dataset_format: Optional[str] = None,
+        training_method_type: Optional[str] = None,
+) -> ImageUnderstandingParseResult:
     """
     图像理解文件解析入口函数
 
@@ -2807,7 +3176,11 @@ async def analyze_image_understanding_dataset_file_content(file_content: bytes, 
         logger.error(f"图像理解数据集仅支持zip格式，当前为: {file_type}")
         raise ValueError("文件格式错误")
     parser = ImageUnderstandingDatasetFileParser()
-    return await parser.process_image_understanding_file(file_content)
+    return await parser.process_image_understanding_file(
+        file_content,
+        dataset_format=dataset_format,
+        training_method_type=training_method_type,
+    )
 
 # ========= 其他基础公共方法 ==========
 
@@ -3183,6 +3556,10 @@ def _collect_metadata_fields_from_data(data: Any, fields: set[str], prefix: str 
                 _collect_metadata_fields_from_data(value, fields, field_name)
     elif isinstance(data, list):
         for item in data:
+            if prefix in {"messages", "conversations", "dialogue"} and isinstance(item, dict):
+                role = item.get("role") or item.get("from") or item.get("speaker")
+                if isinstance(role, str) and role:
+                    fields.add(f"{prefix}.{role}")
             if isinstance(item, (dict, list)):
                 _collect_metadata_fields_from_data(item, fields, prefix)
 
@@ -3358,7 +3735,12 @@ async def analyze_save_dataset_file_multi(
             # 根据数据集类型处理文件
             if dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING:
                 # 图像理解数据集：处理zip文件
-                zip_result = await analyze_image_understanding_dataset_file_content(file_content, file_type)
+                zip_result = await analyze_image_understanding_dataset_file_content(
+                    file_content,
+                    file_type,
+                    dataset_format.value if hasattr(dataset_format, "value") else dataset_format,
+                    training_method_type.value if hasattr(training_method_type, "value") else training_method_type,
+                )
                 jsonl_content = zip_result.jsonl_content
                 images = zip_result.images
                 parse_total_samples = zip_result.total_samples
@@ -3428,7 +3810,7 @@ async def analyze_save_dataset_file_multi(
         raise HTTPException(status_code=500, detail="所有文件解析失败：无有效数据")
 
     metadata_fields = sorted(metadata_field_set)
-    
+
     try:
         # 生成最终的数据集路径
         dataset_path = generate_dataset_path(
@@ -3562,7 +3944,8 @@ async def analyze_export_dataset_file_single(
        - prompt-response: 列结构为 prompt, response, system（可选）
        - alpaca: 列结构为 instruction, input, chosen, rejected
        - role-based: 从 messages 数组转换为表格列（单轮：system, user, assistant；多轮：system, user1, assistant1, user2, assistant2...）
-    
+       - grpo: 列结构为 data_source, prompt, ability, reward_model, extra_info
+
     注意：
     - prompt-response 格式的 JSONL 每行格式为 [{"prompt": "...", "response": "..."}]（数组包装）
     - alpaca 格式的 JSONL 每行格式为 {"instruction": "...", "input": "...", "chosen": "...", "rejected": "..."}
@@ -3594,6 +3977,8 @@ async def analyze_export_dataset_file_single(
                 return _convert_training_prompt_response_to_xlsx([])
             elif dataset_format == DatasetFormat.ALPACA.value:
                 return _convert_training_alpaca_to_xlsx([])
+            elif dataset_format == DatasetFormat.GRPO.value:
+                return _convert_training_grpo_to_xlsx([])
             elif dataset_format == DatasetFormat.ROLE_BASED.value:
                 if db_dataset.training_method_type == TrainingMethodType.DPO.value:
                     return _convert_training_dpo_role_based_to_xlsx([])
@@ -3626,6 +4011,8 @@ async def analyze_export_dataset_file_single(
                 jsonl_line = '[' + json.dumps(item, ensure_ascii=False) + ']'
             elif dataset_format == DatasetFormat.ALPACA.value:
                 jsonl_line = json.dumps(item, ensure_ascii=False)
+            elif dataset_format == DatasetFormat.GRPO.value:
+                jsonl_line = json.dumps(item, ensure_ascii=False)
             else:
                 # role-based 格式：直接序列化
                 jsonl_line = json.dumps(item, ensure_ascii=False)
@@ -3649,7 +4036,10 @@ async def analyze_export_dataset_file_single(
         
         elif dataset_format == DatasetFormat.ALPACA.value:
             return _convert_training_alpaca_to_xlsx(all_items)
-        
+
+        elif dataset_format == DatasetFormat.GRPO.value:
+            return _convert_training_grpo_to_xlsx(all_items)
+
         elif dataset_format == DatasetFormat.ROLE_BASED.value:
             # role-based 格式转换为 XLSX
             if db_dataset.training_method_type == TrainingMethodType.DPO.value:
@@ -3661,7 +4051,7 @@ async def analyze_export_dataset_file_single(
             return _convert_business_to_xlsx(all_items)
         
         else:
-            raise ValueError(f"不支持的数据集格式: {dataset_format}，XLSX 导出仅支持 prompt-response、alpaca 和 role-based 格式")
+            raise ValueError(f"不支持的数据集格式: {dataset_format}，XLSX 导出仅支持 prompt-response、alpaca、role-based 和 grpo 格式")
     
     else:
         raise ValueError(f"不支持的导出格式: {export_type}")
@@ -3898,6 +4288,39 @@ def _convert_training_dpo_role_based_to_xlsx(items: List[Dict[str, Any]]) -> byt
         ]
         if has_images:
             row.append(_convert_value_to_excel(item.get("images", [])))
+        ws.append(row)
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()
+
+
+def _convert_training_grpo_to_xlsx(items: List[Dict[str, Any]]) -> bytes:
+    """将 GRPO 格式的训练数据集转换为 XLSX。"""
+    all_columns = set()
+    for item in items:
+        all_columns.update(item.keys())
+
+    priority_columns = ["data_source", "prompt", "ability", "reward_model", "extra_info"]
+    ordered_columns = []
+
+    if not items:
+        ordered_columns = priority_columns
+    else:
+        for col in priority_columns:
+            if col in all_columns:
+                ordered_columns.append(col)
+                all_columns.discard(col)
+        ordered_columns.extend(sorted(all_columns))
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "训练数据集"
+    ws.append(ordered_columns)
+
+    for item in items:
+        row = [_convert_value_to_excel(item.get(col, "")) for col in ordered_columns]
         ws.append(row)
 
     output = BytesIO()

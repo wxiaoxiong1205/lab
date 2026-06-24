@@ -94,29 +94,17 @@ export interface FormValues {
   loss_type: string
   label_smoothing: number
   max_prompt_length: number
-  max_completion_length: number
-  num_generations: number
-  temperature: number
-  top_p: number
-  top_k: number
-  repetition_penalty: number
-  kl_coefficient: number
-  clip_range: number
-  advantage_estimator: string
-  reward_normalization: boolean
-  reward_scale: number
-  grpo_template_id?: number
-  grpo_template_name?: string
-  grpo_template_content?: string
-  grpo_template_params_json?: string
-  grpo_reward_function_upload_id?: string
-  grpo_reward_function_file_name?: string
-  grpo_reward_function_file_url?: string
-  grpo_resource_config?: any
   preference_prompt: string
   remove_unused_columns: boolean
   gradient_checkpointing_kwargs: string
   additional_params: string
+  advanced_template_id?: number
+  advanced_template_name?: string
+  advanced_template_mode?: 'template' | 'custom'
+  advanced_template_yaml?: string
+  advanced_template_params?: Record<string, string | number | boolean | null>
+  reward_rule_file?: Array<{ name?: string, originFileObj?: File }>
+  reward_rule_upload_id?: string
   gpu_type: string[]
   gpu_model: string
   gpu_memory: string
@@ -129,6 +117,45 @@ export interface FormValues {
     cpu_limit?: number
     memory_request?: number
     memory_limit?: number
+  }
+  ray_resource_config?: {
+    submit_graphics_card_resource?: {
+      card_selector?: string[]
+      card_type?: string | null
+      card_model?: string | null
+      count?: number | null
+      card_memory?: string | null
+      k8s_resource_type?: string | null
+      cpu_request?: number
+      cpu_limit?: number
+      memory_request?: number
+      memory_limit?: number
+    }
+    head_graphics_card_resource?: {
+      card_selector?: string[]
+      card_type?: string | null
+      card_model?: string | null
+      count?: number | null
+      card_memory?: string | null
+      k8s_resource_type?: string | null
+      cpu_request?: number
+      cpu_limit?: number
+      memory_request?: number
+      memory_limit?: number
+    }
+    worker_replicas?: number
+    worker_graphics_card_resource?: {
+      card_selector?: string[]
+      card_type?: string | null
+      card_model?: string | null
+      count?: number | null
+      card_memory?: string | null
+      k8s_resource_type?: string | null
+      cpu_request?: number
+      cpu_limit?: number
+      memory_request?: number
+      memory_limit?: number
+    }
   }
   // 任务定时配置
   schedule_enabled?: boolean

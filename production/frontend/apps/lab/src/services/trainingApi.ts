@@ -1,9 +1,7 @@
 import { message } from 'antd'
 import apiClient from './apiClient'
 import type {
-  DatasetInUseResponse,
   DatasetPreview,
-  MergeDatasetVersionsRequest,
   TrainingDatasetListResponse,
   UploadDatasetVersionRequest,
   UploadDatasetVersionResponse,
@@ -71,11 +69,12 @@ export const trainingDatasetService = {
     )
     return response.data
   },
-  detail: async (projectId: number, datasetId: string, usage?: string, processing_status?: string): Promise<any> => {
-    const response = await apiClient.get<any>(`/training-datasets/project/${projectId}/dataset/${datasetId}`, {
+  detail: async (projectId: number, datasetName: string, usage?: string, processing_status?: string, publish?: number): Promise<any> => {
+    const response = await apiClient.get<any>(`/training-datasets/project/${projectId}/dataset/${datasetName}`, {
       params: {
         usage,
         processing_status,
+        publish,
       },
     })
     return response.data
@@ -202,29 +201,6 @@ export const trainingDatasetService = {
     })
     return response.data
   },
-  checkInUse: async (projectId: number, datasetName: string, version: string, usage?: string): Promise<DatasetInUseResponse> => {
-    const response = await apiClient.get<DatasetInUseResponse>(
-      `/training-datasets/project/${projectId}/dataset/${datasetName}/version/${version}/in-use`,
-      {
-        params: {
-          usage,
-        },
-      },
-    )
-    return response.data
-  },
-  mergeVersions: async (projectId: number, datasetName: string, usage: string, requestData: MergeDatasetVersionsRequest) => {
-    const response = await apiClient.post<any>(
-      `/training-datasets/project/${projectId}/dataset/${datasetName}/merge-versions`,
-      requestData,
-      {
-        params: {
-          usage,
-        },
-      },
-    )
-    return response.data
-  },
 
   // 编辑数据集名称和描述 dataset_id 数据集名称 训练/验证/测试数据集 name为修改后的数据集名称 dataset_name为修改前的数据集名称
   edit: async (project_id: number, dataset_name: string, dataset_id: number, usage: string, name?: string, description?: string) => {
@@ -239,6 +215,28 @@ export const trainingDatasetService = {
         params: {
           usage,
         },
+      },
+    )
+    return response.data
+  },
+
+  // publish 传1 代表发布 传0代表未发布（无对应功能） 固定传1
+  publish: async (project_id: number, dataset_id: number, publish: number) => {
+    const response = await apiClient.patch(
+      `/training-datasets/project/${project_id}/dataset/${dataset_id}/publish`,
+      {
+        publish,
+      },
+    )
+    return response.data
+  },
+
+  //  删除详情中的行数据 row_number number数组 按照preview数据预览接口返回的序号 传入
+  deleteRow: async (project_id: number, dataset_id: number, row_numbers: number[]) => {
+    const response = await apiClient.delete(
+      `/training-datasets/project/${project_id}/dataset/${dataset_id}/rows`,
+      {
+        data: { row_numbers },
       },
     )
     return response.data

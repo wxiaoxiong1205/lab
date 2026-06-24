@@ -466,7 +466,7 @@ const TrainingTaskDetail: React.FC = () => {
       >
         返回
       </Button>
-      <Card className="border border-gray-200 rounded-md mt-4">
+      <Card className="border border-gray-200 rounded-md !mb-4">
         <div className="mb-4">
           <Title level={5}>任务信息</Title>
         </div>

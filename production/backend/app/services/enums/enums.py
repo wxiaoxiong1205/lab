@@ -71,7 +71,7 @@ class DefaultEnumService(EnumService):
             "TrainingMethodType": {
                 "enum_class": TrainingMethodType,
                 "module": "training_task",
-                "description": "训练方法类型，支持SFT、DPO和RFT-GRPO"
+                "description": "训练方法类型，支持SFT、DPO和GRPO"
             },
             "FineTuningType": {
                 "enum_class": FineTuningType,

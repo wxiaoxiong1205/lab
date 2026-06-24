@@ -28,7 +28,7 @@ from app.utils.validators import validate_dataset_upload_file_type
 # =========== 文件解析器 ============
 class TextGenerationInferenceResultFileParser:
     """文本生成推理结果集文件解析器"""
-
+    
     def __init__(self):
         """初始化解析器"""
         pass
@@ -38,25 +38,23 @@ class TextGenerationInferenceResultFileParser:
     def _detect_dataset_format(file_content: bytes, file_type: str) -> Optional[str]:
         """
         根据文件内容自动检测数据集格式
-
+        
         检测逻辑：
-        - 如果数据项包含 `instruction/input/chosen/rejected` 字段 → alpaca
-        - 如果数据项包含 `prompt/completion/reward` 或 `prompt/response/reward` 字段 → completion-reward
         - 如果数据项包含 `messages` 字段且是数组 → role-based
         - 如果数据项包含 `prompt` 和 `response` 字段但不包含 `messages` → prompt-response
         - 如果两者都包含，优先判断为 role-based（因为 role-based 更严格）
-
+        
         Args:
             file_content: 文件字节内容
             file_type: 文件类型（jsonl, json, csv, xlsx）
-
+        
         Returns:
             检测到的格式（'role-based' 或 'prompt-response'），如果无法检测则返回 None
         """
         try:
             # 根据文件类型尝试解析前几行/项来检测格式
             sample_items = []
-
+            
             if file_type == 'jsonl':
                 # JSONL: 读取前5行
                 lines = file_content.decode('utf-8').strip().split('\n')
@@ -69,7 +67,7 @@ class TextGenerationInferenceResultFileParser:
                                 sample_items.append(item)
                         except json.JSONDecodeError:
                             continue
-
+            
             elif file_type == 'json':
                 # JSON: 解析整个文件，取前5项
                 content_str = file_content.decode('utf-8').strip()
@@ -78,7 +76,7 @@ class TextGenerationInferenceResultFileParser:
                     sample_items = parsed_data[:5]
                 elif isinstance(parsed_data, dict):
                     sample_items = [parsed_data]
-
+            
             elif file_type in ['csv', 'xlsx']:
                 # CSV/XLSX: 检查列名来判断格式
                 try:
@@ -93,33 +91,22 @@ class TextGenerationInferenceResultFileParser:
                                 continue
                     else:  # xlsx
                         df = pd.read_excel(BytesIO(file_content), nrows=1)
-
+                    
                     if df is not None and len(df.columns) > 0:
                         # 检查列名来判断格式
                         columns = [col.lower() for col in df.columns]
-
-                        has_alpaca_cols = all(col in columns for col in ['instruction', 'input', 'chosen', 'rejected'])
-                        has_completion_reward_cols = (
-                            'prompt' in columns
-                            and ('completion' in columns or 'response' in columns)
-                            and 'reward' in columns
-                        )
-
+                        
                         # 检查是否有 role-based 格式的特征列（system、user、assistant 或 user1、assistant1）
                         has_system_col = 'system' in columns
                         has_user_col = 'user' in columns or any(col.startswith('user') for col in columns)
                         has_assistant_col = 'assistant' in columns or any(col.startswith('assistant') for col in columns)
-
+                        
                         # 检查是否有 prompt-response 格式的特征列（prompt、response）
                         has_prompt_col = 'prompt' in columns
                         has_response_col = 'response' in columns or '标准回答' in columns
-
+                        
                         # 判断格式
-                        if has_alpaca_cols:
-                            return DatasetFormat.ALPACA.value
-                        elif has_completion_reward_cols:
-                            return DatasetFormat.COMPLETION_REWARD.value
-                        elif has_system_col and (has_user_col or has_assistant_col):
+                        if has_system_col and (has_user_col or has_assistant_col):
                             # 如果有 system 列且同时有 user/assistant 列，判断为 role-based
                             return DatasetFormat.ROLE_BASED.value
                         elif has_prompt_col and has_response_col:
@@ -133,45 +120,29 @@ class TextGenerationInferenceResultFileParser:
                 except Exception:
                     # 如果解析失败，无法检测格式
                     return None
-
+            
             # 如果没有样本，无法检测
             if not sample_items:
                 return None
-
+            
             # 检测格式
-            has_alpaca = False
-            has_completion_reward = False
             has_messages = False
             has_prompt_response = False
-
+            
             for item in sample_items:
                 if not isinstance(item, dict):
                     continue
-
-                if all(field in item for field in ['instruction', 'input', 'chosen', 'rejected']):
-                    has_alpaca = True
-
-                if (
-                    'prompt' in item
-                    and ('completion' in item or 'response' in item)
-                    and 'reward' in item
-                ):
-                    has_completion_reward = True
-
+                
                 # 检查是否有 messages 字段且是数组
                 if 'messages' in item and isinstance(item.get('messages'), list):
                     has_messages = True
-
+                
                 # 检查是否有 prompt 和 response 字段
                 if 'prompt' in item and 'response' in item:
                     has_prompt_response = True
-
+            
             # 判断格式
-            if has_alpaca:
-                return DatasetFormat.ALPACA.value
-            elif has_completion_reward:
-                return DatasetFormat.COMPLETION_REWARD.value
-            elif has_messages:
+            if has_messages:
                 # 如果包含 messages，优先判断为 role-based
                 return DatasetFormat.ROLE_BASED.value
             elif has_prompt_response:
@@ -180,32 +151,32 @@ class TextGenerationInferenceResultFileParser:
             else:
                 # 无法确定格式
                 return None
-
+                
         except Exception as e:
             logger.warning(f"格式检测失败: {str(e)}")
             return None
-
+    
     @staticmethod
     def _validate_prompt_response_item(item: Dict[str, Any], line_num: Optional[int] = None,
                                       item_idx: Optional[int] = None) -> Tuple[bool, str]:
         """
         校验 prompt-response 格式的数据项
-
+        
         校验规则：
         1. prompt 字段必须存在且不能为空
         2. response 字段必须存在且不能为空
-
+        
         Args:
             item: 数据项字典
             line_num: 行号（用于错误提示）
             item_idx: 数据项索引（用于错误提示）
-
+        
         Returns:
             flag: True 如果格式正确，False 如果格式错误
             process_error_msg: 格式错误提示信息
         """
         process_error_msg = ""
-
+        
         # 1. 校验 prompt 字段
         if 'prompt' not in item:
             if line_num:
@@ -214,10 +185,10 @@ class TextGenerationInferenceResultFileParser:
                 process_error_msg = f"第{item_idx}个对象：缺少prompt字段"
             else:
                 process_error_msg = "缺少prompt字段"
-
+            
             logger.warning(process_error_msg)
             return False, process_error_msg
-
+        
         prompt = item.get('prompt', '')
         if not prompt or not str(prompt).strip():
             if line_num:
@@ -226,10 +197,10 @@ class TextGenerationInferenceResultFileParser:
                 process_error_msg = f"第{item_idx}个对象：prompt不能为空"
             else:
                 process_error_msg = "prompt不能为空"
-
+            
             logger.warning(process_error_msg)
             return False, process_error_msg
-
+        
         # 2. 校验 response 字段
         if 'response' not in item:
             if line_num:
@@ -238,10 +209,10 @@ class TextGenerationInferenceResultFileParser:
                 process_error_msg = f"第{item_idx}个对象：缺少response字段"
             else:
                 process_error_msg = "缺少response字段"
-
+            
             logger.warning(process_error_msg)
             return False, process_error_msg
-
+        
         response = item.get('response', '')
         if not response or not str(response).strip():
             if line_num:
@@ -250,58 +221,12 @@ class TextGenerationInferenceResultFileParser:
                 process_error_msg = f"第{item_idx}个对象：response不能为空"
             else:
                 process_error_msg = "response不能为空"
-
+            
             logger.warning(process_error_msg)
             return False, process_error_msg
-
+        
         return True, process_error_msg
-
-    @staticmethod
-    def _validate_alpaca_item(item: Dict[str, Any], line_num: Optional[int] = None,
-                              item_idx: Optional[int] = None) -> Tuple[bool, str]:
-        process_error_msg = ""
-        for field_name in ['instruction', 'input', 'chosen', 'rejected']:
-            if field_name not in item:
-                process_error_msg = f"第{line_num or item_idx}个样本：缺少{field_name}字段"
-                logger.warning(process_error_msg)
-                return False, process_error_msg
-            value = item.get(field_name)
-            if not isinstance(value, str) or not value.strip():
-                process_error_msg = f"第{line_num or item_idx}个样本：{field_name}不能为空"
-                logger.warning(process_error_msg)
-                return False, process_error_msg
-        return True, process_error_msg
-
-    @staticmethod
-    def _validate_completion_reward_item(item: Dict[str, Any], line_num: Optional[int] = None,
-                                         item_idx: Optional[int] = None) -> Tuple[bool, str]:
-        process_error_msg = ""
-        display_index = line_num or item_idx
-        prompt = item.get('prompt')
-        completion = item.get('completion', item.get('response'))
-        if not isinstance(prompt, str) or not prompt.strip():
-            process_error_msg = f"第{display_index}个样本：prompt不能为空"
-            logger.warning(process_error_msg)
-            return False, process_error_msg
-        if not isinstance(completion, str) or not completion.strip():
-            process_error_msg = f"第{display_index}个样本：completion/response不能为空"
-            logger.warning(process_error_msg)
-            return False, process_error_msg
-        if 'reward' not in item:
-            process_error_msg = f"第{display_index}个样本：缺少reward字段"
-            logger.warning(process_error_msg)
-            return False, process_error_msg
-        return True, process_error_msg
-
-    @staticmethod
-    def _normalize_completion_reward_item(item: Dict[str, Any]) -> Dict[str, Any]:
-        normalized = dict(item)
-        if 'completion' not in normalized and 'response' in normalized:
-            normalized['completion'] = normalized['response']
-        if 'response' not in normalized and 'completion' in normalized:
-            normalized['response'] = normalized['completion']
-        return normalized
-
+    
     @staticmethod
     def _validate_prompt_format(prompt: str, line_num: Optional[int] = None, item_idx: Optional[int] = None) -> Tuple[bool, str]:
         """
@@ -441,91 +366,12 @@ class TextGenerationInferenceResultFileParser:
             return False, process_error_msg
 
         return True, process_error_msg
-
-    @staticmethod
-    def _is_dpo_role_based_item(item: Dict[str, Any]) -> bool:
-        return 'chosen' in item or 'rejected' in item
-
-    @staticmethod
-    def _validate_dpo_role_based_message_list(
-        messages: Any,
-        line_num: Optional[int] = None,
-        item_idx: Optional[int] = None,
-    ) -> None:
-        display_index = line_num or item_idx
-        if not isinstance(messages, list) or len(messages) == 0:
-            raise ValueError(f"第{display_index}个样本：messages必须是非空数组")
-
-        has_user = False
-        for msg_idx, message in enumerate(messages, start=1):
-            if not isinstance(message, dict):
-                raise ValueError(f"第{display_index}个样本第{msg_idx}个message必须是对象格式")
-            role = message.get('role')
-            if role not in ['user', 'assistant', 'system']:
-                raise ValueError(f"第{display_index}个样本第{msg_idx}个message的role必须是user、assistant或system")
-            content = message.get('content')
-            if role != 'system' and (not isinstance(content, str) or not content.strip()):
-                raise ValueError(f"第{display_index}个样本第{msg_idx}个message的content不能为空")
-            if role == 'user':
-                has_user = True
-
-        if not has_user:
-            raise ValueError(f"第{display_index}个样本：messages至少需要包含一条user消息")
-
-    @staticmethod
-    def _validate_dpo_role_based_response(
-        response: Any,
-        field_name: str,
-        line_num: Optional[int] = None,
-        item_idx: Optional[int] = None,
-    ) -> None:
-        display_index = line_num or item_idx
-        if not isinstance(response, dict):
-            raise ValueError(f"第{display_index}个样本：{field_name}必须是对象格式")
-        if response.get('role') != 'assistant':
-            raise ValueError(f"第{display_index}个样本：{field_name}.role必须是assistant")
-        content = response.get('content')
-        if not isinstance(content, str) or not content.strip():
-            raise ValueError(f"第{display_index}个样本：{field_name}.content不能为空")
-
-    @staticmethod
-    def _validate_dpo_role_based_item(
-        item: Dict[str, Any],
-        line_num: Optional[int] = None,
-        item_idx: Optional[int] = None,
-    ) -> Tuple[bool, str]:
-        try:
-            for field_name in ['messages', 'chosen', 'rejected']:
-                if field_name not in item:
-                    display_index = line_num or item_idx
-                    return False, f"第{display_index}个样本：缺少{field_name}字段"
-            TextGenerationInferenceResultFileParser._validate_dpo_role_based_message_list(
-                item['messages'],
-                line_num=line_num,
-                item_idx=item_idx,
-            )
-            TextGenerationInferenceResultFileParser._validate_dpo_role_based_response(
-                item['chosen'],
-                'chosen',
-                line_num=line_num,
-                item_idx=item_idx,
-            )
-            TextGenerationInferenceResultFileParser._validate_dpo_role_based_response(
-                item['rejected'],
-                'rejected',
-                line_num=line_num,
-                item_idx=item_idx,
-            )
-        except ValueError as exc:
-            logger.warning(str(exc))
-            return False, str(exc)
-        return True, ""
-
+    
     @staticmethod
     def _parse_prompt_response_jsonl(content: bytes) -> List[Dict[str, Any]]:
         """
         解析JSONL文件（逐行解析）
-
+        
         添加字段校验，至少检查 prompt 和 response 字段是否存在
         如果缺少必需字段，抛出明确的错误信息
         """
@@ -534,11 +380,11 @@ class TextGenerationInferenceResultFileParser:
             line = line.strip()
             if not line:
                 continue
-
+            
             # 跳过注释行
             if line.lstrip().startswith('#'):
                 continue
-
+            
             try:
                 item = json.loads(line)
                 if isinstance(item, dict):
@@ -558,26 +404,26 @@ class TextGenerationInferenceResultFileParser:
             except ValueError as e:
                 # 重新抛出校验错误
                 raise ValueError(str(e))
-
+        
         if len(items) == 0:
             raise ValueError("JSONL文件中没有找到有效的数据样本")
-
+        
         return items
-
+    
     @staticmethod
     def _parse_prompt_response_json(content: bytes) -> List[Dict[str, Any]]:
         """
         解析JSON文件（整体解析，支持跨行对象）
-
+        
         添加字段校验，至少检查 prompt 和 response 字段是否存在
         如果缺少必需字段，抛出明确的错误信息
         """
         items = []
         content_str = content.decode('utf-8').strip()
-
+        
         try:
             parsed_data = json.loads(content_str)
-
+            
             if isinstance(parsed_data, list):
                 for item_idx, item in enumerate(parsed_data, start=1):
                     if isinstance(item, dict):
@@ -590,7 +436,7 @@ class TextGenerationInferenceResultFileParser:
                         items.append(item)
                     else:
                         raise ValueError(f"第{item_idx}个对象：数据项必须是JSON对象格式")
-
+                
                 if len(items) == 0:
                     raise ValueError("JSON文件中没有找到有效的数据样本")
                 return items
@@ -607,18 +453,18 @@ class TextGenerationInferenceResultFileParser:
                 raise ValueError(f"JSON格式不是数组或对象，类型: {type(parsed_data).__name__}")
         except json.JSONDecodeError as e:
             raise ValueError(f"解析JSON文件失败: {str(e)}")
-
+    
     @staticmethod
     def _parse_prompt_response_csv(content: bytes) -> List[Dict[str, Any]]:
         """
         解析CSV文件
-
+        
         添加字段校验，至少检查 prompt 和 response 字段是否存在
         如果缺少必需字段，抛出明确的错误信息
         """
         try:
             encodings_to_try = ['gbk', 'gb18030', 'utf-8', 'latin-1', 'cp1252']
-
+            
             for encoding in encodings_to_try:
                 try:
                     df = pd.read_csv(BytesIO(content), encoding=encoding)
@@ -628,7 +474,7 @@ class TextGenerationInferenceResultFileParser:
                     continue
             else:
                 raise ValueError(f"不支持的文件编码，目前支持: {', '.join(encodings_to_try)}")
-
+            
             items = []
             for row_num, (_, row) in enumerate(df.iterrows(), start=2):  # 从第2行开始（第1行是表头）
                 item = {
@@ -652,22 +498,22 @@ class TextGenerationInferenceResultFileParser:
                 if not flag:
                     raise ValueError(error_msg)
                 items.append(item)
-
+            
             if len(items) == 0:
                 raise ValueError("CSV文件中没有找到有效的数据样本")
-
+            
             return items
         except ValueError:
             # 重新抛出校验错误
             raise
         except Exception as e:
             raise ValueError(f"解析CSV文件失败: {str(e)}")
-
+    
     @staticmethod
     def _parse_prompt_response_excel(content: bytes) -> List[Dict[str, Any]]:
         """
         解析Excel文件
-
+        
         添加字段校验，至少检查 prompt 和 response 字段是否存在
         如果缺少必需字段，抛出明确的错误信息
         """
@@ -696,166 +542,13 @@ class TextGenerationInferenceResultFileParser:
                 if not flag:
                     raise ValueError(error_msg)
                 items.append(item)
-
+            
             if len(items) == 0:
                 raise ValueError("Excel文件中没有找到有效的数据样本")
-
+            
             return items
         except ValueError:
             # 重新抛出校验错误
-            raise
-        except Exception as e:
-            raise ValueError(f"解析Excel文件失败: {str(e)}")
-
-    @staticmethod
-    def _parse_structured_jsonl(
-        content: bytes,
-        validator,
-        normalizer=lambda item: item,
-    ) -> List[Dict[str, Any]]:
-        items = []
-        for line_num, line in enumerate(content.decode('utf-8').strip().split('\n'), start=1):
-            line = line.strip()
-            if not line or line.lstrip().startswith('#'):
-                continue
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError as e:
-                raise ValueError(f"第{line_num}行：JSON解析失败 - {str(e)}")
-            if not isinstance(item, dict):
-                raise ValueError(f"第{line_num}行：数据项必须是JSON对象格式")
-            flag, error_msg = validator(item, line_num=line_num)
-            if not flag:
-                raise ValueError(error_msg)
-            items.append(normalizer(item))
-        if len(items) == 0:
-            raise ValueError("JSONL文件中没有找到有效的数据样本")
-        return items
-
-    @staticmethod
-    def _parse_structured_json(
-        content: bytes,
-        validator,
-        normalizer=lambda item: item,
-    ) -> List[Dict[str, Any]]:
-        content_str = content.decode('utf-8').strip()
-        try:
-            parsed_data = json.loads(content_str)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"解析JSON文件失败: {str(e)}")
-
-        data_items = parsed_data if isinstance(parsed_data, list) else [parsed_data]
-        if not isinstance(data_items, list):
-            raise ValueError(f"JSON格式不是数组或对象，类型: {type(parsed_data).__name__}")
-
-        items = []
-        for item_idx, item in enumerate(data_items, start=1):
-            if not isinstance(item, dict):
-                raise ValueError(f"第{item_idx}个对象：数据项必须是JSON对象格式")
-            flag, error_msg = validator(item, item_idx=item_idx)
-            if not flag:
-                raise ValueError(error_msg)
-            items.append(normalizer(item))
-        if len(items) == 0:
-            raise ValueError("JSON文件中没有找到有效的数据样本")
-        return items
-
-    @staticmethod
-    def _parse_structured_excel(
-        content: bytes,
-        required_columns: List[str],
-        validator,
-        normalizer=lambda item: item,
-    ) -> List[Dict[str, Any]]:
-        try:
-            df = pd.read_excel(BytesIO(content))
-            columns = {str(col).strip().lower(): col for col in df.columns}
-            missing_columns = [col for col in required_columns if col not in columns]
-            if missing_columns:
-                raise ValueError(f"Excel文件缺少必需列: {missing_columns}")
-
-            items = []
-            for row_num, (_, row) in enumerate(df.iterrows(), start=2):
-                item = {
-                    column: TextGenerationInferenceResultFileParser._prompt_response_field_value(row.get(columns[column], ''))
-                    for column in required_columns
-                }
-                flag, error_msg = validator(item, line_num=row_num)
-                if not flag:
-                    raise ValueError(error_msg)
-                items.append(normalizer(item))
-            if len(items) == 0:
-                raise ValueError("Excel文件中没有找到有效的数据样本")
-            return items
-        except ValueError:
-            raise
-        except Exception as e:
-            raise ValueError(f"解析Excel文件失败: {str(e)}")
-
-    @staticmethod
-    def _parse_alpaca_jsonl(content: bytes) -> List[Dict[str, Any]]:
-        return TextGenerationInferenceResultFileParser._parse_structured_jsonl(
-            content,
-            TextGenerationInferenceResultFileParser._validate_alpaca_item,
-        )
-
-    @staticmethod
-    def _parse_alpaca_json(content: bytes) -> List[Dict[str, Any]]:
-        return TextGenerationInferenceResultFileParser._parse_structured_json(
-            content,
-            TextGenerationInferenceResultFileParser._validate_alpaca_item,
-        )
-
-    @staticmethod
-    def _parse_alpaca_excel(content: bytes) -> List[Dict[str, Any]]:
-        return TextGenerationInferenceResultFileParser._parse_structured_excel(
-            content,
-            ['instruction', 'input', 'chosen', 'rejected'],
-            TextGenerationInferenceResultFileParser._validate_alpaca_item,
-        )
-
-    @staticmethod
-    def _parse_completion_reward_jsonl(content: bytes) -> List[Dict[str, Any]]:
-        return TextGenerationInferenceResultFileParser._parse_structured_jsonl(
-            content,
-            TextGenerationInferenceResultFileParser._validate_completion_reward_item,
-            TextGenerationInferenceResultFileParser._normalize_completion_reward_item,
-        )
-
-    @staticmethod
-    def _parse_completion_reward_json(content: bytes) -> List[Dict[str, Any]]:
-        return TextGenerationInferenceResultFileParser._parse_structured_json(
-            content,
-            TextGenerationInferenceResultFileParser._validate_completion_reward_item,
-            TextGenerationInferenceResultFileParser._normalize_completion_reward_item,
-        )
-
-    @staticmethod
-    def _parse_completion_reward_excel(content: bytes) -> List[Dict[str, Any]]:
-        try:
-            df = pd.read_excel(BytesIO(content))
-            columns = {str(col).strip().lower(): col for col in df.columns}
-            completion_column = 'completion' if 'completion' in columns else 'response'
-            required_columns = ['prompt', completion_column, 'reward']
-            missing_columns = [col for col in required_columns if col not in columns]
-            if missing_columns:
-                raise ValueError(f"Excel文件缺少必需列: {missing_columns}")
-
-            items = []
-            for row_num, (_, row) in enumerate(df.iterrows(), start=2):
-                item = {
-                    'prompt': TextGenerationInferenceResultFileParser._prompt_response_field_value(row.get(columns['prompt'], '')),
-                    completion_column: TextGenerationInferenceResultFileParser._prompt_response_field_value(row.get(columns[completion_column], '')),
-                    'reward': row.get(columns['reward'], ''),
-                }
-                flag, error_msg = TextGenerationInferenceResultFileParser._validate_completion_reward_item(item, line_num=row_num)
-                if not flag:
-                    raise ValueError(error_msg)
-                items.append(TextGenerationInferenceResultFileParser._normalize_completion_reward_item(item))
-            if len(items) == 0:
-                raise ValueError("Excel文件中没有找到有效的数据样本")
-            return items
-        except ValueError:
             raise
         except Exception as e:
             raise ValueError(f"解析Excel文件失败: {str(e)}")
@@ -865,73 +558,63 @@ class TextGenerationInferenceResultFileParser:
         """
         解析role-based格式的JSONL文件（推理结果集版本）
         参考训练数据集的解析规则，但保留所有字段（包括推理结果集特有字段）
-
+        
         Args:
             content: JSONL文件的字节内容
-
+        
         Returns:
             解析后的数据项列表
         """
         items = []
         content_str = content.decode('utf-8')
         lines = content_str.splitlines()
-
+        
         for line_num, line in enumerate(lines, start=1):
             line = line.strip()
             if not line:
                 continue
-
+            
             # 跳过注释行（支持 # 前面有空格的情况）
             if line.lstrip().startswith('#'):
                 continue
-
+            
             try:
                 # 解析JSON
                 parsed_data = json.loads(line)
-
+                
                 if not isinstance(parsed_data, dict):
                     raise ValueError(f"第{line_num}行格式错误：数据应该是JSON对象格式")
-
+                
                 # 验证 messages 字段
                 if 'messages' not in parsed_data:
                     raise ValueError(f"第{line_num}行缺少messages字段")
-
+                
                 messages = parsed_data['messages']
                 if not isinstance(messages, list) or len(messages) == 0:
                     raise ValueError(f"第{line_num}行messages必须是非空数组")
-
-                if TextGenerationInferenceResultFileParser._is_dpo_role_based_item(parsed_data):
-                    flag, process_error_msg = TextGenerationInferenceResultFileParser._validate_dpo_role_based_item(
-                        parsed_data,
-                        line_num=line_num,
-                    )
-                    if not flag:
-                        raise ValueError(process_error_msg)
-                    items.append(parsed_data)
-                    continue
-
+                
                 # 验证每个 message
                 expected_role = None
                 for msg_idx, message in enumerate(messages):
                     if not isinstance(message, dict):
                         raise ValueError(f"第{line_num}行第{msg_idx + 1}个message必须是对象格式")
-
+                    
                     # 验证 role 字段
                     if 'role' not in message:
                         raise ValueError(f"第{line_num}行第{msg_idx + 1}个message缺少role字段")
-
+                    
                     role = message['role']
                     if role not in ['user', 'assistant', 'system']:
                         raise ValueError(f"第{line_num}行第{msg_idx + 1}个message的role必须是user、assistant或system")
-
+                    
                     # 验证 content 字段
                     if 'content' not in message:
                         raise ValueError(f"第{line_num}行第{msg_idx + 1}个message缺少content字段")
-
+                    
                     content = message['content']
                     if not isinstance(content, str) or not content.strip():
                         raise ValueError(f"第{line_num}行第{msg_idx + 1}个message的content不能为空，跳过")
-
+                    
                     # 验证 role 交替出现（system 不影响交替规则）
                     if role != 'system':
                         # 如果是第一个非 system 的消息，必须是 user
@@ -951,24 +634,24 @@ class TextGenerationInferenceResultFileParser:
                                 )
                             # 切换期望的角色
                             expected_role = 'assistant' if role == 'user' else 'user'
-
+                
                 # 添加空值校验：校验 messages、prompt、response
                 flag, process_error_msg = TextGenerationInferenceResultFileParser._validate_role_based_item(parsed_data, line_num=line_num)
                 if not flag:
                     # 空值校验失败，抛出异常，用于错误记录
                     raise ValueError(process_error_msg)
-
+                
                 # 验证通过，保留所有字段（包括 messages、response、system、prompt、model_response 等）
                 items.append(parsed_data)
-
+                
             except Exception as e:
                 # 捕获其他异常并抛出
                 logger.warning(f"文件格式异常: {str(e)}")
                 raise ValueError(str(e))
-
+        
         if len(items) == 0:
             raise ValueError("JSONL文件中没有找到有效的数据样本")
-
+        
         return items
 
     @staticmethod
@@ -976,20 +659,20 @@ class TextGenerationInferenceResultFileParser:
         """
         解析role-based格式的JSON文件（推理结果集版本）
         参考训练数据集的解析规则，但保留所有字段（包括推理结果集特有字段）
-
+        
         Args:
             content: JSON文件的字节内容
-
+        
         Returns:
             解析后的数据项列表
         """
         items = []
         content_str = content.decode('utf-8').strip()
-
+        
         try:
             # 解析JSON内容
             data = json.loads(content_str)
-
+            
             # 将数据转换为列表格式统一处理
             if isinstance(data, list):
                 # 数组格式：每个元素是一个对话样本
@@ -999,55 +682,45 @@ class TextGenerationInferenceResultFileParser:
                 data_list = [data]
             else:
                 raise ValueError("JSON文件格式错误：应该是对象或数组格式")
-
+            
             # 处理每个数据项
             for item_idx, item in enumerate(data_list, start=1):
                 try:
                     if not isinstance(item, dict):
                         raise ValueError(f"第{item_idx}个对象不是标准的json对象格式，跳过")
-
+                    
                     # 验证 messages 字段
                     if 'messages' not in item:
                         raise ValueError(f"第{item_idx}个对象缺少messages字段，跳过")
-
+                    
                     messages = item['messages']
                     if not isinstance(messages, list) or len(messages) == 0:
                         raise ValueError(f"第{item_idx}个对象的messages必须是非空数组，跳过")
-
-                    if TextGenerationInferenceResultFileParser._is_dpo_role_based_item(item):
-                        flag, process_error_msg = TextGenerationInferenceResultFileParser._validate_dpo_role_based_item(
-                            item,
-                            item_idx=item_idx,
-                        )
-                        if not flag:
-                            raise ValueError(process_error_msg)
-                        items.append(item)
-                        continue
-
+                    
                     # 验证每个 message
                     expected_role = None
                     for msg_idx, message in enumerate(messages):
                         if not isinstance(message, dict):
                             raise ValueError(f"第{item_idx}个对象第{msg_idx + 1}个message必须是对象格式，跳过")
-
+                        
                         # 验证 role 字段
                         if 'role' not in message:
                             raise ValueError(f"第{item_idx}个对象第{msg_idx + 1}个message缺少role字段，跳过")
-
+                        
                         role = message['role']
                         if role not in ['user', 'assistant', 'system']:
                             raise ValueError(
                                 f"第{item_idx}个对象第{msg_idx + 1}个message的role必须是user、assistant或system，跳过"
                             )
-
+                        
                         # 验证 content 字段
                         if 'content' not in message:
                             raise ValueError(f"第{item_idx}个对象第{msg_idx + 1}个message缺少content字段，跳过")
-
+                        
                         content = message['content']
                         if not isinstance(content, str) or not content.strip():
                             raise ValueError(f"第{item_idx}个对象第{msg_idx + 1}个message的content不能为空，跳过")
-
+                        
                         # 验证 role 交替出现（system 不影响交替规则）
                         if role != 'system':
                             # 如果是第一个非 system 的消息，必须是 user
@@ -1073,19 +746,19 @@ class TextGenerationInferenceResultFileParser:
                     if not flag:
                         # 空值校验失败，抛出异常，用于错误记录
                         raise ValueError(process_error_msg)
-
+                    
                     # 验证通过，保留所有字段（包括 messages、response、system、prompt、model_response 等）
                     items.append(item)
-
+                    
                 except Exception as e:
                     # 捕获其他异常
                     raise ValueError(str(e))
-
+            
             if len(items) == 0:
                 raise ValueError("JSON文件中没有找到有效的数据样本")
-
+            
             return items
-
+            
         except json.JSONDecodeError as e:
             raise ValueError(f"解析JSON文件失败: {str(e)}")
         except UnicodeDecodeError:
@@ -1119,10 +792,10 @@ class TextGenerationInferenceResultFileParser:
         - 单轮数据集：表头为 system、user、assistant，每一行对应一个对话样本
         - 多轮数据集：表头为 system、user1、assistant1、user2、assistant2...，每一行对应一个多轮对话样本
         - 保留所有列的数据（包括推理结果集特有字段：response、system、prompt、model_response等）
-
+        
         Args:
             content: XLSX文件的字节内容
-
+        
         Returns:
             解析后的数据项列表
         """
@@ -1149,40 +822,11 @@ class TextGenerationInferenceResultFileParser:
                 header_value = str(cell.value).strip() if cell.value else ""
                 headers.append(header_value)
 
-            header_lookup = {header.lower(): idx for idx, header in enumerate(headers) if header}
-            if all(key in header_lookup for key in ["messages", "chosen", "rejected"]):
-                items = []
-                row_iter = iter(worksheet.rows)
-                next(row_iter)
-                for row_num, row in enumerate(row_iter, start=2):
-                    item = {}
-                    for key in ["messages", "chosen", "rejected"]:
-                        cell_index = header_lookup[key]
-                        raw_value = row[cell_index].value if cell_index < len(row) else None
-                        if raw_value is None:
-                            raise ValueError(f"第{row_num}行：{key}不能为空")
-                        try:
-                            item[key] = json.loads(str(raw_value).strip())
-                        except json.JSONDecodeError as exc:
-                            raise ValueError(f"第{row_num}行：{key}不是合法JSON - {str(exc)}")
-
-                    flag, process_error_msg = TextGenerationInferenceResultFileParser._validate_dpo_role_based_item(
-                        item,
-                        line_num=row_num,
-                    )
-                    if not flag:
-                        raise ValueError(process_error_msg)
-                    items.append(item)
-
-                if len(items) == 0:
-                    raise ValueError("Excel文件中没有找到有效的数据样本")
-                return items
-
             # 2. 判断是单轮还是多轮格式，并找到对应的列索引
             system_col = None
             user_cols = []  # 存储所有user列的索引
             assistant_cols = []  # 存储所有assistant列的索引
-
+            
             # 查找system列
             for i, header in enumerate(headers):
                 header_lower = header.lower()
@@ -1217,7 +861,7 @@ class TextGenerationInferenceResultFileParser:
                             assistant_cols.append((num, i))
                         except ValueError:
                             continue
-
+                
                 # 按数字排序
                 user_cols.sort(key=lambda x: x[0])
                 assistant_cols.sort(key=lambda x: x[0])
@@ -1242,7 +886,7 @@ class TextGenerationInferenceResultFileParser:
 
             # 3. 处理数据行
             items = []
-
+            
             # 跳过第一行（标题行）
             row_iter = iter(worksheet.rows)
             next(row_iter)
@@ -1341,7 +985,7 @@ class TextGenerationInferenceResultFileParser:
                     data = {
                         "messages": messages
                     }
-
+                    
                     # 保留其他列的数据（用于推理结果集：response、model_response、prompt、system等）
                     # 排除已处理的messages相关列
                     processed_cols = set()
@@ -1351,14 +995,14 @@ class TextGenerationInferenceResultFileParser:
                         processed_cols.add(col_idx)
                     for _, col_idx in assistant_cols:
                         processed_cols.add(col_idx)
-
+                    
                     # 遍历所有表头，保留非messages相关的列
                     for col_idx, header in enumerate(headers):
                         if col_idx not in processed_cols:
                             # 跳过空的表头
                             if not header or not header.strip():
                                 continue
-
+                            
                             # 获取该列的值
                             if col_idx < len(row):
                                 cell_value = row[col_idx].value
@@ -1405,43 +1049,36 @@ class TextGenerationInferenceResultFileParser:
         """
         处理文本生成推理结果集文件
             - prompt-response格式：支持xlsx、csv、json、jsonl
-            - alpaca格式：支持xlsx、json、jsonl
-            - completion-reward格式：支持xlsx、json、jsonl
             - role-based格式：支持xlsx、json、jsonl
-
+        
         Args:
             file_content: 文件字节内容
             file_type: 文件类型（jsonl, json, csv, xlsx）
             dataset_format: 数据集格式（role-based, prompt-response）
-
+        
         Returns:
             解析后的数据项列表
         """
         # 验证数据集格式
-        if dataset_format not in {
-            DatasetFormat.ROLE_BASED.value,
-            DatasetFormat.PROMPT_RESPONSE.value,
-            DatasetFormat.ALPACA.value,
-            DatasetFormat.COMPLETION_REWARD.value,
-        }:
+        if dataset_format != DatasetFormat.ROLE_BASED.value and dataset_format != DatasetFormat.PROMPT_RESPONSE.value:
             raise ValueError(f"不支持的推理结果集格式: {dataset_format}")
-
+        
         # 在解析前先检测文件格式
         detected_format = self._detect_dataset_format(file_content, file_type)
-
+        
         # 如果检测到的格式与用户选择的格式不一致，直接抛出错误
         if detected_format and detected_format != dataset_format:
             raise ValueError(
                 f"当前数据集格式异常：检测到的格式为 {detected_format}，但用户选择的格式为 {dataset_format}。"
             )
-
+        
         # 使用用户选择的格式解析
         try:
             return self._parse_with_format(file_content, file_type, dataset_format)
         except Exception as e:
             # 如果解析失败，直接抛出解析错误
             raise ValueError(f"解析文件失败: {str(e)}")
-
+    
     def _parse_with_format(
         self,
         file_content: bytes,
@@ -1450,12 +1087,12 @@ class TextGenerationInferenceResultFileParser:
     ) -> List[Dict[str, Any]]:
         """
         使用指定格式解析文件
-
+        
         Args:
             file_content: 文件字节内容
             file_type: 文件类型（jsonl, json, csv, xlsx）
             dataset_format: 数据集格式（role-based, prompt-response）
-
+        
         Returns:
             解析后的数据项列表
         """
@@ -1484,33 +1121,13 @@ class TextGenerationInferenceResultFileParser:
             else:
                 raise ValueError(f"不支持的文件格式: {file_type}")
 
-        elif dataset_format == DatasetFormat.ALPACA.value:
-            if file_type == 'jsonl':
-                return self._parse_alpaca_jsonl(file_content)
-            elif file_type == 'json':
-                return self._parse_alpaca_json(file_content)
-            elif file_type in ['xlsx', 'xls']:
-                return self._parse_alpaca_excel(file_content)
-            else:
-                raise ValueError(f"不支持的文件格式: {file_type}")
-
-        elif dataset_format == DatasetFormat.COMPLETION_REWARD.value:
-            if file_type == 'jsonl':
-                return self._parse_completion_reward_jsonl(file_content)
-            elif file_type == 'json':
-                return self._parse_completion_reward_json(file_content)
-            elif file_type in ['xlsx', 'xls']:
-                return self._parse_completion_reward_excel(file_content)
-            else:
-                raise ValueError(f"不支持的文件格式: {file_type}")
-
         else:
             raise ValueError(f"不支持的数据集格式: {dataset_format}")
 
 
 class ImageUnderstandingInferenceResultFileParser:
     """图像理解推理结果集文件解析器"""
-
+    
     def __init__(self):
         """初始化解析器"""
         pass
@@ -1537,7 +1154,7 @@ class ImageUnderstandingInferenceResultFileParser:
             logger.warning("图像理解数据集jsonl内容为空")
 
         return images, items
-
+    
     async def process_file(
         self,
         file_content: bytes,
@@ -1546,12 +1163,12 @@ class ImageUnderstandingInferenceResultFileParser:
     ) -> Tuple[Dict[str, bytes], List[Dict[str, Any]]]:
         """
         处理图像理解推理结果集文件
-
+        
         Args:
             file_content: 文件字节内容
             file_type: 文件类型（zip）
             dataset_format: 数据集格式（必须是role-based）
-
+        
         Returns:
             (图片字典, 数据项列表)
         """
@@ -1575,17 +1192,17 @@ class ImageUnderstandingInferenceResultFileParser:
 
 class BusinessInferenceResultFileParser:
     """业务推理结果集文件解析器"""
-
+    
     def __init__(self):
         """初始化解析器"""
         pass
-
+    
     @staticmethod
     def _parse_jsonl(content: bytes) -> List[Dict[str, Any]]:
         """解析业务数据集JSONL文件（宽松规则）"""
         items = []
         content_str = content.decode('utf-8').strip()
-
+        
         for line_num, line in enumerate(content_str.split('\n'), start=1):
             line = line.strip()
             if line:
@@ -1595,18 +1212,18 @@ class BusinessInferenceResultFileParser:
                         items.append(item)
                 except json.JSONDecodeError as e:
                     logger.warning(f"第 {line_num} 行跳过无效的JSON: {line[:100]}, 错误: {str(e)}")
-
+        
         return items
-
+    
     @staticmethod
     def _parse_json(content: bytes) -> List[Dict[str, Any]]:
         """解析业务数据集JSON文件（宽松规则）"""
         items = []
         content_str = content.decode('utf-8').strip()
-
+        
         try:
             parsed_data = json.loads(content_str)
-
+            
             if isinstance(parsed_data, list):
                 for item in parsed_data:
                     if isinstance(item, dict):
@@ -1619,14 +1236,14 @@ class BusinessInferenceResultFileParser:
                 raise ValueError(f"JSON格式不是数组或对象，类型: {type(parsed_data).__name__}，业务数据集需要字典对象")
         except json.JSONDecodeError as e:
             raise ValueError(f"解析JSON文件失败: {str(e)}")
-
+    
     @staticmethod
     def _parse_csv(content: bytes) -> List[Dict[str, Any]]:
         """解析业务数据集CSV文件（宽松规则）"""
         try:
             encodings_to_try = ['gbk', 'gb18030', 'utf-8', 'latin-1', 'cp1252']
             df = None
-
+            
             for encoding in encodings_to_try:
                 try:
                     df = pd.read_csv(BytesIO(content), encoding=encoding)
@@ -1636,7 +1253,7 @@ class BusinessInferenceResultFileParser:
                     continue
             else:
                 raise ValueError(f"不支持的文件编码，目前支持: {', '.join(encodings_to_try)}")
-
+            
             items = []
             for _, row in df.iterrows():
                 item = row.to_dict()
@@ -1645,7 +1262,7 @@ class BusinessInferenceResultFileParser:
             return items
         except Exception as e:
             raise ValueError(f"解析业务数据集CSV文件失败: {str(e)}")
-
+    
     @staticmethod
     def _parse_excel(content: bytes) -> List[Dict[str, Any]]:
         """解析业务数据集Excel文件（宽松规则）"""
@@ -1659,7 +1276,7 @@ class BusinessInferenceResultFileParser:
             return items
         except Exception as e:
             raise ValueError(f"解析业务数据集Excel文件失败: {str(e)}")
-
+    
     async def process_file(
         self,
         file_content: bytes,
@@ -1668,19 +1285,19 @@ class BusinessInferenceResultFileParser:
     ) -> List[Dict[str, Any]]:
         """
         处理业务推理结果集文件
-
+        
         Args:
             file_content: 文件字节内容
             file_type: 文件类型（jsonl, json, csv, xlsx）
             dataset_format: 数据集格式（必须是business）
-
+        
         Returns:
             解析后的数据项列表
         """
         # 验证数据集格式
         if dataset_format != DatasetFormat.BUSINESS.value:
             raise ValueError(f"不支持的推理结果集格式: {dataset_format}")
-
+        
         # 根据文件类型选择解析方法
         if file_type == 'jsonl':
             return self._parse_jsonl(file_content)
@@ -1788,7 +1405,7 @@ async def analyze_save_inference_result_files(
 ) -> int:
     """
     处理上传的推理结果集文件，解析并保存到 JuiceFS
-
+    
     Args:
         upload_files: 上传的文件列表
         file_path: 文件保存路径
@@ -1797,7 +1414,7 @@ async def analyze_save_inference_result_files(
         dataset_type: 数据集类型
         storage_service: 存储服务
         task: TaskBase 实例（用于日志记录，可选）
-
+    
     Returns:
         int: 总数据量
     """
@@ -1940,10 +1557,10 @@ async def analyze_export_inference_result_file_single(
         db_dataset: 结果集信息
         export_file_type: 需要导出的格式
         storage_service: 存储服务实例
-
+    
     Returns:
         转换后的文件内容（bytes）
-
+    
     转换规则：
     1. JSONL → JSON: 将每行 JSON 对象合并为 JSON 数组
     2. JSONL → XLSX:
@@ -1955,20 +1572,20 @@ async def analyze_export_inference_result_file_single(
         raise ValueError("db_database不能为空")
 
     all_items = await _read_jsonl_file_content(db_dataset.file_path, storage_service)
-
+    
     # 处理空数据情况：记录日志并返回对应的空文件
     if not all_items:
         logger.info(f"推理结果集为空，返回空文件: {db_dataset.file_path}")
         export_type = export_file_type.value
-
+        
         if export_type == InferenceResultDatasetExportType.JSONL_TYPE.value:
             # JSONL 格式：返回空字符串
             return b''
-
+        
         elif export_type == InferenceResultDatasetExportType.JSON_TYPE.value:
             # JSON 格式：返回空数组
             return json.dumps([], ensure_ascii=False, indent=2).encode('utf-8')
-
+        
         elif export_type == InferenceResultDatasetExportType.XLSX_TYPE.value:
             # XLSX 格式：返回只有表头的 Excel 文件
             dataset_format = db_dataset.dataset_format
@@ -1985,32 +1602,32 @@ async def analyze_export_inference_result_file_single(
                 wb.save(output)
                 output.seek(0)
                 return output.getvalue()
-
+        
         else:
             raise ValueError(f"不支持的导出格式: {export_type}")
-
+    
     # 根据导出类型进行转换
     export_type = export_file_type.value
-
+    
     if export_type == InferenceResultDatasetExportType.JSONL_TYPE.value:
         # JSONL 格式：直接返回原始 JSONL 内容
         jsonl_lines = [json.dumps(item, ensure_ascii=False) for item in all_items]
         jsonl_content = "\n".join(jsonl_lines)
         return jsonl_content.encode('utf-8')
-
+    
     elif export_type == InferenceResultDatasetExportType.JSON_TYPE.value:
         # JSON 格式：将每行 JSON 对象合并为 JSON 数组
         json_content = json.dumps(all_items, ensure_ascii=False, indent=2)
         return json_content.encode('utf-8')
-
+    
     elif export_type == InferenceResultDatasetExportType.XLSX_TYPE.value:
         # XLSX 格式：根据数据集格式进行转换
         dataset_format = db_dataset.dataset_format
-
+        
         if dataset_format == DatasetFormat.PROMPT_RESPONSE.value:
             # prompt-response 格式转换为 XLSX
             return _convert_prompt_response_to_xlsx(all_items)
-
+        
         elif dataset_format == DatasetFormat.ROLE_BASED.value:
             # role-based 格式转换为 XLSX
             return _convert_role_based_to_xlsx(all_items)
@@ -2018,10 +1635,10 @@ async def analyze_export_inference_result_file_single(
         elif dataset_format == DatasetFormat.BUSINESS.value:
             # business 格式转化为 XLSX
             return _convert_business_to_xlsx(all_items)
-
+        
         else:
             raise ValueError(f"不支持的数据集格式: {dataset_format}，XLSX 导出仅支持 prompt-response 和 role-based 格式")
-
+    
     else:
         raise ValueError(f"不支持的导出格式: {export_type}")
 
@@ -2029,17 +1646,17 @@ async def analyze_export_inference_result_file_single(
 def _convert_prompt_response_to_xlsx(items: List[Dict[str, Any]]) -> bytes:
     """
     将 prompt-response 格式的数据转换为 XLSX
-
+    
     列结构：
     - prompt（必需）
     - response（必需）
     - system（可选）
     - model_response（可选，推理结果集特有）
     - 其他字段（如 error, error_message 等）
-
+    
     Args:
         items: 数据项列表
-
+    
     Returns:
         XLSX 文件的字节内容
     """
@@ -2047,11 +1664,11 @@ def _convert_prompt_response_to_xlsx(items: List[Dict[str, Any]]) -> bytes:
     all_columns = set()
     for item in items:
         all_columns.update(item.keys())
-
+    
     # 定义列的顺序（优先显示常用列）
     priority_columns = ['prompt', 'response', 'system', 'model_response', 'error', 'error_message']
     ordered_columns = []
-
+    
     # 先添加优先列（如果数据为空，至少添加默认列）
     if not items:
         # 空数据时，使用默认列
@@ -2062,45 +1679,45 @@ def _convert_prompt_response_to_xlsx(items: List[Dict[str, Any]]) -> bytes:
             if col in all_columns:
                 ordered_columns.append(col)
                 all_columns.discard(col)
-
+        
         # 再添加其他列（按字母顺序）
         ordered_columns.extend(sorted(all_columns))
-
+    
     # 创建 Excel 工作簿
     wb = Workbook()
     ws = wb.active
     ws.title = "推理结果集"
-
+    
     # 写入表头
     ws.append(ordered_columns)
-
+    
     # 写入数据行
     for item in items:
         row = [item.get(col, '') for col in ordered_columns]
         # 处理 None 值
         row = ['' if v is None else v for v in row]
         ws.append(row)
-
+    
     # 将工作簿保存到 BytesIO
     output = BytesIO()
     wb.save(output)
     output.seek(0)
-
+    
     return output.getvalue()
 
 
 def _convert_role_based_to_xlsx(items: List[Dict[str, Any]]) -> bytes:
     """
     将 role-based 格式的数据转换为 XLSX
-
+    
     转换规则（反向执行 xlsx 解析逻辑）：
     - 单轮格式：system, user, assistant
     - 多轮格式：system, user1, assistant1, user2, assistant2...
     - 保留其他字段（如 response, system, prompt, model_response 等）
-
+    
     Args:
         items: 数据项列表（每个项包含 messages 数组和其他字段）
-
+    
     Returns:
         XLSX 文件的字节内容
     """
@@ -2108,38 +1725,38 @@ def _convert_role_based_to_xlsx(items: List[Dict[str, Any]]) -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "推理结果集"
-
+    
     # 分析所有数据项，确定是单轮还是多轮格式
     max_turns = 0
     all_other_fields = set()
-
+    
     for item in items:
         if 'messages' not in item:
             continue
-
+        
         messages = item['messages']
         if not isinstance(messages, list):
             continue
-
+        
         # 统计 user-assistant 轮数（排除 system）
         user_assistant_pairs = 0
         for msg in messages:
             if msg.get('role') == 'user':
                 user_assistant_pairs += 1
-
+        
         max_turns = max(max_turns, user_assistant_pairs)
-
+        
         # 收集其他字段（非 messages 字段）
         for key in item.keys():
             if key != 'messages':
                 all_other_fields.add(key)
-
+    
     # 构建表头
     headers = []
-
+    
     # 添加 system 列
     headers.append('system')
-
+    
     # 添加 user 和 assistant 列
     if max_turns == 1:
         # 单轮格式
@@ -2150,39 +1767,39 @@ def _convert_role_based_to_xlsx(items: List[Dict[str, Any]]) -> bytes:
         for turn_num in range(1, max_turns + 1):
             headers.append(f'user{turn_num}')
             headers.append(f'assistant{turn_num}')
-
+    
     # 添加其他字段列（按字母顺序）
     headers.extend(sorted(all_other_fields))
-
+    
     # 写入表头
     ws.append(headers)
-
+    
     # 写入数据行
     for item in items:
         row_data = {}
-
+        
         # 提取 messages 内容
         if 'messages' in item and isinstance(item['messages'], list):
             messages = item['messages']
-
+            
             # 提取 system 消息
             system_content = ''
             user_assistant_pairs = []
-
+            
             for msg in messages:
                 role = msg.get('role', '')
                 content = msg.get('content', '')
-
+                
                 if role == 'system':
                     system_content = content
                 elif role == 'user':
                     user_assistant_pairs.append({'user': content, 'assistant': ''})
                 elif role == 'assistant' and user_assistant_pairs:
                     user_assistant_pairs[-1]['assistant'] = content
-
+            
             # 填充 system 列
             row_data['system'] = system_content
-
+            
             # 填充 user 和 assistant 列
             if max_turns == 1:
                 # 单轮格式
@@ -2202,7 +1819,7 @@ def _convert_role_based_to_xlsx(items: List[Dict[str, Any]]) -> bytes:
                     else:
                         row_data[f'user{turn_num}'] = ''
                         row_data[f'assistant{turn_num}'] = ''
-
+        
         # 填充其他字段
         for field in all_other_fields:
             value = item.get(field, '')
@@ -2210,41 +1827,41 @@ def _convert_role_based_to_xlsx(items: List[Dict[str, Any]]) -> bytes:
             if value is None:
                 value = ''
             row_data[field] = value
-
+        
         # 构建行数据（按照表头顺序）
         row = [row_data.get(header, '') for header in headers]
         ws.append(row)
-
+    
     # 将工作簿保存到 BytesIO
     output = BytesIO()
     wb.save(output)
     output.seek(0)
-
+    
     return output.getvalue()
 
 
 def _convert_value_to_excel(value: Any) -> str:
     """
     将值转换为 Excel 可接受的格式
-
+    
     Args:
         value: 要转换的值
-
+    
     Returns:
         转换后的字符串值
     """
     # None -> 空字符串
     if value is None:
         return ''
-
+    
     # 基本类型（str, int, float, bool）-> 转换为字符串
     if isinstance(value, (str, int, float, bool)):
         return str(value)
-
+    
     # 复杂类型（list, dict）-> 转换为 JSON 字符串
     if isinstance(value, (list, dict)):
         return json.dumps(value, ensure_ascii=False)
-
+    
     # 其他类型 -> 转换为字符串
     return str(value)
 
@@ -2252,15 +1869,15 @@ def _convert_value_to_excel(value: Any) -> str:
 def _convert_business_to_xlsx(items: List[Dict[str, Any]]) -> bytes:
     """
     将业务推理结果集转换为 XLSX 格式
-
+    
     转换规则：
     - 每一行 jsonl 对象就为一个 json 对象
     - 默认第一个对象的属性为表头
     - 后面的 json 对象都以当前表头为准（缺少的字段填充空值）
-
+    
     Args:
         items: 数据项列表
-
+    
     Returns:
         XLSX 文件的字节内容
     """
@@ -2268,7 +1885,7 @@ def _convert_business_to_xlsx(items: List[Dict[str, Any]]) -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "业务推理结果集"
-
+    
     # 如果数据为空，返回只有表头的空 Excel
     if not items:
         # 空数据时，返回只有表头的空 Excel（表头为空）
@@ -2276,13 +1893,13 @@ def _convert_business_to_xlsx(items: List[Dict[str, Any]]) -> bytes:
         wb.save(output)
         output.seek(0)
         return output.getvalue()
-
+    
     # 使用第一个对象的键作为表头
     headers = list(items[0].keys())
-
+    
     # 写入表头
     ws.append(headers)
-
+    
     # 写入数据行
     for item in items:
         # 按照表头顺序获取值，如果某个字段不存在则填充空字符串
@@ -2290,10 +1907,10 @@ def _convert_business_to_xlsx(items: List[Dict[str, Any]]) -> bytes:
         # 使用辅助函数处理每个值，转换为 Excel 可接受的格式
         row = [_convert_value_to_excel(v) for v in row]
         ws.append(row)
-
+    
     # 将工作簿保存到 BytesIO
     output = BytesIO()
     wb.save(output)
     output.seek(0)
-
+    
     return output.getvalue()

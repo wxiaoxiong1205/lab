@@ -22,19 +22,19 @@ from app.schemas.training_dataset import (
     DatasetFormat,
     DatasetUsage, TrainingDatasetUploadTypeCategory,
     DatasetInUseResponse,
-    DatasetProcessingStatus, TrainingDatasetExportTypeCategory,
+    DatasetProcessingStatus, DatasetPublishStatus, TrainingDatasetExportTypeCategory,
     TrainingDatasetAggregationResponse,
     TrainingDatasetBasicInfoUpdate,
-    DatasetVersionMergeRequest,
+    TrainingDatasetDeleteRowsRequest,
 )
 from app.schemas.training_task import TrainingTypeCategory, TrainingMethodType
 from app.services.training_dataset.interface import TrainingDatasetService
 from app.utils.dependencies import get_db_and_user
 from app.utils.dataset_metadata_repair_status import (
     REPAIR_KIND_TRAINING_DATASET,
-    get_metadata_fields_repair_status,
     mark_metadata_fields_repair_failed,
     mark_metadata_fields_repair_submitted,
+    refresh_metadata_fields_repair_status_from_celery,
 )
 from app.utils.validators import (
     validate_dataset_type_category,
@@ -242,6 +242,7 @@ async def get_training_dataset_versions(
     dataset_name: str = Path(..., description="数据集名称"),
     usage: DatasetUsage = Depends(validate_dataset_usage),
     processing_status: Optional[DatasetProcessingStatus] = Depends(validate_dataset_processing_status),
+    publish: Optional[DatasetPublishStatus] = Query(None, description="发布状态：0未发布, 1已发布, 2处理中展示-, 3处理失败展示-"),
     deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
     training_dataset_service: TrainingDatasetService = Depends(Provide[AutoContainer.training_dataset_service])
 ) -> List[TrainingDatasetResponse]:
@@ -252,6 +253,7 @@ async def get_training_dataset_versions(
         dataset_name: 数据集名称
         usage: 数据集用途
         processing_status: 数据集处理状态筛选（可选，pending处理中，completed处理完成，failed处理失败）
+        publish: 发布状态筛选（可选，0未发布，1已发布，2处理中展示-，3处理失败展示-）
         deps: 组合依赖
         
     Returns:
@@ -262,7 +264,7 @@ async def get_training_dataset_versions(
     """
     db, current_user = deps
 
-    return await training_dataset_service.get_training_dataset_versions(project_id, dataset_name, usage, processing_status)
+    return await training_dataset_service.get_training_dataset_versions(project_id, dataset_name, usage, processing_status, publish)
 
 
 @router.patch("/project/{project_id}/dataset/{dataset_name}/basic-info", response_model=bool)
@@ -286,13 +288,71 @@ async def update_training_dataset_basic_info(
     )
 
 
+@router.patch("/project/{project_id}/dataset/{dataset_id}/publish", response_model=bool)
+@inject
+@OperatorLogsAnnotation(function_name=FunctionType.DATA_MANAGER_TRAINING_DATASET, table_name="training_dataset",
+                        operator_type=OperatorType.EDIT, operator_content_key=["name"],
+                        self_service_field_mapping=None,
+                        scope_service_field_mapping={
+                            "service_name": "project_service",
+                            "field_name": "project_id",
+                            "tag_field_name": "name"})
+async def update_training_dataset_publish_status(
+    project_id: int = Path(..., description="项目ID"),
+    dataset_id: int = Path(..., description="数据集ID", gt=0),
+    publish: DatasetPublishStatus = Body(..., embed=True, description="发布状态：仅允许 1（已发布）"),
+    deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
+    training_dataset_service: TrainingDatasetService = Depends(Provide[AutoContainer.training_dataset_service])
+) -> bool:
+    """修改数据集发布状态：仅允许 completed 的未发布数据集发布为已发布。"""
+    db, current_user = deps
+    return await training_dataset_service.update_training_dataset_publish_status(
+        project_id, dataset_id, publish
+    )
+
+
+
+@router.delete("/project/{project_id}/dataset/{dataset_id}/rows", response_model=bool)
+@inject
+async def delete_training_dataset_rows(
+    project_id: int = Path(..., description="项目ID"),
+    dataset_id: int = Path(..., description="数据集ID", gt=0),
+    request: TrainingDatasetDeleteRowsRequest = Body(..., description="删除指定行请求"),
+    deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
+    training_dataset_service: TrainingDatasetService = Depends(Provide[AutoContainer.training_dataset_service])
+) -> bool:
+    """异步删除训练数据集文件中的指定行。
+
+    前端需要传全局行号，不传当前页内序号；全局行号使用预览接口返回的 `row_number`。
+    例如预览接口当前页返回 row_number 为 21、22、23，用户选中第 1、3 条时，传 `[21, 23]`。
+
+    处理规则：
+    - 仅 `processing_status = completed` 已完成的数据集允许删除；
+    - 仅 `publish = 0` 未发布的数据集允许删除；
+    - 接口提交成功后会立即把处理状态改为 `pending`；
+    - 如果当前已是 `pending`，说明数据集有任务正在处理，需要等待处理完成，请刷新后重试；
+
+    请求示例：
+    ```json
+    DELETE /api/v1/training-datasets/project/35/dataset/1001/rows
+    {
+      "row_numbers": [21, 23]
+    }
+    ```
+    """
+    _ = deps
+    return await training_dataset_service.delete_training_dataset_rows(
+        project_id=project_id,
+        dataset_id=dataset_id,
+        row_numbers=request.row_numbers,
+    )
+
 @router.get("/project/{project_id}/dataset/{dataset_name}/version/{version}/in-use", response_model=DatasetInUseResponse)
 # @inject
 async def check_dataset_in_use_status(
     project_id: int = Path(..., description="项目ID"),
     dataset_name: str = Path(..., description="数据集名称"),
     version: str = Path(..., description="数据集版本"),
-    usage: Optional[DatasetUsage] = Query(None, description="数据集用途"),
     deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user)
 ) -> DatasetInUseResponse:
     """查询数据集是否正在被标注或清洗任务使用
@@ -325,7 +385,7 @@ async def check_dataset_in_use_status(
     """
     db, current_user = deps
     
-    result = await query_dataset_in_use(db, dataset_name, project_id, version, usage)
+    result = await query_dataset_in_use(db, dataset_name, project_id, version)
     
     return DatasetInUseResponse(**result)
     
@@ -388,16 +448,18 @@ async def get_metadata_fields(
 
 @router.post("/metadata-fields/repair", response_model=Dict[str, Any])
 @inject
-async def repair_metadata_fields() -> Dict[str, Any]:
+async def repair_metadata_fields(
+    force: bool = Query(False, description="是否强制重刷已有 metadata_fields 的数据集"),
+) -> Dict[str, Any]:
     """提交或查询历史训练数据集 metadata_fields 异步回填任务。"""
     from app.tasks.dataset_processing_tasks import repair_training_dataset_metadata_fields
 
     tenant_id: Optional[str] = None
-    existing_status = await get_metadata_fields_repair_status(
+    existing_status = await refresh_metadata_fields_repair_status_from_celery(
         REPAIR_KIND_TRAINING_DATASET,
         tenant_id,
     )
-    if existing_status:
+    if existing_status and (not force or existing_status.get("status") in {"submitted", "running"}):
         return existing_status
 
     celery_task_id = str(uuid4())
@@ -405,10 +467,11 @@ async def repair_metadata_fields() -> Dict[str, Any]:
         REPAIR_KIND_TRAINING_DATASET,
         tenant_id,
         celery_task_id,
-        nx=True,
+        force=force,
+        nx=not force,
     )
     if not claimed:
-        existing_status = await get_metadata_fields_repair_status(
+        existing_status = await refresh_metadata_fields_repair_status_from_celery(
             REPAIR_KIND_TRAINING_DATASET,
             tenant_id,
         )
@@ -417,7 +480,7 @@ async def repair_metadata_fields() -> Dict[str, Any]:
 
     try:
         repair_training_dataset_metadata_fields.apply_async(
-            kwargs={"tenant_id": tenant_id},
+            kwargs={"tenant_id": tenant_id, "force": force},
             task_id=celery_task_id,
         )
     except Exception as exc:
@@ -429,13 +492,14 @@ async def repair_metadata_fields() -> Dict[str, Any]:
         )
         raise HTTPException(status_code=500, detail=f"提交训练数据集 metadata_fields 修复任务失败: {exc}") from exc
 
-    return await get_metadata_fields_repair_status(
+    return await refresh_metadata_fields_repair_status_from_celery(
         REPAIR_KIND_TRAINING_DATASET,
         tenant_id,
     ) or {
         "success": True,
         "status": "submitted",
         "celery_task_id": celery_task_id,
+        "force": force,
         "message": "训练数据集 metadata_fields 修复任务已提交",
     }
 
@@ -634,43 +698,6 @@ async def create_dataset_version(
         attr_values=attr_values_list,
     )
 
-
-@router.post(
-    "/project/{project_id}/dataset/{dataset_name}/merge-versions",
-    response_model=TrainingDatasetResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-@inject
-@OperatorLogsAnnotation(function_name=FunctionType.DATA_MANAGER_TRAINING_DATASET, table_name="training_dataset",
-                        operator_type=OperatorType.ADD, operator_content_key=["dataset_name（new_version）"],
-                        self_service_field_mapping=None,
-                        scope_service_field_mapping={
-                            "service_name": "project_service",
-                            "field_name": "project_id",
-                            "tag_field_name": "name"})
-async def merge_dataset_versions(
-    project_id: int = Path(..., description="项目ID"),
-    dataset_name: str = Path(..., description="数据集名称"),
-    usage: DatasetUsage = Depends(validate_dataset_usage),
-    request: DatasetVersionMergeRequest = Body(..., description="数据集版本合并请求"),
-    deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
-    training_dataset_service: TrainingDatasetService = Depends(Provide[AutoContainer.training_dataset_service]),
-) -> TrainingDatasetResponse:
-    """合并同一数据集下多个已完成版本，生成新版本。
-
-    当前支持文本/业务类 JSONL 数据集；图像理解数据集仍使用新增版本继承链路。
-    源版本不会被修改，合并任务通过 Celery 异步处理，新版本先以 pending 状态返回。
-    """
-    db, current_user = deps
-    return await training_dataset_service.merge_dataset_versions(
-        current_user=current_user,
-        project_id=project_id,
-        dataset_name=dataset_name,
-        usage=usage,
-        request=request,
-    )
-
-
 @router.delete("/project/{project_id}/dataset/{dataset_name}", status_code=status.HTTP_204_NO_CONTENT)
 @inject
 @OperatorLogsAnnotation(function_name=FunctionType.DATA_MANAGER_TRAINING_DATASET, table_name="training_dataset",
@@ -738,7 +765,6 @@ async def delete_single_dataset(
 
 @router.get(
     "/project/{project_id}/stats",
-    response_model=TrainingDatasetAggregationResponse,
     response_model_exclude_none=True,
 )
 @inject
@@ -749,6 +775,7 @@ async def get_training_dataset_aggregation_stats(
     dataset_type: Optional[List[TrainingTypeCategory]] = Query(None, description="数据集类型，可多选"),
     training_method_type: Optional[List[TrainingMethodType]] = Query(None, description="训练方法类型，可多选"),
     dataset_format: Optional[List[DatasetFormat]] = Query(None, description="数据集格式，可多选"),
+    publish: Optional[List[DatasetPublishStatus]] = Query(None, description="发布状态，可多选：0未发布, 1已发布, 2处理中展示-, 3处理失败展示-"),
     attr_name: Optional[str] = Query(None, description="按属性 name 筛选（需与 option_value 同时传入）"),
     option_value: Optional[str] = Query(None, description="按该属性下 option 值筛选（需与 attr_name 同时传入）"),
     deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
@@ -779,6 +806,7 @@ async def get_training_dataset_aggregation_stats(
         dataset_type=dataset_type,
         training_method_type=training_method_type,
         dataset_format=dataset_format,
+        publish=publish,
     )
 
 
@@ -794,6 +822,7 @@ async def list_training_datasets_by_filters(
     usage: Optional[DatasetUsage] = Depends(validate_dataset_usage_for_filtered),
     processing_status: DatasetProcessingStatus = Query(DatasetProcessingStatus.COMPLETED, description="按处理状态筛选，默认仅统计已完成的数据集"),
     dataset_format: Optional[DatasetFormat] = Depends(validate_dataset_format),
+    publish: Optional[DatasetPublishStatus] = Query(None, description="发布状态：0未发布, 1已发布, 2处理中展示-, 3处理失败展示-"),
     attr_name: Optional[str] = Query(None, description="按属性 name 筛选（需与 option_value 同时传入）"),
     option_value: Optional[str] = Query(None, description="按该属性下 option 值筛选（需与 attr_name 同时传入）"),
     deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
@@ -816,6 +845,7 @@ async def list_training_datasets_by_filters(
         project_id, name, dataset_type, training_method_type,
         usage, page, size, processing_status,
         dataset_format=dataset_format,
+        publish=publish,
         attr_name=attr_name,
         option_value=option_value,
     )

@@ -4,6 +4,7 @@ import os
 import random
 import shutil
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
@@ -42,6 +43,8 @@ from app.services.storage.interface import StorageService
 from app.utils import app_runtime_context
 from app.utils.name_validator import validate_name_format
 from app.utils.storage_enum import StoragePath
+from app.utils.json_path import collect_json_leaf_paths, iter_json_path_values, set_json_path_value
+from app.utils.jfs_utils import JFSUtils
 from app.utils.validators import (
     validate_project_exists,
     check_dataset_in_use,
@@ -58,6 +61,32 @@ class DatasetResult:
     def __init__(self, id: int, version: str):
         self.id = id
         self.version = version
+
+
+def _rebuild_json_field_group(rows_in_group: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Rebuild a JSON sample from data-juicer rows produced for nested field cleaning."""
+    if not rows_in_group:
+        return None
+
+    raw_original_item = rows_in_group[0].get("_original_item")
+    if not isinstance(raw_original_item, str):
+        return None
+
+    try:
+        original_item = json.loads(raw_original_item)
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(original_item, dict):
+        return None
+
+    rebuilt_item = deepcopy(original_item)
+    for row in rows_in_group:
+        field_path = row.get("_field_path")
+        if not isinstance(field_path, str) or not field_path:
+            continue
+        set_json_path_value(rebuilt_item, field_path, row.get("text", ""))
+    return rebuilt_item
 
 
 async def _create_fresh_session():
@@ -1642,7 +1671,7 @@ class DefaultCleaningService(CleaningService):
         if not dataset:
             raise HTTPException(status_code=404, detail=f"训练数据集不存在: {dataset_id}")
 
-        raw_fields = self._get_top_level_metadata_fields(dataset.metadata_fields)
+        raw_fields = self._get_data_cleaning_metadata_fields(dataset.metadata_fields)
         field_source = "metadata_fields"
         if not raw_fields:
             raw_fields = await self._collect_dataset_fields_from_sample_file(dataset)
@@ -1652,6 +1681,12 @@ class DefaultCleaningService(CleaningService):
             raise HTTPException(status_code=400, detail="无法从数据集中提取字段，请检查文件格式或先执行 metadata_fields 修复")
 
         fields = self._format_data_cleaning_dataset_fields(dataset, raw_fields)
+        if not fields and field_source == "metadata_fields":
+            raw_fields = await self._collect_dataset_fields_from_sample_file(dataset)
+            field_source = "sample_file"
+            fields = self._format_data_cleaning_dataset_fields(dataset, raw_fields)
+        if not fields:
+            raise HTTPException(status_code=400, detail="未解析到可清洗字段，请先执行 metadata_fields 修复")
         logger.info(
             f"获取数据清洗字段成功: dataset_id={dataset_id}, "
             f"source={field_source}, fields_count={len(fields)}"
@@ -1663,26 +1698,73 @@ class DefaultCleaningService(CleaningService):
         )
 
     @staticmethod
-    def _get_top_level_metadata_fields(metadata_fields: Any) -> List[str]:
-        """metadata_fields 存的是全量字段路径，数据清洗 text_keys 使用顶层/逻辑字段。"""
+    def _get_data_cleaning_metadata_fields(metadata_fields: Any) -> List[str]:
+        """从全量 metadata_fields 转换为数据清洗可选择字段。"""
         if not isinstance(metadata_fields, list):
             return []
 
         result: List[str] = []
         seen = set()
         ignored_fields = {"row_number", "key", "id"}
+        conversation_structural_fields = {
+            "messages.role", "messages.content",
+            "conversations.from", "conversations.value",
+            "dialogue.speaker", "dialogue.text",
+        }
         for field in metadata_fields:
             if not isinstance(field, str):
                 continue
             field_name = field.strip()
             if not field_name:
                 continue
-            top_level_field = field_name.split(".", 1)[0]
-            if top_level_field in ignored_fields or top_level_field in seen:
+
+            if field_name in conversation_structural_fields:
                 continue
-            seen.add(top_level_field)
-            result.append(top_level_field)
+
+            if field_name.startswith(("messages.", "conversations.", "dialogue.")):
+                if field_name not in seen:
+                    seen.add(field_name)
+                    result.append(field_name)
+                continue
+
+            top_level_field = field_name.split(".", 1)[0]
+            if top_level_field in ignored_fields or field_name in seen:
+                continue
+            seen.add(field_name)
+            result.append(field_name)
         return result
+
+    @staticmethod
+    def _collect_data_cleaning_fields_from_item(item: Dict[str, Any], fields: List[str], seen: set) -> None:
+        ignored_fields = {"row_number", "key", "id"}
+        conversation_specs = (
+            ("messages", "role"),
+            ("conversations", "from"),
+            ("dialogue", "speaker"),
+        )
+        conversation_keys = {name for name, _ in conversation_specs}
+
+        for field_name in item.keys():
+            if field_name in ignored_fields or field_name in conversation_keys or field_name in seen:
+                continue
+            seen.add(field_name)
+            fields.append(field_name)
+
+        for conversation_key, role_key in conversation_specs:
+            turns = item.get(conversation_key)
+            if not isinstance(turns, list):
+                continue
+            for turn in turns:
+                if not isinstance(turn, dict):
+                    continue
+                role = turn.get(role_key)
+                if not isinstance(role, str) or not role:
+                    continue
+                field_name = f"{conversation_key}.{role}"
+                if field_name in seen:
+                    continue
+                seen.add(field_name)
+                fields.append(field_name)
 
     async def _collect_dataset_fields_from_sample_file(
         self,
@@ -1701,7 +1783,6 @@ class DefaultCleaningService(CleaningService):
         seen = set()
         sample_count = 0
         max_samples = 2
-        ignored_fields = {"row_number", "key", "id"}
 
         with jfs.open(dataset_path, 'r', encoding='utf-8') as f:
             for line in f:
@@ -1720,11 +1801,15 @@ class DefaultCleaningService(CleaningService):
                 else:
                     continue
 
-                for field_name in to_parse.keys():
-                    if field_name in ignored_fields or field_name in seen:
-                        continue
-                    seen.add(field_name)
-                    fields.append(field_name)
+                if dataset.dataset_format == "grpo":
+                    for field_name in collect_json_leaf_paths(to_parse):
+                        top_level_field = field_name.split(".", 1)[0]
+                        if top_level_field in {"row_number", "key", "id"} or field_name in seen:
+                            continue
+                        seen.add(field_name)
+                        fields.append(field_name)
+                else:
+                    self._collect_data_cleaning_fields_from_item(to_parse, fields, seen)
                 sample_count += 1
                 if sample_count >= max_samples:
                     break
@@ -1740,22 +1825,55 @@ class DefaultCleaningService(CleaningService):
         from app.schemas.training_task import TrainingMethodType
 
         raw_field_set = set(raw_fields)
-        excluded_fields = {"messages", "conversations", "dialogue"}
+        excluded_fields = {
+            "messages", "messages.role", "messages.content",
+            "conversations", "conversations.from", "conversations.value",
+            "dialogue", "dialogue.speaker", "dialogue.text",
+        }
+
+        def _has_any(*field_names: str) -> bool:
+            return any(field_name in raw_field_set for field_name in field_names)
 
         if dataset.dataset_format == DatasetFormat.ROLE_BASED.value:
             ordered_fields = (
-                ["messages.system", "messages.user", "messages.assistant", "chosen", "rejected"]
+                [
+                    field_name
+                    for field_name in ["messages.system", "messages.user", "messages.assistant", "chosen", "rejected"]
+                    if field_name in raw_field_set
+                ]
                 if dataset.training_method_type == TrainingMethodType.DPO.value
-                else ["system", "user", "assistant"]
+                else [
+                    field_name
+                    for field_name, aliases in [
+                        ("system", ("system", "messages.system")),
+                        ("user", ("user", "messages.user")),
+                        ("assistant", ("assistant", "messages.assistant")),
+                    ]
+                    if _has_any(*aliases)
+                ]
             )
+            if dataset.training_method_type != TrainingMethodType.DPO.value:
+                excluded_fields.update({"messages.system", "messages.user", "messages.assistant"})
         elif dataset.dataset_format == DatasetFormat.ALPACA.value:
-            ordered_fields = ["instruction", "input", "chosen", "rejected"]
+            ordered_fields = [
+                field_name
+                for field_name in ["instruction", "input", "chosen", "rejected"]
+                if field_name in raw_field_set
+            ]
             excluded_fields = set()
         elif dataset.dataset_format == DatasetFormat.PROMPT_RESPONSE.value:
             ordered_fields = (
-                ["instruction", "input", "chosen", "rejected"]
+                [
+                    field_name
+                    for field_name in ["instruction", "input", "chosen", "rejected"]
+                    if field_name in raw_field_set
+                ]
                 if dataset.training_method_type == TrainingMethodType.DPO.value
-                else ["system", "prompt", "response"]
+                else [
+                    field_name
+                    for field_name in ["system", "prompt", "response"]
+                    if field_name in raw_field_set
+                ]
             )
             excluded_fields = set()
         else:
@@ -1866,6 +1984,7 @@ class DefaultCleaningService(CleaningService):
                     'dataset_format': dataset_dict.get('dataset_format'),
                     'usage': dataset_dict.get('usage'),
                     'dataset_config': dataset_dict.get('dataset_config'),
+                    'dataset_path': dataset_dict.get('dataset_path'),
                 }
                 
                 # 验证必要字段
@@ -1887,6 +2006,7 @@ class DefaultCleaningService(CleaningService):
                         'dataset_format': source_dataset.dataset_format,
                         'usage': source_dataset.usage,
                         'dataset_config': getattr(source_dataset, 'dataset_config', None),
+                        'dataset_path': source_dataset.dataset_path,
                     }
                 except Exception as e2:
                     logger.error(f"直接访问属性也失败: {str(e2)}", exc_info=True)
@@ -1934,18 +2054,13 @@ class DefaultCleaningService(CleaningService):
             _internal_keys = {
                 "_cleaning_id", "_group", "_role", "_turn_idx", "_other_turns",
                 "_segment", "_messages_original", "_chosen_original", "_rejected_original",
-                "_total_selected"
+                "_total_selected", "_field_path", "_original_item"
             }
             selected_fields = set(cleaning_task.selected_fields or [])
             dataset_format = source_dataset_info.get("dataset_format") or ""
 
             def _has_nested_field(data: Dict[str, Any], field_path: str) -> bool:
-                current: Any = data
-                for part in field_path.split("."):
-                    if not isinstance(current, dict) or part not in current:
-                        return False
-                    current = current[part]
-                return True
+                return bool(iter_json_path_values(data, field_path))
 
             def _role_logical_field_name(role: str) -> str:
                 if role == "assistant":
@@ -2043,7 +2158,7 @@ class DefaultCleaningService(CleaningService):
             original_rows = _load_original_rows()
 
             if is_grouped:
-                logger.info(f"检测到 _group 字段，开始按会话重组 messages: task_id={task_id}")
+                logger.info(f"检测到 _group 字段，开始按 group 重组清洗结果: task_id={task_id}")
                 # 按 _group 聚合，保留各消息的 _turn_idx 顺序
                 from collections import defaultdict
                 groups: dict = defaultdict(list)
@@ -2057,6 +2172,7 @@ class DefaultCleaningService(CleaningService):
                 # output_lines 保留 _cleaning_id，用于回写 output_path 供对比接口使用
                 rebuilt_by_group: Dict[str, Tuple[str, str]] = {}
                 dropped_groups = 0
+                rebuilt_field_groups = 0
                 for gid in group_order:
                     rows_in_group = sorted(groups[gid], key=lambda r: r.get("_turn_idx", 0))
 
@@ -2068,6 +2184,19 @@ class DefaultCleaningService(CleaningService):
                             f"会话 {gid} 有 {total_selected - len(rows_in_group)} 轮消息被过滤删除，"
                             f"丢弃整条会话（原有 {total_selected} 轮，剩余 {len(rows_in_group)} 轮）"
                         )
+                        continue
+
+                    if any(row.get("_segment") == "field" for row in rows_in_group):
+                        rebuilt_item = _rebuild_json_field_group(rows_in_group)
+                        if rebuilt_item is None:
+                            dropped_groups += 1
+                            logger.info(f"复杂 JSON 字段分组 {gid} 无法还原原样本，丢弃该样本")
+                            continue
+
+                        comparison_line = _format_comparison_line(rebuilt_item, gid)
+                        formatted_line = _format_cleaned_dataset_line(rebuilt_item)
+                        rebuilt_by_group[gid] = (comparison_line, formatted_line)
+                        rebuilt_field_groups += 1
                         continue
 
                     original_messages = []
@@ -2163,9 +2292,10 @@ class DefaultCleaningService(CleaningService):
                         total_characters += len(formatted_line)
 
                 logger.info(
-                    f"会话重组完成: task_id={task_id}, 保留会话数={total_samples}, "
+                    f"group 重组完成: task_id={task_id}, 保留样本数={total_samples}, "
+                    f"复杂 JSON 字段样本数={rebuilt_field_groups}, "
                     f"未命中清洗字段而原样保留的会话数={passthrough_groups}, "
-                    f"因消息被过滤而丢弃的会话数={dropped_groups}"
+                    f"因清洗过滤或还原失败丢弃的样本数={dropped_groups}"
                 )
 
                 # 回写 output_path：用重组后的数据替换 data-juicer 的原始拆行输出，
@@ -2348,7 +2478,7 @@ class DefaultCleaningService(CleaningService):
             logger.info(f"数据文件写入成功: path={new_dataset_path}, file_size={len(content.encode('utf-8')) / (1024 * 1024):.2f}MB")
             from app.utils.dataset_file_parser import collect_metadata_fields_from_jsonl_iterable
             metadata_fields = collect_metadata_fields_from_jsonl_iterable(cleaned_data) if cleaned_data else []
-            
+
             # 创建新的数据集记录
             logger.info(f"创建数据集记录: name={source_dataset_info['name']}, version={new_version}")
             new_dataset = TrainingDataset(

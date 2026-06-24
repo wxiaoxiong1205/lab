@@ -10,8 +10,8 @@ from app.repository.training_dataset_mapper import TrainingDatasetMapper
 from app.schemas.training_dataset import (
     TrainingDatasetResponse, TrainingDatasetSummaryResponse,
     DatasetSamplePageResponse, DatasetFormat, DatasetUsage, TrainingDatasetUploadTypeCategory,
-    DatasetProcessingStatus, TrainingDatasetExportTypeCategory, TrainingDatasetAggregationResponse,
-    TrainingDatasetBasicInfoUpdate, DatasetVersionMergeRequest
+    DatasetProcessingStatus, DatasetPublishStatus, TrainingDatasetExportTypeCategory, TrainingDatasetAggregationResponse,
+    TrainingDatasetBasicInfoUpdate
 )
 from app.schemas.training_task import TrainingTypeCategory, TrainingMethodType
 from app.services.chunk_upload.interface import ChunkUploadService
@@ -118,6 +118,7 @@ class TrainingDatasetService(ABC):
         dataset_name: str,
         usage: DatasetUsage,
         processing_status: Optional[DatasetProcessingStatus] = None,
+        publish: Optional[DatasetPublishStatus] = None,
     ) -> List[TrainingDatasetResponse]:
         """根据数据集名称获取所有版本列表"""
         pass
@@ -131,6 +132,26 @@ class TrainingDatasetService(ABC):
         update_data: TrainingDatasetBasicInfoUpdate,
     ) -> bool:
         """编辑数据集名称和描述，并同步使用该数据集的标注、清洗、推理结果集冗余信息"""
+        pass
+
+    @abstractmethod
+    async def update_training_dataset_publish_status(
+        self,
+        project_id: int,
+        dataset_id: int,
+        publish: DatasetPublishStatus,
+    ) -> bool:
+        """将已完成处理的数据集从未发布改为已发布"""
+        pass
+
+    @abstractmethod
+    async def delete_training_dataset_rows(
+        self,
+        project_id: int,
+        dataset_id: int,
+        row_numbers: List[int],
+    ) -> bool:
+        """异步删除训练数据集文件中的指定行"""
         pass
 
     @abstractmethod
@@ -170,6 +191,7 @@ class TrainingDatasetService(ABC):
     @abstractmethod
     async def repair_metadata_fields(
         self,
+        force: bool = False,
     ) -> Dict[str, Any]:
         """从历史 dataset JSONL 文件回填空的 metadata_fields。"""
         pass
@@ -209,18 +231,6 @@ class TrainingDatasetService(ABC):
         attr_values: Optional[List[Any]] = None,
     ) -> TrainingDatasetResponse:
         """基于现有数据集创建新版本（继承/上传模式，支持单文件直接上传或多文件分片上传）"""
-        pass
-
-    @abstractmethod
-    async def merge_dataset_versions(
-        self,
-        current_user: JwtUserInfo,
-        project_id: int,
-        dataset_name: str,
-        usage: DatasetUsage,
-        request: DatasetVersionMergeRequest,
-    ) -> TrainingDatasetResponse:
-        """合并同一数据集下多个已完成版本，生成新版本"""
         pass
 
     @abstractmethod
@@ -285,6 +295,7 @@ class TrainingDatasetService(ABC):
         dataset_type: Optional[List[TrainingTypeCategory]] = None,
         training_method_type: Optional[List[TrainingMethodType]] = None,
         dataset_format: Optional[List[DatasetFormat]] = None,
+        publish: Optional[List[DatasetPublishStatus]] = None,
     ) -> TrainingDatasetAggregationResponse:
         """聚合统计：按 usage、dataset_format、dataset_type、attr option 分别统计数据量；支持 processing_status、attr、可选多选 usage / dataset_type / training_method_type / dataset_format（usage 未传或为空列表则返回 None、不查库；须传非空 usage 才聚合）"""
         pass
@@ -301,6 +312,7 @@ class TrainingDatasetService(ABC):
         size: Optional[int] = None,
         processing_status: Optional[DatasetProcessingStatus] = None,
         dataset_format: Optional[DatasetFormat] = None,
+        publish: Optional[DatasetPublishStatus] = None,
         attr_name: Optional[str] = None,
         option_value: Optional[str] = None,
     ) -> Page[TrainingDatasetSummaryResponse]:

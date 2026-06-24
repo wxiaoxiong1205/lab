@@ -13,6 +13,7 @@ import MdPreview from '@/components/md-preview'
 const AnnotationDetail: React.FC = () => {
   const { projectId, taskId, formerListData, taskName, loading, dataList, pagination, annotationFilter, isCompleted, isSubmitted, isReauditRound, manualContent, dpoContents, dpoProcessingTarget, assistantContents, savingDraft, auditSubmitting, auditSubmitLoading, auditRejectModalVisible, auditRejectReason, resolvedContentTab, isImageAnnotation, expandedCells, rowHeights, currentProcessingIndex, imagePreviewVisible, previewImageUrl, streamingContent, aiLoading, configModalVisible, annotationConfig, isMultiPerson, isAuditMode, isMultiPersonPassedLocked, setManualContent, setDpoContents, setAssistantContents, setAuditRejectReason, setAuditRejectModalVisible, setConfigModalVisible, setImagePreviewVisible, handleFilterChange, handlePageChange, handleSaveDraft, handleSubmit, handleAuditPass, handleAuditFailOpen, handleAuditFailConfirm, handleSubmitAudit, handleOpenConfig, handleConfigConfirm, toggleRowExpand, toggleCellExpand, handleHeightChange, handleImageClick, handleOpenAIAnnotation } = useAnnotationDetailController()
   const isDpoAnnotation = formerListData?.training_method_type === 'dpo'
+  const isGrpoAnnotation = formerListData?.training_method_type === 'grpo' || formerListData?.dataset_format === 'grpo'
   const isDpoRoleBased = isDpoAnnotation && formerListData?.dataset_format === 'role-based'
 
   const aiAnnotationButtonClass = '!absolute !bottom-2 !right-2 !z-10 !w-auto !min-w-[88px] !max-w-max !px-3 opacity-0 transition-opacity group-hover:opacity-100'
@@ -22,6 +23,11 @@ const AnnotationDetail: React.FC = () => {
     content
       ? <MdPreview content={content} />
       : <span className="text-gray-400">-</span>
+  )
+  const renderTextBlock = (content?: string) => (
+    <div className="max-w-full max-h-[calc(100vh-400px)] overflow-y-auto break-words whitespace-pre-wrap">
+      {content || '-'}
+    </div>
   )
   const renderDpoEditor = (
     value: string,
@@ -96,7 +102,7 @@ const AnnotationDetail: React.FC = () => {
       dataIndex: isImageAnnotation ? '_systemMessage' : 'system',
       key: 'system',
       align: 'left',
-      hidden: isDpoAnnotation,
+      hidden: isDpoAnnotation || isGrpoAnnotation,
       render: (text: string, record: AnnotationDataItem<string>) => {
         if (isImageAnnotation) {
           const rowKey = record.id?.toString() || record.row_number?.toString() || '0'
@@ -115,7 +121,7 @@ const AnnotationDetail: React.FC = () => {
       dataIndex: isImageAnnotation ? '_userMessages' : 'prompt',
       key: isImageAnnotation ? 'user' : 'prompt',
       align: 'left',
-      hidden: isDpoAnnotation,
+      hidden: isDpoAnnotation || isGrpoAnnotation,
       render: (text: any, record: AnnotationDataItem<string>) => {
         if (isImageAnnotation) {
           const rowKey = record.id?.toString() || record.row_number?.toString() || '0'
@@ -189,7 +195,7 @@ const AnnotationDetail: React.FC = () => {
       dataIndex: isImageAnnotation ? '_assistantMessages' : 'ground_truth',
       key: isImageAnnotation ? 'assistant' : 'ground_truth',
       align: 'left',
-      hidden: isDpoAnnotation,
+      hidden: isDpoAnnotation || isGrpoAnnotation,
       render: (text: any, record: AnnotationDataItem<string>) => {
         if (isImageAnnotation) {
           const rowKey = record.id?.toString() || record.row_number?.toString() || '0'
@@ -274,6 +280,76 @@ const AnnotationDetail: React.FC = () => {
           </div>
         )
       },
+    },
+    {
+      title: 'data_source',
+      dataIndex: 'data_source',
+      key: 'data_source',
+      align: 'left',
+      width: 220,
+      hidden: !isGrpoAnnotation,
+      render: (text: string) => renderTextBlock(text),
+    },
+    {
+      title: 'prompt',
+      dataIndex: 'prompt',
+      key: 'grpo_prompt',
+      align: 'left',
+      width: 420,
+      hidden: !isGrpoAnnotation,
+      render: (text: string) => (
+        <div
+          className="max-w-full max-h-[calc(100vh-400px)] overflow-y-auto break-words whitespace-pre-wrap [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded [&_img]:my-1"
+          dangerouslySetInnerHTML={{ __html: text || '-' }}
+        />
+      ),
+    },
+    {
+      title: 'reward_model',
+      dataIndex: 'reward_model',
+      key: 'reward_model',
+      align: 'left',
+      width: 360,
+      hidden: !isGrpoAnnotation,
+      render: (_value: unknown, record: AnnotationDataItem<string>) => {
+        const displayValue = manualContent ?? streamingContent ?? record.reward_model?.ground_truth ?? ''
+        const isCurrentProcessing = aiLoading
+        return (
+          <div className="group relative flex h-[calc(100vh-400px)] min-h-[400px] flex-col">
+            <Input.TextArea
+              value={displayValue}
+              onChange={(e) => setManualContent(e.target.value)}
+              onBlur={(e) => setManualContent(e.target.value)}
+              className="w-full flex-1 resize-none min-h-0"
+              placeholder="请输入 ground_truth"
+              readOnly={isSubmitted}
+            />
+            {!isSubmitted && !isAuditMode && (
+              <Button className={aiAnnotationButtonClass} type="primary" size="small" icon={<RobotOutlined />} onClick={() => handleOpenAIAnnotation()} loading={isCurrentProcessing} style={{ backgroundColor: 'rgba(24, 144, 255, 0.9)' }}>
+                AI标注
+              </Button>
+            )}
+          </div>
+        )
+      },
+    },
+    {
+      title: 'ability',
+      dataIndex: 'ability',
+      key: 'ability',
+      align: 'left',
+      width: 160,
+      hidden: !isGrpoAnnotation,
+      render: (text: string) => renderTextBlock(text),
+    },
+    {
+      title: 'extra_info',
+      dataIndex: 'extra_info',
+      key: 'extra_info',
+      align: 'left',
+      width: 260,
+      hidden: !isGrpoAnnotation,
+      render: (text: string) => renderTextBlock(text),
     },
     {
       title: 'Instruction',

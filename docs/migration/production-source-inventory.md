@@ -6,9 +6,11 @@
 
 - Current path: `production/frontend`
 - Original path: `Project/deepexi-lab-web`
-- Original repository: `https://gitlab.deepexi.com/modelhub/deepexilab/deepexi-lab-web.git`
+- Original repository: `git@gitlab.deepexi.com:modelhub/deepexilab/deepexi-lab-web.git`
 - Original branch: `lab/version/v1.14.0`
-- Original commit: `1629242bc168a42610173859c0146f77e5277333`
+- Original commit: `89334d66ac9e7f2d3a295ff2eafa3d2fc2672f23`
+- Latest source refresh: `2026-06-24 14:17 Asia/Shanghai`
+- Latest upstream commit message: `Merge branch 'lab/v1.14.0/devil/feat-rft-grpo' into 'lab/version/v1.14.0'`
 - Main app: `production/frontend/apps/lab`
 - Stack: pnpm workspace, Vite, React 18, TypeScript, Ant Design 5, Zustand, React Router.
 - Imported large-model modules include training task pages, fine-tune task pages, base model management, LLM model management, hosted/external inference service pages, API service pages, OpenAPI access key pages, Notebook pages, and evaluation pages.
@@ -18,9 +20,11 @@
 
 - Current path: `production/backend`
 - Original path: `Project/lab`
-- Original repository: `https://gitlab.deepexi.com/modelhub/deepexilab/lab.git`
+- Original repository: `git@gitlab.deepexi.com:modelhub/deepexilab/lab.git`
 - Original branch: `version/v1.14.0`
-- Original commit: `e6e548732212b5b61db0f90a58a7244415f09768`
+- Original commit: `6642d49f53d1d762e2a6d00108a2ef9db8dbd5be`
+- Latest source refresh: `2026-06-24 14:17 Asia/Shanghai`
+- Latest upstream commit message: `Merge branch 'feature/v1.14.0-grpo-all' into 'version/v1.14.0'`
 - Main app: `production/backend/app`
 - Stack: FastAPI, SQLAlchemy-style model/repository/service layering, Celery tasks, scheduled managers, Kubernetes task executors.
 - Imported large-model APIs include `training_task.py`, `model.py`, `inference_task.py`, `online_inference_service.py`, `evaluation_task.py`, `manual_evaluation_task.py`, `benchmark_task.py`, `notebook.py`, `openapi_application.py`, and related schema/service/repository modules.

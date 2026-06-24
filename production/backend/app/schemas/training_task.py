@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel, Field, model_validator, model_serializer, field_validator, computed_field
 from app.common.status import TaskStatus
 from app.utils.name_validator import validate_name_format
@@ -24,7 +24,7 @@ class TrainingMethodType(str, Enum):
     """训练方法枚举，用于定义不同的训练方法"""
     SFT = "sft"  # Supervised Fine-Tuning
     DPO = "dpo"  # Direct Preference Optimization
-    RFT_GRPO = "rft-grpo"  # Reinforcement Fine-Tuning with GRPO
+    GRPO = "grpo"  # Group Relative Policy Optimization
     # 添加了业务数据集的特殊训练类型business
     BUSINESS = "business" # 业务训练类型
     
@@ -34,7 +34,7 @@ class TrainingMethodType(str, Enum):
         descriptions = {
             cls.SFT: "监督微调 - 使用标注数据进行有监督的模型微调",
             cls.DPO: "直接偏好优化 - 基于人类偏好数据进行模型优化",
-            cls.RFT_GRPO: "强化微调 - 基于GRPO奖励规则进行模型优化",
+            cls.GRPO: "组相对策略优化 - 基于 verl 的强化学习训练",
             cls.BUSINESS: "业务数据集训练"
         }
         return descriptions.get(method_type, "未知训练方法")
@@ -65,6 +65,31 @@ class FineTuningType(str, Enum):
     def get_all_types(cls) -> List[str]:
         """获取所有可用的微调类型"""
         return [fine_tuning_type.value for fine_tuning_type in cls]
+
+
+def infer_grpo_fine_tuning_type(additional_params: Optional[Dict[str, Any]]) -> FineTuningType:
+    """根据 verl 高级参数推断 GRPO 微调类型。"""
+    params = additional_params or {}
+    lora_rank = params.get("actor_rollout_ref.model.lora_rank")
+    if lora_rank is None:
+        lora_rank = params.get("+actor_rollout_ref.model.lora_rank")
+    try:
+        rank_value = float(lora_rank)
+    except (TypeError, ValueError):
+        rank_value = 0
+    return FineTuningType.LORA if rank_value > 0 else FineTuningType.FULL_PARAMETER
+
+
+def normalize_grpo_training_type(training_type: Any, additional_params: Optional[Dict[str, Any]]) -> Any:
+    """GRPO 的微调类型以后端高级参数推断结果为准。"""
+    if not isinstance(training_type, dict):
+        return training_type
+    method_type = getattr(training_type.get("train_method_type"), "value", training_type.get("train_method_type"))
+    if method_type != TrainingMethodType.GRPO.value:
+        return training_type
+    normalized = dict(training_type)
+    normalized["fine_tuning_type"] = infer_grpo_fine_tuning_type(additional_params).value
+    return normalized
 
 
 # class TrainingTaskStatus(str, Enum):
@@ -560,6 +585,7 @@ class CheckpointInfo(BaseModel):
     epoch: Optional[float] = Field(None, description="训练轮次")
     train_loss: Optional[float] = Field(None, description="训练损失")
     eval_loss: Optional[float] = Field(None, description="评估损失")
+    metrics: Dict[str, float] = Field(default_factory=dict, description="检查点关联指标，GRPO 返回 val/test_score、actor/ppo_kl、reward/mean 等指标")
     
     class Config:
         """Pydantic 配置"""
@@ -569,7 +595,8 @@ class CheckpointInfo(BaseModel):
                 "step": 50,
                 "epoch": 0.556,
                 "train_loss": 2.4111,
-                "eval_loss": 2.6580
+                "eval_loss": 2.6580,
+                "metrics": {}
             }
         }
 class DatasetItem(BaseModel):
@@ -626,6 +653,84 @@ class DatasetItem(BaseModel):
 class TrainingSwitchConfig(BaseModel):
     """训练开关配置"""
     do_train: bool = Field(default=True, description="是否启用训练")
+
+
+class RayNodeResourceConfig(BaseModel):
+    """Ray 节点资源配置，允许 head 节点 GPU 数为 0。"""
+    card_type: Union[CardType, str] = Field(..., description="卡类型（GPU/NPU/CPU）")
+    card_model: Union[CardModel, str] = Field(..., description="卡型号")
+    count: int = Field(default=0, ge=0, description="GPU/NPU 数量")
+    card_memory: Optional[str] = Field(None, max_length=20, description="显存大小")
+    k8s_resource_type: Optional[str] = Field(default=None, max_length=64, description="K8s 资源类型")
+    cpu_limit: Optional[float] = Field(0, ge=0, description="CPU限制，单位：核")
+    cpu_request: Optional[float] = Field(0, ge=0, description="CPU请求，单位：核")
+    memory_limit: Optional[float] = Field(0, ge=0, description="内存限制，单位：GiB")
+    memory_request: Optional[float] = Field(0, ge=0, description="内存请求，单位：GiB")
+
+    @model_validator(mode="after")
+    def validate_resource_limits(self):
+        if self.cpu_limit is not None and self.cpu_request is not None and self.cpu_limit < self.cpu_request:
+            raise ValueError("cpu 限制数必须大等于 cpu 请求数")
+        if self.memory_limit is not None and self.memory_request is not None and self.memory_limit < self.memory_request:
+            raise ValueError("内存限制数必须大等于内存请求数")
+        return self
+
+
+def _default_ray_submit_resource_config() -> RayNodeResourceConfig:
+    return RayNodeResourceConfig(
+        card_type="CPU",
+        card_model="CPU",
+        count=0,
+        cpu_request=1,
+        cpu_limit=2,
+        memory_request=2,
+        memory_limit=4,
+    )
+
+
+class RayResourceConfig(BaseModel):
+    """GRPO RayJob 资源配置。"""
+    submit_graphics_card_resource: RayNodeResourceConfig = Field(
+        default_factory=_default_ray_submit_resource_config,
+        description="RayJob submitter 资源配置",
+    )
+    head_graphics_card_resource: RayNodeResourceConfig = Field(..., description="Ray head 资源配置")
+    worker_replicas: int = Field(..., gt=0, description="Ray worker Pod 副本数")
+    worker_graphics_card_resource: RayNodeResourceConfig = Field(..., description="Ray worker 资源配置")
+
+    @model_validator(mode="after")
+    def validate_worker_resource(self):
+        if self.submit_graphics_card_resource.count > 0:
+            raise ValueError("submit_graphics_card_resource.count 必须为 0，RayJob submitter 不申请 GPU/NPU")
+        if self.worker_graphics_card_resource.count <= 0:
+            raise ValueError("worker_graphics_card_resource.count 必须大于 0")
+        if not self.worker_graphics_card_resource.k8s_resource_type:
+            raise ValueError("worker_graphics_card_resource.k8s_resource_type 必须非空")
+        return self
+
+
+class GrpoRewardFunctionValidateRequest(BaseModel):
+    """GRPO 奖励函数校验请求。"""
+    upload_id: str = Field(..., min_length=1, max_length=100, description="奖励函数分片上传ID")
+
+    @field_validator("upload_id")
+    @classmethod
+    def validate_upload_id(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("upload_id 不能为空")
+        return value
+
+
+class GrpoRewardFunctionValidateResponse(BaseModel):
+    """GRPO 奖励函数校验结果。"""
+    valid: bool = Field(..., description="是否校验通过")
+    upload_id: str = Field(..., description="奖励函数分片上传ID")
+    file_name: Optional[str] = Field(None, description="上传文件名")
+    function_name: str = Field(default="compute_score", description="奖励函数名称")
+    errors: List[str] = Field(default_factory=list, description="错误信息")
+    warnings: List[str] = Field(default_factory=list, description="警告信息")
+
 
 class TrainingConfig(BaseModel):
     """训练配置"""
@@ -812,16 +917,16 @@ class TrainingTaskCreate(BaseModel):
     training_type: TrainingTypeConfigAPI = Field(..., description="训练类型配置")
 
     # 数据处理配置
-    data_processing: DataProcessingConfigAPI = Field(..., description="数据处理配置")
+    data_processing: Optional[DataProcessingConfigAPI] = Field(None, description="数据处理配置")
 
     # 训练数据集列表
-    dataset_items: List[DatasetItem] = Field(..., description="训练数据集列表")
+    dataset_items: List[DatasetItem] = Field(default_factory=list, description="训练数据集列表")
     
     # 基础训练参数
-    basic: BasicTrainingConfigAPI = Field(..., description="基础训练参数")
+    basic: Optional[BasicTrainingConfigAPI] = Field(None, description="基础训练参数")
 
     # 高级配置
-    advanced: AdvancedTrainingConfigAPI = Field(..., description="高级配置")
+    advanced: Optional[AdvancedTrainingConfigAPI] = Field(None, description="高级配置")
 
     # lora配置
     lora_config: Optional[LoRAConfigAPI] = Field(None, description="LoRA训练配置")
@@ -830,19 +935,33 @@ class TrainingTaskCreate(BaseModel):
     dpo_config: Optional[DPOConfigAPI] = Field(None, description="DPO训练配置")
     
     # 评估配置
-    evaluation: EvaluationConfigAPI = Field(..., description="评估配置")
+    evaluation: Optional[EvaluationConfigAPI] = Field(None, description="评估配置")
 
     # 评估数据集列表
     eval_dataset_items: Optional[List[DatasetItem]] = Field(default_factory=list, description="评估数据集列表")
     
     # 保存配置
-    save: SaveConfigAPI = Field(..., description="保存配置")
+    save: Optional[SaveConfigAPI] = Field(None, description="保存配置")
     
     # 监控配置
-    monitor: MonitoringConfigAPI = Field(..., description="监控配置")
+    monitor: Optional[MonitoringConfigAPI] = Field(None, description="监控配置")
     
     # 自定义参数
     additional_params: Optional[Dict[str, Any]] = Field(default_factory=dict, description="额外的训练参数")
+
+    # 高级模板ID
+    advanced_template_id: Optional[int] = Field(
+        None,
+        gt=0,
+        description="高级模板ID，用于前端根据模板字段定义回显和渲染 additional_params"
+    )
+
+    # GRPO 奖励函数上传ID
+    reward_function_upload_id: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="GRPO奖励函数分片上传ID，上传文件应为包含compute_score函数的Python文件"
+    )
 
     # DeepSpeed 配置
     deepspeed: Optional[DeepSpeedConfigOption] = Field(default=None, description="DeepSpeed配置选项")
@@ -863,6 +982,9 @@ class TrainingTaskCreate(BaseModel):
         description="GPU/NPU 资源配置"
     )
 
+    # Ray 资源配置，仅 GRPO 使用
+    ray_resource_config: Optional[RayResourceConfig] = Field(None, description="GRPO RayJob 资源配置")
+
     @field_validator('name')
     @classmethod
     def validate_name(cls, v: str) -> str:
@@ -876,6 +998,38 @@ class TrainingTaskCreate(BaseModel):
     @model_validator(mode='after')
     def validate_evaluation_config(self):
         """验证评估配置的一致性"""
+        is_grpo = self.training_type.train_method_type == TrainingMethodType.GRPO
+        if is_grpo:
+            if self.training_type.train_type_category != TrainingTypeCategory.TEXT_GENERATION:
+                raise ValueError("当training_type.train_method_type=grpo时，train_type_category仅支持text-generation")
+            if self.ray_resource_config is None:
+                raise ValueError("当training_type.train_method_type=grpo时，必须提供ray_resource_config")
+            self.training_type.fine_tuning_type = infer_grpo_fine_tuning_type(self.additional_params)
+            if self.additional_params is not None:
+                for key in self.additional_params.keys():
+                    if not isinstance(key, str) or not key.strip():
+                        raise ValueError("additional_params 的 key 必须是非空字符串")
+            if self.reward_function_upload_id is not None:
+                self.reward_function_upload_id = self.reward_function_upload_id.strip() or None
+            return self
+
+        required_fields = [
+            "data_processing",
+            "dataset_items",
+            "basic",
+            "advanced",
+            "evaluation",
+            "save",
+            "monitor",
+        ]
+        missing_fields = [
+            field_name
+            for field_name in required_fields
+            if getattr(self, field_name) in (None, [])
+        ]
+        if missing_fields:
+            raise ValueError(f"非GRPO训练必须提供字段: {', '.join(missing_fields)}")
+
         has_eval_items = self.eval_dataset_items and len(self.eval_dataset_items) > 0
         if self.training_type.train_method_type == TrainingMethodType.DPO and not self.dpo_config:
             raise ValueError("当training_type.train_method_type=dpo时，必须提供dpo_config")
@@ -987,6 +1141,8 @@ class TrainingTaskCreate(BaseModel):
     
     def generate_llama_factory_config(self) -> str:
         """生成LlamaFactory配置文件内容"""
+        if self.training_type.train_method_type == TrainingMethodType.GRPO:
+            raise ValueError("GRPO训练不生成LlamaFactory配置")
         # 使用转换器将API配置转换为LlamaFactory配置
         llama_factory_config = TrainingConfigConverter.api_to_llama_factory(self)
         
@@ -1010,16 +1166,16 @@ class TrainingTaskResponse(BaseModelWithTimezone):
     training_type: TrainingTypeConfigAPI = Field(..., description="训练类型配置")
     
     # 数据处理配置
-    data_processing: DataProcessingConfigAPI = Field(..., description="数据处理配置")
+    data_processing: Optional[DataProcessingConfigAPI] = Field(None, description="数据处理配置")
     
     # 训练数据集列表
-    dataset_items: List[DatasetItem] = Field(..., description="训练数据集列表")
+    dataset_items: List[DatasetItem] = Field(default_factory=list, description="训练数据集列表")
     
     # 基础训练参数
-    basic: BasicTrainingConfigAPI = Field(..., description="基础训练参数")
+    basic: Optional[BasicTrainingConfigAPI] = Field(None, description="基础训练参数")
 
     # 高级配置
-    advanced: AdvancedTrainingConfigAPI = Field(..., description="高级配置")
+    advanced: Optional[AdvancedTrainingConfigAPI] = Field(None, description="高级配置")
 
     # lora配置
     lora_config: Optional[LoRAConfigAPI] = Field(None, description="LoRA训练配置")
@@ -1028,19 +1184,28 @@ class TrainingTaskResponse(BaseModelWithTimezone):
     dpo_config: Optional[DPOConfigDO] = Field(None, description="DPO训练配置")
     
     # 评估配置
-    evaluation: EvaluationConfigAPI = Field(..., description="评估配置")
+    evaluation: Optional[EvaluationConfigAPI] = Field(None, description="评估配置")
 
     # 评估数据集列表
     eval_dataset_items: Optional[List[DatasetItem]] = Field(default_factory=list, description="评估数据集列表")
     
     # 保存配置
-    save: SaveConfigAPI = Field(..., description="保存配置")
+    save: Optional[SaveConfigAPI] = Field(None, description="保存配置")
     
     # 监控配置
-    monitor: MonitoringConfigAPI = Field(..., description="监控配置")
+    monitor: Optional[MonitoringConfigAPI] = Field(None, description="监控配置")
     
     # 自定义参数
     additional_params: Optional[Dict[str, Any]] = Field(default_factory=dict, description="额外的训练参数")
+
+    # 高级模板ID
+    advanced_template_id: Optional[int] = Field(
+        None,
+        description="高级模板ID，用于前端根据模板字段定义回显和渲染 additional_params"
+    )
+
+    # GRPO 奖励函数上传ID
+    reward_function_upload_id: Optional[str] = Field(None, description="GRPO奖励函数分片上传ID")
 
     # DeepSpeed 配置
     deepspeed: Optional[DeepSpeedConfigOption] = Field(default=None, description="DeepSpeed配置选项")
@@ -1051,23 +1216,38 @@ class TrainingTaskResponse(BaseModelWithTimezone):
         description="GPU/NPU 资源配置"
     )
 
+    # Ray 资源配置，仅 GRPO 使用
+    ray_resource_config: Optional[RayResourceConfig] = Field(None, description="GRPO RayJob 资源配置")
+
     @model_validator(mode='before')
     @classmethod
     def enrich_deepspeed_from_advanced(cls, values):
         if isinstance(values, dict):
+            values["training_type"] = normalize_grpo_training_type(
+                values.get("training_type"),
+                values.get("additional_params"),
+            )
             if values.get("deepspeed") is None:
                 advanced = values.get("advanced")
                 if isinstance(advanced, dict):
                     values["deepspeed"] = advanced.get("deepspeed")
             return values
 
+        data = None
         advanced = getattr(values, "advanced", None)
         deepspeed = getattr(values, "deepspeed", None)
+        training_type = getattr(values, "training_type", None)
+        additional_params = getattr(values, "additional_params", None)
+        normalized_training_type = normalize_grpo_training_type(training_type, additional_params)
+        if normalized_training_type is not training_type:
+            data = {field_name: getattr(values, field_name, None) for field_name in cls.model_fields.keys()}
+            data["training_type"] = normalized_training_type
         if deepspeed is None and isinstance(advanced, dict):
-            data = {}
-            for field_name in cls.model_fields.keys():
-                data[field_name] = getattr(values, field_name, None)
+            if data is None:
+                data = {field_name: getattr(values, field_name, None) for field_name in cls.model_fields.keys()}
             data["deepspeed"] = advanced.get("deepspeed")
+            return data
+        if data is not None:
             return data
         return values
     

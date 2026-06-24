@@ -2,6 +2,7 @@ import asyncio
 import io
 import os
 import re
+import shlex
 import stat
 import uuid
 import zipfile
@@ -14,7 +15,7 @@ from fastapi import HTTPException, status
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlalchemy import apaginate
 from kubernetes import client
-from sqlalchemy import select, delete, and_, or_, func, join, cast, String, literal, update
+from sqlalchemy import select, delete, and_, func, join, cast, String, literal, update
 from modelscope.hub.api import HubApi
 from modelscope.hub.errors import NotExistError
 
@@ -22,10 +23,6 @@ from app.utils.log_service import log_service
 from datetime import datetime
 from app.core.logging import logger
 from app.models.model_manager import BaseModel, TrainedModel, MLModel
-from app.models.benchmark_task_manager import BenchmarkTask, BenchmarkTaskModelRelation
-from app.models.evaluation_task_manager import EvaluationReport, EvaluationTask, EvaluationTaskDatasetModelRelation
-from app.models.inference_result_manager import InferenceResultDataset
-from app.models.inference_task_manager import InferenceTask
 from app.models.models import JwtUserInfo, Project, KubernetesResource, ProjectKubernetesRelation, \
     KubernetesStorageRelation, KubernetesRepositoryRelation, RepositoryResource, TaskExecution, ChunkUploadSession, Notebook
 from app.schemas.model import (
@@ -55,7 +52,7 @@ from ...common.task_execution import (
 )
 from ...models import TrainingTask
 from ...repository.base_mapper import BaseMapper
-from ...schemas import FineTuningType
+from ...schemas import FineTuningType, TrainingMethodType
 from ...schemas.resource_config import GraphicsCardResourceConfig
 from ...services.storage.interface import StorageService
 from ...utils.app_runtime_context import get_tenant_id, set_tenant_id
@@ -77,140 +74,6 @@ class DefaultModelService(ModelService):
         self.mapper = mapper
         self.storage = storage
 
-    async def _raise_if_query_has_reference(self, query, detail: str) -> None:
-        result = await self.mapper.execute(query.limit(1))
-        if result.first():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=detail,
-            )
-
-    async def _ensure_base_model_not_referenced(self, project_id: Optional[int], base_model: BaseModel) -> None:
-        id_str = str(base_model.id)
-        name = (base_model.name or "").strip()
-        training_task_ref_conditions = [
-            cast(TrainingTask.base_model, String).contains(f'"base_model_id": {id_str}'),
-            cast(TrainingTask.base_model, String).contains(f'"base_model_id":{id_str}'),
-            cast(TrainingTask.base_model, String).contains(f"'base_model_id': {id_str}"),
-            cast(TrainingTask.base_model, String).contains(f"'base_model_id':{id_str}"),
-        ]
-        trained_model_ref_conditions = [TrainedModel.base_model_id == base_model.id]
-        if name:
-            training_task_ref_conditions.extend(
-                [
-                    cast(TrainingTask.base_model, String).contains(f'"base_model_name": "{name}"'),
-                    cast(TrainingTask.base_model, String).contains(f'"base_model_name":"{name}"'),
-                ]
-            )
-            trained_model_ref_conditions.append(TrainedModel.base_model_name == name)
-
-        await self._raise_if_query_has_reference(
-            select(TrainingTask.id).where(or_(*training_task_ref_conditions)),
-            "模型已被大模型训练任务引用，无法删除",
-        )
-        await self._raise_if_query_has_reference(
-            select(TrainedModel.id).where(or_(*trained_model_ref_conditions)),
-            "模型已被训练模型引用，无法删除",
-        )
-        await self._ensure_model_ids_not_referenced(
-            model_source="base_model",
-            model_ids=[base_model.id],
-            project_id=project_id,
-            label="模型",
-        )
-        await self._raise_if_query_has_reference(
-            select(BenchmarkTaskModelRelation.id)
-            .join(BenchmarkTask, BenchmarkTask.id == BenchmarkTaskModelRelation.benchmark_task_id)
-            .where(
-                BenchmarkTaskModelRelation.model_type == "model",
-                BenchmarkTaskModelRelation.model_id == base_model.id,
-                BenchmarkTaskModelRelation.model_version.is_(None),
-                *([BenchmarkTask.project_id == project_id] if project_id is not None else []),
-            ),
-            "模型已被基准评估任务引用，无法删除",
-        )
-
-    async def _ensure_model_ids_not_referenced(
-        self,
-        *,
-        model_source: str,
-        model_ids: List[int],
-        project_id: Optional[int],
-        label: str,
-    ) -> None:
-        ids = [model_id for model_id in model_ids if model_id is not None]
-        if not ids:
-            return
-
-        project_filter = [InferenceTask.project_id == project_id] if project_id is not None else []
-        await self._raise_if_query_has_reference(
-            select(InferenceTask.id).where(
-                InferenceTask.model_source == model_source,
-                InferenceTask.model_id.in_(ids),
-                *project_filter,
-            ),
-            f"{label}已被模型部署任务引用，无法删除",
-        )
-
-        project_filter = [InferenceResultDataset.project_id == project_id] if project_id is not None else []
-        await self._raise_if_query_has_reference(
-            select(InferenceResultDataset.id).where(
-                InferenceResultDataset.model_source == model_source,
-                InferenceResultDataset.model_id.in_(ids),
-                *project_filter,
-            ),
-            f"{label}已被推理结果集引用，无法删除",
-        )
-
-        project_filter = [EvaluationTask.project_id == project_id] if project_id is not None else []
-        await self._raise_if_query_has_reference(
-            select(EvaluationTask.id).where(
-                EvaluationTask.referee_type == "model",
-                EvaluationTask.referee_model_source == model_source,
-                EvaluationTask.referee_model_id.in_(ids),
-                *project_filter,
-            ),
-            f"{label}已被评估任务裁判模型引用，无法删除",
-        )
-        await self._raise_if_query_has_reference(
-            select(EvaluationTaskDatasetModelRelation.id)
-            .join(EvaluationTask, EvaluationTask.id == EvaluationTaskDatasetModelRelation.evaluation_task_id)
-            .where(
-                EvaluationTaskDatasetModelRelation.evaluated_model_source == model_source,
-                EvaluationTaskDatasetModelRelation.evaluated_model_id.in_(ids),
-                *project_filter,
-            ),
-            f"{label}已被评估任务待评估模型引用，无法删除",
-        )
-        await self._raise_if_query_has_reference(
-            select(EvaluationReport.id)
-            .join(EvaluationTask, EvaluationTask.id == EvaluationReport.evaluation_task_id)
-            .where(
-                EvaluationReport.evaluated_model_source == model_source,
-                EvaluationReport.evaluated_model_id.in_(ids),
-                *project_filter,
-            ),
-            f"{label}已被评估报告引用，无法删除",
-        )
-
-    async def _ensure_trained_models_not_referenced_by_benchmark(
-        self,
-        project_id: int,
-        models: List[TrainedModel],
-    ) -> None:
-        for model in models:
-            await self._raise_if_query_has_reference(
-                select(BenchmarkTaskModelRelation.id)
-                .join(BenchmarkTask, BenchmarkTask.id == BenchmarkTaskModelRelation.benchmark_task_id)
-                .where(
-                    BenchmarkTask.project_id == project_id,
-                    BenchmarkTaskModelRelation.model_type == "model",
-                    BenchmarkTaskModelRelation.model_id == model.id,
-                    BenchmarkTaskModelRelation.model_version == model.model_version,
-                ),
-                "训练模型已被基准评估任务引用，无法删除",
-            )
-
     @staticmethod
     def _prefix_tenant_to_model_uri(uri: Optional[str], tenant_id: Optional[str]) -> Optional[str]:
         """返回时为模型产物路径补齐租户前缀，已带前缀时保持不变。"""
@@ -227,6 +90,37 @@ class DefaultModelService(ModelService):
         if normalized_no_leading == tid or normalized_no_leading.startswith(f"{tid}/"):
             return f"/{normalized_no_leading}"
         return f"/{tid}/{normalized_no_leading}"
+
+    @staticmethod
+    def _training_method_value(value) -> Optional[str]:
+        if value is None:
+            return None
+        return value.value if hasattr(value, "value") else str(value)
+
+    @classmethod
+    def _is_grpo_training_method(cls, value) -> bool:
+        return cls._training_method_value(value) == TrainingMethodType.GRPO.value
+
+    @classmethod
+    def _requires_training_merge_job(cls, fine_tuning_type: Optional[str], training_method_type) -> bool:
+        return fine_tuning_type == FineTuningType.LORA.value or cls._is_grpo_training_method(training_method_type)
+
+    @staticmethod
+    def _build_merge_trained_model_path(namespace: str, name: str, model_version: str) -> str:
+        registered_base = StoragePath.MERGE_TRAINED_MODELS.format_storage_path(
+            namespace=namespace
+        )
+        return f"{registered_base}{name}_{model_version or 'v1'}"
+
+    @staticmethod
+    def _build_verl_actor_checkpoint_mount_path(checkpoint: str) -> str:
+        checkpoint_path = str(checkpoint or "").strip().strip("/")
+        base_path = f"{StoragePath.UNREGISTERED_TRAINED_MODELS.mount_path.rstrip('/')}/{checkpoint_path}"
+        return base_path if base_path.endswith("/actor") else f"{base_path}/actor"
+
+    @staticmethod
+    def _build_merge_model_mount_path(name: str, model_version: str) -> str:
+        return f"{StoragePath.MERGE_TRAINED_MODELS.mount_path.rstrip('/')}/{name}_{model_version or 'v1'}"
 
     def _build_ml_model_response(
         self, m: MLModel, notebook_name: Optional[str] = None
@@ -789,8 +683,6 @@ class DefaultModelService(ModelService):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"当前任务状态为 {base_model.status}，不允许删除"
             )
-
-        await self._ensure_base_model_not_referenced(None, base_model)
 
         try:
             jfs_client = await self.storage.JUICEFS_CLIENT()
@@ -1581,12 +1473,6 @@ class DefaultModelService(ModelService):
                         "请确认版本号（如 V1、V2）"
                     ),
                 )
-            await self._ensure_model_ids_not_referenced(
-                model_source="ml_model",
-                model_ids=[row.id],
-                project_id=project_id,
-                label="机器学习模型",
-            )
             await self.mapper.delete(row)
             # 清理已复制的文件
             try:
@@ -1617,12 +1503,6 @@ class DefaultModelService(ModelService):
                     status_code=404,
                     detail=f"项目中不存在名为 '{model_name}' 的机器学习模型",
                 )
-            await self._ensure_model_ids_not_referenced(
-                model_source="ml_model",
-                model_ids=[row.id for row in rows],
-                project_id=project_id,
-                label="机器学习模型",
-            )
             for row in rows:
                 await self.mapper.delete(row)
                 # 清理已复制的文件
@@ -1702,26 +1582,58 @@ class DefaultModelService(ModelService):
                 args=[source_path, target_path, trained_model.tenant_id, trained_model.id]
             )
 
-        if is_lora:
+        training_method_type = kwargs.get("training_method_type")
+        is_grpo = self._is_grpo_training_method(training_method_type)
+        if is_lora or is_grpo:
             k8s_uuid = str(uuid.uuid4())
-            lora_payload = type("LoraPayload", (), {})()
-            lora_payload.task_id = task_id
-            lora_payload.checkpoint = checkpoint
-            lora_payload.name = name
-            lora_payload.model_version = model_version or "v1"
-            lora_payload.base_model_name = base_model_name
-            lora_payload.model_provider = model_provider
-            lora_payload.graphics_card_resource = graphics_card_resource
+            target_path_lora = None
+            if is_lora and not is_grpo:
+                lora_payload = type("LoraPayload", (), {})()
+                lora_payload.task_id = task_id
+                lora_payload.checkpoint = checkpoint
+                lora_payload.name = name
+                lora_payload.model_version = model_version or "v1"
+                lora_payload.base_model_name = base_model_name
+                lora_payload.model_provider = model_provider
+                lora_payload.graphics_card_resource = graphics_card_resource
+                lora_payload.model_source = kwargs.get("model_source")
+                lora_payload.trained_model_id = kwargs.get("source_trained_model_id") or kwargs.get("trained_model_id")
+                lora_payload.trained_model_name = kwargs.get("source_trained_model_name") or kwargs.get("trained_model_name")
+                lora_payload.trained_model_version = kwargs.get("source_trained_model_version") or kwargs.get("trained_model_version")
 
-            if isinstance(graphics_card_resource, dict):
-                lora_payload.graphics_card_resource = GraphicsCardResourceConfig(**graphics_card_resource) if graphics_card_resource else None
+                if isinstance(graphics_card_resource, dict):
+                    lora_payload.graphics_card_resource = GraphicsCardResourceConfig(**graphics_card_resource) if graphics_card_resource else None
 
-            target_path_lora = await register_trained_model_lora(
-                storage=self.storage,
-                namespace=namespace,
-                trained_model=lora_payload,
-                trained_id=trained_model.id
-            )
+                target_path_lora = await register_trained_model_lora(
+                    storage=self.storage,
+                    namespace=namespace,
+                    trained_model=lora_payload,
+                    trained_id=trained_model.id
+                )
+            elif is_grpo:
+                source_checkpoint_path = StoragePath.UNREGISTERED_TRAINED_MODELS.format_storage_path(
+                    namespace=namespace,
+                    task_id=task_id,
+                ) + str(checkpoint or "").strip().strip("/")
+                jfs = await self.storage.JUICEFS_CLIENT()
+                if not jfs.exists(source_checkpoint_path):
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"GRPO训练任务输出模型不存在: {source_checkpoint_path}"
+                    )
+                target_path_lora = target_path or trained_model.model_path or self._build_merge_trained_model_path(
+                    namespace,
+                    name or trained_model.name,
+                    model_version or trained_model.model_version or "v1",
+                )
+                if jfs.exists(target_path_lora):
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"注册模型已存在: {target_path_lora}"
+                    )
+                target_dir = os.path.dirname(target_path_lora)
+                if target_dir and not jfs.exists(target_dir):
+                    jfs.makedirs(target_dir, exist_ok=True)
             values_to_update = {"lab_k8s_uuid": k8s_uuid}
             # 兼容历史数据：仅当 model_path 为空时回填，避免运行期再切换路径
             if not trained_model.model_path:
@@ -1735,7 +1647,7 @@ class DefaultModelService(ModelService):
 
             trained_model = await self.mapper.query_one(select(TrainedModel).where(TrainedModel.id == trained_model_id))
             await self.start_training_merge_job_impl(trained_model, k8s_uuid, namespace)
-
+    
     async def create_trained_model(
             self, current_user: JwtUserInfo, trained_model: TrainedModelCreate
     ) -> TrainedModel:
@@ -1763,6 +1675,8 @@ class DefaultModelService(ModelService):
         # 验证训练任务是否存在（如果提供了task_id或task_name和task_version）
 
         task_fine_tuning_type = None
+        task_training_method_type = None
+        task = None
         if trained_model.task_id:
             task = await validate_training_task_exists(self.mapper, trained_model.task_id)
             # 如果同时提供了task_name和task_version，验证是否匹配
@@ -1773,6 +1687,7 @@ class DefaultModelService(ModelService):
                         detail="训练任务ID与任务名称/版本不匹配"
                     )
             task_fine_tuning_type = task.training_type.get("fine_tuning_type","")
+            task_training_method_type = task.training_type.get("train_method_type")
             trained_model.model_provider = task.base_model.get("model_provider",ModelProvider.QWEN.value)
         elif trained_model.task_name and trained_model.task_version:
             # 如果只提供了task_name和task_version，验证任务是否存在
@@ -1783,14 +1698,16 @@ class DefaultModelService(ModelService):
                 trained_model.task_version
             )
             task_fine_tuning_type = task.training_type.get("fine_tuning_type", "")
+            task_training_method_type = task.training_type.get("train_method_type")
 
         is_lora = bool(task_fine_tuning_type and task_fine_tuning_type == FineTuningType.LORA.value)
-        if is_lora and not trained_model.graphics_card_resource:
+        requires_merge_job = self._requires_training_merge_job(task_fine_tuning_type, task_training_method_type)
+        if requires_merge_job and not trained_model.graphics_card_resource:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="LoRA 模型必须填写资源配置"
+                detail="LoRA/GRPO 模型合并必须填写资源配置"
             )
-        if not is_lora:
+        if not requires_merge_job:
             trained_model.graphics_card_resource = None
 
         # 对于从训练任务创建的模型，checkpoint是必需的
@@ -1839,13 +1756,12 @@ class DefaultModelService(ModelService):
 
         task_status = None
         if trained_model.task_name and trained_model.task_version:
-            # 生成merge_config.yaml
-            if task_fine_tuning_type and task_fine_tuning_type == FineTuningType.LORA.value:
-                registered_base = StoragePath.MERGE_TRAINED_MODELS.format_storage_path(
-                    namespace=namespace
+            if requires_merge_job:
+                target_path = self._build_merge_trained_model_path(
+                    namespace,
+                    trained_model.name,
+                    trained_model.model_version or "v1",
                 )
-                target_filename = f"{trained_model.name}_{trained_model.model_version or 'v1'}"
-                target_path = f"{registered_base}{target_filename}"
                 task_status = TaskStatus.SCHEDULED_PENDING.value if trained_model.schedule_at else TaskStatus.CREATED.value
             else:
                 source_path, target_path = await register_trained_model(
@@ -1913,6 +1829,7 @@ class DefaultModelService(ModelService):
                 "notebook_name": trained_model.notebook_name,
                 "model_source_type": trained_model.model_source_type,
                 "notebook_path": trained_model.notebook_path,
+                "training_method_type": task_training_method_type,
             }
 
             # if trained_model.schedule_at:
@@ -1932,7 +1849,7 @@ class DefaultModelService(ModelService):
             #         trained_model_id=mapper_trained_model.id,
             #         **post_kwargs
             #     )
-            if task_fine_tuning_type != FineTuningType.LORA.value:
+            if not requires_merge_job:
                 await self.run_create_trained_model_post_process(
                     trained_model_id=mapper_trained_model.id,
                     **post_kwargs
@@ -2016,6 +1933,8 @@ class DefaultModelService(ModelService):
                     )
 
         task_fine_tuning_type = None
+        task_training_method_type = None
+        task = None
         if trained_model.task_id:
             task = await validate_training_task_exists(self.mapper, trained_model.task_id)
             if trained_model.task_name and trained_model.task_version:
@@ -2025,6 +1944,7 @@ class DefaultModelService(ModelService):
                         detail="训练任务ID与任务名称/版本不匹配"
                     )
             task_fine_tuning_type = task.training_type.get("fine_tuning_type", "")
+            task_training_method_type = task.training_type.get("train_method_type")
             trained_model.model_provider = task.base_model.get("model_provider", ModelProvider.QWEN.value)
         elif trained_model.task_name and trained_model.task_version:
             task = await validate_training_task_by_name_version(
@@ -2034,6 +1954,7 @@ class DefaultModelService(ModelService):
                 trained_model.task_version
             )
             task_fine_tuning_type = task.training_type.get("fine_tuning_type", "")
+            task_training_method_type = task.training_type.get("train_method_type")
 
         if (trained_model.task_id or (trained_model.task_name and trained_model.task_version)) and not trained_model.checkpoint:
             raise HTTPException(
@@ -2064,12 +1985,13 @@ class DefaultModelService(ModelService):
         project = await self.mapper.query_one(select(Project).filter(Project.id == trained_model.project_id))
         namespace = f"{os.getenv('KUBERNETES_NAMESPACE_PREFIX', 'deepexilab')}-{project.id}"
         is_lora = bool(task_fine_tuning_type and task_fine_tuning_type == FineTuningType.LORA.value)
-        if is_lora and not trained_model.graphics_card_resource:
+        requires_merge_job = self._requires_training_merge_job(task_fine_tuning_type, task_training_method_type)
+        if requires_merge_job and not trained_model.graphics_card_resource:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="LoRA 模型必须填写资源配置"
+                detail="LoRA/GRPO 模型合并必须填写资源配置"
             )
-        if not is_lora:
+        if not requires_merge_job:
             trained_model.graphics_card_resource = None
 
         # 按创建参数覆盖业务数据
@@ -2088,14 +2010,14 @@ class DefaultModelService(ModelService):
         db_model.notebook_name = trained_model.notebook_name
         db_model.model_source_type = trained_model.model_source_type
         db_model.notebook_path = trained_model.notebook_path
-        db_model.schedule_at = trained_model.schedule_at if is_lora else None
+        db_model.schedule_at = trained_model.schedule_at if requires_merge_job else None
         db_model.graphics_card_resource = (
             trained_model.graphics_card_resource.model_dump()
             if trained_model.graphics_card_resource
             else None
         )
         db_model.status = (
-            TaskStatus.SCHEDULED_PENDING.value if (is_lora and trained_model.schedule_at) else TaskStatus.CREATED.value
+            TaskStatus.SCHEDULED_PENDING.value if (requires_merge_job and trained_model.schedule_at) else TaskStatus.CREATED.value
         )
         db_model.started_at = None
         db_model.finished_at = None
@@ -2113,17 +2035,18 @@ class DefaultModelService(ModelService):
         source_path = old_kwargs.get("source_path")
         target_path = old_kwargs.get("target_path", db_model.model_path)
 
-        # LoRA 编辑时也要提前固定到注册目录，避免运行期仍指向训练原始目录导致误删
-        if is_lora:
-            registered_base = StoragePath.MERGE_TRAINED_MODELS.format_storage_path(
-                namespace=namespace
+        # LoRA/GRPO 编辑时也要提前固定到注册目录，避免运行期仍指向训练原始目录导致误删
+        if requires_merge_job:
+            source_path = None
+            target_path = self._build_merge_trained_model_path(
+                namespace,
+                trained_model.name,
+                trained_model.model_version or "v1",
             )
-            target_filename = f"{trained_model.name}_{trained_model.model_version or 'v1'}"
-            target_path = f"{registered_base}{target_filename}"
             db_model.model_path = target_path
 
         # 切换到全参或notebook时，重建注册模型路径，保证可直接执行后处理
-        if not is_lora:
+        if not requires_merge_job:
             source_path, target_path = await register_trained_model(
                 storage=self.storage,
                 namespace=namespace,
@@ -2167,13 +2090,14 @@ class DefaultModelService(ModelService):
             "notebook_name": trained_model.notebook_name,
             "model_source_type": trained_model.model_source_type,
             "notebook_path": trained_model.notebook_path,
+            "training_method_type": task_training_method_type,
         }
 
         for item in executions:
             if item.status in [TaskExecutionStatus.RUNNING.value]:
                 raise HTTPException(status_code=400, detail=f"执行任务状态为 {item.status}，不允许编辑")
 
-        if is_lora:
+        if requires_merge_job:
             if execution:
                 execution.schedule_at = trained_model.schedule_at
                 execution.status = TaskExecutionStatus.PENDING.value
@@ -2197,7 +2121,7 @@ class DefaultModelService(ModelService):
                 await self.mapper.insert(execution)
             await self.mapper.commit()
         else:
-            # 全参与notebook编辑不走执行器：删除历史执行器记录后直接执行
+            # 非GRPO全参与notebook编辑不走执行器：删除历史执行器记录后直接执行
             for item in executions:
                 await self.mapper.delete(item)
             await self.mapper.commit()
@@ -2249,14 +2173,6 @@ class DefaultModelService(ModelService):
                 status_code=400,
                 detail=f"无法删除模型 '{model_name}'，以下版本状态不允许删除: {', '.join(non_deletable_versions)}"
             )
-
-        await self._ensure_model_ids_not_referenced(
-            model_source="trained_model",
-            model_ids=[model.id for model in models],
-            project_id=project_id,
-            label="训练模型",
-        )
-        await self._ensure_trained_models_not_referenced_by_benchmark(project_id, models)
 
         # 删除所有版本的模型文件和数据库记录
         deleted_count = 0
@@ -2323,14 +2239,6 @@ class DefaultModelService(ModelService):
                 status_code=400,
                 detail=f"{trained_model.status}的模型不允许删除: {model_name} (版本: {version})"
             )
-
-        await self._ensure_model_ids_not_referenced(
-            model_source="trained_model",
-            model_ids=[trained_model.id],
-            project_id=project_id,
-            label="训练模型",
-        )
-        await self._ensure_trained_models_not_referenced_by_benchmark(project_id, [trained_model])
 
         try:
             # 先删除模型文件（如果存在）
@@ -2500,11 +2408,14 @@ class DefaultModelService(ModelService):
 
         # 查询训练任务，获取GPU资源配置和项目ID
         from app.schemas.resource_config import GraphicsCardResourceConfig
-        from app.schemas.repository_image import CardType, CardModel
+        from app.schemas.repository_image import CardType, CardModel, ImageType
+        from app.tasks.image_utils import find_image_with_fallback
 
         training_task = await self.mapper.query_one(select(TrainingTask).filter(TrainingTask.id == trained_model.task_id))
         if training_task is None:
             raise RuntimeError(f"训练任务不存在: {trained_model.task_id}")
+        training_method_type = (training_task.training_type or {}).get("train_method_type")
+        is_grpo = self._is_grpo_training_method(training_method_type)
 
         # 从数据库读取 graphics_card_resource，如果没有则从 gpu_count 构建（向后兼容）
         if training_task.graphics_card_resource:
@@ -2547,9 +2458,23 @@ class DefaultModelService(ModelService):
             if isinstance(graphics_card_resource.card_model, Enum)
             else graphics_card_resource.card_model
         )
-        # 延迟导入以避免循环依赖（training_tasks 可能导入 model）
-        from ...tasks.training_tasks import find_image as training_tasks_find_image
-        image = await training_tasks_find_image(trained_model.project_id, card_type_str, card_model_str)
+        if is_grpo:
+            fallback_image = os.getenv("VERL_RAY_IMAGE", "lab-cn-guangzhou.cr.volces.com/fs/verl:v0.8.0-vllm")
+            try:
+                image = await find_image_with_fallback(
+                    project_id=trained_model.project_id,
+                    image_type=ImageType.TEXT_GENERATION_GRPO.value,
+                    card_category=card_type_str,
+                    card_model=card_model_str,
+                    error_message_prefix="未找到匹配的GRPO模型合并镜像",
+                )
+            except RuntimeError as exc:
+                logger.warning("使用默认GRPO模型合并镜像: %s, reason=%s", fallback_image, exc)
+                image = fallback_image
+        else:
+            # 延迟导入以避免循环依赖（training_tasks 可能导入 model）
+            from ...tasks.training_tasks import find_image as training_tasks_find_image
+            image = await training_tasks_find_image(trained_model.project_id, card_type_str, card_model_str)
 
         # 初始化 K8s 启动器
         launcher = K8sLauncher(config_str=kubeconfig_str)
@@ -2580,6 +2505,29 @@ class DefaultModelService(ModelService):
                             card_memory=trained_model.graphics_card_resource.get("card_memory",None),
                             category=trained_model.graphics_card_resource.get("card_type",None))
 
+        if is_grpo:
+            actor_checkpoint_path = self._build_verl_actor_checkpoint_mount_path(trained_model.checkpoint)
+            merge_target_path = self._build_merge_model_mount_path(
+                trained_model.name,
+                trained_model.model_version or "v1",
+            )
+            merge_command = (
+                "set -euo pipefail; "
+                "if [ -d /workspace/verl ]; then cd /workspace/verl; "
+                "elif [ -d /home/ray/verl ]; then cd /home/ray/verl; fi; "
+                "python scripts/legacy_model_merger.py merge "
+                "--backend fsdp "
+                f"--local_dir {shlex.quote(actor_checkpoint_path)} "
+                f"--target_dir {shlex.quote(merge_target_path)}"
+            )
+            command = ["bash", "-lc"]
+            args = [merge_command]
+            working_dir = None
+        else:
+            command = ["llamafactory-cli"]
+            args = ["export", "configs/merge_config.yaml"]
+            working_dir = "/data"
+
         # 创建合并模型Job
         job_name = f"loramerge-{trained_model.id}"
         result = await launcher.create_job(
@@ -2587,8 +2535,8 @@ class DefaultModelService(ModelService):
             job_name=job_name,
             image=image,
             service_type="loramerge",
-            command=["llamafactory-cli"],  # 启动llamafactory merge
-            args=["export", "configs/merge_config.yaml"],  # 训练配置文件
+            command=command,
+            args=args,
             cpu_limit=trained_model.graphics_card_resource.get("cpu_limit",None),
             memory_limit=trained_model.graphics_card_resource.get("memory_limit",None),
             cpu_request=trained_model.graphics_card_resource.get("cpu_request",None),
@@ -2598,7 +2546,7 @@ class DefaultModelService(ModelService):
             # env_vars=env_vars,
             volume_mounts=volume_mounts,
             volumes=volumes,
-            working_dir="/data",  # 训练工作目录
+            working_dir=working_dir,
             security_context=None,
             automount_service_account_token=True,
             k8s_uuid=lab_k8s_uuid

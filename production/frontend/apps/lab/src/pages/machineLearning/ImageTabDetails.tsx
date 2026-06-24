@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { Table } from 'antd'
+import { Button, Popconfirm, Table } from 'antd'
 import ImageAnnotationPreview, {
   AnnotationTags,
   type ImageAnnotationDisplayItem,
@@ -17,6 +17,9 @@ interface ImageTabDetailsProps {
   onPageChange: (page: number) => void
   storagePath?: string
   datasetPath?: string
+  canDeleteRows?: boolean
+  deletingRowNumber?: number | null
+  onDeleteRow?: (record: ItemDetail) => void | Promise<void>
 }
 
 interface RawImageAnnotationItem {
@@ -256,6 +259,9 @@ const ImageTabDetails: React.FC<ImageTabDetailsProps> = ({
   onPageChange,
   storagePath,
   datasetPath,
+  canDeleteRows,
+  deletingRowNumber,
+  onDeleteRow,
 }) => {
   const rows = useMemo<ImageRow[]>(() => {
     const list = Array.isArray(items) ? items : []
@@ -324,6 +330,39 @@ const ImageTabDetails: React.FC<ImageTabDetailsProps> = ({
       width: 240,
       render: (labels: number[]) => <AnnotationTags classIds={labels} labelSchema={labelSchema} />,
     },
+    ...(canDeleteRows
+      ? [{
+          title: '操作',
+          key: 'action',
+          width: 100,
+          align: 'center' as const,
+          render: (_: unknown, record: ImageRow) => {
+            const rowNumber = Number(record?.row_number)
+            const canDelete = Number.isFinite(rowNumber) && !!onDeleteRow
+            return (
+              <Popconfirm
+                title="确认删除"
+                description="确定要删除该行数据吗？删除后将无法恢复。"
+                okText="确认删除"
+                cancelText="取消"
+                okButtonProps={{ danger: true }}
+                disabled={!canDelete}
+                onConfirm={() => onDeleteRow?.(record)}
+              >
+                <Button
+                  type="link"
+                  danger
+                  size="small"
+                  disabled={!canDelete}
+                  loading={deletingRowNumber === rowNumber}
+                >
+                  删除
+                </Button>
+              </Popconfirm>
+            )
+          },
+        }]
+      : []),
   ]
 
   return (

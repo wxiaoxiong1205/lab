@@ -182,11 +182,10 @@ async def check_dataset_in_use_status(
     project_id: int = Path(..., description="项目 ID。"),
     dataset_name: str = Path(..., description="数据集名称。"),
     version: str = Path(..., description="数据集版本号。"),
-    usage: Optional[DatasetUsage] = Query(None, description="数据集用途。"),
     deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
 ) -> OpenApiResponse[OpenDatasetInUse]:
     db, current_user = deps
-    result = await query_dataset_in_use(db, dataset_name, project_id, version, usage)
+    result = await query_dataset_in_use(db, dataset_name, project_id, version)
     return openapi_success(to_dataset_in_use(result))
 
 

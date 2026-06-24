@@ -1,6 +1,6 @@
 from enum import Enum
 from datetime import datetime
-from typing import TypedDict, Optional
+from typing import Any, Dict, Optional, TypedDict
 
 from kubernetes.client.models import V1Job, V1JobStatus, V1Namespace, V1Deployment, V1DeploymentStatus
 from kubernetes_asyncio import client
@@ -253,7 +253,12 @@ async def map_job_status_async(
     logger.info(f"Job {job_name} 默认状态: PENDING")
     return TaskStatus.PENDING
 
-def map_deployment_status(k8s_status: V1DeploymentStatus, event_type: str, current_status: Optional[TaskStatus] = None) -> tuple[TaskStatus, Optional[int]]:
+def map_deployment_status(
+    k8s_status: V1DeploymentStatus,
+    event_type: str,
+    current_status: Optional[TaskStatus] = None,
+    spec_replicas: Optional[int] = None,
+) -> tuple[TaskStatus, Optional[int]]:
     """
     映射 Deployment 的 Kubernetes 状态到业务状态
     
@@ -273,16 +278,30 @@ def map_deployment_status(k8s_status: V1DeploymentStatus, event_type: str, curre
     ready_replicas = k8s_status.ready_replicas
     replicas = k8s_status.replicas
     
-    # 运行中状态：期望副本数为1且可用副本数也为1，ready副本数也为1
-    if replicas == 1 and available_replicas == 1 and ready_replicas == 1:
+    # spec.replicas 是期望副本数，status.replicas 是实际被控制器观测到的副本数。
+    # 刚创建/启动时常见 spec=1,status=0/None，此时应保持排队中；只有 spec=0 才表示业务上的已终止。
+    if spec_replicas == 0:
+        return TaskStatus.TERMINATED, available_replicas
+
+    expected_replicas = spec_replicas if spec_replicas is not None else replicas
+
+    # 运行中状态：期望副本数大于0，且实际/可用/就绪副本均达到期望值
+    if (
+        expected_replicas
+        and expected_replicas > 0
+        and replicas == expected_replicas
+        and available_replicas is not None
+        and available_replicas >= expected_replicas
+        and ready_replicas is not None
+        and ready_replicas >= expected_replicas
+    ):
         return TaskStatus.RUNNING, available_replicas
     
-    # 暂停状态：只有从运行中状态才能进入暂停状态
-    # 明确设置副本数为0，或者在运行状态下所有副本都变为None
-    if not replicas:
+    # 已终止状态下，K8s 状态事件可能只有 status 而没有 spec，保持已终止，避免回退到排队中。
+    if spec_replicas is None and current_status == TaskStatus.TERMINATED:
         return TaskStatus.TERMINATED, available_replicas
     elif (current_status == TaskStatus.RUNNING and 
-          replicas is None and available_replicas is None and 
+          spec_replicas is None and replicas is None and available_replicas is None and
           event_type == 'MODIFIED'):
         return TaskStatus.TERMINATED, available_replicas
     
@@ -293,3 +312,64 @@ def map_deployment_status(k8s_status: V1DeploymentStatus, event_type: str, curre
     # 4. 有不可用副本存在
     # 5. 创建过程中的中间状态（replicas=None但不是从运行状态转换）
     return TaskStatus.PENDING, available_replicas
+
+
+def map_ray_job_status(ray_job_status: Optional[Dict[str, Any]], current_status: Optional[TaskStatus] = None) -> Optional[TaskStatus]:
+    """映射 KubeRay RayJob CRD status 到业务状态。"""
+    if not ray_job_status:
+        return TaskStatus.PENDING if current_status != TaskStatus.RUNNING else TaskStatus.RUNNING
+
+    failed_count = ray_job_status.get("failed")
+    try:
+        if failed_count and int(failed_count) > 0:
+            return TaskStatus.FAILED
+    except (TypeError, ValueError):
+        logger.warning(f"RayJob failed 字段无法解析: {failed_count}")
+
+    deployment_status_text = str(
+        ray_job_status.get("jobDeploymentStatus")
+        or ray_job_status.get("deploymentStatus")
+        or ray_job_status.get("status")
+        or ""
+    ).strip().lower()
+    if deployment_status_text in {"failed", "fail", "error"}:
+        return TaskStatus.FAILED
+
+    status_text = str(ray_job_status.get("jobStatus") or deployment_status_text or "").strip().lower()
+
+    if status_text in {"succeeded", "success", "completed", "complete"}:
+        return TaskStatus.COMPLETED
+    if status_text in {"failed", "fail", "error"}:
+        return TaskStatus.FAILED
+    if status_text in {"running", "started"}:
+        return TaskStatus.RUNNING
+    if status_text in {"stopped", "suspended", "terminating", "terminated"}:
+        return TaskStatus.TERMINATED
+    if status_text in {"pending", "initializing", "submitted", "waiting"}:
+        if current_status == TaskStatus.RUNNING:
+            return TaskStatus.RUNNING
+        return TaskStatus.PENDING
+
+    conditions = ray_job_status.get("conditions") or []
+    if isinstance(conditions, list):
+        for condition in conditions:
+            if not isinstance(condition, dict):
+                continue
+            condition_status = str(condition.get("status") or "").lower()
+            condition_type = str(condition.get("type") or "").lower()
+            reason = str(condition.get("reason") or "").lower()
+            message = str(condition.get("message") or "").lower()
+            if condition_status not in {"true", "1"}:
+                continue
+            if any(token in condition_type or token in reason or token in message for token in ("failed", "error")):
+                return TaskStatus.FAILED
+            if any(token in condition_type or token in reason or token in message for token in ("complete", "succeed", "success")):
+                return TaskStatus.COMPLETED
+            if any(token in condition_type or token in reason or token in message for token in ("running", "ready")):
+                return TaskStatus.RUNNING
+            if any(token in condition_type or token in reason or token in message for token in ("stopped", "suspended", "terminat")):
+                return TaskStatus.TERMINATED
+
+    if current_status == TaskStatus.RUNNING:
+        return TaskStatus.RUNNING
+    return TaskStatus.PENDING

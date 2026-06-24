@@ -28,7 +28,7 @@ from app.api.v1 import (project, user, repository, storage, notebook, repository
                         common_config, training_dataset, inference_task, applications, label, multi_label, data_cleaning,
                         admin_permissions, third_party_api, business_inference_result_dataset, task_execution, benchmark_task,
                         machine_learning_dataset, online_annotation_service, ml_backend_proxy, tag, openapi_application,
-                        compute_task_overview, training_parameter_template)
+                        compute_task_overview, advanced_template, reward)
 from app.api.openapi.v1.router import router as openapi_v1_router
 from app.api.v1 import k8s
 from app.tasks.sync_k8s_labels import KubernetesLabelsSync
@@ -281,7 +281,6 @@ def create_app() -> FastAPI:
     # app.include_router(chain_test.router)
     app.include_router(training_dataset.router)
     app.include_router(training_task.router)
-    app.include_router(training_parameter_template.router)
     app.include_router(inference_task.router)
     app.include_router(compute_task_overview.router)
     app.include_router(k8s.router)
@@ -301,6 +300,8 @@ def create_app() -> FastAPI:
     app.include_router(manual_evaluation_task.router)
     app.include_router(benchmark_task.router)
     app.include_router(common_config.router)
+    app.include_router(advanced_template.router)
+    app.include_router(reward.router)
 
     # 在所有路由注册完成后，配置 Swagger UI 的 Bearer Token 认证
     # 这样可以确保 OpenAPI schema 包含所有路由信息

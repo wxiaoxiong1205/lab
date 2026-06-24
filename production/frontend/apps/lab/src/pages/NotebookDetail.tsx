@@ -673,14 +673,13 @@ const NotebookDetail: React.FC = () => {
             value={value}
             onContextMenu={handleInputContextMenu}
           />
-          {fieldName !== 'ssh_password' && (
-            <Button
-              type="text"
-              icon={<CopyOutlined />}
-              onClick={() => copyToClipboard(value, label)}
-              size="small"
-            />
-          )}
+          <Button
+            type="text"
+            icon={<CopyOutlined />}
+            onClick={() => copyToClipboard(value, label)}
+            size="small"
+            style={{ visibility: fieldName === 'ssh_password' ? 'hidden' : 'visible' }}
+          />
         </div>
       </div>
     )

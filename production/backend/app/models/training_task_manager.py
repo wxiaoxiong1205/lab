@@ -54,9 +54,18 @@ class TrainingTask(baseModel):
     
     # 自定义参数 (JSON)
     additional_params: Mapped[Dict] = Column(JSON, nullable=False, default=dict, comment="额外的训练参数")
+
+    # 高级模板ID（用于前端根据模板字段定义回显 additional_params，不参与训练执行参数合成）
+    advanced_template_id: Mapped[Optional[int]] = Column(Integer, nullable=True, comment="高级模板ID")
+
+    # GRPO 奖励函数分片上传ID
+    reward_function_upload_id: Mapped[Optional[str]] = Column(String(100), nullable=True, comment="GRPO奖励函数分片上传会话ID")
     
     # 训练资源配置 (JSON) - 存储完整的 GPU/NPU 资源配置信息
     graphics_card_resource: Mapped[Optional[Dict]] = Column(JSON, nullable=True, comment="GPU/NPU 资源配置（包含 card_type, card_model, count, card_memory, k8s_resource_type）")
+
+    # Ray 资源配置 (JSON) - GRPO 多机多卡训练使用，区分 head 和 worker
+    ray_resource_config: Mapped[Optional[Dict]] = Column(JSON, nullable=True, comment="RayJob 资源配置（包含 submit_graphics_card_resource, head_graphics_card_resource, worker_graphics_card_resource, worker_replicas）")
     
     # 训练资源配置（向后兼容字段，保留用于快速查询）
     gpu_count: Mapped[int] = Column(Integer, nullable=False, default=1, comment="GPU数量（向后兼容字段，从 graphics_card_resource.count 同步）")
@@ -93,4 +102,5 @@ class TrainingTask(baseModel):
         Index('idx_training_tasks_project', 'project_id'),
         Index('idx_training_tasks_status', 'status'),
         Index('idx_training_tasks_name', 'name'),
+        Index('idx_training_tasks_advanced_template', 'advanced_template_id'),
     )

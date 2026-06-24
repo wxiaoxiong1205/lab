@@ -76,7 +76,7 @@ export function useSystemSetting() {
    * ['attribute']
    */
   const canViewTabs = useMemo(() => {
-    return tagsSettingMenuItems.length > 0 ? ['attribute', 'tags', 'training-template'] : ['attribute', 'training-template']
+    return tagsSettingMenuItems.length > 0 ? ['attribute', 'tags', 'template'] : ['attribute', 'template']
   }, [tagsSettingMenuItems])
 
   return {

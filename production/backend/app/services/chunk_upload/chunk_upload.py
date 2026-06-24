@@ -21,7 +21,8 @@ from app.schemas.chunk_upload import (
     ChunkUploadMergeResponse,
     ChunkUploadProgressRequest,
     ChunkUploadProgressResponse,
-    ChunkUploadFileUsage
+    ChunkUploadFileUsage,
+    ChunkUploadFileInfoResponse
 )
 from app.services.chunk_upload.interface import ChunkUploadService
 from app.services.storage.interface import StorageService
@@ -48,7 +49,7 @@ class DefaultChunkUploadService(ChunkUploadService):
         """获取分片临时目录路径"""
         base_path = StoragePath.CHUNK_UPLOAD_TEMP.storage_path.format(upload_id=upload_id)
         return base_path.replace('\\', '/')
-    
+
     async def _get_final_file_path(
             self,
             file_name: str,
@@ -427,6 +428,38 @@ class DefaultChunkUploadService(ChunkUploadService):
         except Exception as e:
             logger.error(f"查询进度失败: {str(e)}")
             raise HTTPException(status_code=500, detail=f"查询进度失败: {str(e)}")
+
+    async def get_file_info_by_upload_id(self, upload_id: str) -> ChunkUploadFileInfoResponse:
+        """通过upload_id查询上传文件信息。"""
+        try:
+            query = select(ChunkUploadSession).filter(
+                ChunkUploadSession.upload_id == upload_id
+            )
+            query = await self.mapper.append_tenant_id(query)
+            session = await self.mapper.query_one(query)
+
+            if not session:
+                raise HTTPException(status_code=404, detail=f"上传会话不存在: {upload_id}")
+
+            return ChunkUploadFileInfoResponse(
+                uploadId=session.upload_id,
+                fileName=session.file_name,
+                fileSize=session.file_size,
+                fileHash=session.file_hash,
+                chunkSize=session.chunk_size,
+                totalChunkNum=session.total_chunks,
+                isComplete=session.is_complete,
+                fileUrl=f"{get_tenant_id()}{session.file_url}",
+                errorMessage=session.error_message,
+                createdAt=session.created_at.isoformat() if session.created_at else None,
+                updatedAt=session.updated_at.isoformat() if session.updated_at else None,
+            )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"查询上传文件信息失败: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"查询上传文件信息失败: {str(e)}")
 
     async def cleanup_upload_data(self, upload_id: str) -> None:
         """清理分片上传相关的数据

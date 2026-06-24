@@ -17,6 +17,15 @@ const { Title, Text } = Typography
 const { Option } = Select
 const { TextArea } = Input
 const pickBelleResourceValue = (...values: any[]) => values.find((value) => value !== undefined && value !== null && value !== '' && value !== 0)
+const getTrainingMethodType = (task: any) => String(
+  task?.training_method_type
+  ?? task?.train_method_type
+  ?? task?.training_type?.training_method_type
+  ?? task?.training_type?.train_method_type
+  ?? '',
+).toLowerCase()
+const isLoraTrainingTask = (task: any) => task?.training_type?.fine_tuning_type?.toLowerCase() === 'lora'
+const needsResourceConfig = (task: any) => isLoraTrainingTask(task) || getTrainingMethodType(task) === 'grpo'
 
 interface ModelSource {
   id: string
@@ -144,8 +153,8 @@ const CreateModelPage: React.FC = () => {
       ? gpuMemory
       : ((gpuMemory != null && gpuMemory !== '') ? `${Number(gpuMemory)}GB` : '')
     const cardModel = isBelleProvider ? pickBelleResourceValue(belleResource?.gpu_model, gpuModel) : gpuModel
-    const isLora = trainingTask?.training_type?.fine_tuning_type?.toLowerCase() === 'lora'
-    const hasValidResource = isLora
+    const taskNeedsResourceConfig = needsResourceConfig(trainingTask)
+    const hasValidResource = taskNeedsResourceConfig
       && trainingTask?.id
       && gpuType?.length >= 2
       && cardModel
@@ -169,7 +178,7 @@ const CreateModelPage: React.FC = () => {
       memory_limit: isBelleProvider ? memoryLimit : (Number(resource.memory_limit) ?? 16),
     }
       : undefined
-    if (isLora && trainingTask?.id && (!graphics_card_resource || !graphics_card_resource.card_model || !graphics_card_resource.card_memory)) {
+    if (taskNeedsResourceConfig && trainingTask?.id && (!graphics_card_resource || !graphics_card_resource.card_model || !graphics_card_resource.card_memory)) {
       message.warning('请先选择显卡类型及型号，并确保资源配置完整后再提交')
       return
     }
@@ -318,10 +327,9 @@ const CreateModelPage: React.FC = () => {
     const selectedVersion = versions.find((item: any) => item.version === targetVersion && item.name === targetTaskName)
     setTrainingTask(selectedVersion || {})
     // 非 Lora 类型时清空定时配置
-    const isLora = selectedVersion?.training_type?.fine_tuning_type?.toLowerCase() === 'lora'
-    if (!isLora) {
+    const selectedVersionIsLora = isLoraTrainingTask(selectedVersion)
+    if (!selectedVersionIsLora) {
       form.setFieldsValue({ schedule_enabled: false, schedule_date: undefined, schedule_time: undefined })
-      setAllocatableResources(undefined)
     }
     if (selectedVersion) {
       // 设置模型路径
@@ -419,6 +427,8 @@ const CreateModelPage: React.FC = () => {
       checkpoint: undefined,
     })
   }
+  const taskNeedsResourceConfig = needsResourceConfig(trainingTask)
+  const taskSupportsSchedule = isLoraTrainingTask(trainingTask)
   return (
     <div className="create-form-page">
       <section className="create-form-card">
@@ -524,7 +534,7 @@ const CreateModelPage: React.FC = () => {
                   <Cascader className="w-[400px]" options={cascaderOptions} showCheckedStrategy={Cascader.SHOW_CHILD} placeholder="请选择训练任务" loadData={loadData} onChange={handleTrainingTaskChange} changeOnSelect loading={isLoading} />
                 </Form.Item>
 
-                {trainingTask?.training_type?.fine_tuning_type?.toLowerCase() === 'lora' && (
+                {taskNeedsResourceConfig && (
                   <Form.Item label="资源配置" className="mb-0">
                     <ResourceConfig
                       projectId={projectId ? Number(projectId) : undefined}
@@ -534,7 +544,7 @@ const CreateModelPage: React.FC = () => {
                   </Form.Item>
                 )}
 
-                {trainingTask?.training_type?.fine_tuning_type?.toLowerCase() === 'lora' && (
+                {taskSupportsSchedule && (
                   <Form.Item label="任务定时配置">
                     <Space direction="vertical" className="w-full">
                       <Form.Item name="schedule_enabled" valuePropName="checked" className="mb-0" initialValue={false}>

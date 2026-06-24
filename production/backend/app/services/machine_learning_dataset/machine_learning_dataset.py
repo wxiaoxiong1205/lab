@@ -2,6 +2,7 @@ import json
 import os
 import re
 import urllib.parse
+import uuid
 from io import BytesIO
 from math import ceil
 from typing import Any, Dict, List, Optional
@@ -22,6 +23,7 @@ from app.schemas.machine_learning_dataset import (
     MachineLearningDatasetAnnotationType,
     MachineLearningDatasetBasicInfoUpdate,
     MachineLearningDatasetCategory,
+    DatasetPublishStatus,
     MachineLearningDatasetCreateResponse,
     MachineLearningDatasetDataSource,
     MachineLearningDatasetDataType,
@@ -29,11 +31,11 @@ from app.schemas.machine_learning_dataset import (
     MachineLearningDatasetSampleCategory,
     MachineLearningDatasetSampleResponse,
     MachineLearningDatasetResponse,
+    MachineLearningDatasetProcessingStatus,
     MachineLearningDatasetSampleFileType,
     MachineLearningDatasetSourceType,
     MachineLearningDatasetTaskType,
     MachineLearningDatasetTemplateType, TASK_EXPORT_FORMATS, ExportFormat,
-    MachineLearningDatasetVersionMergeRequest,
 )
 from app.schemas.notebook import NotebookExtDatasetType, NotebookExtKey
 from app.utils.dataset_file_parser import (
@@ -50,6 +52,7 @@ from app.utils.storage_enum import StoragePath
 from app.utils.timezone_utils import to_local_tz
 from app.utils.validators import validate_project_exists, validate_notebook_exists
 from app.utils.app_runtime_context import get_tenant_id
+from app.utils.jfs_utils import JFSUtils
 
 from .interface import MachineLearningDatasetService
 
@@ -146,6 +149,35 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
         chunk_upload_service: ChunkUploadService,
     ) -> None:
         super().__init__(machine_learning_dataset_mapper, storage, chunk_upload_service)
+
+    @staticmethod
+    def set_publish_display(target) -> None:
+        try:
+            publish_status = DatasetPublishStatus(getattr(target, "publish", 0))
+            target.publish = publish_status.value
+            target.publish_display = publish_status.description
+        except (ValueError, TypeError):
+            target.publish_display = None
+
+    @staticmethod
+    def set_status_display(target) -> None:
+        try:
+            processing_status_value = getattr(target, "processing_status", MachineLearningDatasetProcessingStatus.COMPLETED.value)
+            processing_status = MachineLearningDatasetProcessingStatus(processing_status_value)
+            target.processing_status = processing_status.value
+            target.processing_status_display = processing_status.description
+        except (ValueError, TypeError):
+            target.processing_status_display = None
+
+        processing_status_display = getattr(target, "processing_status_display", None)
+        publish_display = getattr(target, "publish_display", None)
+        if processing_status_display == MachineLearningDatasetProcessingStatus.COMPLETED.description and publish_display in (
+            DatasetPublishStatus.UNPUBLISHED.description,
+            DatasetPublishStatus.PUBLISHED.description,
+        ):
+            target.status_display = publish_display
+        else:
+            target.status_display = processing_status_display
 
     async def get_file_by_jfs_path(self, file_path: str) -> UploadFile:
         """从 JFS 路径读取单个文件并封装为 UploadFile。"""
@@ -327,6 +359,7 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
             metadata_fields=metadata_fields,
             sample_count=merged_sample_count,
             file_size=(len(merged_dataset_jsonl_content) / (1024 * 1024)) if merged_dataset_jsonl_content is not None else source.file_size,
+            publish=DatasetPublishStatus.UNPUBLISHED.value,
             created_id=current_user.userId,
             created_by=current_user.username,
         )
@@ -384,163 +417,8 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
         response = MachineLearningDatasetCreateResponse.model_validate(dataset)
         response.created_at = to_local_tz(dataset.created_at)
         response.updated_at = to_local_tz(dataset.updated_at)
-        return response
-
-    async def merge_dataset_versions(
-        self,
-        current_user: JwtUserInfo,
-        project_id: int,
-        dataset_id: int,
-        request: MachineLearningDatasetVersionMergeRequest,
-    ) -> MachineLearningDatasetCreateResponse:
-        """合并同一机器学习数据集下多个版本，生成一个新版本。"""
-        session = await self.machine_learning_dataset_mapper.get_session()
-        await validate_project_exists(session, project_id)
-
-        base_dataset = await self.machine_learning_dataset_mapper.query_one(
-            select(MachineLearningDataset).filter(
-                MachineLearningDataset.id == dataset_id,
-                MachineLearningDataset.project_id == project_id,
-            )
-        )
-        if not base_dataset:
-            raise HTTPException(status_code=404, detail="机器学习数据集不存在")
-
-        existing = await self.machine_learning_dataset_mapper.query_one(
-            select(MachineLearningDataset).filter(
-                MachineLearningDataset.project_id == project_id,
-                MachineLearningDataset.name == base_dataset.name,
-                MachineLearningDataset.version == request.version,
-            )
-        )
-        if existing:
-            raise HTTPException(status_code=400, detail="同项目下已存在同名同版本的机器学习数据集")
-
-        source_datasets = await self.machine_learning_dataset_mapper.query(
-            select(MachineLearningDataset).filter(
-                MachineLearningDataset.id.in_(request.source_version_ids),
-                MachineLearningDataset.project_id == project_id,
-                MachineLearningDataset.name == base_dataset.name,
-            )
-        )
-        source_by_id = {item.id: item for item in source_datasets}
-        ordered_sources = [source_by_id.get(source_id) for source_id in request.source_version_ids]
-        missing_ids = [source_id for source_id, source in zip(request.source_version_ids, ordered_sources) if source is None]
-        if missing_ids:
-            raise HTTPException(status_code=404, detail=f"源版本不存在或不属于当前数据集: {missing_ids}")
-
-        first_source = ordered_sources[0]
-        for source in ordered_sources:
-            if (
-                source.data_type != first_source.data_type
-                or source.annotation_type != first_source.annotation_type
-                or source.template_type != first_source.template_type
-                or source.is_annotated != first_source.is_annotated
-            ):
-                raise HTTPException(status_code=400, detail="仅支持同一数据类型、标注类型、模板和标注状态的版本合并")
-            if not source.dataset_path or not source.storage_path:
-                raise HTTPException(status_code=400, detail=f"版本 {source.version} 存储路径无效，不允许合并")
-
-        jfs = await self.storage.JUICEFS_CLIENT()
-        for source in ordered_sources:
-            if not jfs.exists(source.dataset_path):
-                raise HTTPException(status_code=404, detail=f"版本 {source.version} dataset.jsonl 不存在，无法合并")
-
-        merged_lines: List[str] = []
-        next_sample_id = 1
-        for source in ordered_sources:
-            with jfs.open(source.dataset_path, "r", encoding="utf-8") as f:
-                for raw_line in f:
-                    line = raw_line.strip()
-                    if not line:
-                        continue
-                    try:
-                        sample = json.loads(line)
-                    except json.JSONDecodeError as exc:
-                        raise HTTPException(status_code=400, detail=f"版本 {source.version} dataset.jsonl 存在无效 JSON") from exc
-                    if not isinstance(sample, dict):
-                        raise HTTPException(status_code=400, detail=f"版本 {source.version} dataset.jsonl 样本格式错误")
-                    sample["source_version"] = source.version
-                    sample["sample_id"] = next_sample_id
-                    next_sample_id += 1
-                    merged_lines.append(json.dumps(sample, ensure_ascii=False))
-
-        merged_dataset_jsonl_content = ("\n".join(merged_lines) + "\n").encode("utf-8") if merged_lines else b""
-        effective_label_schema: Optional[Dict[str, str]] = None
-        for source in ordered_sources:
-            effective_label_schema = self._merge_inherited_label_schema(
-                effective_label_schema,
-                self._read_label_schema(jfs, source),
-            )
-
-        metadata_fields = _collect_metadata_fields_from_jsonl_bytes(merged_dataset_jsonl_content) if merged_dataset_jsonl_content else None
-        dataset = MachineLearningDataset(
-            name=base_dataset.name,
-            description=request.description if request.description is not None else first_source.description,
-            project_id=project_id,
-            version=request.version,
-            dataset_category=first_source.dataset_category,
-            task_type=first_source.task_type,
-            data_type=first_source.data_type,
-            data_source=MachineLearningDatasetDataSource.LOCAL_UPLOAD.value,
-            annotation_type=first_source.annotation_type,
-            template_type=first_source.template_type,
-            is_annotated=first_source.is_annotated,
-            source_type=MachineLearningDatasetSourceType.MIXED.value,
-            storage_path="",
-            dataset_path="",
-            label_schema_path=None,
-            metadata_fields=metadata_fields,
-            sample_count=len(merged_lines),
-            file_size=len(merged_dataset_jsonl_content) / (1024 * 1024),
-            created_id=current_user.userId,
-            created_by=current_user.username,
-        )
-        new_storage = ""
-        try:
-            await self.machine_learning_dataset_mapper.insert(dataset)
-            await self.machine_learning_dataset_mapper.flush()
-            await self.machine_learning_dataset_mapper.refresh(dataset)
-
-            namespace = f"{os.getenv('KUBERNETES_NAMESPACE_PREFIX', 'deepexilab')}-{project_id}"
-            new_storage = StoragePath.REGISTERED_MACHINE_LEARNING_DATASETS.format_storage_path(namespace=namespace, dataset_id=dataset.id)
-            new_storage = new_storage.rstrip("/") + "/"
-            if not jfs.exists(new_storage):
-                jfs.makedirs(new_storage, exist_ok=True)
-
-            assets_seen: Dict[str, bytes] = {}
-            for source in ordered_sources:
-                self._copy_ml_assets_with_conflict_guard(jfs, source.storage_path.rstrip("/") + "/assets/", new_storage + "assets/", assets_seen)
-            with jfs.open(new_storage + "dataset.jsonl", "wb") as f:
-                _write_jsonl_bytes_in_batches(f, merged_dataset_jsonl_content)
-            if effective_label_schema is not None:
-                with jfs.open(new_storage + "classname.json", "w", encoding="utf-8") as f:
-                    f.write(json.dumps(effective_label_schema, ensure_ascii=False, indent=2))
-                dataset.label_schema_path = new_storage + "classname.json"
-            dataset.storage_path = new_storage
-            dataset.dataset_path = new_storage + "dataset.jsonl"
-            await self.machine_learning_dataset_mapper.commit()
-            await self.machine_learning_dataset_mapper.refresh(dataset)
-        except HTTPException:
-            await self.machine_learning_dataset_mapper.rollback()
-            if new_storage and jfs.exists(new_storage):
-                try:
-                    jfs.rmr(new_storage)
-                except Exception:
-                    pass
-            raise
-        except Exception as exc:
-            await self.machine_learning_dataset_mapper.rollback()
-            if new_storage and jfs.exists(new_storage):
-                try:
-                    jfs.rmr(new_storage)
-                except Exception:
-                    pass
-            raise HTTPException(status_code=500, detail=f"合并机器学习数据集版本失败: {str(exc)}") from exc
-
-        response = MachineLearningDatasetCreateResponse.model_validate(dataset)
-        response.created_at = to_local_tz(dataset.created_at)
-        response.updated_at = to_local_tz(dataset.updated_at)
+        self.set_publish_display(response)
+        self.set_status_display(response)
         return response
 
     def _read_jfs_bytes(self, jfs, path: str) -> bytes:
@@ -636,36 +514,6 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
                 content = f.read()
             with jfs.open(target_dir + "classname.json", "wb") as f:
                 f.write(content)
-
-    def _copy_ml_assets_with_conflict_guard(
-        self,
-        jfs,
-        source_assets_dir: str,
-        target_assets_dir: str,
-        assets_seen: Dict[str, bytes],
-        root_assets_dir: Optional[str] = None,
-    ) -> None:
-        """复制 ML 图片资产；同名不同内容视为冲突。"""
-        if not jfs.exists(source_assets_dir):
-            return
-        root_assets_dir = (root_assets_dir or source_assets_dir).rstrip("/") + "/"
-        if not jfs.exists(target_assets_dir):
-            jfs.makedirs(target_assets_dir, exist_ok=True)
-        for item in jfs.listdir(source_assets_dir):
-            source_path = (source_assets_dir.rstrip("/") + "/" + item).replace("\\", "/")
-            target_path = (target_assets_dir.rstrip("/") + "/" + item).replace("\\", "/")
-            try:
-                jfs.listdir(source_path)
-                self._copy_ml_assets_with_conflict_guard(jfs, source_path + "/", target_path + "/", assets_seen, root_assets_dir)
-            except Exception:
-                with jfs.open(source_path, "rb") as f:
-                    data = f.read()
-                relative_name = source_path[len(root_assets_dir):] if source_path.startswith(root_assets_dir) else item
-                if relative_name in assets_seen and assets_seen[relative_name] != data:
-                    raise HTTPException(status_code=400, detail=f"合并版本中存在同名但内容不同的图片资产: {relative_name}")
-                assets_seen[relative_name] = data
-                with jfs.open(target_path, "wb") as f:
-                    f.write(data)
 
     def _jfs_copy_dir(self, jfs, src_dir: str, target_dir: str) -> None:
         """递归复制 JuiceFS 目录。"""
@@ -774,6 +622,7 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
                 metadata_fields=metadata_fields,
                 sample_count=parse_result.sample_count,
                 file_size=len(parse_result.dataset_jsonl_content) / (1024 * 1024),
+                publish=DatasetPublishStatus.UNPUBLISHED.value,
                 created_id=current_user.userId,
                 created_by=current_user.username,
             )
@@ -829,6 +678,8 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
         response = MachineLearningDatasetCreateResponse.model_validate(dataset)
         response.created_at = to_local_tz(dataset.created_at)
         response.updated_at = to_local_tz(dataset.updated_at)
+        self.set_publish_display(response)
+        self.set_status_display(response)
         return response
 
     def _validate_sample_file_type_supported(
@@ -1046,7 +897,8 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
         name: Optional[str] = None,
         task_type: Optional[MachineLearningDatasetTaskType] = None,
         template_type: Optional[MachineLearningDatasetTemplateType] = None,
-        is_annotated: Optional[bool] = None
+        is_annotated: Optional[bool] = None,
+        publish: Optional[DatasetPublishStatus] = None
     ) -> Page[MachineLearningDatasetResponse]:
         """分页查询机器学习数据集列表；同一名称多版本时仅返回最新版本（按 id 最大）。"""
         # 子查询：每个 (project_id, name) 取最新版本的 id（id 最大即最新）
@@ -1063,6 +915,8 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
             subq = subq.where(MachineLearningDataset.template_type == template_type.value)
         if is_annotated is not None:
             subq = subq.where(MachineLearningDataset.is_annotated == is_annotated)
+        if publish is not None:
+            subq = subq.where(MachineLearningDataset.publish == publish.value)
         base_query = (
             select(MachineLearningDataset)
             .where(
@@ -1071,17 +925,23 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
             )
             .order_by(MachineLearningDataset.updated_at.desc())
         )
-        return await self.machine_learning_dataset_mapper.query_page(
+        page_result = await self.machine_learning_dataset_mapper.query_page(
             base_query,
             page=params.page,
             page_size=params.size,
         )
+        if hasattr(page_result, 'items') and page_result.items:
+            for item in page_result.items:
+                self.set_publish_display(item)
+                self.set_status_display(item)
+        return page_result
 
     async def get_dataset_versions(
         self,
         project_id: int,
         dataset_id: int,
-        is_annotated: Optional[bool] = None
+        is_annotated: Optional[bool] = None,
+        publish: Optional[DatasetPublishStatus] = None
     ) -> List[MachineLearningDatasetResponse]:
         """根据数据集 id 获取该数据集（同名）下的所有版本列表，按创建时间倒序。"""
         await validate_project_exists(await self.machine_learning_dataset_mapper.get_session(), project_id)
@@ -1100,12 +960,16 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
 
         if is_annotated is not None:
             stmt = stmt.filter(MachineLearningDataset.is_annotated == is_annotated)
+        if publish is not None:
+            stmt = stmt.filter(MachineLearningDataset.publish == publish.value)
         datasets = await self.machine_learning_dataset_mapper.query(stmt)
         result = []
         for d in datasets:
             resp = MachineLearningDatasetResponse.model_validate(d)
             resp.created_at = to_local_tz(d.created_at)
             resp.updated_at = to_local_tz(d.updated_at)
+            self.set_publish_display(resp)
+            self.set_status_display(resp)
             result.append(resp)
         return result
 
@@ -1157,6 +1021,185 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
 
         await self.machine_learning_dataset_mapper.commit()
         return True
+
+    async def update_dataset_publish_status(
+        self,
+        project_id: int,
+        dataset_id: int,
+        publish: DatasetPublishStatus,
+    ) -> bool:
+        await validate_project_exists(await self.machine_learning_dataset_mapper.get_session(), project_id)
+
+        if publish != DatasetPublishStatus.PUBLISHED:
+            raise HTTPException(status_code=400, detail="仅允许将未发布状态修改为已发布状态")
+
+        dataset = await self.machine_learning_dataset_mapper.query_one(
+            select(MachineLearningDataset).filter(
+                MachineLearningDataset.project_id == project_id,
+                MachineLearningDataset.id == dataset_id,
+            ).with_for_update()
+        )
+        if not dataset:
+            raise HTTPException(status_code=404, detail=f"项目中不存在指定的机器学习数据集：dataset_id={dataset_id}")
+
+        if dataset.publish == DatasetPublishStatus.PUBLISHED.value:
+            raise HTTPException(status_code=400, detail="机器学习数据集已发布，不用重新发布")
+        if getattr(dataset, "processing_status", MachineLearningDatasetProcessingStatus.COMPLETED.value) != MachineLearningDatasetProcessingStatus.COMPLETED.value:
+            raise HTTPException(status_code=400, detail="只有处理完成的机器学习数据集才能发布")
+        if dataset.publish != DatasetPublishStatus.UNPUBLISHED.value:
+            raise HTTPException(status_code=400, detail="仅未发布状态的机器学习数据集可以发布")
+
+        dataset.publish = DatasetPublishStatus.PUBLISHED.value
+        await self.machine_learning_dataset_mapper.commit()
+        return True
+
+    async def delete_dataset_rows(
+        self,
+        project_id: int,
+        dataset_id: int,
+        row_numbers: List[int],
+    ) -> bool:
+        await validate_project_exists(await self.machine_learning_dataset_mapper.get_session(), project_id)
+
+        normalized_rows = sorted(set(row_numbers or []))
+        if not normalized_rows:
+            raise HTTPException(status_code=400, detail="删除行号不能为空")
+        if any(row_number < 1 for row_number in normalized_rows):
+            raise HTTPException(status_code=400, detail="删除行号必须大于等于 1")
+
+        dataset = await self.machine_learning_dataset_mapper.query_one(
+            select(MachineLearningDataset).filter(
+                MachineLearningDataset.id == dataset_id,
+                MachineLearningDataset.project_id == project_id,
+            ).with_for_update()
+        )
+        if not dataset:
+            raise HTTPException(status_code=404, detail="机器学习数据集不存在")
+        if getattr(dataset, "processing_status", MachineLearningDatasetProcessingStatus.COMPLETED.value) == MachineLearningDatasetProcessingStatus.PENDING.value:
+            raise HTTPException(status_code=400, detail="机器学习数据集有任务正在处理中，请刷新后重试")
+        if dataset.publish != DatasetPublishStatus.UNPUBLISHED.value:
+            raise HTTPException(status_code=400, detail="只有未发布状态的机器学习数据集才能删除指定行")
+        if not dataset.dataset_path:
+            raise HTTPException(status_code=404, detail="dataset.jsonl 文件不存在")
+
+        sample_count = int(dataset.sample_count or 0)
+        if normalized_rows[-1] > sample_count:
+            raise HTTPException(status_code=400, detail=f"删除行号超出数据集范围: {normalized_rows[-1]}")
+        if len(normalized_rows) >= sample_count:
+            raise HTTPException(status_code=400, detail="删除后数据集至少需要保留一行数据")
+
+        dataset_path = dataset.dataset_path
+        storage_path = (dataset.storage_path or os.path.dirname(dataset_path)).rstrip("/") + "/"
+        dataset.processing_status = MachineLearningDatasetProcessingStatus.PENDING.value
+        dataset.publish = DatasetPublishStatus.PROCESSING.value
+        await self.machine_learning_dataset_mapper.commit()
+
+        jfs = await self.storage.JUICEFS_CLIENT()
+        temp_path = None
+        backup_path = None
+
+        try:
+            if not jfs.exists(dataset_path):
+                raise HTTPException(status_code=404, detail="dataset.jsonl 文件不存在")
+
+            operation_id = uuid.uuid4().hex
+            row_number_set = set(normalized_rows)
+            temp_path = f"{dataset_path}.delete_rows_{operation_id}.tmp"
+            backup_path = f"{dataset_path}.delete_rows_{operation_id}.bak"
+            total_rows = 0
+            removed_count = 0
+            matched_rows = set()
+            kept_samples = 0
+            file_size_bytes = 0
+
+            with jfs.open(dataset_path, "rb") as source_file:
+                with jfs.open(temp_path, "wb") as target_file:
+                    while True:
+                        line_bytes = source_file.readline()
+                        if not line_bytes:
+                            break
+
+                        line_text = line_bytes.decode("utf-8", errors="ignore")
+                        stripped = line_text.strip()
+                        if not stripped:
+                            target_file.write(line_bytes)
+                            file_size_bytes += len(line_bytes)
+                            continue
+
+                        total_rows += 1
+                        if total_rows in row_number_set:
+                            matched_rows.add(total_rows)
+                            removed_count += 1
+                            continue
+
+                        target_file.write(line_bytes)
+                        kept_samples += 1
+                        file_size_bytes += len(line_bytes)
+
+            missing_rows = sorted(row_number_set - matched_rows)
+            if missing_rows:
+                raise ValueError(f"删除行号超出数据集范围: {missing_rows}")
+            if removed_count == 0:
+                raise ValueError("未匹配到需要删除的行")
+            if kept_samples < 1:
+                raise ValueError("删除后数据集至少需要保留一行数据")
+
+            jfs.rename(dataset_path, backup_path)
+            try:
+                jfs.rename(temp_path, dataset_path)
+            except Exception:
+                if jfs.exists(backup_path):
+                    jfs.rename(backup_path, dataset_path)
+                raise
+
+            JFSUtils.cleanup_path(jfs, backup_path)
+            temp_path = None
+            backup_path = None
+            JFSUtils.cleanup_path(jfs, f"{storage_path}exports")
+
+            latest_dataset = await self.machine_learning_dataset_mapper.query_one(
+                select(MachineLearningDataset).filter(MachineLearningDataset.id == dataset_id)
+            )
+            if latest_dataset:
+                latest_dataset.sample_count = kept_samples
+                latest_dataset.file_size = file_size_bytes / (1024 * 1024)
+                latest_dataset.processing_status = MachineLearningDatasetProcessingStatus.COMPLETED.value
+                latest_dataset.publish = DatasetPublishStatus.UNPUBLISHED.value
+                await self.machine_learning_dataset_mapper.commit()
+
+            logger.info(f"机器学习数据集同步删除行完成: dataset_id={dataset_id}, removed={removed_count}")
+            return True
+        except Exception as exc:
+            logger.error(f"机器学习数据集同步删除行失败: dataset_id={dataset_id}, error={str(exc)}", exc_info=True)
+            try:
+                if temp_path:
+                    JFSUtils.cleanup_path(jfs, temp_path)
+                if backup_path and jfs.exists(backup_path):
+                    if not jfs.exists(dataset_path):
+                        jfs.rename(backup_path, dataset_path)
+                    else:
+                        JFSUtils.cleanup_path(jfs, backup_path)
+            except Exception as cleanup_error:
+                logger.warning(f"清理机器学习删除行临时文件失败: dataset_id={dataset_id}, error={str(cleanup_error)}")
+
+            try:
+                latest_dataset = await self.machine_learning_dataset_mapper.query_one(
+                    select(MachineLearningDataset).filter(MachineLearningDataset.id == dataset_id)
+                )
+                if latest_dataset:
+                    latest_dataset.processing_status = MachineLearningDatasetProcessingStatus.FAILED.value
+                    latest_dataset.publish = DatasetPublishStatus.FAILED.value
+                    await self.machine_learning_dataset_mapper.commit()
+            except Exception as update_error:
+                logger.error(f"更新机器学习删除行失败状态失败: dataset_id={dataset_id}, error={str(update_error)}")
+
+            if isinstance(exc, HTTPException):
+                raise exc
+            if isinstance(exc, ValueError):
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            if isinstance(exc, FileNotFoundError):
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+            raise HTTPException(status_code=500, detail=f"删除机器学习数据集行失败: {str(exc)}") from exc
 
     async def delete_dataset(self, project_id: int, dataset_id: int) -> None:
         """根据数据集 id 删除单条记录及其 JFS 上的文件。"""
@@ -1396,7 +1439,7 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
 
         pages = ceil(total_samples / size) if total_samples > 0 else 1
         base_url = _build_machine_learning_dataset_base_url(dataset)
-        return MachineLearningDatasetDetailResponse(
+        response = MachineLearningDatasetDetailResponse(
             id=dataset.id,
             name=dataset.name,
             description=dataset.description,
@@ -1414,7 +1457,11 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
             label_schema_path=dataset.label_schema_path,
             metadata_fields=dataset.metadata_fields,
             sample_count=dataset.sample_count,
+            processing_status=MachineLearningDatasetProcessingStatus(getattr(dataset, "processing_status", MachineLearningDatasetProcessingStatus.COMPLETED.value)),
+            processing_status_display=MachineLearningDatasetProcessingStatus(getattr(dataset, "processing_status", MachineLearningDatasetProcessingStatus.COMPLETED.value)).description,
             file_size=dataset.file_size,
+            publish=getattr(dataset, "publish", DatasetPublishStatus.UNPUBLISHED.value),
+            publish_display=DatasetPublishStatus(getattr(dataset, "publish", DatasetPublishStatus.UNPUBLISHED.value)).description,
             created_at=to_local_tz(dataset.created_at),
             updated_at=to_local_tz(dataset.updated_at),
             created_by=dataset.created_by,
@@ -1426,22 +1473,58 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
             size=size,
             pages=pages,
         )
+        self.set_status_display(response)
+        return response
 
     async def repair_metadata_fields(
         self,
+        force: bool = False,
     ) -> Dict[str, Any]:
-        """从历史机器学习 dataset.jsonl 文件回填空的 metadata_fields。"""
-        empty_metadata_fields = or_(
-            MachineLearningDataset.metadata_fields.is_(None),
-            cast(MachineLearningDataset.metadata_fields, String).in_(["[]", "null", ""]),
-        )
-        stmt = select(MachineLearningDataset).where(empty_metadata_fields)
+        """从历史机器学习 dataset.jsonl 文件回填 metadata_fields；force=True 时覆盖已有字段。"""
+        stmt = select(MachineLearningDataset)
+        if not force:
+            empty_metadata_fields = or_(
+                MachineLearningDataset.metadata_fields.is_(None),
+                cast(MachineLearningDataset.metadata_fields, String).in_(["[]", "null", ""]),
+            )
+            stmt = stmt.where(empty_metadata_fields)
         datasets = await self.machine_learning_dataset_mapper.query(stmt)
 
-        jfs = await self.storage.JUICEFS_CLIENT()
-        result = {"total": len(datasets), "repaired": 0, "failed": 0, "failed_items": []}
+        result = {"total": len(datasets), "repaired": 0, "failed": 0, "failed_items": [], "force": force}
         for dataset in datasets:
-            if dataset.metadata_fields:
+            if not force and dataset.metadata_fields:
+                continue
+            if not dataset.tenant_id:
+                message = "数据集 tenant_id 为空，无法定位 JuiceFS 存储"
+                logger.warning(f"机器学习数据集 {dataset.id} {message}，跳过 metadata_fields 修复")
+                result["failed"] += 1
+                result["failed_items"].append({
+                    "dataset_id": dataset.id,
+                    "project_id": dataset.project_id,
+                    "name": dataset.name,
+                    "version": dataset.version,
+                    "dataset_path": dataset.dataset_path,
+                    "reason_code": "tenant_id_missing",
+                    "message": message,
+                    "retryable": False,
+                })
+                continue
+            try:
+                jfs = await self.storage.JUICEFS_CLIENT(dataset.tenant_id)
+            except Exception as exc:
+                message = f"获取数据集租户 JuiceFS 客户端失败: tenant_id={dataset.tenant_id}, error={exc}"
+                logger.warning(f"机器学习数据集 {dataset.id} {message}，跳过 metadata_fields 修复")
+                result["failed"] += 1
+                result["failed_items"].append({
+                    "dataset_id": dataset.id,
+                    "project_id": dataset.project_id,
+                    "name": dataset.name,
+                    "version": dataset.version,
+                    "dataset_path": dataset.dataset_path,
+                    "reason_code": "juicefs_client_error",
+                    "message": message,
+                    "retryable": True,
+                })
                 continue
             if not dataset.dataset_path or not jfs.exists(dataset.dataset_path):
                 message = f"数据集文件不存在: {dataset.dataset_path or ''}"

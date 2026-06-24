@@ -13,6 +13,7 @@ import DataAttributeFormSection from './DataAttributeFormSection'
 import { DescriptionTextArea } from '@/components/common/DescriptionTextArea.tsx'
 import ChunkFileUploader from '@/components/common/ChunkFileUploader'
 import CreateFormPageHeader from '@/components/common/CreateFormPageHeader'
+import { SegmentedRadioButton, SegmentedRadioGroup } from '@/components/common/SegmentedRadio'
 import { trainingDatasetService } from '@/services/trainingApi'
 import { attributeService } from '@/services/inferenceService'
 import type { DatasetEnumConfig } from '@/types/enum'
@@ -120,6 +121,7 @@ const CreateDatasetPage: React.FC<CreateDatasetPageProps> = ({ type, usage, busi
         return [
           { value: 'sft', label: '监督学习SFT', enabled: false },
           ...(!isTestDataset ? [{ value: 'dpo', label: '偏好对齐DPO', enabled: false }] : []),
+          ...(!isTestDataset ? [{ value: 'grpo', label: 'RFT-GRPO', enabled: false }] : []),
         ]
       case 'image-generation':
         return [
@@ -128,6 +130,7 @@ const CreateDatasetPage: React.FC<CreateDatasetPageProps> = ({ type, usage, busi
       case 'image-understanding':
         return [
           { value: 'sft', label: '监督学习SFT' },
+          ...(!isTestDataset ? [{ value: 'grpo', label: 'RFT-GRPO', enabled: false }] : []),
         ]
       default:
         return [
@@ -146,7 +149,7 @@ const CreateDatasetPage: React.FC<CreateDatasetPageProps> = ({ type, usage, busi
     if (options.length > 0) {
       setTrainingMethodType(nextTrainingMethodType)
     }
-    // 如果选择图像理解，自动设置数据格式为 role-based
+    // 如果选择图像理解，自动设置数据格式
     const defaultDataFormat = getDefaultDataFormat(value, nextTrainingMethodType)
     if (defaultDataFormat) {
       form.setFieldValue('dataFormat', defaultDataFormat)
@@ -177,6 +180,10 @@ const CreateDatasetPage: React.FC<CreateDatasetPageProps> = ({ type, usage, busi
   const [dataFormatOptions, setDataFormatOptions] = useState<DatasetEnumConfig | null>(null)
 
   const getAllowedDataFormats = useCallback((nextDataSource = dataSource, nextTrainingMethodType = trainingMethodType) => {
+    if (nextTrainingMethodType === 'grpo') {
+      return ['grpo']
+    }
+
     if (nextDataSource === 'image-understanding') {
       return ['role-based']
     }
@@ -204,8 +211,11 @@ const CreateDatasetPage: React.FC<CreateDatasetPageProps> = ({ type, usage, busi
         const projectEnumValues = JSON.parse(localStorage.getItem('projectEnumValues') || '[]')
         if (projectEnumValues) {
           const dataFormatOptions = projectEnumValues.all_enums.find((item: any) => item.enum_name === 'DatasetFormat')
-          dataFormatOptions.options = dataFormatOptions.options.filter((item: any) => !['business', 'prefix-suffix-middle'].includes(item.value))
-          setDataFormatOptions(dataFormatOptions)
+          const options = dataFormatOptions.options.filter((item: any) => !['business', 'prefix-suffix-middle'].includes(item.value))
+          if (!options.some((item: any) => item.value === 'grpo')) {
+            options.push({ value: 'grpo', name: 'GRPO', description: 'GRPO JSONL' })
+          }
+          setDataFormatOptions({ ...dataFormatOptions, options })
         }
       }
       catch (error) {
@@ -538,20 +548,20 @@ const CreateDatasetPage: React.FC<CreateDatasetPageProps> = ({ type, usage, busi
 
           {usage !== 'business_test' && (
             <Form.Item className="create-dataset-radio-field create-dataset-usage-field" label="数据用途">
-              <Radio.Group onChange={handleDataSourceChange} value={dataSource} className="create-dataset-usage-options">
+              <SegmentedRadioGroup onChange={handleDataSourceChange} value={dataSource} className="create-dataset-usage-options">
                 <Space direction="horizontal" size={10}>
                   {dataSourceOptions.map((option) => (
                     <Tooltip title={option.disabled ? option.disabledTooltip : null} color="blue" key={option.value}>
-                      <Radio.Button className="create-dataset-usage-option" disabled={option.disabled} value={option.value}>
+                      <SegmentedRadioButton variant="usage" disabled={option.disabled} value={option.value}>
                         <Space size={6}>
                           {option.icon}
                           <span>{option.label}</span>
                         </Space>
-                      </Radio.Button>
+                      </SegmentedRadioButton>
                     </Tooltip>
                   ))}
                 </Space>
-              </Radio.Group>
+              </SegmentedRadioGroup>
 
               <div className="create-dataset-method-row">
                 <Radio.Group value={trainingMethodType} onChange={handleTrainingMethodTypeChange}>
@@ -575,7 +585,7 @@ const CreateDatasetPage: React.FC<CreateDatasetPageProps> = ({ type, usage, busi
 
           {usage !== 'business_test' && (
             <Form.Item className="create-dataset-radio-field create-dataset-format-field" label="数据格式" name="dataFormat">
-              <Radio.Group onChange={handleDataFormatChange} className="create-dataset-format-options">
+              <SegmentedRadioGroup onChange={handleDataFormatChange} className="create-dataset-format-options">
                 <Space direction="horizontal" size={10}>
                   {dataFormatOptions?.options
                     ?.filter((option) => {
@@ -585,7 +595,7 @@ const CreateDatasetPage: React.FC<CreateDatasetPageProps> = ({ type, usage, busi
                       const shouldDisable = !getAllowedDataFormats().includes(option.value)
                       const hasFormatHelp = option.value === 'role-based' || option.value === 'prompt-response' || option.value === 'alpaca'
                       return (
-                        <Radio.Button key={option.value} className={`create-dataset-format-option create-dataset-format-option-${option.value}`} value={option.value} disabled={shouldDisable}>
+                        <SegmentedRadioButton key={option.value} className={`create-dataset-format-option-${option.value}`} value={option.value} disabled={shouldDisable}>
                           <span>{option.name}</span>
                           {hasFormatHelp && (
                             <Popover
@@ -606,11 +616,11 @@ const CreateDatasetPage: React.FC<CreateDatasetPageProps> = ({ type, usage, busi
                               <QuestionCircleOutlined className="create-dataset-info-icon" />
                             </Popover>
                           )}
-                        </Radio.Button>
+                        </SegmentedRadioButton>
                       )
                     })}
                 </Space>
-              </Radio.Group>
+              </SegmentedRadioGroup>
             </Form.Item>
           )}
 
@@ -619,12 +629,12 @@ const CreateDatasetPage: React.FC<CreateDatasetPageProps> = ({ type, usage, busi
           </div>
 
           <Form.Item className="create-dataset-source-field" label="数据来源" name="importMethod" initialValue={importMethod}>
-            <Radio.Group value={importMethod} onChange={(e) => setImportMethod(e.target.value)}>
-              <Radio.Button className="create-dataset-source-option" value="本地上传">本地上传</Radio.Button>
+            <SegmentedRadioGroup value={importMethod} onChange={(e) => setImportMethod(e.target.value)}>
+              <SegmentedRadioButton variant="source" value="本地上传">本地上传</SegmentedRadioButton>
               {/* <Tooltip title="即将上线" color="blue" >
                           <Radio value="URL获取" disabled>URL获取</Radio>
                       </Tooltip> */}
-            </Radio.Group>
+            </SegmentedRadioGroup>
           </Form.Item>
 
           {importMethod === '本地上传' && (

@@ -7,6 +7,25 @@ import { useConfigStore } from '@/stores/configStore'
 
 const { Option } = Select
 const { Text } = Typography
+type ResourceFieldName = string | (string | number)[]
+
+const toNamePath = (name: ResourceFieldName) => Array.isArray(name) ? name : [name]
+const childName = (name: ResourceFieldName, child: string) => [...toNamePath(name), child]
+const CPU_GPU_OPTION = {
+  value: 'CPU',
+  label: 'CPU',
+  isLeaf: false,
+  children: [
+    {
+      value: 'CPU',
+      label: 'CPU',
+      memory: null,
+      model: 'CPU',
+      type: null,
+      isLeaf: true,
+    },
+  ],
+}
 
 const createLimitValidator = (
   form: any,
@@ -58,6 +77,21 @@ interface ResourceConfigProps {
   onResourceLoadingChange?: (loading: boolean) => void
   /** belle 回显场景只把可分配值作为上限，不覆盖详情已有资源值 */
   preserveResourceValuesOnAllocatableChange?: boolean
+  /** 允许显卡数量为 0，GRPO Ray 的 submit/head CPU 节点使用 */
+  allowZeroGpuCount?: boolean
+  /** 固定显卡数量为 0 且不可编辑，GRPO Ray 的 submit/head CPU 节点使用 */
+  readonlyZeroGpuCount?: boolean
+  /** 隐藏模型训练适配提示，GRPO Ray 资源节点不使用该提示 */
+  hideGpuAdaptationWarning?: boolean
+  /** 自定义字段路径，GRPO Ray 多节点资源配置复用本组件时使用；默认保持原字段不变 */
+  fieldNames?: {
+    gpuType?: ResourceFieldName
+    gpuCount?: ResourceFieldName
+    gpuModel?: ResourceFieldName
+    gpuMemory?: ResourceFieldName
+    k8sResourceType?: ResourceFieldName
+    graphicsCardResource?: ResourceFieldName
+  }
 }
 
 interface AllocatableResources {
@@ -109,6 +143,10 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
   onGpuSelectionChange,
   onResourceLoadingChange,
   preserveResourceValuesOnAllocatableChange = false,
+  allowZeroGpuCount = false,
+  readonlyZeroGpuCount = false,
+  hideGpuAdaptationWarning = false,
+  fieldNames,
 }) => {
   const [gpuCascaderOptions, setGpuCascaderOptions] = useState<any[]>([])
   const [showGpuNotAdaptedWarning, setShowGpuNotAdaptedWarning] = useState(false)
@@ -116,7 +154,13 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
   const [isInitialized, setIsInitialized] = useState(false) // 标记是否已初始化
   const [allocatableResourcesLoading, setAllocatableResourcesLoading] = useState(false)
   const form = Form.useFormInstance()
-  const selectedGpuCount = Form.useWatch('gpu_count', form) as number | undefined
+  const gpuTypeName = fieldNames?.gpuType ?? 'gpu_type'
+  const gpuCountName = fieldNames?.gpuCount ?? 'gpu_count'
+  const gpuModelName = fieldNames?.gpuModel ?? 'gpu_model'
+  const gpuMemoryName = fieldNames?.gpuMemory ?? 'gpu_memory'
+  const k8sResourceTypeName = fieldNames?.k8sResourceType ?? 'k8s_resource_type'
+  const graphicsCardResourceName = fieldNames?.graphicsCardResource ?? 'graphics_card_resource'
+  const selectedGpuCount = Form.useWatch(gpuCountName, form) as number | undefined
 
   const [allocatableResources, setAllocatableResources] = useState<AllocatableResources>()
   const { config, providerType } = useConfigStore()
@@ -125,8 +169,11 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
     if (simpleGpuCountSelect || !isBelleProvider || isInitialized)
       return false
 
-    const gpuTypeValue = form.getFieldValue('gpu_type')
-    const gpuModelValue = form.getFieldValue('gpu_model')
+    const gpuTypeValue = form.getFieldValue(gpuTypeName)
+    const gpuModelValue = form.getFieldValue(gpuModelName)
+    if (allowZeroGpuCount && Array.isArray(gpuTypeValue) && gpuTypeValue[0] === 'CPU')
+      return false
+
     return Array.isArray(gpuTypeValue) && gpuTypeValue.length === 2 && Boolean(gpuModelValue)
   })()
   const belleCpuLimit = calculateBelleResourceValue(
@@ -142,20 +189,36 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
     selectedGpuCount,
   )
 
+  useEffect(() => {
+    if (!readonlyZeroGpuCount)
+      return
+    form.setFields([
+      { name: toNamePath(gpuTypeName), value: ['CPU', 'CPU'] },
+      { name: toNamePath(gpuModelName), value: 'CPU' },
+      { name: toNamePath(gpuMemoryName), value: null },
+      { name: toNamePath(k8sResourceTypeName), value: null },
+      { name: toNamePath(gpuCountName), value: 0 },
+    ])
+  }, [form, gpuCountName, gpuMemoryName, gpuModelName, gpuTypeName, k8sResourceTypeName, readonlyZeroGpuCount])
+
   const resetBelleResourceFields = useCallback(() => {
-    const graphicsCardResource = form.getFieldValue('graphics_card_resource') || {}
-    form.setFieldsValue({
-      gpu_count: null,
-      gpu_memory: undefined,
-      graphics_card_resource: {
+    const graphicsCardResource = form.getFieldValue(graphicsCardResourceName) || {}
+    form.setFields([
+      { name: toNamePath(gpuCountName), value: null },
+      { name: toNamePath(gpuMemoryName), value: undefined },
+      { name: childName(graphicsCardResourceName, 'cpu_request'), value: undefined },
+      { name: childName(graphicsCardResourceName, 'cpu_limit'), value: undefined },
+      { name: childName(graphicsCardResourceName, 'memory_request'), value: undefined },
+      { name: childName(graphicsCardResourceName, 'memory_limit'), value: undefined },
+      { name: toNamePath(graphicsCardResourceName), value: {
         ...graphicsCardResource,
         cpu_request: undefined,
         cpu_limit: undefined,
         memory_request: undefined,
         memory_limit: undefined,
-      },
-    })
-  }, [form])
+      } },
+    ])
+  }, [form, gpuCountName, gpuMemoryName, graphicsCardResourceName])
 
   useEffect(() => {
     if (!isBelleProvider)
@@ -169,32 +232,36 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
     if (!allocatableResources || !selectedGpuCount)
       return
 
-    const graphicsCardResource = form.getFieldValue('graphics_card_resource') || {}
-    form.setFieldsValue({
-      gpu_memory: allocatableResources.gpu_memory_per_card && allocatableResources.ratio !== undefined
-        ? String(allocatableResources.gpu_memory_per_card * allocatableResources.ratio)
-        : form.getFieldValue('gpu_memory'),
-      graphics_card_resource: {
-        ...graphicsCardResource,
-        ...(belleCpuLimit !== undefined && {
-          cpu_request: preserveResourceValuesOnAllocatableChange
-            ? clampBelleResourceValue(graphicsCardResource.cpu_request, belleCpuLimit)
-            : belleCpuLimit,
-          cpu_limit: preserveResourceValuesOnAllocatableChange
-            ? clampBelleResourceValue(graphicsCardResource.cpu_limit, belleCpuLimit)
-            : belleCpuLimit,
-        }),
-        ...(belleMemoryLimit !== undefined && {
-          memory_request: preserveResourceValuesOnAllocatableChange
-            ? clampBelleResourceValue(graphicsCardResource.memory_request, belleMemoryLimit)
-            : belleMemoryLimit,
-          memory_limit: preserveResourceValuesOnAllocatableChange
-            ? clampBelleResourceValue(graphicsCardResource.memory_limit, belleMemoryLimit)
-            : belleMemoryLimit,
-        }),
+    const graphicsCardResource = form.getFieldValue(graphicsCardResourceName) || {}
+    const nextResource = {
+      ...graphicsCardResource,
+      ...(belleCpuLimit !== undefined && {
+        cpu_request: preserveResourceValuesOnAllocatableChange
+          ? clampBelleResourceValue(graphicsCardResource.cpu_request, belleCpuLimit)
+          : belleCpuLimit,
+        cpu_limit: preserveResourceValuesOnAllocatableChange
+          ? clampBelleResourceValue(graphicsCardResource.cpu_limit, belleCpuLimit)
+          : belleCpuLimit,
+      }),
+      ...(belleMemoryLimit !== undefined && {
+        memory_request: preserveResourceValuesOnAllocatableChange
+          ? clampBelleResourceValue(graphicsCardResource.memory_request, belleMemoryLimit)
+          : belleMemoryLimit,
+        memory_limit: preserveResourceValuesOnAllocatableChange
+          ? clampBelleResourceValue(graphicsCardResource.memory_limit, belleMemoryLimit)
+          : belleMemoryLimit,
+      }),
+    }
+    form.setFields([
+      {
+        name: toNamePath(gpuMemoryName),
+        value: allocatableResources.gpu_memory_per_card && allocatableResources.ratio !== undefined
+          ? String(allocatableResources.gpu_memory_per_card * allocatableResources.ratio)
+          : form.getFieldValue(gpuMemoryName),
       },
-    })
-  }, [allocatableResources, belleCpuLimit, belleMemoryLimit, form, isBelleProvider, preserveResourceValuesOnAllocatableChange, resetBelleResourceFields, selectedGpuCount])
+      { name: toNamePath(graphicsCardResourceName), value: nextResource },
+    ])
+  }, [allocatableResources, belleCpuLimit, belleMemoryLimit, form, gpuMemoryName, graphicsCardResourceName, isBelleProvider, preserveResourceValuesOnAllocatableChange, resetBelleResourceFields, selectedGpuCount])
 
   // 回显显卡资源配置中的值（当非 skipLocalStorageEcho 时从 localStorage 读取）
   useEffect(() => {
@@ -202,16 +269,14 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
     const cpuResource = JSON.parse(localStorage.getItem('taskInfo') || 'null')
     if (cpuResource?.graphics_card_resource) {
       const { graphics_card_resource } = cpuResource
-      form.setFieldsValue({
-        graphics_card_resource: {
-          cpu_request: graphics_card_resource.cpu_request,
-          cpu_limit: graphics_card_resource.cpu_limit,
-          memory_request: graphics_card_resource.memory_request,
-          memory_limit: graphics_card_resource.memory_limit,
-        },
-      })
+      form.setFields([
+        { name: childName(graphicsCardResourceName, 'cpu_request'), value: graphics_card_resource.cpu_request },
+        { name: childName(graphicsCardResourceName, 'cpu_limit'), value: graphics_card_resource.cpu_limit },
+        { name: childName(graphicsCardResourceName, 'memory_request'), value: graphics_card_resource.memory_request },
+        { name: childName(graphicsCardResourceName, 'memory_limit'), value: graphics_card_resource.memory_limit },
+      ])
     }
-  }, [form, skipLocalStorageEcho])
+  }, [form, graphicsCardResourceName, skipLocalStorageEcho])
   // 获取显卡资源列表（第一级：显卡类型）
   const { data: gpuResourceOptions = [], isLoading: gpuResourceOptionsLoading, error: gpuResourceOptionsError } = useQuery({
     queryKey: ['gpuResources', projectId],
@@ -224,6 +289,8 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
         label: item.category,
         isLeaf: false, // 标记为非叶子节点，表示有子节点
       }))
+      if (allowZeroGpuCount || readonlyZeroGpuCount)
+        return [CPU_GPU_OPTION, ...data.filter((item: any) => item.value !== 'CPU')]
       return data
     },
     enabled: !!projectId,
@@ -237,14 +304,17 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
     if (gpuResourceOptions && gpuResourceOptions.length > 0) {
       setGpuCascaderOptions(gpuResourceOptions)
     }
-  }, [gpuResourceOptions])
+    else if (allowZeroGpuCount || readonlyZeroGpuCount) {
+      setGpuCascaderOptions([CPU_GPU_OPTION])
+    }
+  }, [allowZeroGpuCount, gpuResourceOptions, readonlyZeroGpuCount])
 
   // 处理回显逻辑：当表单中有 gpu_type 和 gpu_model 时，自动加载对应的选项（仅在初始化时执行一次）
   useEffect(() => {
     if (!projectId || isInitialized) return // 如果已初始化，直接返回
 
-    const gpuTypeValue = form.getFieldValue('gpu_type')
-    const gpuModelValue = form.getFieldValue('gpu_model')
+    const gpuTypeValue = form.getFieldValue(gpuTypeName)
+    const gpuModelValue = form.getFieldValue(gpuModelName)
 
     // 如果 gpu_type 是数组且长度为 2，且有 gpu_model，说明需要回显
     if (Array.isArray(gpuTypeValue) && gpuTypeValue.length === 2 && gpuModelValue) {
@@ -283,15 +353,15 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
             const matchedModel = children.find((child: any) => child.model === gpuModelValue)
             if (matchedModel) {
               // 设置正确的 gpu_type 值
-              form.setFieldsValue({
-                gpu_type: [cardType, matchedModel.value],
-                gpu_model: matchedModel.model,
-                gpu_memory: isBelleProvider ? undefined : matchedModel.memory,
-                k8s_resource_type: matchedModel.type, // 保存type字段
-              })
+              form.setFields([
+                { name: toNamePath(gpuTypeName), value: [cardType, matchedModel.value] },
+                { name: toNamePath(gpuModelName), value: matchedModel.model },
+                { name: toNamePath(gpuMemoryName), value: isBelleProvider ? undefined : matchedModel.memory },
+                { name: toNamePath(k8sResourceTypeName), value: matchedModel.type },
+              ])
 
               // 检查是否支持
-              if (SupportedGpuCategory && SupportedGpuCategory.length > 0) {
+              if (!hideGpuAdaptationWarning && SupportedGpuCategory && SupportedGpuCategory.length > 0) {
                 const isSupported = SupportedGpuCategory.some(
                   (category) => category.value === matchedModel.model,
                 )
@@ -337,15 +407,15 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
         // 如果子节点已加载，直接匹配
         const matchedModel = typeOption.children.find((child: any) => child.model === gpuModelValue)
         if (matchedModel) {
-          form.setFieldsValue({
-            gpu_type: [cardType, matchedModel.value],
-            gpu_model: matchedModel.model,
-            gpu_memory: isBelleProvider ? undefined : matchedModel.memory,
-            k8s_resource_type: matchedModel.type, // 保存type字段
-          })
+          form.setFields([
+            { name: toNamePath(gpuTypeName), value: [cardType, matchedModel.value] },
+            { name: toNamePath(gpuModelName), value: matchedModel.model },
+            { name: toNamePath(gpuMemoryName), value: isBelleProvider ? undefined : matchedModel.memory },
+            { name: toNamePath(k8sResourceTypeName), value: matchedModel.type },
+          ])
 
           // 检查是否支持
-          if (SupportedGpuCategory && SupportedGpuCategory.length > 0) {
+          if (!hideGpuAdaptationWarning && SupportedGpuCategory && SupportedGpuCategory.length > 0) {
             const isSupported = SupportedGpuCategory.some(
               (category) => category.value === matchedModel.model,
             )
@@ -359,7 +429,7 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
         }
       }
     }
-  }, [gpuCascaderOptions, form, projectId, SupportedGpuCategory, isInitialized, simpleGpuCountSelect, onGpuSelectionChange, onAllocatableResourcesChange, isBelleProvider, resetBelleResourceFields])
+  }, [gpuCascaderOptions, form, projectId, SupportedGpuCategory, hideGpuAdaptationWarning, isInitialized, simpleGpuCountSelect, onGpuSelectionChange, onAllocatableResourcesChange, isBelleProvider, resetBelleResourceFields, gpuTypeName, gpuModelName, gpuMemoryName, k8sResourceTypeName])
 
   // 处理GPU资源加载错误
   useEffect(() => {
@@ -425,12 +495,14 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
   }, [projectId])
 
   const handleGpuCascaderChange = async (value: any, selectedOptions: any[]) => {
+    const isZeroGpuNode = (allowZeroGpuCount || readonlyZeroGpuCount) && value?.[0] === 'CPU'
+
     if (!simpleGpuCountSelect) {
-      form.setFieldsValue({ gpu_count: null })
+      form.setFields([{ name: toNamePath(gpuCountName), value: isZeroGpuNode ? 0 : null }])
     }
 
     let hasAvailableBelleResource = true
-    if (!simpleGpuCountSelect && isBelleProvider && value?.length === 2) {
+    if (!simpleGpuCountSelect && isBelleProvider && value?.length === 2 && !isZeroGpuNode) {
       setAllocatableResourcesLoading(true)
       try {
         const allocatableResource = await getKubernetesAllocatableResources(projectId, value[0], value[1])
@@ -459,7 +531,8 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
     else if (isBelleProvider) {
       setAllocatableResources(undefined)
       onAllocatableResourcesChange?.(undefined)
-      resetBelleResourceFields()
+      if (!isZeroGpuNode)
+        resetBelleResourceFields()
     }
 
     // 当选择完成时（选择了类型和型号），设置gpu_model和gpu_memory
@@ -478,14 +551,14 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
       }
 
       if (modelOption && modelOption.memory !== undefined && modelOption.model !== undefined) {
-        form.setFieldsValue({
-          gpu_model: modelOption.model,
-          gpu_memory: isBelleProvider ? undefined : modelOption.memory,
-          k8s_resource_type: modelOption.type, // 保存type字段
-        })
+        form.setFields([
+          { name: toNamePath(gpuModelName), value: modelOption.model },
+          { name: toNamePath(gpuMemoryName), value: isZeroGpuNode ? null : isBelleProvider ? undefined : modelOption.memory },
+          { name: toNamePath(k8sResourceTypeName), value: isZeroGpuNode ? null : modelOption.type },
+        ])
 
         // 检查选择的GPU型号是否在SupportedGpuCategory中
-        if (SupportedGpuCategory && SupportedGpuCategory.length > 0) {
+        if (!hideGpuAdaptationWarning && SupportedGpuCategory && SupportedGpuCategory.length > 0) {
           const isSupported = SupportedGpuCategory.some(
             (category) => category.value === modelOption.model,
           )
@@ -509,11 +582,11 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
       setShowGpuNotAdaptedWarning(false)
       setGpuTypeHelp('')
       if (simpleGpuCountSelect) {
-        form.setFieldsValue({
-          gpu_model: undefined,
-          gpu_memory: undefined,
-          k8s_resource_type: undefined,
-        })
+        form.setFields([
+          { name: toNamePath(gpuModelName), value: undefined },
+          { name: toNamePath(gpuMemoryName), value: undefined },
+          { name: toNamePath(k8sResourceTypeName), value: undefined },
+        ])
       }
       onGpuSelectionChange?.(null)
     }
@@ -540,21 +613,30 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
         ({ getFieldValue }: any) => ({
           validator(_: unknown, value: unknown) {
             if (!getFieldValue('gpu_enabled')) return Promise.resolve()
-            if (value == null || value === '' || (typeof value === 'number' && value < 1)) {
+            if (value == null || value === '' || (typeof value === 'number' && value < (allowZeroGpuCount || readonlyZeroGpuCount ? 0 : 1))) {
               return Promise.reject(new Error('请选择显卡数量'))
             }
             return Promise.resolve()
           },
         }),
       ]
-    : [{ required: true, message: '请选择显卡卡数配置' }]
+    : [
+        {
+          validator(_: unknown, value: unknown) {
+            if (value == null || value === '' || (typeof value === 'number' && value < (allowZeroGpuCount || readonlyZeroGpuCount ? 0 : 1))) {
+              return Promise.reject(new Error('请选择显卡卡数配置'))
+            }
+            return Promise.resolve()
+          },
+        },
+      ]
 
   const gpuPickerBlock = (
     <>
       <Row gutter={16}>
         <Col span={8}>
           <Form.Item
-            name="gpu_type"
+            name={gpuTypeName}
             label="显卡类型及型号"
             rules={gpuTypeRules}
             help={gpuTypeHelp ? (
@@ -571,14 +653,14 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
               loadData={loadGpuModelData}
               changeOnSelect={false}
               loading={gpuResourceOptionsLoading}
-              disabled={!projectId}
+              disabled={!projectId || readonlyZeroGpuCount}
               onChange={handleGpuCascaderChange}
             />
           </Form.Item>
         </Col>
         <Col span={8} hidden>
           <Form.Item
-            name="gpu_model"
+            name={gpuModelName}
             label="显卡型号"
           >
             <Text></Text>
@@ -586,7 +668,7 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
         </Col>
         <Col span={8} hidden>
           <Form.Item
-            name="gpu_memory"
+            name={gpuMemoryName}
             label="显卡内存"
           >
             <Text></Text>
@@ -594,7 +676,7 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
         </Col>
         <Col span={8} hidden>
           <Form.Item
-            name="k8s_resource_type"
+            name={k8sResourceTypeName}
             label="显卡类型"
           >
             <Text></Text>
@@ -602,7 +684,7 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
         </Col>
         <Col span={8}>
           <Form.Item
-            name="gpu_count"
+            name={gpuCountName}
             label={notebookLayout ? '显卡数量' : '显卡 卡数配置'}
             help={!simpleGpuCountSelect && isBelleProvider ? (
               !allocatableResources?.gpu_count ? (
@@ -615,14 +697,14 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
             ) : undefined}
             rules={gpuCountRules}
           >
-            <Select placeholder="请选择显卡数量">
-              {Array.from({
+            <Select placeholder="请选择显卡数量" disabled={readonlyZeroGpuCount}>
+              {(allowZeroGpuCount || readonlyZeroGpuCount ? [0] : []).concat(Array.from({
                 length: simpleGpuCountSelect
                   ? 8
                   : isBelleProvider
                     ? allocatableResources?.gpu_count || 0
                     : 8,
-              }, (_, i) => i + 1).map((count) => (
+              }, (_, i) => i + 1)).map((count) => (
                 <Option key={count} value={count}>
                   {count}
                   张
@@ -771,7 +853,7 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
       <Row gutter={16}>
         <Col span={8}>
           <Form.Item
-            name={['graphics_card_resource', 'cpu_request']}
+            name={childName(graphicsCardResourceName, 'cpu_request')}
             label="CPU 请求"
             rules={[
               { required: true, message: '请输入CPU请求' },
@@ -791,15 +873,15 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
         </Col>
         <Col span={8}>
           <Form.Item
-            name={['graphics_card_resource', 'cpu_limit']}
+            name={childName(graphicsCardResourceName, 'cpu_limit')}
             label="CPU 限制"
-            dependencies={[['graphics_card_resource', 'cpu_request']]}
+            dependencies={[childName(graphicsCardResourceName, 'cpu_request')]}
             rules={[
               { required: true, message: '请输入CPU限制' },
               {
                 validator: createLimitValidator(
                   form,
-                  ['graphics_card_resource', 'cpu_request'],
+                  childName(graphicsCardResourceName, 'cpu_request'),
                   'CPU限制必须大于或等于CPU请求的值',
                 ),
               },
@@ -821,7 +903,7 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
       <Row gutter={16}>
         <Col span={8}>
           <Form.Item
-            name={['graphics_card_resource', 'memory_request']}
+            name={childName(graphicsCardResourceName, 'memory_request')}
             label="内存请求"
             rules={[
               { required: true, message: '请输入内存请求' },
@@ -841,15 +923,15 @@ const ResourceConfig: React.FC<ResourceConfigProps> = ({
         </Col>
         <Col span={8}>
           <Form.Item
-            name={['graphics_card_resource', 'memory_limit']}
+            name={childName(graphicsCardResourceName, 'memory_limit')}
             label="内存限制"
-            dependencies={[['graphics_card_resource', 'memory_request']]}
+            dependencies={[childName(graphicsCardResourceName, 'memory_request')]}
             rules={[
               { required: true, message: '请输入内存限制' },
               {
                 validator: createLimitValidator(
                   form,
-                  ['graphics_card_resource', 'memory_request'],
+                  childName(graphicsCardResourceName, 'memory_request'),
                   '内存限制必须大于或等于内存请求的值',
                 ),
               },

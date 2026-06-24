@@ -1267,6 +1267,8 @@ class DefaultInferenceTaskService(InferenceTaskService):
                 namespace=inference_task.namespace,
                 app_name=app_name
             )
+            inference_task.status = TaskStatus.TERMINATED.value
+            inference_task.ready_replicas = 0
         except Exception as e:
             inference_task.status = TaskStatus.FAILED
             await self.mapper.commit()
@@ -1284,7 +1286,9 @@ class DefaultInferenceTaskService(InferenceTaskService):
                 namespace=inference_task.namespace,
                 app_name=app_name,
                 replicas=inference_task.desired_replicas
-            )            
+            )
+            inference_task.status = TaskStatus.PENDING.value
+            inference_task.ready_replicas = 0
         except Exception as e:
             inference_task.status = TaskStatus.FAILED
             await self.mapper.commit()

@@ -1,21 +1,175 @@
-import { Button, Card, Col, Dropdown, Modal, Popconfirm, Row, Spin, Table, Typography, message } from 'antd'
+import { Button, Card, Col, Dropdown, Modal, Popconfirm, Row, Spin, Table, Tag, Typography, message } from 'antd'
 import { ArrowLeftOutlined, DatabaseOutlined, DownOutlined, FileTextOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import React, { useCallback, useEffect, useState } from 'react'
 import BasicView from './DatasetDetailBasicView'
 import { useDatasetDetailDpoColumns } from './DatasetDetailDpoColumns'
-import DatasetVersionMergeModal from './DatasetVersionMergeModal'
-import { getDatasetDeleteErrorMessage, getDatasetVersionDeleteBlockReason } from './datasetDeleteGuard'
 import { formatDatasetPreviewItems, getBusinessTestKeys, isDpoAlpacaPreview, isDpoRoleBasedPreview } from './datasetPreviewFormat'
 import { trainingDatasetService } from '@/services/trainingApi.ts'
 import ExpandableCell from '@/components/common/ExpandableCell.tsx'
-import { expandImageData } from '@/utils/imageUtils.ts'
+import { expandImageData, replaceImagePlaceholders } from '@/utils/imageUtils.ts'
 import { isInteractiveElement } from '@/utils/domUtils'
 import { downloadBlobFile, extractFilenameFromHeaders, getContentType, processFilenameExtension } from '@/utils/download.ts'
 import './DatasetDetail.css'
 
 const { Text } = Typography
+const DELETE_ROW_POLL_INTERVAL = 300
+const DELETE_ROW_POLL_MAX_TIMES = 10
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const PREVIEW_META_KEYS = new Set(['key', 'id', 'item', 'row_number', 'base_url', 'images'])
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+const isMessageList = (value: unknown): value is Array<Record<string, unknown>> => {
+  return Array.isArray(value) && value.every((item) => isPlainObject(item) && ('role' in item || 'content' in item))
+}
+
+const formatPreviewValue = (value: unknown): string => {
+  if (value === undefined || value === null || value === '') return '-'
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  try {
+    return JSON.stringify(value, null, 2)
+  }
+  catch {
+    return String(value)
+  }
+}
+
+const getRoleTagColor = (role?: unknown) => {
+  const normalizedRole = typeof role === 'string' ? role : 'message'
+  const roleColorMap: Record<string, string> = {
+    system: 'purple',
+    user: 'blue',
+    assistant: 'green',
+  }
+  return roleColorMap[normalizedRole] || 'default'
+}
+
+const getRoleLabel = (role?: unknown) => {
+  const normalizedRole = typeof role === 'string' && role ? role : 'message'
+  return normalizedRole.charAt(0).toUpperCase() + normalizedRole.slice(1)
+}
+
+const getPreviewImageUrl = (imagePath: string, baseUrl: string) => {
+  const imageBaseUrl = import.meta.env.DEV
+    ? `${import.meta.env.VITE_PREFIX_BASE_URL}/api/v1/storage/download/`
+    : '/lab-backend/api/v1/storage/download/'
+  const fileName = imagePath.includes('/') ? imagePath.split('/').pop() : imagePath
+  return `${imageBaseUrl}${baseUrl}/${fileName}`
+}
+
+const renderContentWithImages = (
+  content: string,
+  images: string[],
+  baseUrl: string,
+  startIndex: number,
+) => {
+  if (!content.includes('<image>') || images.length === 0) {
+    return {
+      content: <div className="whitespace-pre-wrap">{content}</div>,
+      nextIndex: startIndex,
+    }
+  }
+
+  let imageIndex = startIndex
+  const nodes: React.ReactNode[] = []
+  const parts = content.split('<image>')
+
+  parts.forEach((part, partIndex) => {
+    if (part) {
+      nodes.push(
+        <span key={`text-${part.slice(0, 24)}-${nodes.length}`} className="whitespace-pre-wrap">
+          {part}
+        </span>,
+      )
+    }
+
+    if (partIndex >= parts.length - 1)
+      return
+
+    const imagePath = images[imageIndex]
+    if (!imagePath) {
+      nodes.push(<span key={`placeholder-${nodes.length}`}>{'<image>'}</span>)
+      return
+    }
+
+    nodes.push(
+      <img
+        key={`image-${imagePath}-${nodes.length}`}
+        src={getPreviewImageUrl(imagePath, baseUrl)}
+        alt="Image"
+        className="my-1 h-auto max-w-full rounded"
+      />,
+    )
+    imageIndex += 1
+  })
+
+  return {
+    content: <div>{nodes}</div>,
+    nextIndex: imageIndex,
+  }
+}
+
+const formatMessageList = (messages: unknown, images: unknown = [], baseUrl = ''): string => {
+  if (!isMessageList(messages)) return formatPreviewValue(messages)
+  let imageIndex = 0
+  return messages.map((item) => {
+    const role = getRoleLabel(item.role)
+    const rawContent = formatPreviewValue(item.content)
+    const { processedContent, nextIndex } = replaceImagePlaceholders(
+      rawContent,
+      Array.isArray(images) ? images : [],
+      baseUrl,
+      imageIndex,
+    )
+    imageIndex = nextIndex
+    const content = processedContent
+    return `${role}\n${content}`
+  }).join('\n\n')
+}
+
+const renderMessageListContent = (messages: unknown, images: unknown = [], baseUrl = '') => {
+  if (!isMessageList(messages))
+    return undefined
+
+  let imageIndex = 0
+  const imageList = Array.isArray(images) ? images.filter((image): image is string => typeof image === 'string') : []
+  return (
+    <div className="space-y-3">
+      {messages.map((item) => {
+        const rawContent = formatPreviewValue(item.content)
+        const { content, nextIndex } = renderContentWithImages(
+          rawContent,
+          imageList,
+          baseUrl,
+          imageIndex,
+        )
+        imageIndex = nextIndex
+
+        return (
+          <div key={`${formatPreviewValue(item.role)}-${rawContent.slice(0, 48)}`}>
+            <Tag color={getRoleTagColor(item.role)} className="!mb-1">
+              {getRoleLabel(item.role)}
+            </Tag>
+            {content}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+const getDynamicSampleKeys = (previewData: any[]) => {
+  const sampleData = previewData[0]?.item?.sample_data
+  const source = isPlainObject(sampleData) ? sampleData : previewData[0]
+  return Object.keys(source || {}).filter((key) => !PREVIEW_META_KEYS.has(key))
+}
 
 interface DatasetAsyncExportResponse {
   message?: string
@@ -44,8 +198,8 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
   const [previewTotal, setPreviewTotal] = useState(0)
   // 添加正在删除的版本状态
   const [deletingVersion, setDeletingVersion] = useState<string | null>(null)
-  const [mergeVersionOpen, setMergeVersionOpen] = useState(false)
-  const [mergeVersionLoading, setMergeVersionLoading] = useState(false)
+  const [publishingVersion, setPublishingVersion] = useState<string | null>(null)
+  const [deletingRowNumber, setDeletingRowNumber] = useState<number | null>(null)
   // 添加展开状态管理，key格式: `${rowKey}-${columnKey}`
   const [expandedCells, setExpandedCells] = useState<Set<string>>(new Set())
   // 添加单元格高度跟踪，key格式: `${rowKey}-${columnKey}`
@@ -168,6 +322,64 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
     }
   }
 
+  const isVersionUnpublished = (versionItem: any) => {
+    if (!versionItem) return false
+    const publishDisplay = versionItem.status_display ?? versionItem.publish_display
+    if (publishDisplay !== undefined && publishDisplay !== null && publishDisplay !== '') {
+      return publishDisplay !== '已发布'
+    }
+    if (versionItem.is_published !== undefined && versionItem.is_published !== null) {
+      return versionItem.is_published === false
+    }
+    return false
+  }
+
+  const renderPublishStatusBadge = (versionItem: any) => {
+    const publishDisplay = versionItem?.status_display
+    if (!publishDisplay) return null
+
+    const unpublished = isVersionUnpublished(versionItem)
+    const colorClass = unpublished
+      ? 'bg-orange-50 text-orange-500'
+      : 'bg-green-50 text-green-600'
+
+    return (
+      <span className={`absolute right-3 top-2 rounded-full px-3 py-[2px] text-xs leading-5 font-medium ${colorClass}`}>
+        {publishDisplay}
+      </span>
+    )
+  }
+
+  const canDeletePreviewRows = () => {
+    return selectedVersion?.processing_status_display === '处理完成'
+      && isVersionUnpublished(selectedVersion)
+  }
+
+  const waitForDeleteRowProcessingComplete = async (currentVersion: any) => {
+    let latestVersion = currentVersion
+
+    for (let times = 0; times < DELETE_ROW_POLL_MAX_TIMES; times++) {
+      const result = await refetch()
+      if (result.data) {
+        latestVersion = pickSelectedVersionFromDetail(result.data, latestVersion)
+        setSelectedVersion(latestVersion)
+      }
+
+      const processingStatus = latestVersion?.processing_status_display || ''
+      if (processingStatus === '处理完成') {
+        return latestVersion
+      }
+
+      if (processingStatus !== '处理中') {
+        return latestVersion
+      }
+
+      await sleep(DELETE_ROW_POLL_INTERVAL)
+    }
+
+    return latestVersion
+  }
+
   const pickSelectedVersionFromDetail = (detail: any, currentVersion: any) => {
     if (!Array.isArray(detail)) {
       return detail
@@ -176,50 +388,6 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
       || detail.find((item: any) => item.version === currentVersion?.version)
       || detail[detail.length - 1]
       || currentVersion
-  }
-
-  const buildNextVersion = (versions: any[]) => {
-    const maxVersionNumber = versions.reduce((max, versionItem) => {
-      const match = String(versionItem?.version || '').match(/^V?(\d+)$/i)
-      return Math.max(max, match ? Number(match[1]) : 0)
-    }, 0)
-    return `V${maxVersionNumber + 1}`
-  }
-
-  const mergeableVersions = Array.isArray(dataset) ? dataset : selectedVersion ? [selectedVersion] : []
-  const nextMergeVersion = buildNextVersion(mergeableVersions)
-
-  const handleMergeVersions = async (sourceVersionIds: number[], description?: string) => {
-    if (!projectId || !datasetId) return
-    setMergeVersionLoading(true)
-    try {
-      const createdVersion = await trainingDatasetService.mergeVersions(Number(projectId), datasetId, usage, {
-        new_version: nextMergeVersion,
-        source_version_ids: sourceVersionIds,
-        description,
-      })
-      message.success('已提交版本合并任务')
-      setMergeVersionOpen(false)
-      queryClient.invalidateQueries({
-        predicate: (query) => {
-          const queryKey = query.queryKey
-          return Array.isArray(queryKey)
-            && queryKey.length > 0
-            && (queryKey[0] === 'training-datasets' || queryKey[0] === `${type}-dataset-detail`)
-        },
-      })
-      const result = await refetch()
-      if (result.data) {
-        setSelectedVersion(pickSelectedVersionFromDetail(result.data, createdVersion))
-      }
-    }
-    catch (error) {
-      console.error('合并数据集版本失败:', error)
-      message.error('合并数据集版本失败')
-    }
-    finally {
-      setMergeVersionLoading(false)
-    }
   }
 
   const handleEditBasicInfo = async (values: { name?: string, description?: string }) => {
@@ -266,6 +434,99 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
     }
   }
 
+  const handlePublishVersion = async () => {
+    if (!selectedVersion?.id || !projectId) return
+
+    setPublishingVersion(selectedVersion.version)
+    try {
+      await trainingDatasetService.publish(Number(projectId), selectedVersion.id, 1)
+      message.success('发布成功')
+
+      const result = await refetch()
+      if (result.data) {
+        setSelectedVersion(pickSelectedVersionFromDetail(result.data, selectedVersion))
+      }
+
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const queryKey = query.queryKey
+          return Array.isArray(queryKey)
+            && queryKey.length > 0
+            && queryKey[0] === 'training-datasets'
+        },
+      })
+    }
+    catch (error) {
+      console.error('发布数据集版本失败:', error)
+      message.error('发布失败')
+    }
+    finally {
+      setPublishingVersion(null)
+    }
+  }
+
+  const getPreviewRowNumber = (record: any) => {
+    const rowNumber = record?.row_number ?? record?.id ?? record?.key
+    const normalized = Number(rowNumber)
+    return Number.isFinite(normalized) ? normalized : undefined
+  }
+
+  const handleDeletePreviewRow = async (record: any) => {
+    if (!selectedVersion?.id || !projectId) return
+
+    const rowNumber = getPreviewRowNumber(record)
+    if (!rowNumber) {
+      message.error('无法获取行号，删除失败')
+      return
+    }
+
+    setDeletingRowNumber(rowNumber)
+    try {
+      await trainingDatasetService.deleteRow(Number(projectId), selectedVersion.id, [rowNumber])
+      message.success('删除成功')
+
+      const nextPage = previewData.length <= 1 && dataContentPage > 1
+        ? dataContentPage - 1
+        : dataContentPage
+
+      const result = await refetch()
+      const latestVersion = result.data
+        ? pickSelectedVersionFromDetail(result.data, selectedVersion)
+        : selectedVersion
+      setSelectedVersion(latestVersion)
+
+      if (latestVersion?.processing_status_display === '处理中') {
+        setIsPreviewLoading(true)
+        const completedVersion = await waitForDeleteRowProcessingComplete(latestVersion)
+        if (completedVersion?.processing_status_display === '处理完成') {
+          await handleVersionChange(completedVersion, nextPage, dataContentPageSize)
+        }
+        else {
+          setIsPreviewLoading(false)
+        }
+      }
+      else {
+        await handleVersionChange(latestVersion, nextPage, dataContentPageSize)
+      }
+
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const queryKey = query.queryKey
+          return Array.isArray(queryKey)
+            && queryKey.length > 0
+            && queryKey[0] === 'training-datasets'
+        },
+      })
+    }
+    catch (error) {
+      console.error('删除行数据失败:', error)
+      message.error('删除失败')
+    }
+    finally {
+      setDeletingRowNumber(null)
+    }
+  }
+
   const deleteDatasetVersion = async (version: string) => {
     // 检查是否是最后一个版本
     const isLastVersion = Array.isArray(dataset)
@@ -285,12 +546,6 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
         onOk: async () => {
           setDeletingVersion(version)
           try {
-            const blockReason = await getDatasetVersionDeleteBlockReason(Number(projectId), datasetName, version, usage)
-            if (blockReason) {
-              message.warning(blockReason)
-              return
-            }
-
             // 删除整个数据集
             await trainingDatasetService.delete(Number(projectId), datasetName, usage)
             message.success('数据集删除成功')
@@ -331,10 +586,7 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
           }
           catch (error) {
             console.error('删除数据集失败:', error)
-            message.error(getDatasetDeleteErrorMessage(error, '删除数据集失败'))
-            setDeletingVersion(null)
-          }
-          finally {
+            message.error('删除数据集失败')
             setDeletingVersion(null)
           }
         },
@@ -345,12 +597,6 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
     // 如果不是最后一个版本，正常删除版本
     setDeletingVersion(version)
     try {
-      const blockReason = await getDatasetVersionDeleteBlockReason(Number(projectId), datasetId, version, usage)
-      if (blockReason) {
-        message.warning(blockReason)
-        return
-      }
-
       await trainingDatasetService.deleteVersion(Number(projectId), datasetId, version, usage)
       message.success('数据集版本删除成功')
 
@@ -398,7 +644,7 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
     }
     catch (error) {
       console.error('删除数据集版本失败:', error)
-      message.error(getDatasetDeleteErrorMessage(error, '删除数据集版本失败'))
+      message.error('删除数据集版本失败')
     }
     finally {
       setDeletingVersion(null)
@@ -784,6 +1030,56 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
   ], [expandedCells, toggleCellExpand, handleCellHeightChange, getRowMaxHeight])
 
   const keys = getBusinessTestKeys(previewData)
+  const dynamicSampleKeys = getDynamicSampleKeys(previewData)
+  const createDynamicSampleDataContentColumns = useCallback((getRowKey: (record: any) => any) => [
+    {
+      title: '序号',
+      dataIndex: 'id',
+      key: 'id',
+      width: 80,
+      align: 'center' as const,
+      fixed: 'left' as const,
+      render: (text: any) => (
+        <span className="font-semibold text-blue-500 text-sm">{text}</span>
+      ),
+    },
+    ...dynamicSampleKeys.map((key) => ({
+      title: key,
+      dataIndex: key,
+      key,
+      width: key === 'prompt' ? 420 : 240,
+      align: 'left' as const,
+      ellipsis: { showTitle: false },
+      getExpandKeys: (_record: any, rowKey: any) => {
+        const rowPrefix = rowKey?.toString() || '0'
+        return [`${rowPrefix}-${key}`]
+      },
+      render: (text: unknown, record: any) => {
+        const rowKey = getRowKey(record)
+        const baseRowKey = rowKey?.toString() || '0'
+        const rawValue = record?.item?.sample_data?.[key] ?? record?.[key] ?? text
+        const images = record?.item?.sample_data?.images ?? record?.images ?? []
+        const baseUrl = record?.base_url || record?.item?.base_url || ''
+        const isMessagesValue = isMessageList(rawValue)
+        const value = isMessagesValue ? formatMessageList(rawValue, images, baseUrl) : formatPreviewValue(rawValue)
+        return (
+          <ExpandableCell
+            text={value}
+            content={isMessagesValue ? renderMessageListContent(rawValue, images, baseUrl) : undefined}
+            rowKey={rowKey}
+            columnKey={key}
+            bgColor={isMessagesValue ? '#fff7e6' : '#f0f9ff'}
+            borderColor={isMessagesValue ? '#faad14' : '#1890ff'}
+            isExpanded={expandedCells.has(`${rowKey}-${key}`)}
+            onToggle={toggleCellExpand}
+            onHeightChange={handleCellHeightChange}
+            synchronizedHeight={getRowMaxHeight(baseRowKey)}
+          />
+        )
+      },
+    })),
+  ], [dynamicSampleKeys, expandedCells, toggleCellExpand, handleCellHeightChange, getRowMaxHeight])
+
   const createBusinessTestDataContentColumns = useCallback((getRowKey: (record: any) => any) => [
     {
       title: '序号',
@@ -927,18 +1223,20 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
               {(() => {
                 const statusDisplay = selectedVersion?.processing_status_display || ''
                 const isProcessingOrFailed = ['处理中', '处理失败'].includes(statusDisplay)
-                const isButtonDisabled = deletingVersion === selectedVersion?.version || isProcessingOrFailed
+                const isPublishing = publishingVersion === selectedVersion?.version
+                const isButtonDisabled = deletingVersion === selectedVersion?.version || isPublishing || isProcessingOrFailed
+                const isUnpublished = isVersionUnpublished(selectedVersion)
                 return (
                   <>
-                    {type !== 'test'
-                    && selectedVersion?.dataset_type !== 'image-understanding'
+                    {(isUnpublished || (type !== 'test' && selectedVersion?.dataset_type !== 'image-understanding'))
                     && (
                       <Button
                         type="primary"
-                        onClick={handleActionClick}
+                        onClick={isUnpublished ? handlePublishVersion : handleActionClick}
+                        loading={isPublishing}
                         disabled={isButtonDisabled}
                       >
-                        {type === 'training' || usage === 'validation' ? '去训练' : '去评估'}
+                        {isUnpublished ? '发布' : (type === 'training' || usage === 'validation' ? '去训练' : '去评估')}
                       </Button>
                     )}
                     <Dropdown
@@ -1016,30 +1314,24 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
             >
               新增版本
             </Button>
-            <Button
-              className="mt-2"
-              block
-              disabled={mergeableVersions.length < 2 || selectedVersion?.dataset_type === 'image-understanding'}
-              onClick={() => setMergeVersionOpen(true)}
-            >
-              合并版本
-            </Button>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             {Array.isArray(dataset) ? dataset.map((item) => (
               <div
                 key={item.id}
-                className={`px-4 py-3 cursor-pointer transition-all duration-200 ${selectedVersion.id === item.id
+                className={`relative px-4 py-3 pr-[76px] cursor-pointer transition-all duration-200 ${selectedVersion.id === item.id
                   ? 'bg-blue-50 border-l-4 border-blue-500 -ml-px font-medium text-blue-500'
                   : 'bg-white border-l-4 border-transparent font-normal text-gray-800'
                 }`}
                 onClick={() => handleVersionChange(item)}
               >
+                {renderPublishStatusBadge(item)}
                 {item.version}
               </div>
             )) : (
             // 如果dataset不是数组，则显示单一版本
-              <div className="px-4 py-3 bg-blue-50 border-l-4 border-blue-500 -ml-px font-medium text-blue-500">
+              <div className="relative px-4 py-3 pr-[76px] bg-blue-50 border-l-4 border-blue-500 -ml-px font-medium text-blue-500">
+                {renderPublishStatusBadge(selectedVersion)}
                 v1.0
               </div>
             )}
@@ -1082,12 +1374,16 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
                 const firstPreviewItem = previewData[0]
                 const isDpoRoleBased = isDpoRoleBasedPreview(firstPreviewItem)
                 const isDpoAlpaca = isDpoAlpacaPreview(firstPreviewItem)
+                const isGrpoPreview = selectedVersion?.dataset_format === 'grpo' || selectedVersion?.training_method_type === 'grpo'
 
                 if (isDpoRoleBased) {
                   createColumnsFn = createDpoRoleBasedDataContentColumns
                 }
                 else if (isDpoAlpaca) {
                   createColumnsFn = createDpoAlpacaDataContentColumns
+                }
+                else if (isGrpoPreview) {
+                  createColumnsFn = createDynamicSampleDataContentColumns
                 }
                 else if (selectedVersion?.dataset_type === 'image-understanding' || selectedVersion?.dataset_type === 'image-generation') {
                   createColumnsFn = createImageDataContentColumns
@@ -1109,12 +1405,56 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
 
                 // 生成最终的 columns
                 const currentColumns = createColumnsFn(getRowKey)
+                const tableColumns = canDeletePreviewRows()
+                  ? [
+                      ...currentColumns,
+                      {
+                        title: '操作',
+                        key: 'action',
+                        width: 100,
+                        align: 'center' as const,
+                        className: 'dataset-detail-action-cell',
+                        onCell: () => ({
+                          className: 'dataset-detail-action-cell',
+                          style: {
+                            verticalAlign: 'middle',
+                          },
+                        }),
+                        render: (_: unknown, record: any) => {
+                          const rowNumber = getPreviewRowNumber(record)
+                          return (
+                            <div className="dataset-detail-action-wrapper">
+                              <Popconfirm
+                                title="确认删除"
+                                description="确定要删除该行数据吗？删除后将无法恢复。"
+                                okText="确认删除"
+                                cancelText="取消"
+                                okButtonProps={{ danger: true }}
+                                onConfirm={() => handleDeletePreviewRow(record)}
+                                disabled={!rowNumber}
+                              >
+                                <Button
+                                  type="link"
+                                  size="small"
+                                  className="dataset-detail-action-delete"
+                                  loading={deletingRowNumber === rowNumber}
+                                  disabled={!rowNumber}
+                                >
+                                  删除
+                                </Button>
+                              </Popconfirm>
+                            </div>
+                          )
+                        },
+                      },
+                    ]
+                  : currentColumns
 
                 return (
                   <Table
-                    columns={currentColumns}
+                    columns={tableColumns}
                     dataSource={
-                      isDpoRoleBased || isDpoAlpaca
+                      isDpoRoleBased || isDpoAlpaca || isGrpoPreview
                         ? previewData
                         : (selectedVersion?.dataset_type === 'image-understanding' || selectedVersion?.dataset_type === 'image-generation')
                             ? expandImageData(previewData)
@@ -1148,7 +1488,7 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
                       index % 2 === 0 ? 'bg-gray-50 hover:bg-blue-50' : 'bg-white hover:bg-blue-50'}
                     className="dataset-detail-preview-table bg-white"
                     rowKey={(record) => {
-                      return getRecordRowKey(record, currentColumns)
+                      return getRecordRowKey(record, tableColumns)
                     }}
                     onRow={(record) => ({
                       onClick: (e) => {
@@ -1171,15 +1511,6 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
           </div>
         </Col>
       </Row>
-      <DatasetVersionMergeModal
-        open={mergeVersionOpen}
-        loading={mergeVersionLoading}
-        datasetName={selectedVersion?.name || datasetId || ''}
-        nextVersion={nextMergeVersion}
-        versions={mergeableVersions}
-        onCancel={() => setMergeVersionOpen(false)}
-        onSubmit={handleMergeVersions}
-      />
     </Card>
   )
 }

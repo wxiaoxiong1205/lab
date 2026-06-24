@@ -3,6 +3,7 @@ from typing import List, Optional, Tuple
 
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Query, Path, status
+from fastapi.responses import FileResponse
 from fastapi_pagination import Page
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.common.status import TaskStatus
@@ -17,13 +18,38 @@ from app.schemas.training_task import (
     TrainingTypeCategory,
     TrainingTaskCreatedResponse,
     MLflowTaskResponse,
-    TrainingTaskLogResponse, CheckpointInfo
+    TrainingTaskLogResponse, CheckpointInfo,
+    GrpoRewardFunctionValidateRequest,
+    GrpoRewardFunctionValidateResponse
 )
 from app.services.training_task.interface import TrainingTaskService
 from app.utils.dependencies import get_db_and_user
 from app.utils.validators import validate_training_type_category, validate_training_method_type
 
 router = APIRouter(prefix="/api/v1/training_tasks", tags=["training-tasks"])
+
+
+@router.post("/grpo/reward-function/validate", response_model=GrpoRewardFunctionValidateResponse)
+@inject
+async def validate_grpo_reward_function(
+    request: GrpoRewardFunctionValidateRequest,
+    deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
+    training_task_service: TrainingTaskService = Depends(Provide[AutoContainer.training_task_service])
+) -> GrpoRewardFunctionValidateResponse:
+    """校验GRPO奖励函数上传文件"""
+    db, current_user = deps
+    return await training_task_service.validate_grpo_reward_function(current_user, request)
+
+
+@router.get("/grpo/reward-function/sample")
+@inject
+async def download_grpo_reward_function_sample(
+    deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
+    training_task_service: TrainingTaskService = Depends(Provide[AutoContainer.training_task_service])
+) -> FileResponse:
+    """下载GRPO奖励函数样例"""
+    db, current_user = deps
+    return await training_task_service.download_grpo_reward_function_sample()
 
 
 @router.post("/project/{project_id}", response_model=TrainingTaskCreatedResponse, status_code=status.HTTP_202_ACCEPTED)

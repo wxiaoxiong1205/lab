@@ -128,6 +128,7 @@ export default function MachineLearningDatasetMultiSelect({
           undefined,
           templateType,
           true,
+          1,
         )
         const items = res.items ?? []
         targetOption.children = items.map((it) => ({
@@ -141,7 +142,7 @@ export default function MachineLearningDatasetMultiSelect({
       else if (selectedOptions.length === 3) {
         const datasetId = targetOption.datasetId
         if (datasetId == null) return
-        const versions = await machineDatamanagement.getDatasetVersion(pid, datasetId, true)
+        const versions = await machineDatamanagement.getDatasetVersion(pid, datasetId, true, 1)
         const list = versions ?? []
         targetOption.children = list.map((v) => ({
           value: `ver-${v.id}`,

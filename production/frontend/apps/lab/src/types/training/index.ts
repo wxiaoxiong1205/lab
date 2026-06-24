@@ -36,14 +36,6 @@ export interface TrainingDatasetListResponse {
   pages: number
 }
 
-export interface DatasetInUseResponse {
-  in_use: boolean
-  task_type?: string | null
-  task_id?: number | null
-  task_name?: string | null
-  version: string
-}
-
 // 数据集类型枚举
 export enum DatasetType {
   TEXT_GENERATION = 'text-generation',
@@ -54,9 +46,9 @@ export enum DatasetType {
 // 训练方法类型枚举
 export enum TrainingMethodType {
   SFT = 'sft',
-  RFT_GRPO = 'rft-grpo',
   RFT = 'rft',
   DPO = 'dpo',
+  GRPO = 'grpo',
   KTO = 'kto',
   RLHF = 'rlhf',
   POST_TRAIN = 'post-train',
@@ -67,6 +59,7 @@ export enum DatasetFormat {
   ROLE_BASED = 'role-based',
   QUESTION_ANSWER = 'question-answer',
   TEXT_COMPLETION = 'text-completion',
+  GRPO = 'grpo',
 }
 
 // 上传训练数据集请求参数接口
@@ -132,12 +125,6 @@ export interface UploadDatasetVersionResponse {
   dataset_name: string
   version: string
   created_at: string
-}
-
-export interface MergeDatasetVersionsRequest {
-  new_version: string
-  source_version_ids: number[]
-  description?: string
 }
 
 /**
@@ -271,28 +258,38 @@ export interface SaveConfig {
 // 额外参数
 export interface AdditionalParams {
   dataloader_num_workers: number
-  grpo_config?: {
-    num_generations?: number
-    max_prompt_length?: number
-    max_completion_length?: number
-    temperature?: number
-    top_p?: number
-    top_k?: number
-    repetition_penalty?: number
-    kl_coefficient?: number
-    clip_range?: number
-    advantage_estimator?: string
-    reward_normalization?: boolean
-    reward_scale?: number
-  }
 }
 
 export interface GPUConfig {
+  card_type?: string | null
+  card_model?: string | null
+  count?: number | null
+  card_memory?: string | null
+  k8s_resource_type?: string | null
   cpu_request: number
   cpu_limit: number
   memory_request: number
   memory_limit: number
 }
+
+export interface RayResourceConfig {
+  submit_graphics_card_resource: GPUConfig
+  head_graphics_card_resource: GPUConfig
+  worker_replicas: number
+  worker_graphics_card_resource: GPUConfig
+}
+
+export interface GrpoConfig {
+  template_id?: number
+  template_name?: string
+  mode?: string
+  yaml_content?: string
+  params?: Record<string, string | number | boolean | null>
+  reward_rule_file_name?: string
+  reward_rule_upload_id?: string
+}
+
+export type GrpoAdditionalParams = Record<string, string | number | boolean | null>
 
 // 完整的训练任务配置
 export interface TrainingTaskConfig {
@@ -300,7 +297,10 @@ export interface TrainingTaskConfig {
   name: string
   description: string
   project_id: number
-  gpu_count: number
+  gpu_count?: number
+  version?: string
+  advanced_template_id?: number
+  reward_function_upload_id?: string
   /** 定时执行时间，格式：YYYY-MM-DDTHH:mm:ss */
   schedule_at?: string
 
@@ -314,38 +314,40 @@ export interface TrainingTaskConfig {
   base_model: BaseModelConfig
 
   // 基础训练参数
-  basic: BasicTrainingConfig
+  basic?: BasicTrainingConfig
 
   // 高级参数
-  advanced: AdvancedTrainingConfig
+  advanced?: AdvancedTrainingConfig
 
   // LoRA配置
-  lora_config: LoraConfig
+  lora_config?: LoraConfig
 
   // 数据处理配置
-  data_processing: DataProcessingConfig
+  data_processing?: DataProcessingConfig
 
   // 数据集配置
   dataset_items: DatasetItem[]
   eval_dataset_items: DatasetItem[]
 
   // 评估配置
-  evaluation: EvaluationConfig
+  evaluation?: EvaluationConfig
 
   // 监控配置
-  monitor: MonitorConfig
+  monitor?: MonitorConfig
 
   // 保存配置
-  save: SaveConfig
+  save?: SaveConfig
 
   // cpu配置 内存配置
-  graphics_card_resource: GPUConfig
+  graphics_card_resource?: GPUConfig
+  ray_resource_config?: RayResourceConfig
 
   // 额外参数
-  additional_params: AdditionalParams
+  additional_params: AdditionalParams | GrpoAdditionalParams
 
   // dpo配置
   dpo_config?: DpoConfig
+  grpo_config?: GrpoConfig
 }
 
 export interface DpoConfig {

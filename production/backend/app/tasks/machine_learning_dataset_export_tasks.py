@@ -20,6 +20,7 @@ from app.tasks.task_base import TaskBase
 from app.utils import app_runtime_context
 from app.utils.machine_learning_dataset_exporter import export_samples_to_dir, read_label_schema_from_jfs
 from app.utils.timezone_utils import get_current_shanghai_time
+from app.utils.jfs_utils import JFSUtils
 
 
 def _get_storage_service():
@@ -441,3 +442,178 @@ async def _build_ml_dataset_export_cache_batch_for_notebook_impl(
                 await mapper.close()
             except Exception as close_error:
                 logger.warning("关闭 NotebookMapper 数据库会话失败: %s", close_error)
+
+
+@celery_app.task(base=TaskBase, bind=True)
+def delete_machine_learning_dataset_rows(
+    self: TaskBase,
+    dataset_id: int,
+    row_numbers: List[int],
+) -> Dict:
+    """异步删除机器学习数据集 dataset.jsonl 中的指定行。"""
+    return run_async_in_celery(
+        _delete_machine_learning_dataset_rows_async(
+            self,
+            dataset_id=dataset_id,
+            row_numbers=row_numbers,
+        )
+    )
+
+
+async def _delete_machine_learning_dataset_rows_async(
+    task: TaskBase,
+    dataset_id: int,
+    row_numbers: List[int],
+) -> Dict:
+    from sqlalchemy import select
+    from app.core.depend_manager import AutoContainer
+    from app.models.models import MachineLearningDataset
+    from app.schemas.machine_learning_dataset import DatasetPublishStatus, MachineLearningDatasetProcessingStatus
+
+    container = AutoContainer()
+    storage_service = container.storage_service()
+    machine_learning_dataset_mapper = container.machine_learning_dataset_mapper()
+    row_number_set = set(row_numbers or [])
+    temp_path = None
+    backup_path = None
+    jfs = None
+
+    try:
+        if not row_number_set:
+            raise ValueError("删除行号不能为空")
+        if any(row_number < 1 for row_number in row_number_set):
+            raise ValueError("删除行号必须大于等于 1")
+
+        dataset = await machine_learning_dataset_mapper.query_one(
+            select(MachineLearningDataset).filter(MachineLearningDataset.id == dataset_id)
+        )
+        if not dataset:
+            raise ValueError(f"机器学习数据集不存在: dataset_id={dataset_id}")
+        if not dataset.tenant_id:
+            raise ValueError(f"机器学习数据集没有租户ID: dataset_id={dataset_id}")
+        if getattr(dataset, "processing_status", MachineLearningDatasetProcessingStatus.COMPLETED.value) == MachineLearningDatasetProcessingStatus.PENDING.value:
+            raise ValueError("Machine learning dataset has a task processing, please refresh and retry")
+        if dataset.publish != DatasetPublishStatus.UNPUBLISHED.value:
+            raise ValueError("只有未发布状态的机器学习数据集才能删除指定行")
+        if not dataset.dataset_path:
+            raise ValueError("dataset.jsonl 文件路径为空")
+
+        sample_count = int(dataset.sample_count or 0)
+        if max(row_number_set) > sample_count:
+            raise ValueError(f"删除行号超出数据集范围: {max(row_number_set)}")
+        if len(row_number_set) >= sample_count:
+            raise ValueError("删除后数据集至少需要保留一行数据")
+
+        app_runtime_context.set_tenant_id(dataset.tenant_id)
+        jfs = await storage_service.JUICEFS_CLIENT()
+        if not jfs.exists(dataset.dataset_path):
+            raise FileNotFoundError(f"dataset.jsonl 文件不存在: {dataset.dataset_path}")
+
+        storage_path = (dataset.storage_path or os.path.dirname(dataset.dataset_path)).rstrip("/") + "/"
+        dataset.processing_status = MachineLearningDatasetProcessingStatus.PENDING.value
+        dataset.publish = DatasetPublishStatus.PROCESSING.value
+        await machine_learning_dataset_mapper.commit()
+
+        temp_path = f"{dataset.dataset_path}.delete_rows_{task.request.id}.tmp"
+        backup_path = f"{dataset.dataset_path}.delete_rows_{task.request.id}.bak"
+
+        total_rows = 0
+        removed_count = 0
+        matched_rows = set()
+        kept_samples = 0
+        file_size_bytes = 0
+
+        with jfs.open(dataset.dataset_path, "rb") as source_file:
+            with jfs.open(temp_path, "wb") as target_file:
+                while True:
+                    line_bytes = source_file.readline()
+                    if not line_bytes:
+                        break
+
+                    line_text = line_bytes.decode("utf-8", errors="ignore")
+                    stripped = line_text.strip()
+                    if not stripped:
+                        target_file.write(line_bytes)
+                        file_size_bytes += len(line_bytes)
+                        continue
+
+                    total_rows += 1
+                    if total_rows in row_number_set:
+                        matched_rows.add(total_rows)
+                        removed_count += 1
+                        continue
+
+                    target_file.write(line_bytes)
+                    kept_samples += 1
+                    file_size_bytes += len(line_bytes)
+
+        missing_rows = sorted(row_number_set - matched_rows)
+        if missing_rows:
+            raise ValueError(f"删除行号超出数据集范围: {missing_rows}")
+        if removed_count == 0:
+            raise ValueError("未匹配到需要删除的行")
+        if kept_samples < 1:
+            raise ValueError("删除后数据集至少需要保留一行数据")
+
+        jfs.rename(dataset.dataset_path, backup_path)
+        try:
+            jfs.rename(temp_path, dataset.dataset_path)
+        except Exception:
+            if jfs.exists(backup_path):
+                jfs.rename(backup_path, dataset.dataset_path)
+            raise
+
+        JFSUtils.cleanup_path(jfs, backup_path)
+        temp_path = None
+        backup_path = None
+        JFSUtils.cleanup_path(jfs, f"{storage_path}exports")
+
+        latest_dataset = await machine_learning_dataset_mapper.query_one(
+            select(MachineLearningDataset).filter(MachineLearningDataset.id == dataset_id)
+        )
+        if latest_dataset:
+            latest_dataset.sample_count = kept_samples
+            latest_dataset.file_size = file_size_bytes / (1024 * 1024)
+            latest_dataset.processing_status = MachineLearningDatasetProcessingStatus.COMPLETED.value
+            latest_dataset.publish = DatasetPublishStatus.UNPUBLISHED.value
+            await machine_learning_dataset_mapper.commit()
+
+        task._log_complete(f"机器学习数据集删除行完成: dataset_id={dataset_id}, removed={removed_count}")
+        return {
+            "success": True,
+            "dataset_id": dataset_id,
+            "removed_count": removed_count,
+            "sample_count": kept_samples,
+        }
+    except Exception as exc:
+        logger.error(f"机器学习数据集删除行失败: dataset_id={dataset_id}, error={str(exc)}", exc_info=True)
+        try:
+            if jfs is not None:
+                if temp_path:
+                    JFSUtils.cleanup_path(jfs, temp_path)
+                if backup_path and jfs.exists(backup_path):
+                    original_dataset = await machine_learning_dataset_mapper.query_one(
+                        select(MachineLearningDataset).filter(MachineLearningDataset.id == dataset_id)
+                    )
+                    if original_dataset and not jfs.exists(original_dataset.dataset_path):
+                        jfs.rename(backup_path, original_dataset.dataset_path)
+                    else:
+                        JFSUtils.cleanup_path(jfs, backup_path)
+        except Exception as cleanup_error:
+            logger.warning(f"清理机器学习删除行临时文件失败: dataset_id={dataset_id}, error={str(cleanup_error)}")
+        try:
+            failed_dataset = await machine_learning_dataset_mapper.query_one(
+                select(MachineLearningDataset).filter(MachineLearningDataset.id == dataset_id)
+            )
+            if failed_dataset:
+                failed_dataset.processing_status = MachineLearningDatasetProcessingStatus.FAILED.value
+                failed_dataset.publish = DatasetPublishStatus.FAILED.value
+                await machine_learning_dataset_mapper.commit()
+        except Exception as update_error:
+            logger.error(f"Update machine learning delete rows failed status failed: dataset_id={dataset_id}, error={str(update_error)}")
+        raise
+    finally:
+        try:
+            await machine_learning_dataset_mapper.close()
+        except Exception as close_error:
+            logger.error(f"关闭数据库会话失败: {str(close_error)}")

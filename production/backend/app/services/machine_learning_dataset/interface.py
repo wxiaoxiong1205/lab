@@ -11,12 +11,13 @@ from app.schemas.machine_learning_dataset import (
     MachineLearningDatasetBasicInfoUpdate,
     MachineLearningDatasetCreateResponse,
     MachineLearningDatasetDataSource,
+    DatasetPublishStatus,
     MachineLearningDatasetDetailResponse,
     MachineLearningDatasetDataType,
     MachineLearningDatasetResponse,
     MachineLearningDatasetSampleFileType,
     MachineLearningDatasetTaskType,
-    MachineLearningDatasetTemplateType, ExportFormat, MachineLearningDatasetVersionMergeRequest,
+    MachineLearningDatasetTemplateType, ExportFormat,
 )
 from app.services.chunk_upload.interface import ChunkUploadService
 from app.services.storage.interface import StorageService
@@ -63,7 +64,8 @@ class MachineLearningDatasetService(ABC):
         name: Optional[str] = None,
         task_type: Optional[MachineLearningDatasetTaskType] = None,
         template_type: Optional[MachineLearningDatasetTemplateType] = None,
-        is_annotated: Optional[bool] = None
+        is_annotated: Optional[bool] = None,
+        publish: Optional[DatasetPublishStatus] = None
     ) -> Page[MachineLearningDatasetResponse]:
         pass
 
@@ -78,14 +80,23 @@ class MachineLearningDatasetService(ABC):
         pass
 
     @abstractmethod
-    async def merge_dataset_versions(
+    async def update_dataset_publish_status(
         self,
-        current_user: JwtUserInfo,
         project_id: int,
         dataset_id: int,
-        request: MachineLearningDatasetVersionMergeRequest,
-    ) -> MachineLearningDatasetCreateResponse:
-        """合并同一机器学习数据集下多个版本，生成新版本。"""
+        publish: DatasetPublishStatus,
+    ) -> bool:
+        """修改机器学习数据集发布状态：仅允许处理完成且未发布的数据集改为已发布。"""
+        pass
+
+    @abstractmethod
+    async def delete_dataset_rows(
+        self,
+        project_id: int,
+        dataset_id: int,
+        row_numbers: List[int],
+    ) -> bool:
+        """同步删除机器学习数据集文件中的指定行"""
         pass
 
     @abstractmethod
@@ -93,7 +104,8 @@ class MachineLearningDatasetService(ABC):
         self,
         project_id: int,
         dataset_id: int,
-        is_annotated: Optional[bool] = None
+        is_annotated: Optional[bool] = None,
+        publish: Optional[DatasetPublishStatus] = None
     ) -> List[MachineLearningDatasetResponse]:
         """根据数据集 id 获取该数据集（同名）下的所有版本列表。"""
         pass
@@ -120,6 +132,7 @@ class MachineLearningDatasetService(ABC):
     @abstractmethod
     async def repair_metadata_fields(
         self,
+        force: bool = False,
     ) -> Dict[str, Any]:
         """从历史 dataset.jsonl 回填空的 metadata_fields。"""
         pass

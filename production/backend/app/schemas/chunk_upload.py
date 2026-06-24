@@ -90,3 +90,18 @@ class ChunkUploadProgressResponse(BaseModel):
     isComplete: bool = Field(..., description="是否已完成")
 
 
+class ChunkUploadFileInfoResponse(BaseModel):
+    """上传文件信息响应"""
+    uploadId: str = Field(..., description="上传会话ID")
+    fileName: str = Field(..., description="文件名称")
+    fileSize: int = Field(..., description="文件大小")
+    fileHash: str = Field(..., description="文件SHA-256哈希值")
+    chunkSize: int = Field(..., description="分片大小")
+    totalChunkNum: int = Field(..., description="分片数量")
+    isComplete: bool = Field(..., description="是否已完成")
+    fileUrl: Optional[str] = Field(None, description="文件上传地址")
+    errorMessage: Optional[str] = Field(None, description="错误信息")
+    createdAt: Optional[str] = Field(None, description="创建时间")
+    updatedAt: Optional[str] = Field(None, description="更新时间")
+
+

@@ -671,6 +671,22 @@ class DefaultMultiLabelService(MultiLabelService):
                 normalized["chosen"] = normalized["response"]
             return normalized
 
+        if dataset_format == LabelDatasetFormat.GRPO.value:
+            reward_model = normalized.get("reward_model")
+            if isinstance(reward_model, dict):
+                reward_model = reward_model.copy()
+            else:
+                reward_model = {}
+
+            for field_name in ("reward_model.ground_truth", "ground_truth", "answer", "response"):
+                if field_name in normalized:
+                    reward_model["ground_truth"] = normalized[field_name]
+                    break
+
+            if reward_model:
+                normalized["reward_model"] = reward_model
+            return normalized
+
         if dataset_format != LabelDatasetFormat.ROLE_BASED.value:
             return normalized
 

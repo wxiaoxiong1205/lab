@@ -23,7 +23,7 @@ from app.models.models import ImageBuildLog, KubernetesResource, Notebook
 from app.models.training_task_manager import TrainingTask
 from app.models.data_cleaning_manager import DataCleaningTask
 from app.models.inference_result_manager import InferenceResultDataset
-from .k8s_task_status import TaskStatus, map_job_status_async, map_deployment_status
+from .k8s_task_status import TaskStatus, map_job_status_async, map_deployment_status, map_ray_job_status
 from ..models import TrainedModel, BaseModel
 from ..schemas.model import ModelStatus
 from ..models import EvaluationTask
@@ -44,9 +44,17 @@ class K8sStatusManager:
     # 终态状态集合
     TERMINAL_STATUSES: Set[TaskStatus] = {
         TaskStatus.COMPLETED, 
-        TaskStatus.FAILED
+        TaskStatus.FAILED,
+        TaskStatus.TERMINATED
      
     }
+
+    @staticmethod
+    def _is_terminal_update_blocked(model_class: type, current_status: TaskStatus) -> bool:
+        """部署任务是可启停资源，已终止不能作为不可变终态处理。"""
+        if model_class == InferenceTask:
+            return False
+        return current_status in K8sStatusManager.TERMINAL_STATUSES
 
     def __init__(self):
         """初始化状态管理器"""
@@ -96,6 +104,7 @@ class K8sStatusManager:
         self.label_selector = "deepexilab_status_auto_update=true"
         self.namespace_label_selector = "app=deepexilab"
         self.redis_key_prefix = "k8s:rv"
+        self.resource_types = ["job", "deployment", "rayjob"]
         
         # 日志控制
         self._logged_watchers = set()  # 记录已记录日志的监听器
@@ -176,10 +185,6 @@ class K8sStatusManager:
     async def _get_current_task_status(self, lab_k8s_uuid: str, status_update_relevant_table: str) -> Optional[TaskStatus]:
         """获取任务的当前状态"""
         try:
-            # 优先从缓存获取
-            if lab_k8s_uuid in self.task_status_cache:
-                return self.task_status_cache[lab_k8s_uuid]
-            
             # 根据表名获取对应的模型类
             model_class = self.table_model_mapping.get(status_update_relevant_table)
             if not model_class:
@@ -217,10 +222,6 @@ class K8sStatusManager:
             if not model_class:
                 logger.error(f"未找到表 {status_update_relevant_table} 对应的模型类")
                 return
-            
-            # 如果状态没有变化，跳过更新
-            if current_status == new_status and model_class != InferenceTask:
-                return
 
             async with get_db_session() as db:
                 stmt = select(model_class).where(model_class.lab_k8s_uuid == lab_k8s_uuid)
@@ -232,7 +233,7 @@ class K8sStatusManager:
                     # 首先检查数据库中的状态是否为终态，如果是终态，则不允许更新
                     try:
                         current_db_status = TaskStatus(record.status)
-                        if current_db_status in self.TERMINAL_STATUSES:
+                        if self._is_terminal_update_blocked(model_class, current_db_status):
                             # 已是终态时不再保留缓存，防止删除后脏数据
                             self.task_status_cache.pop(lab_k8s_uuid, None)
                             logger.warning(f"拒绝更新终态任务状态: {lab_k8s_uuid} - 数据库状态: {current_db_status} - 尝试更新为: {new_status}")
@@ -240,6 +241,11 @@ class K8sStatusManager:
                     except ValueError:
                         # 如果状态值无法转换为枚举，记录警告但继续更新
                         logger.warning(f"未知的状态值: {record.status}")
+
+                    # 如果状态没有变化，跳过更新。必须放在数据库终态检查之后，
+                    # 避免终止接口已写入终态后，旧 RUNNING 缓存让事件处理短路。
+                    if current_status == new_status and model_class != InferenceTask:
+                        return
                     
                     # 如果是训练任务或清洗任务，需要更新时间
                     if model_class == TrainingTask or model_class == TrainedModel:
@@ -345,9 +351,12 @@ class K8sStatusManager:
                         elif new_status == TaskStatus.PENDING and not available_replicas:
                             record.ready_replicas = 0
                             new_status_value = TaskStatus.PENDING.value
-                        else:
+                        elif new_status == TaskStatus.TERMINATED:
                             record.ready_replicas = 0
                             new_status_value = TaskStatus.TERMINATED.value
+                        else:
+                            record.ready_replicas = 0
+                            new_status_value = new_status.value
                     record.status = new_status_value
                     await db.commit()
                     
@@ -653,6 +662,45 @@ class K8sStatusManager:
                 await api_client.close()
 
 
+    @staticmethod
+    def _get_resource_metadata(resource: Any) -> Dict[str, Any]:
+        if isinstance(resource, dict):
+            metadata = resource.get("metadata") or {}
+            return {
+                "name": metadata.get("name"),
+                "resource_version": metadata.get("resourceVersion"),
+                "labels": metadata.get("labels") or {},
+            }
+        metadata = getattr(resource, "metadata", None)
+        return {
+            "name": getattr(metadata, "name", None),
+            "resource_version": getattr(metadata, "resource_version", None),
+            "labels": getattr(metadata, "labels", None) or {},
+        }
+
+    @staticmethod
+    def _get_resource_status(resource: Any) -> Any:
+        if isinstance(resource, dict):
+            return resource.get("status") or {}
+        return getattr(resource, "status", None)
+
+    @staticmethod
+    def _get_deployment_spec_replicas(resource: Any) -> Optional[int]:
+        if isinstance(resource, dict):
+            spec = resource.get("spec") or {}
+            return spec.get("replicas")
+        spec = getattr(resource, "spec", None)
+        return getattr(spec, "replicas", None)
+
+    @staticmethod
+    def _get_list_resource_version(resource_list: Any) -> Optional[str]:
+        if isinstance(resource_list, dict):
+            metadata = resource_list.get("metadata") or {}
+            return metadata.get("resourceVersion")
+        metadata = getattr(resource_list, "metadata", None)
+        return getattr(metadata, "resource_version", None)
+
+
     async def _handle_resource_event(
         self, 
         event: Dict[str, Any], 
@@ -665,15 +713,16 @@ class K8sStatusManager:
         try:
             resource = event['object']
             event_type = event['type']
-            resource_name = resource.metadata.name
-            resource_version = resource.metadata.resource_version
+            metadata = self._get_resource_metadata(resource)
+            resource_name = metadata.get("name", "")
+            resource_version = metadata.get("resource_version", "")
             
             # 首先更新resource_version到Redis（所有情况都需要）
             redis_key = self._get_redis_key(cluster_id, namespace, resource_type)
             await self._redis_set(redis_key, resource_version)
             
             # 检查必要标签
-            labels = resource.metadata.labels
+            labels = metadata.get("labels")
             if not labels:
                 logger.warning(f"资源{resource_name}没有标签")
                 return
@@ -681,12 +730,21 @@ class K8sStatusManager:
             lab_k8s_uuid = labels.get("deepexilab_k8s_uuid")
 
             
-            logger.info(f"处理资源事件: {event_type} - {resource_name} - {resource.status}")
+            resource_status = self._get_resource_status(resource)
+            logger.info(f"处理资源事件: {event_type} - {resource_name} - {resource_status}")
             # 处理状态更新
             if event_type == 'DELETED':
                 if lab_k8s_uuid:
                     self.task_status_cache.pop(lab_k8s_uuid, None)
                     logger.debug(f"资源删除事件触发缓存清理: {lab_k8s_uuid}")
+                    if resource_type == "deployment" and status_update_relevant_table == "inference_tasks":
+                        await self._update_task_state(
+                            lab_k8s_uuid,
+                            TaskStatus.TERMINATED,
+                            status_update_relevant_table,
+                            available_replicas=0,
+                        )
+                        logger.info(f"Deployment 删除事件触发模型部署状态更新为已终止: {resource_name}")
                 #await self._delete_task(lab_k8s_uuid, status_update_relevant_table)
             else:
                 # 获取当前任务状态
@@ -695,7 +753,9 @@ class K8sStatusManager:
                 # 根据资源类型映射状态
                 new_status = None
                 available_replicas = 0
-                if hasattr(resource.status, 'active'):  # Job状态
+                if resource_type == "rayjob":
+                    new_status = map_ray_job_status(resource_status, current_task_status)
+                elif hasattr(resource.status, 'active'):  # Job状态
                     new_status = await map_job_status_async(
                         resource.status, 
                         core_v1, 
@@ -704,7 +764,12 @@ class K8sStatusManager:
                         current_task_status
                     )
                 elif hasattr(resource.status, 'available_replicas'):  # Deployment状态
-                    new_status, available_replicas = map_deployment_status(resource.status, event_type, current_task_status)
+                    new_status, available_replicas = map_deployment_status(
+                        resource.status,
+                        event_type,
+                        current_task_status,
+                        self._get_deployment_spec_replicas(resource),
+                    )
 
                 if new_status:
                     await self._update_task_state(lab_k8s_uuid, new_status, status_update_relevant_table, available_replicas)
@@ -754,8 +819,8 @@ class K8sStatusManager:
             self.cluster_namespaces[cluster_id].add(namespace_name)
             logger.info(f"新增命名空间: {cluster_id}/{namespace_name}")
             
-            # 为新命名空间创建Job和Deployment监听器
-            for resource_type in ["job", "deployment"]:
+            # 为新命名空间创建资源监听器
+            for resource_type in self.resource_types:
                 watcher_key = self._get_watcher_key(cluster_id, namespace_name, resource_type)
                 
                 if watcher_key not in self.watcher_tasks:
@@ -818,7 +883,7 @@ class K8sStatusManager:
                         logger.error(f"停止命名空间 {cluster_id}/{namespace_name} 监听器时出错: {e}")
                 
                 # 清理Redis中的resource_version数据
-                for resource_type in ["job", "deployment"]:
+                for resource_type in self.resource_types:
                     redis_key = self._get_redis_key(cluster_id, namespace_name, resource_type)
                     await self._redis_delete(redis_key)
                     
@@ -853,9 +918,20 @@ class K8sStatusManager:
             if resource_type == "job":
                 resource_api = client.BatchV1Api(api_client=api_client_instance)
                 list_method = resource_api.list_namespaced_job
-            else:  # deployment
+            elif resource_type == "deployment":
                 resource_api = client.AppsV1Api(api_client=api_client_instance)
                 list_method = resource_api.list_namespaced_deployment
+            else:  # rayjob
+                resource_api = client.CustomObjectsApi(api_client=api_client_instance)
+
+                async def list_method(namespace: str, **kwargs):
+                    return await resource_api.list_namespaced_custom_object(
+                        group="ray.io",
+                        version="v1",
+                        namespace=namespace,
+                        plural="rayjobs",
+                        **kwargs,
+                    )
             
             w = watch.Watch()
             try:
@@ -868,8 +944,21 @@ class K8sStatusManager:
                         label_selector=self.label_selector,
                         limit=1  # 只需获取元数据，不需要全部列表
                     )
-                    k8s_resource_version = initial_list.metadata.resource_version
+                    k8s_resource_version = self._get_list_resource_version(initial_list)
+                    if not k8s_resource_version:
+                        raise RuntimeError("K8s列表响应缺少resourceVersion")
                 except Exception as e:
+                    if resource_type == "rayjob" and (
+                        "404" in str(e)
+                        or "403" in str(e)
+                        or "not found" in str(e).lower()
+                        or "forbidden" in str(e).lower()
+                    ):
+                        if watcher_key not in self._logged_watchers:
+                            logger.info(f"集群命名空间未安装或无权限访问 RayJob CRD，暂不监听: {watcher_key}")
+                            self._logged_watchers.add(watcher_key)
+                        await asyncio.sleep(60)
+                        continue
                     logger.warning(f"获取K8s初始版本失败 {watcher_key}: {e}")
                     await asyncio.sleep(5)
                     continue
@@ -1062,9 +1151,9 @@ class K8sStatusManager:
             # 3. 初始化集群命名空间缓存
             self.cluster_namespaces[cluster_id] = set(namespaces)
             
-            # 4. 为每个现有命名空间创建Job和Deployment监听器
+            # 4. 为每个现有命名空间创建资源监听器
             for namespace in namespaces:
-                for resource_type in ["job", "deployment"]:
+                for resource_type in self.resource_types:
                     watcher_key = self._get_watcher_key(cluster_id, namespace, resource_type)
                     
                     if watcher_key not in self.watcher_tasks:
@@ -1275,6 +1364,7 @@ class K8sStatusManager:
                     'namespaces': set(),
                     'job_watchers': 0,
                     'deployment_watchers': 0,
+                    'rayjob_watchers': 0,
                     'namespace_watcher': False
                 }
             
@@ -1290,6 +1380,8 @@ class K8sStatusManager:
                     cluster_summary[cluster_id]['job_watchers'] += 1
                 elif resource_type == 'deployment':
                     cluster_summary[cluster_id]['deployment_watchers'] += 1
+                elif resource_type == 'rayjob':
+                    cluster_summary[cluster_id]['rayjob_watchers'] += 1
         
         # 转换set为list以便序列化
         for cluster_info in cluster_summary.values():

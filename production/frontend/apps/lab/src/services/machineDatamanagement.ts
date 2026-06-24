@@ -8,11 +8,11 @@ import type {
   DownloadDatasetRequest,
   ItemList,
   MachineLearnListModel,
-  MergeMachineDatasetVersionsRequest,
 } from '@/services/machineLearnModel.ts'
 
 export const machineDatamanagement = {
   // 获取机器学习数据管理下的数据集列表  task_type枚举值：text_classification, text_entity_recognition, image_classification, object_detection, image_segmentation
+  // publish 0:未发布 1:已发布
   getMachineDatasetList: async (
     projectId: number,
     page: number,
@@ -21,6 +21,7 @@ export const machineDatamanagement = {
     name?: string,
     template_type?: string,
     is_annotated?: boolean,
+    publish?: number,
   ) => {
     const response = await apiClient.get<MachineLearnListModel>(`machine-learning-datasets/dataset/${projectId}/page`, {
       params: {
@@ -30,6 +31,7 @@ export const machineDatamanagement = {
         ...(name ? { name } : {}),
         ...(template_type ? { template_type } : {}),
         is_annotated,
+        publish,
       },
     })
     return response.data
@@ -52,15 +54,6 @@ export const machineDatamanagement = {
       `machine-learning-datasets/dataset/${projectId}/upload`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
-    )
-    return response.data
-  },
-
-  // 合并同一机器学习数据集下多个版本
-  mergeMachineDatasetVersions: async (projectId: number, datasetId: number, params: MergeMachineDatasetVersionsRequest) => {
-    const response = await apiClient.post(
-      `machine-learning-datasets/dataset/${projectId}/${datasetId}/merge-versions`,
-      params,
     )
     return response.data
   },
@@ -115,11 +108,12 @@ export const machineDatamanagement = {
     return response.data
   },
 
-  // 根据数据集 id 获取该数据集（同名）下的所有版本列表，按创建时间倒序。
-  getDatasetVersion: async (projectId: number, datasetId: number, isAnnotated?: boolean) => {
+  // 根据数据集 id 获取该数据集（同名）下的所有版本列表，按创建时间倒序。 publish 0:未发布 1:已发布
+  getDatasetVersion: async (projectId: number, datasetId: number, isAnnotated?: boolean, publish?: number) => {
     const response = await apiClient.get<ItemList[]>(`machine-learning-datasets/dataset/${projectId}/${datasetId}/versions`, {
       params: {
         is_annotated: isAnnotated,
+        publish,
       },
     })
     return response.data
@@ -133,6 +127,28 @@ export const machineDatamanagement = {
         size,
       },
     })
+    return response.data
+  },
+
+  // publish 传1 代表发布 传0代表未发布（无对应功能） 固定传1
+  publish: async (project_id: number, dataset_id: number, publish: number) => {
+    const response = await apiClient.patch(
+      `/machine-learning-datasets/dataset/${project_id}/${dataset_id}/publish`,
+      {
+        publish,
+      },
+    )
+    return response.data
+  },
+
+  //  删除详情中的行数据 row_number number数组 按照preview数据预览接口返回的序号 传入
+  deleteRow: async (project_id: number, dataset_id: number, row_numbers: number[]) => {
+    const response = await apiClient.delete(
+      `/machine-learning-datasets/dataset/${project_id}/${dataset_id}/rows`,
+      {
+        data: { row_numbers },
+      },
+    )
     return response.data
   },
 }

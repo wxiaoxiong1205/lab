@@ -50,6 +50,7 @@ python -m app.init_db.init
 # 初始化指定模块
 python -m app.init_db.init models
 python -m app.init_db.init images
+python -m app.init_db.init advanced_templates
 ```
 
 ## 核心组件
@@ -121,7 +122,7 @@ __all__ = [
 1. **模块名称**：`seeder.py` 中的 `name` 属性必须与模块目录名一致
 2. **执行顺序**：在 `modules/__init__.py` 的 `SEEDERS` 列表中控制执行顺序
 3. **数据库模型**：确保导入正确的数据库模型类
-4. **会话传递**：`init_all()` 需要传入 session，其他函数内部创建 session
+4. **会话传递**：`init_all()` 可复用外部 session，未传 session 时内部创建；其他函数内部创建 session
 5. **重复处理**：种子管理器会自动跳过已存在的记录
 6. **租户隔离**：models 和 images 模块基于 RepositoryResource 的租户ID创建数据
 
@@ -131,7 +132,8 @@ __all__ = [
 |------|------|--------|
 | models | 基础模型数据 | 基于 RepositoryResource 租户创建 |
 | images | 镜像数据 | 基于 RepositoryResource 租户创建 |
+| advanced_templates | 高级模板数据 | 基于 RepositoryResource 租户创建，YAML 文件生成 |
 
 ---
 
-**最后更新**: 2025-11-13
+**最后更新**: 2026-06-23

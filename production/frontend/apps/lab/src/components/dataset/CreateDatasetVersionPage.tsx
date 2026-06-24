@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { RcFile } from 'antd/es/upload'
 import { DescriptionTextArea } from '@/components/common/DescriptionTextArea.tsx'
 import CreateFormPageHeader from '@/components/common/CreateFormPageHeader'
+import { SegmentedRadioButton, SegmentedRadioGroup } from '@/components/common/SegmentedRadio'
 import { trainingDatasetService } from '@/services/trainingApi.ts'
 import type { UploadDatasetVersionRequest } from '@/types/training'
 import { ModelTypeMapping, TrainingMethodTypeMapping } from '@/utils/EnumMaping.ts'
@@ -489,13 +490,13 @@ const CreateDatasetVersionPage: React.FC<CreateDatasetVersionPageProps> = ({ typ
               name="importMethod"
               initialValue={importMethod}
             >
-              <Radio.Group value={importMethod} onChange={(e) => setImportMethod(e.target.value)}>
-                <Radio.Button className="create-dataset-source-option !mr-4" value="本地上传">本地上传</Radio.Button>
+              <SegmentedRadioGroup value={importMethod} onChange={(e) => setImportMethod(e.target.value)}>
+                <SegmentedRadioButton variant="source" value="本地上传">本地上传</SegmentedRadioButton>
                 <Tooltip title="即将上线">
-                  <Radio.Button className="create-dataset-source-option" value="URL获取" disabled>URL获取</Radio.Button>
+                  <SegmentedRadioButton variant="source" value="URL获取" disabled>URL获取</SegmentedRadioButton>
                 </Tooltip>
 
-              </Radio.Group>
+              </SegmentedRadioGroup>
             </Form.Item>
             {/* {!inheritFromHistory && (importMethod === '本地上传') && ( */}
             <div className="create-dataset-upload-section">

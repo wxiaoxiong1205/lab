@@ -21,6 +21,7 @@ class DatasetFormat(str, Enum):
     ALPACA = "alpaca"
     ROLE_BASED = "role-based"
     PREFIX_SUFFIX_MIDDLE = "prefix-suffix-middle"
+    GRPO = "grpo"
 
 
 @dataclass
@@ -385,6 +386,8 @@ class OpenAICompatibleCaller(BaseModelCaller):
                 format_rules = "这是偏好/指令数据生成场景，答案应直接可作为候选回复内容。"
             elif dataset_format == DatasetFormat.ROLE_BASED.value:
                 format_rules = "这是对话数据生成场景，答案应直接可作为 assistant 单轮回复内容。"
+            elif dataset_format == DatasetFormat.GRPO.value:
+                format_rules = "这是 GRPO 训练样本标注场景，答案应直接可作为 reward_model.ground_truth。"
             elif dataset_format == DatasetFormat.PREFIX_SUFFIX_MIDDLE.value:
                 format_rules = "这是补全文本场景，只输出需要补全的内容本身。"
             else:
@@ -434,9 +437,9 @@ class OpenAICompatibleCaller(BaseModelCaller):
             if system_prompt:
                 messages.insert(0, {"role": "system", "content": system_prompt})
                 
-        elif dataset_format == DatasetFormat.ROLE_BASED.value:
-            # role-based格式：直接使用messages字段
-            raw_messages = raw_data.get("messages", [])
+        elif dataset_format in (DatasetFormat.ROLE_BASED.value, DatasetFormat.GRPO.value):
+            # role-based 使用 messages；GRPO 使用 verl prompt 消息数组。
+            raw_messages = raw_data.get("messages", []) if dataset_format == DatasetFormat.ROLE_BASED.value else raw_data.get("prompt", [])
             if isinstance(raw_messages, list):
                 messages.append({"role": "system", "content": _default_system_prompt()})
                 images_base64 = raw_data.get("images_base64", [])
@@ -577,6 +580,11 @@ class OpenAICompatibleCaller(BaseModelCaller):
         elif dataset_format == DatasetFormat.PREFIX_SUFFIX_MIDDLE.value:
             # prefix-suffix-middle格式：响应内容放入middle字段
             annotation["middle"] = result.content
+
+        elif dataset_format == DatasetFormat.GRPO.value:
+            annotation["reward_model"] = {
+                "ground_truth": result.content
+            }
             
         else:
             # 默认：放入response字段

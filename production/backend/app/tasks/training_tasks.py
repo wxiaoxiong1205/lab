@@ -28,6 +28,7 @@ from app.services.repository_image.interface import RepositoryImageService
 from app.tasks.celery_app import celery_app
 from app.tasks.task_base import TaskBase
 from app.schemas.training_task import TrainingTaskCreate
+from app.tasks.service.training.grpo_training_task import GrpoTrainingTaskK8s
 from app.utils.dataset_mixer import create_mixed_dataset, append_json_str_to_tmp_zip, append_jfs_dir_to_tmp_zip
 from app.utils.training_config_storage import store_training_config
 from app.utils.storage_enum import LlamaFactoryDatasetName, StoragePath, TrainingDatasetMountArtifact
@@ -57,6 +58,10 @@ def init_task_logger(task: TaskBase) -> None:
         task.task_logger = TaskLogger(task.task_id, task.task_name)
     except Exception as e:
         task._log_warning(f"初始化任务日志记录器失败: {e}")
+
+
+def _is_grpo_task_data(task_data: dict) -> bool:
+    return (task_data.get("training_type") or {}).get("train_method_type") == "grpo"
 
 def _resolve_training_dataset_format(task: TaskBase, *, project_id: Optional[int], dataset_items: list) -> Optional[str]:
     if not project_id:
@@ -934,6 +939,9 @@ async def _create_training_task_async_impl(self: TaskBase, task_id: int, namespa
         # 1. 更新任务状态为PENDING
         await update_training_task_status(self, task_id=task_id, status=TaskStatus.PENDING)
         self._log_info("任务状态已更新为PENDING")
+
+        if _is_grpo_task_data(task_data):
+            return await _create_grpo_training_task_async_impl(self, task_id, namespace, task_data, tenant_id)
         
         # 获取存储服务实例（在 Celery worker 中使用）
         storage_service = get_storage_service()
@@ -1045,6 +1053,66 @@ async def _create_training_task_async_impl(self: TaskBase, task_id: int, namespa
     # finally:
     #     # 清理资源
     #     # cleanup_task_logger(self)
+
+
+async def _create_grpo_training_task_async_impl(self: TaskBase, task_id: int, namespace: str, task_data: dict, tenant_id: str = None):
+    """GRPO 训练任务实现：JSONL -> Parquet，提交 KubeRay RayJob。"""
+    self._log_info("检测到GRPO训练任务，进入verl/KubeRay执行链路")
+    storage_service = get_storage_service()
+    jfs_client = await storage_service.JUICEFS_CLIENT()
+
+    db = Database()
+    async with db.session() as session:
+        task_result = await session.execute(
+            select(TrainingTask).where(TrainingTask.id == task_id)
+        )
+        training_task = task_result.scalar_one_or_none()
+        if training_task is None:
+            raise RuntimeError(f"训练任务不存在: {task_id}")
+
+        project_result = await session.execute(
+            select(Project).where(Project.id == training_task.project_id)
+        )
+        project = project_result.scalar_one_or_none()
+        if project is None:
+            raise RuntimeError(f"项目不存在: {training_task.project_id}")
+
+        k8s_result = await session.execute(
+            select(KubernetesResource.config, ProjectKubernetesRelation.namespace)
+            .join(ProjectKubernetesRelation, ProjectKubernetesRelation.k8s_id == KubernetesResource.id)
+            .where(ProjectKubernetesRelation.project_id == training_task.project_id)
+        )
+        row = k8s_result.first()
+        if not row:
+            raise RuntimeError(f"未绑定K8s集群或命名空间: project_id={training_task.project_id}")
+        kubeconfig_str, k8s_namespace = row[0], row[1]
+
+        launcher = K8sLauncher(config_str=kubeconfig_str)
+        grpo_task = GrpoTrainingTaskK8s(
+            project_id=training_task.project_id,
+            namespace=k8s_namespace or namespace,
+            k8s_uuid=training_task.lab_k8s_uuid,
+            launcher=launcher,
+            db=session,
+            task_id=task_id,
+            training_task=training_task,
+            task_data=task_data,
+            jfs=jfs_client,
+            project_name=project.former_name,
+            tenant_id=tenant_id or training_task.tenant_id,
+        )
+        ray_job_name = await grpo_task.submit()
+        training_task.status = TaskStatus.PENDING.value
+        await session.commit()
+
+    self._log_info(f"GRPO RayJob 已提交: {ray_job_name}")
+    return {
+        "status": "success",
+        "task_id": task_id,
+        "ray_job_name": ray_job_name,
+        "training_method_type": "grpo",
+    }
+
 
 async def start_training_job_mock(*, config_path: str, task_id: int, namespace: str, storage_service: DefaultStorageService = None) -> str:
     """

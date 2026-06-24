@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Alert, Button, Card, Col, Descriptions, Input, Row, Spin, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd'
-import { ArrowLeftOutlined, ClearOutlined, CodeOutlined, CopyOutlined, DatabaseOutlined, DownloadOutlined, HistoryOutlined, PauseOutlined, PlayCircleOutlined, ReloadOutlined, SearchOutlined, SettingOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, ClearOutlined, CodeOutlined, DatabaseOutlined, DownloadOutlined, HistoryOutlined, PauseOutlined, PlayCircleOutlined, ReloadOutlined, SearchOutlined, SettingOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { finetuneTaskService } from '@/services/FinetuneTrainingServices'
@@ -9,9 +9,20 @@ import { TrainingTaskStatusMapping } from '@/utils/EnumMaping'
 import MLflowInfo from '@/components/MLflowInfo'
 import { formatDuration } from '@/utils/timeProcessing'
 import { useConfigStore } from '@/stores/configStore'
+import SegmentedSwitch from '@/components/common/SegmentedSwitch'
 import './ExperimentRunDetail.css'
 
 const { Text } = Typography
+
+interface CheckpointRecord {
+  name: string
+  epoch: number | null
+  train_loss: number | null
+  eval_loss: number | null
+  step: number
+  metrics?: Record<string, number | string | null | undefined>
+}
+
 /**
  * 实验运行详情页面
  * 展示训练任务的详细信息，包括基本信息、参数配置、数据集等
@@ -30,6 +41,8 @@ const ExperimentRunDetail: React.FC = () => {
   const [logSearchText, setLogSearchText] = useState('')
   const [mergedLogsData, setMergedLogsData] = useState<any>(null)
   const [isPolling, setIsPolling] = useState(false)
+  const [activeRayResourceNode, setActiveRayResourceNode] = useState('submit')
+  const [activeGrpoParamGroup, setActiveGrpoParamGroup] = useState<string>()
   const logsContainerRef = React.useRef<HTMLDivElement>(null)
   const [fineTuningType, setFineTuningType] = useState<any[]>([])
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -115,77 +128,21 @@ const ExperimentRunDetail: React.FC = () => {
       default: '-'
     }
   }
+  const normalizeTrainingMethodType = (value?: unknown) => {
+    if (typeof value !== 'string')
+      return undefined
+
+    const normalized = value.toLowerCase()
+    if (normalized.includes('grpo') || normalized.includes('rft'))
+      return 'grpo'
+    return normalized
+  }
   // 获取学习率调度器类型名称
   const getLRSchedulerTypeName = (value: string) => {
     if (!value)
       return '-'
     const matchedOption = fineTuningType.find((item: any) => item.value === value)
     return matchedOption?.name || value
-  }
-  const isRftGrpoRun = () => {
-    const method = runDetail?.training_type?.train_method_type || runDetail?.training_type?.training_method_type
-    return typeof method === 'string' && method.toLowerCase().includes('grpo')
-  }
-  const formatYamlValue = (value: any, indent = 0): string => {
-    const prefix = ' '.repeat(indent)
-    if (Array.isArray(value)) {
-      return value.length > 0
-        ? value.map(item => `${prefix}- ${typeof item === 'object' && item !== null ? JSON.stringify(item) : String(item)}`).join('\n')
-        : `${prefix}[]`
-    }
-    if (value && typeof value === 'object') {
-      const entries = Object.entries(value)
-      if (entries.length === 0)
-        return `${prefix}{}`
-      return entries.map(([key, item]) => {
-        if (item && typeof item === 'object') {
-          return `${prefix}${key}:\n${formatYamlValue(item, indent + 2)}`
-        }
-        return `${prefix}${key}: ${String(item)}`
-      }).join('\n')
-    }
-    return `${prefix}${String(value ?? '')}`
-  }
-  const buildLegacyGrpoTemplateContent = () => {
-    const grpoConfig = runDetail?.additional_params?.grpo_config
-    if (!grpoConfig || Object.keys(grpoConfig).length === 0)
-      return ''
-    return [
-      `fineTuneType: ${runDetail?.training_type?.fine_tuning_type || 'full'}`,
-      'params:',
-      formatYamlValue(grpoConfig, 2),
-    ].join('\n')
-  }
-  const getGrpoTemplateSnapshot = () => {
-    const snapshot = runDetail?.additional_params?.grpo_template_snapshot
-    if (snapshot?.template_content) {
-      return {
-        templateName: snapshot.template_name || '-',
-        fineTuneType: snapshot.fine_tune_type || runDetail?.training_type?.fine_tuning_type || '-',
-        templateContent: snapshot.template_content,
-        appliedParams: snapshot.applied_params,
-      }
-    }
-
-    const fallbackContent = buildLegacyGrpoTemplateContent()
-    if (!fallbackContent)
-      return null
-
-    return {
-      templateName: '旧版本参数快照',
-      fineTuneType: runDetail?.training_type?.fine_tuning_type || '-',
-      templateContent: fallbackContent,
-      appliedParams: runDetail?.additional_params?.grpo_config,
-    }
-  }
-  const copyText = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      message.success('复制成功')
-    }
-    catch {
-      message.error('复制失败')
-    }
   }
   // GPU使用率
   // 格式化时间
@@ -411,59 +368,108 @@ const ExperimentRunDetail: React.FC = () => {
     ]
     return (<Table columns={parameterColumns} dataSource={parameterData} rowKey="key" pagination={false} size="small" className="mb-4" />)
   }
-  const renderGrpoTemplateSnapshot = () => {
-    const snapshot = getGrpoTemplateSnapshot()
-    if (!snapshot) {
-      return <Alert message="暂无 GRPO 参数模板快照" type="info" showIcon />
+
+  const parseDottedParamGroups = (params: Record<string, any>) => {
+    return Object.entries(params).reduce<Record<string, Array<{
+      key: string
+      field: string
+      path: string
+      value: any
+    }>>>((groups, [key, value]) => {
+      const parts = key.split('.').filter(Boolean)
+      const group = parts[0] || 'default'
+      const field = parts[parts.length - 1] || key
+      const path = parts.length > 2 ? parts.slice(1, -1).join('.') : ''
+
+      if (!groups[group]) {
+        groups[group] = []
+      }
+      groups[group].push({ key, field, path, value })
+      return groups
+    }, {})
+  }
+
+  const renderGrpoAdditionalParams = (params?: Record<string, any>) => {
+    if (!params || Object.keys(params).length === 0) {
+      return <Alert message="暂无自定义参数" type="info" showIcon />
     }
+
+    const preferredOrder = ['data', 'actor_rollout_ref', 'critic', 'algorithm', 'reward', 'trainer']
+    const groups = parseDottedParamGroups(params)
+    const groupNames = Object.keys(groups).sort((a, b) => {
+      const indexA = preferredOrder.indexOf(a)
+      const indexB = preferredOrder.indexOf(b)
+      if (indexA !== -1 && indexB !== -1)
+        return indexA - indexB
+      if (indexA !== -1)
+        return -1
+      if (indexB !== -1)
+        return 1
+      return a.localeCompare(b)
+    })
+    const currentGroup = activeGrpoParamGroup && groupNames.includes(activeGrpoParamGroup)
+      ? activeGrpoParamGroup
+      : groupNames[0]
+
+    const formatParamValue = (value: any) => {
+      if (value === undefined || value === null || value === '')
+        return '-'
+      if (typeof value === 'object')
+        return JSON.stringify(value, null, 2)
+      return String(value)
+    }
+
+    const columns: ColumnsType<{
+      key: string
+      field: string
+      path: string
+      value: any
+    }> = [
+      {
+        title: '参数名称',
+        dataIndex: 'field',
+        key: 'field',
+        width: '40%',
+        render: (_: string, record) => (
+          <div>
+            <div>{record.field}</div>
+            {/* {record.path && <Text type="secondary" className="text-[12px]">{record.path}</Text>} */}
+          </div>
+        ),
+      },
+      {
+        title: '参数值',
+        dataIndex: 'value',
+        key: 'value',
+        render: (value: any) => (
+          <code className="p-[2px_4px] rounded-[3px] break-all whitespace-pre-wrap experiment-run-inline-code">
+            {formatParamValue(value)}
+          </code>
+        ),
+      },
+    ]
 
     return (
       <div>
-        <Descriptions column={2} size="small" className="mb-4">
-          <Descriptions.Item label="模板名称">
-            {snapshot.templateName}
-          </Descriptions.Item>
-          <Descriptions.Item label="参数类型">
-            {getFineTuningTypeName(snapshot.fineTuneType)}
-          </Descriptions.Item>
-        </Descriptions>
-        <Card
+        <SegmentedSwitch
+          className="!mb-4"
+          value={currentGroup}
+          options={groupNames.map((groupName) => ({
+            label: groupName,
+            value: groupName,
+          }))}
+          onChange={(value) => setActiveGrpoParamGroup(String(value))}
+        />
+        <Table
+          columns={columns}
+          dataSource={groups[currentGroup]}
+          rowKey="key"
+          pagination={false}
           size="small"
-          title="YAML 快照"
-          extra={(
-            <Button
-              size="small"
-              icon={<CopyOutlined />}
-              onClick={() => copyText(snapshot.templateContent)}
-            >
-              复制
-            </Button>
-          )}
-        >
-          <pre className="experiment-run-yaml-snapshot">
-            {snapshot.templateContent}
-          </pre>
-        </Card>
-        {snapshot.appliedParams && (
-          <Card size="small" title="本次应用参数" className="mt-4">
-            {renderParamTable(snapshot.appliedParams)}
-          </Card>
-        )}
+          className="mb-4"
+        />
       </div>
     )
-  }
-  const renderAdditionalParams = () => {
-    const additionalParams = Object.fromEntries(
-      Object.entries(runDetail.additional_params || {}).filter(([key]) =>
-        !['grpo_config', 'grpo_template_snapshot', 'grpo_resource_config'].includes(key),
-      ),
-    )
-
-    if (Object.keys(additionalParams).length === 0) {
-      return <Alert message="暂无其它额外参数" type="info" showIcon />
-    }
-
-    return renderParamTable(additionalParams)
   }
   // 渲染显卡资源配置
   const renderGraphicsCardResource = (graphicsCardResource?: any) => {
@@ -476,43 +482,39 @@ const ExperimentRunDetail: React.FC = () => {
       return unit ? `${value}${unit}` : value
     }
 
-    const buildResourceData = (resource: any, includeGpu = true) => [
-      ...(includeGpu
-        ? [
-            {
-              key: 'gpu_type_model',
-              label: '显卡类型及型号',
-              value: [
-                resource.card_type ?? (Array.isArray(resource.gpu_type) ? resource.gpu_type[0] : resource.gpu_type),
-                resource.card_model ?? resource.gpu_model,
-              ].filter(Boolean).join(' / ') || '-',
-            },
-            {
-              key: 'count',
-              label: '显卡卡数配置',
-              value: formatValue(resource.count ?? resource.gpu_count, '张'),
-            },
-          ]
-        : []),
+    const resourceData = [
+      {
+        key: 'gpu_type_model',
+        label: '显卡类型及型号',
+        value: [
+          graphicsCardResource.card_type,
+          graphicsCardResource.card_model,
+        ].filter(Boolean).join(' / ') || '-',
+      },
+      {
+        key: 'count',
+        label: '显卡卡数配置',
+        value: formatValue(graphicsCardResource.count, '张'),
+      },
       {
         key: 'cpu_request',
         label: 'CPU 请求',
-        value: formatValue(resource.cpu_request, ' Core'),
+        value: formatValue(graphicsCardResource.cpu_request, ' Core'),
       },
       {
         key: 'cpu_limit',
         label: 'CPU 限制',
-        value: formatValue(resource.cpu_limit, ' Core'),
+        value: formatValue(graphicsCardResource.cpu_limit, ' Core'),
       },
       {
         key: 'memory_request',
         label: '内存请求',
-        value: formatValue(resource.memory_request, ' GB'),
+        value: formatValue(graphicsCardResource.memory_request, ' GB'),
       },
       {
         key: 'memory_limit',
         label: '内存限制',
-        value: formatValue(resource.memory_limit, ' GB'),
+        value: formatValue(graphicsCardResource.memory_limit, ' GB'),
       },
     ].filter(Boolean) as Array<{
       key: string
@@ -541,49 +543,51 @@ const ExperimentRunDetail: React.FC = () => {
         ),
       },
     ]
-    const renderResourceTable = (resource: any, includeGpu = true) => (
-      <Table
-        columns={resourceColumns}
-        dataSource={buildResourceData(resource, includeGpu)}
-        rowKey="key"
-        pagination={false}
-        size="small"
-        className="mb-4"
-      />
-    )
-
-    const grpoResourceConfig = runDetail?.additional_params?.grpo_resource_config
-    if (isRftGrpoRun() && grpoResourceConfig) {
-      const legacySubmit = {
-        cpu_request: graphicsCardResource.cpu_request,
-        cpu_limit: graphicsCardResource.cpu_limit,
-        memory_request: graphicsCardResource.memory_request,
-        memory_limit: graphicsCardResource.memory_limit,
-      }
-      return (
-        <Tabs
-          items={[
-            {
-              key: 'hand',
-              label: 'Hand',
-              children: renderResourceTable(grpoResourceConfig.hand || graphicsCardResource, true),
-            },
-            {
-              key: 'work',
-              label: 'Work',
-              children: renderResourceTable(grpoResourceConfig.work || graphicsCardResource, true),
-            },
-            {
-              key: 'submit',
-              label: 'Submit',
-              children: renderResourceTable(grpoResourceConfig.submit || legacySubmit, false),
-            },
-          ]}
-        />
-      )
+    return (<Table columns={resourceColumns} dataSource={resourceData} rowKey="key" pagination={false} size="small" className="mb-4" />)
+  }
+  const renderRayResourceConfig = (rayResourceConfig?: any) => {
+    if (!rayResourceConfig) {
+      return <Alert message="暂无资源配置信息" type="info" showIcon />
     }
 
-    return renderResourceTable(graphicsCardResource)
+    const nodeOptions = [
+      {
+        label: 'Submit',
+        value: 'submit',
+        resource: rayResourceConfig.submit_graphics_card_resource,
+      },
+      {
+        label: 'Header',
+        value: 'head',
+        resource: rayResourceConfig.head_graphics_card_resource,
+      },
+      {
+        label: 'Worker',
+        value: 'worker',
+        resource: rayResourceConfig.worker_graphics_card_resource,
+      },
+    ]
+    const activeNode = nodeOptions.find((item) => item.value === activeRayResourceNode) ?? nodeOptions[0]
+
+    return (
+      <div>
+        <div className="mb-4 flex items-center justify-between">
+          <SegmentedSwitch
+            value={activeNode.value}
+            options={nodeOptions.map(({ label, value }) => ({ label, value }))}
+            onChange={(value) => setActiveRayResourceNode(String(value))}
+          />
+          {activeNode.value === 'worker' && (
+            <Text type="secondary">
+              Worker Replicas:
+              {' '}
+              {rayResourceConfig.worker_replicas ?? '-'}
+            </Text>
+          )}
+        </div>
+        {renderGraphicsCardResource(activeNode.resource)}
+      </div>
+    )
   }
   // 渲染数据集表格
   const renderDatasetTable = (datasets?: Array<{
@@ -641,32 +645,46 @@ const ExperimentRunDetail: React.FC = () => {
     ]
     return (<Table columns={datasetColumns} dataSource={datasets} rowKey={(record, index) => `${record.name}-${(record as any).version || index}`} pagination={false} size="small" />)
   }
+  const formatCheckpointMetricValue = (value: number | string | null | undefined) => {
+    if (value === null || value === undefined || value === '')
+      return '-'
+    return value
+  }
+  const getSortableMetricValue = (value: number | string | null | undefined) => {
+    const numericValue = Number(value)
+    return Number.isFinite(numericValue) ? numericValue : 0
+  }
   // 渲染检查点列表
-  const renderCheckpoints = (checkpoints?: {
-    name: string
-    epoch: number
-    train_loss: number
-    eval_loss: number
-    step: number
-  }[]) => {
+  const renderCheckpoints = (checkpoints?: CheckpointRecord[]) => {
     if (!checkpoints || checkpoints.length === 0) {
       return <Alert message="暂无检查点" type="info" showIcon />
     }
-    const checkpointColumns: ColumnsType<typeof checkpoints[0]> = [
+    const metricKeys = isGrpoRun
+      ? Array.from(new Set(checkpoints.flatMap((checkpoint) => Object.keys(checkpoint.metrics || {}))))
+      : []
+    const checkpointColumns: ColumnsType<CheckpointRecord> = [
       {
         title: 'Step',
         dataIndex: 'name',
         key: 'name',
       },
-      {
-        title: 'Training Loss',
-        dataIndex: 'train_loss',
-        key: 'train_loss',
-        render: (loss: number) => loss || '-',
-        sorter: (a, b) => (a.train_loss || 0) - (b.train_loss || 0),
-        defaultSortOrder: 'ascend',
-        showSorterTooltip: false,
-      },
+      ...(isGrpoRun
+        ? metricKeys.map((metricKey) => ({
+            title: metricKey,
+            key: metricKey,
+            render: (_: unknown, record: CheckpointRecord) => formatCheckpointMetricValue(record.metrics?.[metricKey]),
+            sorter: (a: CheckpointRecord, b: CheckpointRecord) => getSortableMetricValue(a.metrics?.[metricKey]) - getSortableMetricValue(b.metrics?.[metricKey]),
+            showSorterTooltip: false,
+          }))
+        : [{
+            title: 'Training Loss',
+            dataIndex: 'train_loss',
+            key: 'train_loss',
+            render: (loss: number | null) => formatCheckpointMetricValue(loss),
+            sorter: (a: CheckpointRecord, b: CheckpointRecord) => getSortableMetricValue(a.train_loss) - getSortableMetricValue(b.train_loss),
+            defaultSortOrder: 'ascend' as const,
+            showSorterTooltip: false,
+          }]),
     ]
     return (<Table columns={checkpointColumns} dataSource={checkpoints} rowKey={(record, index) => record.name || `checkpoint-${index}`} pagination={false} size="small" showSorterTooltip={false} />)
   }
@@ -677,6 +695,7 @@ const ExperimentRunDetail: React.FC = () => {
       </div>
     )
   }
+  const isGrpoRun = normalizeTrainingMethodType(runDetail?.training_type?.train_method_type || runDetail?.training_type?.training_method_type) === 'grpo'
   return (
     <div className="p-6">
       <Card>
@@ -751,7 +770,7 @@ const ExperimentRunDetail: React.FC = () => {
                 ),
                 children: (
                   <div>
-                    <Card title="训练数据集" size="small" className="mb-4">
+                    <Card title="训练数据集" size="small" className="!mb-4">
                       {renderDatasetTable(runDetail.dataset_items, 'training')}
                     </Card>
                     <Card title="验证数据集" size="small">
@@ -792,12 +811,14 @@ const ExperimentRunDetail: React.FC = () => {
                 label: (
                   <span>
                     <ThunderboltOutlined />
-                    显卡资源配置
+                    {isGrpoRun ? '资源配置' : '显卡资源配置'}
                   </span>
                 ),
                 children: (
-                  <Card title="显卡资源配置" size="small">
-                    {renderGraphicsCardResource(runDetail?.graphics_card_resource)}
+                  <Card title={isGrpoRun ? '资源配置' : '显卡资源配置'} size="small">
+                    {isGrpoRun
+                      ? renderRayResourceConfig(runDetail?.ray_resource_config)
+                      : renderGraphicsCardResource(runDetail?.graphics_card_resource)}
                   </Card>
                 ),
               },
@@ -809,16 +830,11 @@ const ExperimentRunDetail: React.FC = () => {
                     参数配置
                   </span>
                 ),
-                children: (
+                children: isGrpoRun ? renderGrpoAdditionalParams(runDetail.additional_params) : (
                   <Tabs
-                    defaultActiveKey={isRftGrpoRun() ? 'grpo-template' : 'basic'}
+                    defaultActiveKey="basic"
                     size="small"
                     items={[
-                      isRftGrpoRun() && {
-                        key: 'grpo-template',
-                        label: 'GRPO模板',
-                        children: renderGrpoTemplateSnapshot(),
-                      },
                       runDetail.basic && {
                         key: 'basic',
                         label: '基础参数',
@@ -862,7 +878,7 @@ const ExperimentRunDetail: React.FC = () => {
                       runDetail.additional_params && Object.keys(runDetail.additional_params).length > 0 && {
                         key: 'additional',
                         label: '额外参数',
-                        children: renderAdditionalParams(),
+                        children: renderParamTable(runDetail.additional_params),
                       },
                     ].filter(Boolean)} // 过滤掉false值
                   />

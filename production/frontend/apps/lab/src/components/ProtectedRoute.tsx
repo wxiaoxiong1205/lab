@@ -15,7 +15,6 @@ const ProtectedRoute = ({ children, adminOnly = false, requireMenuPermission = t
   const { isAuthenticated, userMenus, isLoggingOut } = useAuthStore()
   const [isMenuLoaded, setIsMenuLoaded] = useState(false)
   const location = useLocation()
-  const isLocalTenantAdminPreview = import.meta.env.DEV && localStorage.getItem('lab-local-role') === 'tenant_admin'
   // 监听菜单加载状态
   useEffect(() => {
     if (isAuthenticated) {
@@ -61,7 +60,7 @@ const ProtectedRoute = ({ children, adminOnly = false, requireMenuPermission = t
     )
   }
   // 如果是仅限管理员访问的页面，通过菜单检查用户是否是管理员
-  if (adminOnly && !isLocalTenantAdminPreview && !isAdminUser(userMenus)) {
+  if (adminOnly && !isAdminUser(userMenus)) {
     return (
       <Result
         status="403"
@@ -85,7 +84,7 @@ const ProtectedRoute = ({ children, adminOnly = false, requireMenuPermission = t
         </div>
       )
     }
-    const hasPermission = isLocalTenantAdminPreview || checkPathPermission(userMenus, location.pathname)
+    const hasPermission = checkPathPermission(userMenus, location.pathname)
     if (!hasPermission) {
       return (
         <Result

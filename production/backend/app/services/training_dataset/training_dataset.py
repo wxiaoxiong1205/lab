@@ -34,9 +34,9 @@ from app.schemas.label import LabelTaskStatus, LabelTaskType
 from app.schemas.training_dataset import (
     TrainingDatasetResponse, TrainingDatasetSummaryResponse,
     DatasetSampleResponse, DatasetSamplePageResponse, DatasetFormat, DatasetUsage,
-    TrainingDatasetUploadTypeCategory, DatasetProcessingStatus,
+    TrainingDatasetUploadTypeCategory, DatasetProcessingStatus, DatasetPublishStatus,
     TrainingDatasetExportTypeCategory, TrainingDatasetAggregationResponse, CountByValueItem,
-    AttrOptionGroupItem, TrainingDatasetBasicInfoUpdate, DatasetVersionMergeRequest,
+    AttrOptionGroupItem, TrainingDatasetBasicInfoUpdate,
 )
 from app.schemas.training_task import TrainingTypeCategory, TrainingMethodType
 from app.utils.business_attr_utils import BusinessAttrValueHelper
@@ -86,6 +86,28 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
         self.executor = ThreadPoolExecutor(max_workers=2)
 
     # ------------------------------ 基础工具方法实现 ------------------------------
+    @staticmethod
+    def set_publish_display(target) -> None:
+        try:
+            publish_status = DatasetPublishStatus(getattr(target, "publish", DatasetPublishStatus.UNPUBLISHED.value))
+            target.publish = publish_status.value
+            target.publish_display = publish_status.description
+        except (ValueError, TypeError):
+            target.publish_display = None
+
+    @staticmethod
+    def set_status_display(target) -> None:
+        processing_status_display = getattr(target, "processing_status_display", None)
+        publish_display = getattr(target, "publish_display", None)
+        if processing_status_display == DatasetProcessingStatus.COMPLETED.description and publish_display in (
+            DatasetPublishStatus.UNPUBLISHED.description,
+            DatasetPublishStatus.PUBLISHED.description,
+        ):
+            target.status_display = publish_display
+        else:
+            target.status_display = processing_status_display
+
+
     @staticmethod
     def generate_dataset_path(
             namespace: str,
@@ -142,6 +164,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
         if method_dir not in (
             TrainingMethodType.SFT.value,
             TrainingMethodType.DPO.value,
+            TrainingMethodType.GRPO.value,
             TrainingMethodType.BUSINESS.value,
         ):
             raise HTTPException(
@@ -151,7 +174,25 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
 
         if dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING:
             # 图像理解数据集特殊处理
-            if dataset_format == DatasetFormat.ROLE_BASED:
+            if training_method_type == TrainingMethodType.GRPO:
+                if dataset_format != DatasetFormat.GRPO:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="GRPO训练方法仅支持grpo数据集格式"
+                    )
+                if file_type != TrainingDatasetUploadTypeCategory.ZIP_TYPE:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="图像理解GRPO样例当前仅支持zip格式"
+                    )
+                sample_path = os.path.join(
+                    base_sample_dir,
+                    method_dir,
+                    "qa",
+                    DatasetSampleFileCategory.IMAGE_UNDERSTANDING_GRPO + "." + file_type
+                )
+
+            elif dataset_format == DatasetFormat.ROLE_BASED:
                 # role-based
                 sample_path = os.path.join(
                     base_sample_dir,
@@ -169,7 +210,29 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
 
         elif dataset_type == TrainingTypeCategory.TEXT_GENERATION:
             # 文本生成数据集
-            if dataset_format == DatasetFormat.PROMPT_RESPONSE:
+            if training_method_type == TrainingMethodType.GRPO:
+                if dataset_format != DatasetFormat.GRPO:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="GRPO训练方法仅支持grpo数据集格式"
+                    )
+                if file_type not in (
+                    TrainingDatasetUploadTypeCategory.JSON_TYPE,
+                    TrainingDatasetUploadTypeCategory.JSONL_TYPE,
+                    TrainingDatasetUploadTypeCategory.XLSX_TYPE,
+                ):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="GRPO样例当前仅支持json/jsonl/xlsx格式"
+                    )
+                sample_path = os.path.join(
+                    base_sample_dir,
+                    method_dir,
+                    "qa",
+                    DatasetSampleFileCategory.TEXT_GENERATION_GRPO + "." + file_type
+                )
+
+            elif dataset_format == DatasetFormat.PROMPT_RESPONSE:
                 # prompt_response
                 sample_path = os.path.join(
                     base_sample_dir,
@@ -763,6 +826,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 TrainingDataset.name,
                 TrainingDataset.processing_status,
                 TrainingDataset.processing_error,
+                TrainingDataset.publish,
                 func.row_number().over(
                     partition_by=TrainingDataset.name,
                     order_by=cast(func.replace(TrainingDataset.version, 'V', ''), Integer).desc()
@@ -800,7 +864,8 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 subquery.c.created_by,
                 # 从最新版本子查询获取处理状态和错误信息
                 latest_status_subquery.c.processing_status,
-                latest_status_subquery.c.processing_error
+                latest_status_subquery.c.processing_error,
+                latest_status_subquery.c.publish
             )
             .select_from(
                 join(
@@ -829,7 +894,8 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 subquery.c.project_id,
                 subquery.c.created_by,
                 latest_status_subquery.c.processing_status,
-                latest_status_subquery.c.processing_error
+                latest_status_subquery.c.processing_error,
+                latest_status_subquery.c.publish
             )
             .order_by(func.max(TrainingDataset.updated_at).desc())  # 按最后更新时间降序
         )
@@ -854,6 +920,8 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                     item.processing_status = None
                     item.processing_status_display = None
 
+                self.set_publish_display(item)
+
                 # processing_error 已经通过查询获取，无需额外处理
 
         return page_result
@@ -864,6 +932,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
             dataset_name: str,
             usage: DatasetUsage,
             processing_status: Optional[DatasetProcessingStatus] = None,
+            publish: Optional[DatasetPublishStatus] = None,
     ) -> List[TrainingDatasetResponse]:
         """获取当前数据集下的所有版本的数据集"""
         # 验证项目存在
@@ -879,6 +948,8 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
         # 如果指定了处理状态，添加筛选条件
         if processing_status is not None:
             where_conditions.append(TrainingDataset.processing_status == processing_status.value)
+        if publish is not None:
+            where_conditions.append(TrainingDataset.publish == publish.value)
 
         # 查询该数据集名称下的所有版本
         datasets = await self.training_dataset_mapper.query(
@@ -909,6 +980,8 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
             response.processing_status = DatasetProcessingStatus(dataset.processing_status)
             response.processing_status_display = response.processing_status.description
             response.processing_error = dataset.processing_error
+            self.set_publish_display(response)
+            self.set_status_display(response)
 
             # 添加格式化的文件大小显示（前端友好）
             if hasattr(response, 'file_size') and dataset.file_size:
@@ -1015,6 +1088,102 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
 
         await self.training_dataset_mapper.commit()
         return True
+
+    async def update_training_dataset_publish_status(
+        self,
+        project_id: int,
+        dataset_id: int,
+        publish: DatasetPublishStatus,
+    ) -> bool:
+        await validate_project_exists(await self.training_dataset_mapper.get_session(), project_id)
+
+        if publish != DatasetPublishStatus.PUBLISHED:
+            raise HTTPException(status_code=400, detail="仅允许将未发布状态修改为已发布状态")
+
+        dataset = await self.training_dataset_mapper.query_one(
+            select(TrainingDataset).filter(
+                TrainingDataset.project_id == project_id,
+                TrainingDataset.id == dataset_id,
+            )
+        )
+        if not dataset:
+            raise HTTPException(
+                status_code=404,
+                detail=f"项目中不存在指定的数据集：dataset_id={dataset_id}"
+            )
+
+        if dataset.publish == DatasetPublishStatus.PUBLISHED.value:
+            raise HTTPException(status_code=400, detail="数据集已发布，不用重新发布")
+        if dataset.publish != DatasetPublishStatus.UNPUBLISHED.value:
+            raise HTTPException(status_code=400, detail="仅未发布状态的数据集可以发布")
+
+        if dataset.processing_status != DatasetProcessingStatus.COMPLETED.value:
+            raise HTTPException(status_code=400, detail="数据集处理状态为已完成时才允许发布")
+
+        dataset.publish = DatasetPublishStatus.PUBLISHED.value
+        await self.training_dataset_mapper.commit()
+        return True
+
+    async def delete_training_dataset_rows(
+        self,
+        project_id: int,
+        dataset_id: int,
+        row_numbers: List[int],
+    ) -> bool:
+        await validate_project_exists(await self.training_dataset_mapper.get_session(), project_id)
+
+        normalized_rows = sorted(set(row_numbers or []))
+        if not normalized_rows:
+            raise HTTPException(status_code=400, detail="删除行号不能为空")
+        if any(row_number < 1 for row_number in normalized_rows):
+            raise HTTPException(status_code=400, detail="删除行号必须大于等于 1")
+
+        dataset = await self.training_dataset_mapper.query_one(
+            select(TrainingDataset).filter(
+                TrainingDataset.project_id == project_id,
+                TrainingDataset.id == dataset_id,
+            ).with_for_update()
+        )
+        if not dataset:
+            raise HTTPException(status_code=404, detail="数据集不存在")
+        if dataset.processing_status == DatasetProcessingStatus.PENDING.value:
+            raise HTTPException(status_code=400, detail="数据集有任务正在处理中，请刷新后重试")
+        if dataset.processing_status != DatasetProcessingStatus.COMPLETED.value:
+            raise HTTPException(status_code=400, detail="只有已完成状态的数据集才能删除指定行")
+        if dataset.publish != DatasetPublishStatus.UNPUBLISHED.value:
+            raise HTTPException(status_code=400, detail="只有未发布状态的数据集才能删除指定行")
+        if not dataset.dataset_path:
+            raise HTTPException(status_code=404, detail="数据集文件不存在")
+
+        sample_count = int(dataset.total_samples or 0)
+        if normalized_rows[-1] > sample_count:
+            raise HTTPException(status_code=400, detail=f"删除行号超出数据集范围: {normalized_rows[-1]}")
+        if len(normalized_rows) >= sample_count:
+            raise HTTPException(status_code=400, detail="删除后数据集至少需要保留一行数据")
+
+        dataset.processing_status = DatasetProcessingStatus.PENDING.value
+        dataset.publish = DatasetPublishStatus.PROCESSING.value
+        dataset.processing_error = None
+        await self.training_dataset_mapper.commit()
+
+        try:
+            from app.tasks.dataset_processing_tasks import delete_training_dataset_rows
+            delete_training_dataset_rows.apply_async(
+                args=[dataset_id, normalized_rows],
+                countdown=1,
+            )
+            return True
+        except Exception as exc:
+            logger.error(f"提交删除数据集行任务失败: dataset_id={dataset_id}, error={str(exc)}", exc_info=True)
+            latest_dataset = await self.training_dataset_mapper.query_one(
+                select(TrainingDataset).filter(TrainingDataset.id == dataset_id)
+            )
+            if latest_dataset:
+                latest_dataset.processing_status = DatasetProcessingStatus.FAILED.value
+                latest_dataset.publish = DatasetPublishStatus.FAILED.value
+                latest_dataset.processing_error = f"提交删除数据集行任务失败: {str(exc)}"[:1000]
+                await self.training_dataset_mapper.commit()
+            raise HTTPException(status_code=500, detail=f"提交删除数据集行任务失败: {str(exc)}") from exc
 
     async def _sync_training_task_dataset_names(
         self,
@@ -1239,6 +1408,22 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 status_code=400,
                 detail="alpaca 数据集格式仅支持 dpo 训练方法"
             )
+        if training_method_type == TrainingMethodType.GRPO:
+            if dataset_type not in (TrainingTypeCategory.TEXT_GENERATION, TrainingTypeCategory.IMAGE_UNDERSTANDING):
+                raise HTTPException(
+                    status_code=400,
+                    detail="grpo 训练方法仅支持 text-generation 或 image-understanding 数据集类型"
+                )
+            if dataset_format != DatasetFormat.GRPO:
+                raise HTTPException(
+                    status_code=400,
+                    detail="grpo 训练方法仅支持 grpo 数据集格式"
+                )
+        elif dataset_format == DatasetFormat.GRPO:
+            raise HTTPException(
+                status_code=400,
+                detail="grpo 数据集格式仅支持 grpo 训练方法"
+            )
 
         # 验证项目是否存在
         project = await validate_project_exists(await self.training_dataset_mapper.get_session(), project_id)
@@ -1275,6 +1460,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 dataset_config=config_dict,
                 metadata_fields=None,
                 processing_status=DatasetProcessingStatus.PENDING.value,  # 初始状态：处理中
+                publish=DatasetPublishStatus.PROCESSING.value,
                 temp_file_path="",  # 记录临时文件路径
                 dataset_path="",  # 暂时为空，处理完成后更新
                 total_samples=None,
@@ -1338,6 +1524,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                     logger.error(f"任务未注册: dataset_id={new_dataset.id}, task_name={task_name}")
 
                     new_dataset.processing_status = DatasetProcessingStatus.FAILED.value
+                    new_dataset.publish = DatasetPublishStatus.FAILED.value
                     new_dataset.processing_error = error_msg
                     await self.training_dataset_mapper.commit()
 
@@ -1373,6 +1560,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 logger.error(f"提交任务失败: dataset_id={new_dataset.id}, error={error_msg}", exc_info=True)
 
                 new_dataset.processing_status = DatasetProcessingStatus.FAILED.value
+                new_dataset.publish = DatasetPublishStatus.FAILED.value
                 new_dataset.processing_error = error_msg
                 await self.training_dataset_mapper.commit()
 
@@ -1387,6 +1575,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
             response.processing_status = DatasetProcessingStatus(new_dataset.processing_status)
             response.processing_status_display = response.processing_status.description
             response.processing_error = new_dataset.processing_error
+            self.set_publish_display(response)
 
             # 注意：此时文件还在处理中，统计信息为空
             response.file_size_display = "处理中..."
@@ -1408,6 +1597,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
             # 注意：如果执行到这里，说明第一个 try-except 已经成功，new_dataset 一定存在
             try:
                 new_dataset.processing_status = DatasetProcessingStatus.FAILED.value
+                new_dataset.publish = DatasetPublishStatus.FAILED.value
                 new_dataset.processing_error = f"创建数据集失败: {str(e)}"
                 await self.training_dataset_mapper.commit()
                 logger.info(f"已更新数据集状态为失败: dataset_id={new_dataset.id}")
@@ -1559,6 +1749,11 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 file_size=file_size_mb,
                 dataset_path=new_dataset_path,
                 processing_status=processing_status,
+                publish=(
+                    DatasetPublishStatus.UNPUBLISHED.value
+                    if processing_status == DatasetProcessingStatus.COMPLETED.value
+                    else DatasetPublishStatus.PROCESSING.value
+                ),
                 temp_file_path=None,
                 created_id=current_user.userId,
                 created_by=current_user.username
@@ -1616,6 +1811,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                         logger.error(f"任务未注册: dataset_id={new_dataset.id}, task_name={task_name}")
 
                         new_dataset.processing_status = DatasetProcessingStatus.FAILED.value
+                        new_dataset.publish = DatasetPublishStatus.FAILED.value
                         new_dataset.processing_error = error_msg
                         await self.training_dataset_mapper.commit()
 
@@ -1658,6 +1854,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                     logger.error(f"提交任务失败: dataset_id={new_dataset.id}, error={error_msg}", exc_info=True)
 
                     new_dataset.processing_status = DatasetProcessingStatus.FAILED.value
+                    new_dataset.publish = DatasetPublishStatus.FAILED.value
                     new_dataset.processing_error = error_msg
                     await self.training_dataset_mapper.commit()
 
@@ -1678,6 +1875,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                         logger.error(f"任务未注册: dataset_id={new_dataset.id}, task_name={task_name}")
 
                         new_dataset.processing_status = DatasetProcessingStatus.FAILED.value
+                        new_dataset.publish = DatasetPublishStatus.FAILED.value
                         new_dataset.processing_error = error_msg
                         await self.training_dataset_mapper.commit()
 
@@ -1717,6 +1915,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                     logger.error(f"提交任务失败: dataset_id={new_dataset.id}, error={error_msg}", exc_info=True)
 
                     new_dataset.processing_status = DatasetProcessingStatus.FAILED.value
+                    new_dataset.publish = DatasetPublishStatus.FAILED.value
                     new_dataset.processing_error = error_msg
                     await self.training_dataset_mapper.commit()
 
@@ -1731,6 +1930,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
             response.processing_status = DatasetProcessingStatus(new_dataset.processing_status)
             response.processing_status_display = response.processing_status.description
             response.processing_error = new_dataset.processing_error
+            self.set_publish_display(response)
 
             # 添加格式化的文件大小显示
             if new_dataset.file_size:
@@ -1762,6 +1962,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
             # 注意：如果执行到这里，说明第一个 try-except 已经成功，new_dataset 一定存在
             try:
                 new_dataset.processing_status = DatasetProcessingStatus.FAILED.value
+                new_dataset.publish = DatasetPublishStatus.FAILED.value
                 new_dataset.processing_error = f"创建数据集版本失败: {str(e)}"
                 await self.training_dataset_mapper.commit()
                 logger.info(f"已更新数据集版本状态为失败: dataset_id={new_dataset.id}")
@@ -1769,122 +1970,6 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 logger.error(f"更新数据集版本状态失败: dataset_id={new_dataset.id}, error={str(update_error)}")
 
             raise HTTPException(status_code=500, detail=f"创建数据集版本失败: {str(e)}")
-
-    async def merge_dataset_versions(
-            self,
-            current_user: JwtUserInfo,
-            project_id: int,
-            dataset_name: str,
-            usage: DatasetUsage,
-            request: DatasetVersionMergeRequest,
-    ) -> TrainingDatasetResponse:
-        """合并同一数据集下多个已完成版本，生成一个新的异步处理版本。"""
-        project = await validate_project_exists(await self.training_dataset_mapper.get_session(), project_id)
-        await validate_training_dataset_by_name_version_usage_not_exists(
-            await self.training_dataset_mapper.get_session(),
-            project.id,
-            dataset_name,
-            request.new_version,
-            usage,
-        )
-
-        source_datasets = await self.training_dataset_mapper.query(
-            select(TrainingDataset).filter(
-                TrainingDataset.id.in_(request.source_version_ids),
-                TrainingDataset.project_id == project_id,
-                TrainingDataset.name == dataset_name,
-                TrainingDataset.usage == usage,
-            )
-        )
-        source_by_id = {item.id: item for item in source_datasets}
-        ordered_sources = [source_by_id.get(source_id) for source_id in request.source_version_ids]
-        missing_ids = [source_id for source_id, item in zip(request.source_version_ids, ordered_sources) if item is None]
-        if missing_ids:
-            raise HTTPException(status_code=404, detail=f"源版本不存在或不属于当前数据集: {missing_ids}")
-
-        first_source = ordered_sources[0]
-        if first_source.dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING.value:
-            raise HTTPException(status_code=400, detail="图像理解数据集暂不支持多版本合并，请使用新增版本继承能力")
-
-        for source in ordered_sources:
-            if source.processing_status != DatasetProcessingStatus.COMPLETED.value:
-                raise HTTPException(status_code=400, detail=f"版本 {source.version} 尚未处理完成，不允许合并")
-            if not source.dataset_path:
-                raise HTTPException(status_code=400, detail=f"版本 {source.version} 原始文件不存在，不允许合并")
-            if (
-                source.dataset_type != first_source.dataset_type
-                or source.training_method_type != first_source.training_method_type
-                or source.dataset_format != first_source.dataset_format
-            ):
-                raise HTTPException(status_code=400, detail="仅支持同一类型、训练方法和数据格式的版本合并")
-
-        namespace = f"{os.getenv('KUBERNETES_NAMESPACE_PREFIX', 'deepexilab')}-{project.id}"
-        new_dataset_path = generate_dataset_path_util(
-            namespace,
-            dataset_name,
-            request.new_version,
-            "jsonl",
-            usage,
-            first_source.dataset_type,
-        )
-
-        new_dataset = TrainingDataset(
-            name=dataset_name,
-            description=request.description,
-            project_id=project_id,
-            version=request.new_version,
-            dataset_type=first_source.dataset_type,
-            training_method_type=first_source.training_method_type,
-            dataset_format=first_source.dataset_format,
-            usage=usage,
-            dataset_config=first_source.dataset_config,
-            metadata_fields=list(first_source.metadata_fields or []),
-            total_samples=sum((source.total_samples or 0) for source in ordered_sources),
-            total_characters=sum((source.total_characters or 0) for source in ordered_sources),
-            file_size=sum((source.file_size or 0) for source in ordered_sources),
-            dataset_path=new_dataset_path,
-            processing_status=DatasetProcessingStatus.PENDING.value,
-            temp_file_path=None,
-            created_id=current_user.userId,
-            created_by=current_user.username,
-        )
-
-        try:
-            await self.training_dataset_mapper.insert(new_dataset)
-            await self.training_dataset_mapper.flush()
-            await self.training_dataset_mapper.commit()
-            await self.training_dataset_mapper.refresh(new_dataset)
-
-            from app.tasks.dataset_processing_tasks import process_dataset_version_merge
-            from app.tasks.celery_app import celery_app
-
-            task_name = 'app.tasks.dataset_processing_tasks.process_dataset_version_merge'
-            if task_name not in celery_app.tasks.keys():
-                error_msg = f"Celery任务未注册: {task_name}。请检查Celery worker是否正常运行，任务模块是否正确导入。"
-                new_dataset.processing_status = DatasetProcessingStatus.FAILED.value
-                new_dataset.processing_error = error_msg
-                await self.training_dataset_mapper.commit()
-                raise HTTPException(status_code=500, detail=error_msg)
-
-            celery_result = process_dataset_version_merge.apply_async(
-                args=[new_dataset.id, request.source_version_ids, new_dataset_path],
-                countdown=1,
-            )
-            if not celery_result.id:
-                raise ValueError("Celery任务ID为空，任务可能未成功提交")
-
-            return TrainingDatasetResponse.model_validate(new_dataset)
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"创建合并版本失败: {str(e)}", exc_info=True)
-            try:
-                new_dataset.processing_status = DatasetProcessingStatus.FAILED.value
-                new_dataset.processing_error = f"创建合并版本失败: {str(e)}"
-                await self.training_dataset_mapper.commit()
-            except Exception:
-                await self.training_dataset_mapper.rollback()
-            raise HTTPException(status_code=500, detail=f"创建合并版本失败: {str(e)}")
 
     async def delete_dataset_all_versions(
             self,
@@ -2231,6 +2316,11 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 if name not in all_fields:
                     result.append(name)
             ordered_fields = ["instruction", "input", "chosen", "rejected"]
+        elif dataset.dataset_format == DatasetFormat.GRPO.value:
+            for name in ("data_source", "prompt", "reward_model.ground_truth", "extra_info", "model_response"):
+                if name not in all_fields:
+                    result.append(name)
+            ordered_fields = ["data_source", "prompt", "reward_model.ground_truth", "extra_info", "model_response"]
         else:
             if "model_response" not in all_fields:
                 result.append("model_response")
@@ -2254,22 +2344,55 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
 
     async def repair_metadata_fields(
         self,
+        force: bool = False,
     ) -> Dict[str, Any]:
-        """从历史 dataset JSONL 文件回填空的 metadata_fields。"""
-        empty_metadata_fields = or_(
-            TrainingDataset.metadata_fields.is_(None),
-            cast(TrainingDataset.metadata_fields, String).in_(["[]", "null", ""]),
-        )
+        """从历史 dataset JSONL 文件回填 metadata_fields；force=True 时覆盖已有字段。"""
         stmt = select(TrainingDataset).where(
-            empty_metadata_fields,
             TrainingDataset.processing_status == DatasetProcessingStatus.COMPLETED.value,
         )
+        if not force:
+            empty_metadata_fields = or_(
+                TrainingDataset.metadata_fields.is_(None),
+                cast(TrainingDataset.metadata_fields, String).in_(["[]", "null", ""]),
+            )
+            stmt = stmt.where(empty_metadata_fields)
         datasets = await self.training_dataset_mapper.query(stmt)
 
-        jfs = await self._get_juicefs_client()
-        result = {"total": len(datasets), "repaired": 0, "failed": 0, "failed_items": []}
+        result = {"total": len(datasets), "repaired": 0, "failed": 0, "failed_items": [], "force": force}
         for dataset in datasets:
-            if dataset.metadata_fields:
+            if not force and dataset.metadata_fields:
+                continue
+            if not dataset.tenant_id:
+                message = "数据集 tenant_id 为空，无法定位 JuiceFS 存储"
+                logger.warning(f"训练数据集 {dataset.id} {message}，跳过 metadata_fields 修复")
+                result["failed"] += 1
+                result["failed_items"].append({
+                    "dataset_id": dataset.id,
+                    "project_id": dataset.project_id,
+                    "name": dataset.name,
+                    "version": dataset.version,
+                    "dataset_path": dataset.dataset_path,
+                    "reason_code": "tenant_id_missing",
+                    "message": message,
+                    "retryable": False,
+                })
+                continue
+            try:
+                jfs = await self.storage.JUICEFS_CLIENT(dataset.tenant_id)
+            except Exception as exc:
+                message = f"获取数据集租户 JuiceFS 客户端失败: tenant_id={dataset.tenant_id}, error={exc}"
+                logger.warning(f"训练数据集 {dataset.id} {message}，跳过 metadata_fields 修复")
+                result["failed"] += 1
+                result["failed_items"].append({
+                    "dataset_id": dataset.id,
+                    "project_id": dataset.project_id,
+                    "name": dataset.name,
+                    "version": dataset.version,
+                    "dataset_path": dataset.dataset_path,
+                    "reason_code": "juicefs_client_error",
+                    "message": message,
+                    "retryable": True,
+                })
                 continue
             if not dataset.dataset_path or not jfs.exists(dataset.dataset_path):
                 message = f"数据集文件不存在: {dataset.dataset_path or ''}"
@@ -3021,6 +3144,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
         dataset_type: Optional[List[TrainingTypeCategory]] = None,
         training_method_type: Optional[List[TrainingMethodType]] = None,
         dataset_format: Optional[List[DatasetFormat]] = None,
+        publish: Optional[List[DatasetPublishStatus]] = None,
     ) -> TrainingDatasetAggregationResponse:
         """聚合统计：按 usage、dataset_format、dataset_type、attr option 分别统计数据量；按数据集 name 去重后统计；支持 processing_status、attr 筛选。
 
@@ -3054,6 +3178,8 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
             )
         if processing_status is not None:
             conditions.append(TrainingDataset.processing_status == processing_status.value)
+        if publish:
+            conditions.append(TrainingDataset.publish.in_(tuple(p.value for p in publish)))
         if attr_name and option_value:
             attr_exists = (
                 select(1)
@@ -3096,6 +3222,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
             DatasetFormat.PROMPT_RESPONSE.value: 0,
             DatasetFormat.ROLE_BASED.value: 1,
             DatasetFormat.ALPACA.value: 2,
+            DatasetFormat.GRPO.value: 3,
         }
         by_dataset_format.sort(
             key=lambda item: (dataset_format_order.get(item.value, len(dataset_format_order)), item.value or "")
@@ -3167,6 +3294,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 size: Optional[int] = None,
                 processing_status: Optional[DatasetProcessingStatus] = None,
                 dataset_format: Optional[DatasetFormat] = None,
+                publish: Optional[DatasetPublishStatus] = None,
                 attr_name: Optional[str] = None,
                 option_value: Optional[str] = None,
         ) -> Page[TrainingDatasetSummaryResponse]:
@@ -3193,6 +3321,8 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
             conditions.append(TrainingDataset.usage == usage.value)
         if dataset_format is not None:
             conditions.append(TrainingDataset.dataset_format == dataset_format.value)
+        if publish is not None:
+            conditions.append(TrainingDataset.publish == publish.value)
         if attr_name and option_value:
             attr_exists = (
                 select(1)
@@ -3238,6 +3368,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 TrainingDataset.name,
                 TrainingDataset.processing_status,
                 TrainingDataset.processing_error,
+                TrainingDataset.publish,
                 func.row_number().over(
                     partition_by=TrainingDataset.name,
                     order_by=cast(func.replace(TrainingDataset.version, 'V', ''), Integer).desc()
@@ -3262,7 +3393,8 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 subquery.c.project_id,
                 subquery.c.created_by,
                 latest_status_subquery.c.processing_status,
-                latest_status_subquery.c.processing_error
+                latest_status_subquery.c.processing_error,
+                latest_status_subquery.c.publish
             )
             .select_from(
                 join(TrainingDataset, subquery, and_(TrainingDataset.name == subquery.c.name, subquery.c.rn == 1))
@@ -3278,7 +3410,8 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 subquery.c.project_id,
                 subquery.c.created_by,
                 latest_status_subquery.c.processing_status,
-                latest_status_subquery.c.processing_error
+                latest_status_subquery.c.processing_error,
+                latest_status_subquery.c.publish
             )
             .order_by(func.max(TrainingDataset.updated_at).desc())
         )
@@ -3297,4 +3430,5 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 else:
                     item.processing_status = None
                     item.processing_status_display = None
+                self.set_publish_display(item)
         return page_result

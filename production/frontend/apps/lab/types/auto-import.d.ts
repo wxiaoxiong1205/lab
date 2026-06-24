@@ -6,5 +6,5 @@
 // biome-ignore lint: disable
 export {}
 declare global {
-  const $at: typeof import('i18n-auto-extractor')['$at']
+  const $at: typeof import('i18n-auto-extractor').$at
 }
