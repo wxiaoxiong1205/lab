@@ -24,10 +24,51 @@ import type {
   PublishCaseResponse,
   StorageClass,
   UpdateNotebookRequest,
+  NotebookSquare,
   notebookSshResponse,
 } from '../types'
 import { mockNotebookService } from '../mock/mockNotebookService'
+import { isLocalPreview } from '../mock/localPreviewData'
 import apiClient from './apiClient'
+
+const isNotebookSquareListResponse = (value: unknown): value is NotebookSquareListResponse => {
+  return Boolean(
+    value
+    && typeof value === 'object'
+    && Array.isArray((value as NotebookSquareListResponse).items),
+  )
+}
+
+const getMockNotebookSquareList = async (
+  params: NotebookSquareSearchParams,
+): Promise<NotebookSquareListResponse> => {
+  const page = params.page ?? 1
+  const size = params.size ?? 10
+  const offset = Math.max(page - 1, 0) * size
+  const mockCases = await mockNotebookService.getNotebookCases({
+    search: params.name,
+    skip: offset,
+    limit: size,
+  })
+  const now = new Date().toISOString()
+  const items: NotebookSquare[] = mockCases.items.map((item, index) => ({
+    id: Number.parseInt(item.id.replace(/\D/g, ''), 10) || offset + index + 1,
+    name: item.name,
+    describe: item.description,
+    is_available: true,
+    created_at: item.created_at || now,
+    updated_at: item.updated_at || now,
+    created_by: item.created_by || 'DeepEXI Lab',
+    created_id: 0,
+  }))
+
+  return {
+    items,
+    total: mockCases.total,
+    page,
+    size,
+  }
+}
 
 export const notebookService = {
   // 获取Notebook模板列表
@@ -321,9 +362,20 @@ export const notebookService = {
         `notebooks/examples/notebook/list`,
         { params },
       )
+      if (isNotebookSquareListResponse(response.data)) {
+        return response.data
+      }
+      if (isLocalPreview) {
+        console.warn('本地预览：Notebook 广场接口未返回分页数据，使用演示案例兜底。', response.data)
+        return await getMockNotebookSquareList(params)
+      }
       return response.data
     }
     catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：Notebook 广场接口不可用，使用演示案例兜底。', error)
+        return await getMockNotebookSquareList(params)
+      }
       console.error('Failed to fetch notebook square list:', error)
       throw error
     }

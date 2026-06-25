@@ -62,11 +62,12 @@ export default function NotebookSquare() {
     staleTime: 0,
     gcTime: 0,
   })
+  const notebookCases = list?.items ?? []
   useEffect(() => {
     pollingCountRef.current = 0
   }, [searchParams])
   useEffect(() => {
-    const hasUnavailableCase = list?.items.some((item) => !item.is_available)
+    const hasUnavailableCase = notebookCases.some((item) => !item.is_available)
     if (!hasUnavailableCase) {
       pollingCountRef.current = 0
       return undefined
@@ -82,7 +83,7 @@ export default function NotebookSquare() {
     return () => {
       window.clearTimeout(timer)
     }
-  }, [isFetching, list?.items, refetchNotebookSquareList])
+  }, [isFetching, notebookCases, refetchNotebookSquareList])
   const handleSearch = (value: string) => {
     setSearchParams({ ...searchParams, name: value, page: 1 })
     refetchNotebookSquareList()
@@ -138,10 +139,10 @@ export default function NotebookSquare() {
               <Spin />
             </div>
           )
-        : list?.items.length > 0
+        : notebookCases.length > 0
           ? (
               <div className="grid grid-cols-3 gap-4 mb-4">
-                {list?.items.map((item) => (<NotebookCard key={item.id} title={item.name} description={item.describe} isAvailable={item.is_available} detail={() => handleViewDetail(item.id.toString())} deleteFn={() => handleDelete(item.id.toString())} copy={() => handleCopy(item.id.toString())} />))}
+                {notebookCases.map((item) => (<NotebookCard key={item.id} title={item.name} description={item.describe ?? ''} isAvailable={item.is_available} detail={() => handleViewDetail(item.id.toString())} deleteFn={() => handleDelete(item.id.toString())} copy={() => handleCopy(item.id.toString())} />))}
               </div>
             )
           : (
@@ -154,7 +155,7 @@ export default function NotebookSquare() {
         <Pagination
           current={searchParams.page}
           pageSize={searchParams.size}
-          total={list?.total}
+          total={list?.total ?? 0}
           onChange={(page, pageSize) => {
             setSearchParams({ ...searchParams, page, size: pageSize })
             refetchNotebookSquareList()
