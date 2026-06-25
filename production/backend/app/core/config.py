@@ -4,8 +4,21 @@ from typing import Optional, Literal, List, Tuple, Any, Dict
 from urllib.parse import urlparse, unquote_plus
 from dotenv import load_dotenv
 import urllib.parse
-# 再导入 JuiceFS SDK
-import juicefs
+import sys
+# 再导入 JuiceFS SDK。本地预览环境（尤其 Mac ARM64）可能没有可用的
+# JuiceFS wheel；允许应用先完成导入，真正使用存储能力时再抛出明确错误。
+try:
+    import juicefs
+except ModuleNotFoundError:
+    class _MissingJuiceFSClient:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("当前本地预览环境未安装 JuiceFS SDK，无法使用存储文件能力")
+
+    class _MissingJuiceFS:
+        Client = _MissingJuiceFSClient
+
+    juicefs = _MissingJuiceFS()
+    sys.modules["juicefs"] = juicefs
 import redis.asyncio as redis_async
 from redis.asyncio.client import Redis as AsyncRedis
 from redis.client import Redis as SyncRedis
@@ -481,4 +494,4 @@ def get_settings() -> Settings:
 
 
 # 导出常用配置，方便其他模块导入
-__all__ = ['Settings', 'settings', 'get_settings'] 
+__all__ = ['Settings', 'settings', 'get_settings']

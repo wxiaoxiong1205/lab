@@ -27,6 +27,12 @@ class LogService:
         self.loki_url = f"{settings.LOKI_PROTOCOL}://{settings.LOKI_ADDRESS}/loki/api/v1/query_range"
         
         # MinIO配置
+        if os.getenv("LAB_LOCAL_PREVIEW", "").lower() in {"1", "true", "yes", "on"}:
+            logger.info("LAB_LOCAL_PREVIEW=true，跳过 MinIO 日志归档客户端初始化")
+            self.minio_client = None
+            self.bucket = settings.MINIO_BUCKET
+            return
+
         try:
             self.minio_client = Minio(
                 endpoint=settings.MINIO_ENDPOINT,

@@ -45,6 +45,7 @@ from app.core.ssh_gateway import start_ssh_server
 from app.tasks.stop_notebook_task import NotebookTasks
 import asyncio
 import argparse
+import os
 
 setup_logging()
 # 记录应用启动日志
@@ -52,6 +53,10 @@ logger.info(f"DeepexiLab 开始运行")
 
 # 替换Python标准库中的json.dumps函数，确保全局默认使用ensure_ascii=False
 patch_json()
+
+
+def _is_local_preview() -> bool:
+    return os.getenv("LAB_LOCAL_PREVIEW", "").lower() in {"1", "true", "yes", "on"}
 
 
 def _get_validation_detail(exc: RequestValidationError) -> str:
@@ -151,19 +156,24 @@ def _log_exception_and_add_request_id(handler):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 启动ssh监听
-    # asyncio.create_task(start_ssh_server())
+    local_preview = _is_local_preview()
 
-    # 启动stop_notebook_tasks任务
-    stop_notebook_tasks = NotebookTasks()
-    stop_notebook_tasks.start()
+    if local_preview:
+        logger.info("LAB_LOCAL_PREVIEW=true，跳过 Redis/K8s/标注后台任务，仅启动 API 服务")
+    else:
+        # 启动ssh监听
+        # asyncio.create_task(start_ssh_server())
 
-    # 启动sync_k8s_labels任务
-    sync_k8s_labels = KubernetesLabelsSync()
-    sync_k8s_labels.start()
+        # 启动stop_notebook_tasks任务
+        stop_notebook_tasks = NotebookTasks()
+        stop_notebook_tasks.start()
 
-    # 启动标注事件消费者
-    await start_annotation_consumer()
+        # 启动sync_k8s_labels任务
+        sync_k8s_labels = KubernetesLabelsSync()
+        sync_k8s_labels.start()
+
+        # 启动标注事件消费者
+        await start_annotation_consumer()
 
     yield
 
@@ -171,7 +181,8 @@ async def lifespan(app: FastAPI):
     logger.info("应用正在关闭...")
 
     # 停止标注事件消费者
-    await stop_annotation_consumer()
+    if not local_preview:
+        await stop_annotation_consumer()
 
     # httpClient close
     await SharedAsyncClient.close()
