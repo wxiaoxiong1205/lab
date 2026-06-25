@@ -13,6 +13,8 @@ import { useConfigStore } from './stores/configStore'
 import { authApi, userApi } from './services/api'
 import configApi from './services/config'
 import { labAntdTheme } from './theme/antdTheme'
+import { mockMenuData } from './mock/mockMenuData'
+import { isLocalPreview, previewTenantAdminToken, previewTenantAdminUser } from './mock/localPreviewData'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -130,16 +132,24 @@ function AppContent() {
       const localTestToken = import.meta.env.VITE_LOCAL_TEST_TOKEN
       const existingToken = tokenStorage.getToken()
 
-      if (!token && existingToken) {
-        token = existingToken
+      if (!token && isLocalPreview) {
+        token = previewTenantAdminToken
+        console.log('🔧 使用本地预览租户管理员账号 lab@lab')
       }
       else if (!token && isLocalDev && localTestToken) {
         token = localTestToken
         console.log('🔧 使用本地测试 token')
       }
+      else if (!token && existingToken) {
+        token = existingToken
+      }
       const loginUrl = params.get('_login_url')
 
       if (!token || tokenLoginProcessed.current) {
+        if (!token && isLocalPreview && !tokenLoginProcessed.current) {
+          tokenLoginProcessed.current = true
+          setAuth(previewTenantAdminUser, previewTenantAdminToken, mockMenuData)
+        }
         setIsInitializing(false)
         return
       }
@@ -181,7 +191,9 @@ function AppContent() {
           return
         }
 
-        const user = await authApi.getCurrentUser()
+        const user = isLocalPreview && cleanToken === previewTenantAdminToken
+          ? previewTenantAdminUser
+          : await authApi.getCurrentUser()
         setAuth(user, cleanToken, menus)
 
         try {

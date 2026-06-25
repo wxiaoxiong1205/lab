@@ -1,10 +1,28 @@
 import type { KubernetesCluster, Project, RegistryConfig, StorageConfig } from '@/types'
+import type { User } from '@/types'
 import type { BaseModel, BaseModelListResponse, GetBaseModelsParams } from '@/types/model'
 import type { RegistryMirrorImage, RegistryMirrorImageListResponse } from '@/services/RegistryMirrorService'
 
 const now = '2026-06-24T15:30:00+08:00'
 
 export const isLocalPreview = import.meta.env.DEV
+
+export const previewTenantAdminCredentials = {
+  account: 'lab@lab',
+  username: 'lab',
+  enterpriseCode: 'lab',
+  password: 'abcd1234',
+}
+
+export const previewTenantAdminUser: User = {
+  userId: 10001,
+  username: previewTenantAdminCredentials.username,
+  accountId: 10001,
+  tenantId: 'lab',
+  enterpriseCode: previewTenantAdminCredentials.enterpriseCode,
+}
+
+export const previewTenantAdminToken = 'local-preview-lab-tenant-admin-token'
 
 export const previewProjects: Project[] = [
   {

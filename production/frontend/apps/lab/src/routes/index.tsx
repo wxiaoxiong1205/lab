@@ -3,7 +3,6 @@ import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { lazy } from 'react'
 import ProtectedRoute from '../components/ProtectedRoute'
 import ProjectLayout from '../layouts/ProjectLayout'
-import MainLayout from '../layouts/MainLayout'
 import HomePageWrapper from '../components/HomePageWrapper'
 import DocCenterFrame from '../pages/Docs/DocCenterFrame'
 import DynamicRedirect from '../components/DynamicRedirect'
@@ -189,9 +188,7 @@ const AppRoutes = () => {
         path="/docs/*"
         element={(
           <ProtectedRoute requireMenuPermission={false}>
-            <MainLayout>
-              <DocCenterFrame />
-            </MainLayout>
+            <DocCenterFrame />
           </ProtectedRoute>
         )}
       />

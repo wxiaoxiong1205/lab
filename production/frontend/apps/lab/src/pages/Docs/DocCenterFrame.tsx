@@ -22,7 +22,7 @@ const DocCenterFrame = () => {
 
   return (
     <div
-      className="h-[calc(100vh-60px)] min-h-0 bg-white"
+      className="h-screen min-h-0 bg-white"
     >
       <iframe
         src={docCenterUrl}
