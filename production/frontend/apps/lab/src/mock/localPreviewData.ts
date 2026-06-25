@@ -24,6 +24,23 @@ export const previewTenantAdminUser: User = {
 
 export const previewTenantAdminToken = 'local-preview-lab-tenant-admin-token'
 
+export const previewTenantAdminCredentials = {
+  account: 'lab@lab',
+  username: 'lab',
+  enterpriseCode: 'lab',
+  password: 'abcd1234',
+}
+
+export const previewTenantAdminUser: User = {
+  userId: 10001,
+  username: previewTenantAdminCredentials.username,
+  accountId: 10001,
+  tenantId: 'lab',
+  enterpriseCode: previewTenantAdminCredentials.enterpriseCode,
+}
+
+export const previewTenantAdminToken = 'local-preview-lab-tenant-admin-token'
+
 export const previewProjects: Project[] = [
   {
     id: 1001,
