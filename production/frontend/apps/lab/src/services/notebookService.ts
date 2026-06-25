@@ -39,12 +39,55 @@ const isNotebookSquareListResponse = (value: unknown): value is NotebookSquareLi
   )
 }
 
+const getProductionBuiltinMachineLearningNotebookCases = (): NotebookSquare[] => {
+  const now = new Date().toISOString()
+  return [
+    {
+      id: 10001,
+      name: 'YOLO目标检测案例',
+      describe: `# YOLO目标检测案例
+
+## 1. 简介
+
+在目标检测任务中，我们的目标是在图像中定位并识别出多个目标对象，预测每个对象的类别和边界框位置。本案例以 COCO128 数据集为例，演示如何进行 YOLO 目标检测模型的训练和预测。
+
+本案例使用 YOLO11n 作为基础模型，覆盖数据格式转换、训练集/验证集划分、模型加载和微调、训练过程监控、模型评估、单图推理以及服务部署。
+
+## 推荐跑通流程
+
+1. 准备 COCO128 数据集。
+2. 进入 train 目录安装依赖并执行训练。
+3. 导出可部署模型。
+4. 进入 service 目录启动推理服务。`,
+      is_available: true,
+      created_at: now,
+      updated_at: now,
+      created_by: 'system',
+      created_id: 0,
+    },
+  ]
+}
+
 const getMockNotebookSquareList = async (
   params: NotebookSquareSearchParams,
 ): Promise<NotebookSquareListResponse> => {
   const page = params.page ?? 1
   const size = params.size ?? 10
   const offset = Math.max(page - 1, 0) * size
+  if (params.biz_type === 'machine_learning') {
+    const normalizedSearch = params.name?.trim().toLowerCase()
+    const allItems = getProductionBuiltinMachineLearningNotebookCases()
+    const filteredItems = normalizedSearch
+      ? allItems.filter((item) => item.name.toLowerCase().includes(normalizedSearch))
+      : allItems
+    return {
+      items: filteredItems.slice(offset, offset + size),
+      total: filteredItems.length,
+      page,
+      size,
+    }
+  }
+
   const mockCases = await mockNotebookService.getNotebookCases({
     search: params.name,
     skip: offset,
