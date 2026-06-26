@@ -5,7 +5,7 @@ import type { RegistryMirrorImage, RegistryMirrorImageListResponse } from '@/ser
 
 const now = '2026-06-24T15:30:00+08:00'
 
-export const isLocalPreview = import.meta.env.DEV
+export const isLocalPreview = import.meta.env.DEV || import.meta.env.VITE_SHOWCASE_PREVIEW === 'true'
 
 export const previewTenantAdminCredentials = {
   account: 'lab@lab',
