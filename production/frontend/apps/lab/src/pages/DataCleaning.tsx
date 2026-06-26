@@ -60,6 +60,31 @@ const cleaningSteps = [
   },
 ]
 
+const fallbackCleaningTaskStatusOptions = [
+  { label: '已创建', value: '已创建' },
+  { label: '排队中', value: '排队中' },
+  { label: '运行中', value: '运行中' },
+  { label: '已完成', value: '已完成' },
+  { label: '失败', value: '失败' },
+  { label: '已终止', value: '已终止' },
+]
+
+const getCachedCleaningTaskStatusOptions = () => {
+  try {
+    const value = localStorage.getItem('projectEnumValues')
+    if (!value)
+      return fallbackCleaningTaskStatusOptions
+
+    const projectEnumValues = JSON.parse(value)
+    const allEnums = Array.isArray(projectEnumValues?.all_enums) ? projectEnumValues.all_enums : []
+    const options = allEnums.find((item: any) => item.enum_name === 'TrainingTaskStatus')?.options
+    return Array.isArray(options) && options.length > 0 ? options : fallbackCleaningTaskStatusOptions
+  }
+  catch {
+    return fallbackCleaningTaskStatusOptions
+  }
+}
+
 const getCleaningStatusClassName = (status: string) => {
   const text = TrainingTaskStatusMapping(status).text
   if (text.includes('完成') || text.includes('成功')) return 'data-cleaning-status-success'
@@ -108,10 +133,7 @@ const DataCleaning: React.FC = () => {
   }, [debouncedNameSearch, submitSearch])
 
   useEffect(() => {
-    const value = localStorage.getItem('projectEnumValues')
-    if (value) {
-      setCleaningTaskStatus(JSON.parse(value).all_enums.find((item) => item.enum_name === 'TrainingTaskStatus').options)
-    }
+    setCleaningTaskStatus(getCachedCleaningTaskStatusOptions())
   }, [])
   const numericProjectId = projectId ? Number(projectId) : currentProject?.id
   if (!numericProjectId) {

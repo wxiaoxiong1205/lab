@@ -204,9 +204,63 @@ export interface ProjectEnumValuesResponse {
   training_dataset?: []
   training_task?: []
 }
+const previewProjectEnumValues = {
+  all_enums: [
+    {
+      enum_name: 'TrainingTaskStatus',
+      module: 'training_task',
+      options: [
+        { label: '已创建', value: '已创建' },
+        { label: '排队中', value: '排队中' },
+        { label: '运行中', value: '运行中' },
+        { label: '已完成', value: '已完成' },
+        { label: '失败', value: '失败' },
+        { label: '已终止', value: '已终止' },
+      ],
+    },
+    {
+      enum_name: 'DatasetFormat',
+      module: 'training_dataset',
+      options: [
+        { label: 'Alpaca', value: 'alpaca' },
+        { label: 'Alpaca Messages', value: 'alpaca_messages' },
+        { label: 'ShareGPT', value: 'sharegpt' },
+        { label: '文本分类', value: 'text_classification' },
+      ],
+    },
+  ],
+  enums_by_module: {
+    training_task: [
+      {
+        enum_name: 'TrainingTaskStatus',
+        module: 'training_task',
+        options: [
+          { label: '已创建', value: '已创建' },
+          { label: '排队中', value: '排队中' },
+          { label: '运行中', value: '运行中' },
+          { label: '已完成', value: '已完成' },
+          { label: '失败', value: '失败' },
+          { label: '已终止', value: '已终止' },
+        ],
+      },
+    ],
+  },
+}
 export const getProjectEnum = async () => {
-  const response = await api.get<ProjectEnumValuesResponse>(`/enums/list`)
-  return response.data
+  try {
+    const response = await api.get<ProjectEnumValuesResponse>(`/enums/list`)
+    if (isLocalPreview && !Array.isArray((response.data as any)?.all_enums)) {
+      return previewProjectEnumValues
+    }
+    return response.data
+  }
+  catch (error) {
+    if (isLocalPreview) {
+      console.warn('本地预览：项目枚举获取失败，使用演示枚举兜底。', error)
+      return previewProjectEnumValues
+    }
+    throw error
+  }
 }
 export const projectApi = {
   /**

@@ -10,6 +10,32 @@ import { useProjectStore } from '@/stores/projectStore'
 import '../styles/log-blocks.css'
 
 const { Title, Text } = Typography
+
+const fallbackCleaningTaskStatusOptions = [
+  { label: '已创建', value: '已创建' },
+  { label: '排队中', value: '排队中' },
+  { label: '运行中', value: '运行中' },
+  { label: '已完成', value: '已完成' },
+  { label: '失败', value: '失败' },
+  { label: '已终止', value: '已终止' },
+]
+
+const getCachedCleaningTaskStatusOptions = () => {
+  try {
+    const value = localStorage.getItem('projectEnumValues')
+    if (!value)
+      return fallbackCleaningTaskStatusOptions
+
+    const projectEnumValues = JSON.parse(value)
+    const allEnums = Array.isArray(projectEnumValues?.all_enums) ? projectEnumValues.all_enums : []
+    const options = allEnums.find((item: any) => item.enum_name === 'TrainingTaskStatus')?.options
+    return Array.isArray(options) && options.length > 0 ? options : fallbackCleaningTaskStatusOptions
+  }
+  catch {
+    return fallbackCleaningTaskStatusOptions
+  }
+}
+
 /**
  * 清洗任务详情页面
  */
@@ -84,10 +110,7 @@ const CleaningTaskDetail: React.FC = () => {
     staleTime: 30 * 1000,
   })
   useEffect(() => {
-    const value = localStorage.getItem('projectEnumValues')
-    if (value) {
-      setCleaningTaskStatus(JSON.parse(value).all_enums.find((item) => item.enum_name === 'TrainingTaskStatus').options)
-    }
+    setCleaningTaskStatus(getCachedCleaningTaskStatusOptions())
   }, [])
   // 处理日志数据合并和轮询
   useEffect(() => {
