@@ -162,6 +162,9 @@ export const authApi = {
    * 获取菜单可见性配置
    */
   getMenuVisible: async () => {
+    if (isLocalPreview) {
+      return { visible: true, reason: 'showcase preview' }
+    }
     const response = await api.get<{ visible: boolean, reason: string }>('/permissions/menu/visible')
     return response.data
   },
@@ -997,6 +1000,10 @@ export const userApi = {
     // 用于测试菜单获取失败的情况
     // throw new Error('模拟菜单获取失败 - 用于测试错误处理功能');
 
+    if (isLocalPreview) {
+      return getLocalPreviewMenuData()
+    }
+
     try {
       const response = await api.get<unknown>('/menu')
       const menus = pickMenuArray(response.data)
@@ -1005,7 +1012,7 @@ export const userApi = {
         return menus
       }
 
-      if (import.meta.env.DEV) {
+      if (isLocalPreview) {
         console.warn('本地预览：/menu 未返回菜单数组，使用预览菜单数据兜底。', response.data)
         return getLocalPreviewMenuData()
       }
@@ -1013,7 +1020,7 @@ export const userApi = {
       return []
     }
     catch (error) {
-      if (import.meta.env.DEV) {
+      if (isLocalPreview) {
         console.warn('本地预览：/menu 获取失败，使用预览菜单数据兜底。', error)
         return getLocalPreviewMenuData()
       }
