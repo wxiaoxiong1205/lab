@@ -13,6 +13,7 @@ from app.schemas.training_dataset import (
     DatasetProcessingStatus, DatasetPublishStatus, TrainingDatasetExportTypeCategory, TrainingDatasetAggregationResponse,
     TrainingDatasetBasicInfoUpdate
 )
+from app.schemas.dataset_operation import DatasetVersionOperationResponse
 from app.schemas.training_task import TrainingTypeCategory, TrainingMethodType
 from app.services.chunk_upload.interface import ChunkUploadService
 from app.services.storage.interface import StorageService
@@ -147,10 +148,11 @@ class TrainingDatasetService(ABC):
     @abstractmethod
     async def delete_training_dataset_rows(
         self,
+        current_user: JwtUserInfo,
         project_id: int,
         dataset_id: int,
         row_numbers: List[int],
-    ) -> bool:
+    ) -> DatasetVersionOperationResponse:
         """异步删除训练数据集文件中的指定行"""
         pass
 

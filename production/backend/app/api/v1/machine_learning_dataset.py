@@ -23,6 +23,7 @@ from app.schemas.machine_learning_dataset import (
     MachineLearningDatasetTaskType,
     MachineLearningDatasetTemplateType, ExportFormat, TASK_EXPORT_FORMATS,
 )
+from app.schemas.dataset_operation import DatasetVersionOperationResponse
 from app.services.machine_learning_dataset.interface import MachineLearningDatasetService
 from app.utils.dataset_metadata_repair_status import (
     REPAIR_KIND_MACHINE_LEARNING_DATASET,
@@ -264,7 +265,7 @@ async def get_machine_learning_dataset_detail(
 
 
 
-@router.delete("/dataset/{project_id}/{dataset_id}/rows", response_model=bool, status_code=status.HTTP_200_OK)
+@router.delete("/dataset/{project_id}/{dataset_id}/rows", response_model=DatasetVersionOperationResponse, status_code=status.HTTP_200_OK)
 @inject
 async def delete_machine_learning_dataset_rows(
     project_id: int = Path(..., description="项目ID", gt=0),
@@ -274,17 +275,17 @@ async def delete_machine_learning_dataset_rows(
     machine_learning_dataset_service: MachineLearningDatasetService = Depends(
         Provide[AutoContainer.machine_learning_dataset_service]
     ),
-) -> bool:
-    """同步删除机器学习数据集文件中的指定行。
+) -> DatasetVersionOperationResponse:
+    """提交后台任务删除机器学习数据集文件中的指定行。
 
     前端需要传全局行号，不传当前页内序号；全局行号使用详情接口返回的 `row_number`。
     例如详情接口当前页返回 row_number 为 21、22、23，用户选中第 1、3 条时，传 `[21, 23]`。
 
     处理规则：
     - 仅 `publish = 0` 未发布的数据集允许删除；
-    - 接口会同步处理文件；
-    - 如果当前 `processing_status = pending`，说明数据集有任务正在处理，需要前端刷新后重试；
-    - 删除成功后会更新样本数和文件大小，并清理导出缓存。
+    - 接口返回后台删除任务信息；
+    - 删除任务处理期间，该版本不可发布、删除、创建新版本、合并版本或再次删除行；
+    - 任务成功后会更新样本数和文件大小，并清理导出缓存。
 
     请求示例：
     ```json
@@ -294,8 +295,9 @@ async def delete_machine_learning_dataset_rows(
     }
     ```
     """
-    _ = deps
+    _, current_user = deps
     return await machine_learning_dataset_service.delete_dataset_rows(
+        current_user=current_user,
         project_id=project_id,
         dataset_id=dataset_id,
         row_numbers=request.row_numbers,
@@ -379,7 +381,7 @@ async def repair_machine_learning_dataset_metadata_fields(
 
 
 
-@router.delete("/dataset/{project_id}/{dataset_id}/rows", response_model=bool, status_code=status.HTTP_200_OK)
+@router.delete("/dataset/{project_id}/{dataset_id}/rows", response_model=DatasetVersionOperationResponse, status_code=status.HTTP_200_OK)
 @inject
 async def delete_machine_learning_dataset_rows(
     project_id: int = Path(..., description="项目ID", gt=0),
@@ -389,17 +391,17 @@ async def delete_machine_learning_dataset_rows(
     machine_learning_dataset_service: MachineLearningDatasetService = Depends(
         Provide[AutoContainer.machine_learning_dataset_service]
     ),
-) -> bool:
-    """同步删除机器学习数据集文件中的指定行。
+) -> DatasetVersionOperationResponse:
+    """提交后台任务删除机器学习数据集文件中的指定行。
 
     前端需要传全局行号，不传当前页内序号；全局行号使用详情接口返回的 `row_number`。
     例如详情接口当前页返回 row_number 为 21、22、23，用户选中第 1、3 条时，传 `[21, 23]`。
 
     处理规则：
     - 仅 `publish = 0` 未发布的数据集允许删除；
-    - 接口会同步处理文件；
-    - 如果当前 `processing_status = pending`，说明数据集有任务正在处理，需要前端刷新后重试；
-    - 删除成功后会更新样本数和文件大小，并清理导出缓存。
+    - 接口返回后台删除任务信息；
+    - 删除任务处理期间，该版本不可发布、删除、创建新版本、合并版本或再次删除行；
+    - 任务成功后会更新样本数和文件大小，并清理导出缓存。
 
     请求示例：
     ```json
@@ -409,8 +411,9 @@ async def delete_machine_learning_dataset_rows(
     }
     ```
     """
-    _ = deps
+    _, current_user = deps
     return await machine_learning_dataset_service.delete_dataset_rows(
+        current_user=current_user,
         project_id=project_id,
         dataset_id=dataset_id,
         row_numbers=request.row_numbers,

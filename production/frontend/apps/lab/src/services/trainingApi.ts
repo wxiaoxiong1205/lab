@@ -9,12 +9,37 @@ import type {
   UploadTrainingDatasetRequest,
   UploadTrainingDatasetResponse,
   getDataParams } from '@/types/training/index'
+import { isLocalPreview } from '@/mock/localPreviewData'
+import {
+  deletePreviewTrainingDatasetAllVersions,
+  deletePreviewTrainingDatasetRows,
+  deletePreviewTrainingDatasetVersion,
+  editPreviewTrainingDataset,
+  isPreviewTrainingDatasetId,
+  isPreviewTrainingDatasetName,
+  mergePreviewTrainingDatasetList,
+  previewTrainingDatasetDetail,
+  previewTrainingDatasetList,
+  previewTrainingDatasetPreview,
+  publishPreviewTrainingDataset,
+} from '@/mock/previewTrainingDatasets'
 
 // 训练数据列表
 export const trainingDatasetService = {
   get: async (projectId: number, params: getDataParams): Promise<TrainingDatasetListResponse> => {
-    const response = await apiClient.get<TrainingDatasetListResponse>(`/training-datasets/project/${projectId}`, { params })
-    return response.data
+    try {
+      const response = await apiClient.get<TrainingDatasetListResponse>(`/training-datasets/project/${projectId}`, { params })
+      return isLocalPreview
+        ? mergePreviewTrainingDatasetList(response.data, params)
+        : response.data
+    }
+    catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：训练/测试数据集列表获取失败，使用 V1.14 showcase 演示数据兜底。', error)
+        return previewTrainingDatasetList(params)
+      }
+      throw error
+    }
   },
   /**
    * 上传训练数据集
@@ -70,25 +95,47 @@ export const trainingDatasetService = {
     return response.data
   },
   detail: async (projectId: number, datasetName: string, usage?: string, processing_status?: string, publish?: number): Promise<any> => {
-    const response = await apiClient.get<any>(`/training-datasets/project/${projectId}/dataset/${datasetName}`, {
-      params: {
-        usage,
-        processing_status,
-        publish,
-      },
-    })
-    return response.data
+    if (isLocalPreview && isPreviewTrainingDatasetName(datasetName)) {
+      return previewTrainingDatasetDetail(datasetName, usage)
+    }
+    try {
+      const response = await apiClient.get<any>(`/training-datasets/project/${projectId}/dataset/${datasetName}`, {
+        params: {
+          usage,
+          processing_status,
+          publish,
+        },
+      })
+      return response.data
+    }
+    catch (error) {
+      if (isLocalPreview && isPreviewTrainingDatasetName(datasetName)) {
+        return previewTrainingDatasetDetail(datasetName, usage)
+      }
+      throw error
+    }
   },
   // 数据预览
   preview: async (projectId: number, datasetId: string, version: string, page: number = 1, pageSize: number = 10, usage?: string) => {
-    const response = await apiClient.get<DatasetPreview>(`/training-datasets/project/${projectId}/dataset/${datasetId}/version/${version}/preview`, {
-      params: {
-        page,
-        size: pageSize,
-        usage,
-      },
-    })
-    return response.data
+    if (isLocalPreview && isPreviewTrainingDatasetName(datasetId)) {
+      return previewTrainingDatasetPreview(datasetId, version, page, pageSize, usage)
+    }
+    try {
+      const response = await apiClient.get<DatasetPreview>(`/training-datasets/project/${projectId}/dataset/${datasetId}/version/${version}/preview`, {
+        params: {
+          page,
+          size: pageSize,
+          usage,
+        },
+      })
+      return response.data
+    }
+    catch (error) {
+      if (isLocalPreview && isPreviewTrainingDatasetName(datasetId)) {
+        return previewTrainingDatasetPreview(datasetId, version, page, pageSize, usage)
+      }
+      throw error
+    }
   },
   /**
    * 创建数据集新版本
@@ -186,6 +233,10 @@ export const trainingDatasetService = {
     return response
   },
   delete: async (project_id: number, dataset_name: string, usage?: string) => {
+    if (isLocalPreview && isPreviewTrainingDatasetName(dataset_name)) {
+      deletePreviewTrainingDatasetAllVersions(dataset_name, usage)
+      return {}
+    }
     const response = await apiClient.delete<any>(`/training-datasets/project/${project_id}/dataset/${dataset_name}`, {
       params: {
         usage,
@@ -194,6 +245,10 @@ export const trainingDatasetService = {
     return response.data
   },
   deleteVersion: async (project_id: number, dataset_name: string, version: string, usage?: string) => {
+    if (isLocalPreview && isPreviewTrainingDatasetName(dataset_name)) {
+      deletePreviewTrainingDatasetVersion(dataset_name, version, usage)
+      return {}
+    }
     const response = await apiClient.delete<any>(`/training-datasets/project/${project_id}/dataset/${dataset_name}/${version}`, {
       params: {
         usage,
@@ -204,6 +259,10 @@ export const trainingDatasetService = {
 
   // 编辑数据集名称和描述 dataset_id 数据集名称 训练/验证/测试数据集 name为修改后的数据集名称 dataset_name为修改前的数据集名称
   edit: async (project_id: number, dataset_name: string, dataset_id: number, usage: string, name?: string, description?: string) => {
+    if (isLocalPreview && isPreviewTrainingDatasetId(dataset_id)) {
+      editPreviewTrainingDataset(dataset_name, dataset_id, usage, name, description)
+      return {}
+    }
     const response = await apiClient.patch(
       `/training-datasets/project/${project_id}/dataset/${dataset_name}/basic-info`,
       {
@@ -222,6 +281,10 @@ export const trainingDatasetService = {
 
   // publish 传1 代表发布 传0代表未发布（无对应功能） 固定传1
   publish: async (project_id: number, dataset_id: number, publish: number) => {
+    if (isLocalPreview && isPreviewTrainingDatasetId(dataset_id)) {
+      publishPreviewTrainingDataset(dataset_id)
+      return {}
+    }
     const response = await apiClient.patch(
       `/training-datasets/project/${project_id}/dataset/${dataset_id}/publish`,
       {
@@ -233,6 +296,10 @@ export const trainingDatasetService = {
 
   //  删除详情中的行数据 row_number number数组 按照preview数据预览接口返回的序号 传入
   deleteRow: async (project_id: number, dataset_id: number, row_numbers: number[]) => {
+    if (isLocalPreview && isPreviewTrainingDatasetId(dataset_id)) {
+      deletePreviewTrainingDatasetRows(dataset_id, row_numbers)
+      return {}
+    }
     const response = await apiClient.delete(
       `/training-datasets/project/${project_id}/dataset/${dataset_id}/rows`,
       {

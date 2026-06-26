@@ -25,6 +25,18 @@ export interface ItemList {
   updated_at: string
   created_by: string
   is_annotated: boolean // 是否有标注信息
+  active_operation?: DatasetVersionOperation
+}
+
+export interface DatasetVersionOperation {
+  operation_id?: string
+  operation_type?: string
+  status?: 'queued' | 'running' | 'succeeded' | 'failed' | string
+  row_numbers?: number[]
+  requested_count?: number
+  removed_count?: number
+  error_message?: string
+  updated_at?: string
 }
 // 创建数据集/新增版本接口 请求体定义
 export interface CreateDatasetRequest {
@@ -96,6 +108,9 @@ export interface DatasetDetailsResponse {
   status_display: string
   is_published?: boolean
   processing_status_display?: string
+  processing_status?: string
+  publish?: number
+  active_operation?: DatasetVersionOperation
 }
 export interface ItemDetail {
   row_number: number

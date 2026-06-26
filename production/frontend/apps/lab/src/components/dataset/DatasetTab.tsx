@@ -11,6 +11,7 @@ import type { ProjectEnumValuesResponse } from '@/services/api.ts'
 import { trainingDatasetService } from '@/services/trainingApi.ts'
 import { calculatePageAfterDelete } from '@/utils/paginationUtils.ts'
 import { getTablePagination } from '@/utils/tablePagination'
+import { formatDatasetCreationStatus } from '@/utils/datasetStatus'
 
 const { Option } = Select
 const { Text } = Typography
@@ -291,7 +292,7 @@ const DatasetTab: React.FC<DatasetTabProps> = ({ projectId, type, basePath, data
       width: 170,
       render: (text: string, record) => (
         <Space className="!gap-x-[23px]">
-          <span className={getStatusClassName(text)}>{text || '-'}</span>
+          <span className={getStatusClassName(formatDatasetCreationStatus(text))}>{formatDatasetCreationStatus(text)}</span>
           {record?.processing_error && (
             <Tooltip title={record.processing_error}>
               <ExclamationCircleOutlined className="cursor-pointer" style={{ color: 'rgba(112, 118, 127, 1)' }} />

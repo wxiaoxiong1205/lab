@@ -60,6 +60,7 @@
 }
 
 .design-doc-panel__header {
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -89,6 +90,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .design-doc-panel__tabs .ant-tabs-nav {
@@ -103,9 +105,25 @@
   flex: 1;
 }
 
-.design-doc-panel__content {
+.design-doc-panel__tabs .ant-tabs-content-holder {
+  display: flex;
+  overflow: hidden;
+}
+
+.design-doc-panel__tabs .ant-tabs-content {
   height: 100%;
-  overflow: auto;
+}
+
+.design-doc-panel__tabs .ant-tabs-tabpane {
+  overflow: hidden;
+}
+
+.design-doc-panel__content {
+  min-height: 0;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 18px 20px 28px;
 }
 

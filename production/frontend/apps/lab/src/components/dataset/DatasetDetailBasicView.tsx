@@ -2,6 +2,7 @@ import { Descriptions, Tag, Typography, message } from 'antd'
 import { useState } from 'react'
 import { ModelTypeMapping, TrainingMethodTypeMapping } from '@/utils/EnumMaping.ts'
 import type { Attribute } from '@/types/training'
+import { formatDatasetCreationStatus, formatDatasetVersionStatus, isDatasetCreateSucceeded } from '@/utils/datasetStatus'
 
 const { Paragraph, Text } = Typography
 
@@ -19,6 +20,7 @@ export interface BasicViewDataType {
   usage: string
   dataset_type: string
   publish_display?: string
+  dataset_config?: Record<string, any> | string | null
   attr_values: Attribute[]
 }
 
@@ -37,9 +39,67 @@ const getFormatTag = (format: string, selectedVersion?: BasicViewDataType) => {
 }
 
 const getPublishTag = (data: BasicViewDataType) => {
-  const text = data.publish_display
+  const creationStatus = formatDatasetCreationStatus(data.processing_status_display)
+  const text = isDatasetCreateSucceeded(creationStatus)
+    ? formatDatasetVersionStatus(data as unknown as Record<string, any>)
+    : (data.publish_display || '-')
   const color = text === '已发布' ? 'green' : 'orange'
   return <Tag color={color}>{text}</Tag>
+}
+
+const formatAttributeValue = (item: Attribute) => {
+  const optionValues = item.options
+    ?.map((option) => option.option_value)
+    .filter(Boolean)
+    .join('、')
+  const manualValue = (item as any).attr_value
+  const value = optionValues || (manualValue !== undefined && manualValue !== null && manualValue !== '' ? String(manualValue) : '-')
+  return `${item.name || '未命名属性'}: ${value}`
+}
+
+const normalizeSourceVersions = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean)
+  }
+  if (typeof value === 'string') {
+    return value.split(/[,+，、]/).map((item) => item.trim()).filter(Boolean)
+  }
+  return []
+}
+
+const getDatasetConfig = (rawConfig: BasicViewDataType['dataset_config']) => {
+  if (!rawConfig) return {}
+  if (typeof rawConfig === 'string') {
+    try {
+      const parsed = JSON.parse(rawConfig)
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? parsed as Record<string, any>
+        : {}
+    }
+    catch {
+      return {}
+    }
+  }
+  return rawConfig
+}
+
+const formatDatasetSource = (data: BasicViewDataType) => {
+  const config = getDatasetConfig(data.dataset_config)
+  const dataSourceType = config.data_source_type || config.source_type || config.data_source
+  const inheritSource = config.inherit_source_version || config.source_version || config.inherit_version
+  const mergeSources = normalizeSourceVersions(config.merge_source_versions || config.source_versions || config.merge_versions)
+  const hasUploadedFiles = Boolean(config.has_uploaded_files || config.local_upload || config.uploaded_files)
+
+  if (dataSourceType === 'merge' || mergeSources.length > 0) {
+    return mergeSources.length > 0 ? `合并（${mergeSources.join('+')}）` : '合并'
+  }
+  if (inheritSource) {
+    const inherited = `继承（${inheritSource}）`
+    return dataSourceType === 'inherit_upload' || hasUploadedFiles
+      ? `${inherited}+本地上传`
+      : inherited
+  }
+  return '本地上传'
 }
 
 const DatasetDetailBasicView = ({
@@ -118,8 +178,8 @@ const DatasetDetailBasicView = ({
     }] : []),
     {
       key: 'processing_status_display',
-      label: '状态',
-      children: <strong>{data.processing_status_display || '-'}</strong>,
+      label: '创建状态',
+      children: <strong>{formatDatasetCreationStatus(data.processing_status_display)}</strong>,
     },
     {
       key: 'publish_display',
@@ -169,8 +229,13 @@ const DatasetDetailBasicView = ({
     },
     {
       key: 'attr_values',
-      label: '属性分类',
-      children: <Text>{data.attr_values?.map((item) => item.options?.map((option) => option.option_value).join(',') || '-').join(',') || '-'}</Text>,
+      label: '数据属性',
+      children: <Text>{data.attr_values?.length ? data.attr_values.map(formatAttributeValue).join('；') : '-'}</Text>,
+    },
+    {
+      key: 'data_source',
+      label: '数据来源',
+      children: <Text>{formatDatasetSource(data)}</Text>,
     },
   ]
 

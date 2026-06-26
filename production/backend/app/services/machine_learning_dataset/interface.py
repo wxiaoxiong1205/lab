@@ -19,6 +19,7 @@ from app.schemas.machine_learning_dataset import (
     MachineLearningDatasetTaskType,
     MachineLearningDatasetTemplateType, ExportFormat,
 )
+from app.schemas.dataset_operation import DatasetVersionOperationResponse
 from app.services.chunk_upload.interface import ChunkUploadService
 from app.services.storage.interface import StorageService
 
@@ -92,11 +93,12 @@ class MachineLearningDatasetService(ABC):
     @abstractmethod
     async def delete_dataset_rows(
         self,
+        current_user: JwtUserInfo,
         project_id: int,
         dataset_id: int,
         row_numbers: List[int],
-    ) -> bool:
-        """同步删除机器学习数据集文件中的指定行"""
+    ) -> DatasetVersionOperationResponse:
+        """提交后台任务删除机器学习数据集文件中的指定行。"""
         pass
 
     @abstractmethod

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import type { SelectProps } from 'antd'
-import { Button, Form, Input, Layout, Radio, Select, Space, Switch, Tag, Tooltip, message } from 'antd'
+import { Alert, Button, Form, Input, Layout, Radio, Select, Space, Switch, Tag, Tooltip, message } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
@@ -13,6 +13,7 @@ import type { UploadDatasetVersionRequest } from '@/types/training'
 import { ModelTypeMapping, TrainingMethodTypeMapping } from '@/utils/EnumMaping.ts'
 import { downloadDatasetExample } from '@/utils/download'
 import ChunkFileUploader from '@/components/common/ChunkFileUploader'
+import { formatDatasetVersionStatus } from '@/utils/datasetStatus'
 import './CreateDatasetPage.css'
 
 const TEXT_FILE_MAX_SIZE_MB = 500
@@ -67,6 +68,26 @@ const CreateDatasetVersionPage: React.FC<CreateDatasetVersionPageProps> = ({ typ
 
   const latestVersionItem
     = Array.isArray(datasetInfo) && datasetInfo.length > 0 ? datasetInfo[datasetInfo.length - 1] : null
+  const latestVersionStatus = latestVersionItem ? formatDatasetVersionStatus(latestVersionItem) : ''
+  const canCreateNextVersion = !!latestVersionItem && latestVersionStatus === '已发布'
+  const newVersionBlockedReason = latestVersionItem
+    ? latestVersionStatus === '创建失败'
+      ? '最新版本创建失败，不能新增下一个版本'
+      : latestVersionStatus === '未发布'
+        ? '最新版本未发布，发布后才能新增下一个版本'
+        : latestVersionStatus === '创建中'
+          ? '最新版本创建中，创建完成并发布后才能新增下一个版本'
+          : latestVersionStatus === '已发布'
+            ? ''
+            : '最新版本需已发布后才能新增下一个版本'
+    : '正在读取最新版本状态'
+  const isPublishedVersion = (item: any) => {
+    if (!item) return false
+    return formatDatasetVersionStatus(item) === '已发布'
+  }
+  const publishedVersionOptions = Array.isArray(datasetInfo)
+    ? datasetInfo.filter(isPublishedVersion)
+    : []
   /**
    * 计算新版本号
    * @returns 新版本号字符串，如 "V6"
@@ -99,8 +120,8 @@ const CreateDatasetVersionPage: React.FC<CreateDatasetVersionPageProps> = ({ typ
    */
   const getDatasetFormat = (dataSource: string) => {
     const projectEnumValues = JSON.parse(localStorage.getItem('projectEnumValues') || '[]')
-    const datasetFormat = projectEnumValues.all_enums.find((item: any) => item.enum_name === 'DatasetFormat')
-    return datasetFormat.options.find((item: any) => item.value === dataSource)?.name
+    const datasetFormat = projectEnumValues?.all_enums?.find((item: any) => item.enum_name === 'DatasetFormat')
+    return datasetFormat?.options?.find((item: any) => item.value === dataSource)?.name || dataSource || '-'
   }
   /**
    * 获取数据用途标签
@@ -121,6 +142,11 @@ const CreateDatasetVersionPage: React.FC<CreateDatasetVersionPageProps> = ({ typ
   }
   // 表单提交处理
   const handleSubmit = async (values: any) => {
+    if (!canCreateNextVersion) {
+      message.error(newVersionBlockedReason)
+      return
+    }
+
     setLoading(true)
     try {
       // 根据接口要求创建UploadDatasetVersionRequest对象
@@ -170,6 +196,10 @@ const CreateDatasetVersionPage: React.FC<CreateDatasetVersionPageProps> = ({ typ
         requestData.source_version = selectedHistoryVersion
 
         if (!uploadFn()) return
+      }
+      else if (inheritFromHistory) {
+        message.error('请选择已发布的历史版本')
+        return
       }
       else {
         if (!uploadFn()) return
@@ -353,7 +383,7 @@ const CreateDatasetVersionPage: React.FC<CreateDatasetVersionPageProps> = ({ typ
               <Button className="create-form-cancel" onClick={handleCancel}>
                 取消
               </Button>
-              <Button className="create-form-submit" type="primary" onClick={() => form.submit()} loading={loading}>
+              <Button className="create-form-submit" type="primary" onClick={() => form.submit()} loading={loading} disabled={!canCreateNextVersion}>
                 提交
               </Button>
             </>
@@ -363,6 +393,14 @@ const CreateDatasetVersionPage: React.FC<CreateDatasetVersionPageProps> = ({ typ
         <div className="create-form-divider" />
 
         <div className="create-form-body">
+          {!canCreateNextVersion && (
+            <Alert
+              className="mb-4"
+              type="warning"
+              showIcon
+              message={newVersionBlockedReason}
+            />
+          )}
           <Form
             form={form}
             layout="vertical"
@@ -417,10 +455,10 @@ const CreateDatasetVersionPage: React.FC<CreateDatasetVersionPageProps> = ({ typ
 
             {inheritFromHistory && (
               <Form.Item className="create-dataset-url-field" label="历史版本">
-                {datasetInfo && datasetInfo.length > 0 ? (
+                {publishedVersionOptions.length > 0 ? (
                   <Select
-                    placeholder="请选择要继承的历史版本"
-                    value={selectedHistoryVersion ?? datasetInfo?.[datasetInfo?.length - 1]?.version}
+                    placeholder="请选择已发布版本"
+                    value={selectedHistoryVersion}
                     onChange={setSelectedHistoryVersion}
                     allowClear
                     showSearch
@@ -430,8 +468,8 @@ const CreateDatasetVersionPage: React.FC<CreateDatasetVersionPageProps> = ({ typ
                     filterOption={(input, option) =>
                       (option?.label as string)?.toLowerCase()?.includes(input.toLowerCase()) ?? false}
                   >
-                    {datasetInfo?.map((item) => {
-                      const isActive = datasetInfo.length > 1 && item.active
+                    {publishedVersionOptions.map((item) => {
+                      const isActive = item.id === latestVersionItem?.id
                       const formattedDate = item.created_at
                         ? new Date(item.created_at).toLocaleString()
                         : '未知'
@@ -478,7 +516,7 @@ const CreateDatasetVersionPage: React.FC<CreateDatasetVersionPageProps> = ({ typ
                 ) : (
                   // 空状态处理
                   <div className="p-4 bg-gray-50 rounded-md text-center text-gray-500">
-                    暂无历史版本数据
+                    暂无已发布历史版本
                   </div>
                 )}
               </Form.Item>

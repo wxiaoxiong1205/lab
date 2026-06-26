@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, model_validator
 from app.schemas.common import BaseModelWithTimezone
 from app.schemas.training_task import TrainingTypeCategory, TrainingMethodType
 from app.schemas.business_attr_value import BusinessAttrValueResponse
+from app.schemas.dataset_operation import DatasetVersionOperationResponse
 from enum import Enum
 
 # 数据集格式枚举 - 根据数据库定义：prompt-response, role-based, prefix-suffix-middle
@@ -123,6 +124,7 @@ class TrainingDatasetResponse(BaseModelWithTimezone):
     updated_at: datetime = Field(..., description="更新时间")
     created_by: Optional[str] = Field(None, description="创建人")
     attr_values: Optional[List[BusinessAttrValueResponse]] = Field(default_factory=list, description="关联属性值及选项列表")
+    active_operation: Optional[DatasetVersionOperationResponse] = Field(None, description="当前未完成的版本操作")
 
     class Config:
         from_attributes = True

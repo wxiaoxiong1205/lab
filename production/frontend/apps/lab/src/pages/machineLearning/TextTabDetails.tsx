@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { Button, Popconfirm, Table, Typography } from 'antd'
+import { Button, Popconfirm, Table, Tooltip, Typography } from 'antd'
 import { renderEntityRecognitionText } from './renderEntityRecognitionText'
 import type {
   Annotation,
@@ -18,7 +18,10 @@ interface TextTabDetailsProps {
   total: number
   onPageChange: (page: number) => void
   canDeleteRows?: boolean
+  deleteLocked?: boolean
   deletingRowNumber?: number | null
+  deletingRowNumbers?: number[]
+  failedRowNumbers?: number[]
   onDeleteRow?: (record: ItemDetail) => void | Promise<void>
 }
 
@@ -80,7 +83,10 @@ const TextTabDetails: React.FC<TextTabDetailsProps> = ({
   total,
   onPageChange,
   canDeleteRows,
+  deleteLocked,
   deletingRowNumber,
+  deletingRowNumbers = [],
+  failedRowNumbers = [],
   onDeleteRow,
 }) => {
   const isEntityRecognition
@@ -161,34 +167,60 @@ const TextTabDetails: React.FC<TextTabDetailsProps> = ({
     align: 'center' as const,
     render: (_: unknown, record: ItemDetail) => {
       const rowNumber = Number((record as any)?.row_number)
-      const canDelete = Number.isFinite(rowNumber) && !!onDeleteRow
+      const isDeleting = deletingRowNumbers.includes(rowNumber)
+      const isDeleteFailed = failedRowNumbers.includes(rowNumber)
+      const canDelete = Number.isFinite(rowNumber) && !!onDeleteRow && !deleteLocked
       return (
-        <Popconfirm
-          title="确认删除"
-          description="确定要删除该行数据吗？删除后将无法恢复。"
-          okText="确认删除"
-          cancelText="取消"
-          okButtonProps={{ danger: true }}
-          disabled={!canDelete}
-          onConfirm={() => onDeleteRow?.(record)}
-        >
+        isDeleting ? (
           <Button
             type="link"
             danger
             size="small"
-            disabled={!canDelete}
-            loading={deletingRowNumber === rowNumber}
+            disabled
+            loading
           >
-            删除
+            删除中
           </Button>
-        </Popconfirm>
+        ) : isDeleteFailed ? (
+          <Tooltip title="重新提交该条数据的删除任务">
+            <Button
+              type="link"
+              danger
+              size="small"
+              disabled={!canDelete}
+              onClick={() => onDeleteRow?.(record)}
+            >
+              重试删除
+            </Button>
+          </Tooltip>
+        ) : (
+          <Popconfirm
+            title="确认删除该条数据？"
+            description="数据集较大时删除可能需要较长时间。确认后将进入后台处理，处理完成前该版本不可发布、删除、创建新版本或合并版本。"
+            okText="确认删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+            disabled={!canDelete}
+            onConfirm={() => onDeleteRow?.(record)}
+          >
+            <Button
+              type="link"
+              danger
+              size="small"
+              disabled={!canDelete}
+              loading={deletingRowNumber === rowNumber}
+            >
+              删除
+            </Button>
+          </Popconfirm>
+        )
       )
     },
   }
 
   const columns = [
     ...(isEntityRecognition ? baseColumns : [...baseColumns, labelColumn]),
-    ...(canDeleteRows ? [actionColumn] : []),
+    ...(canDeleteRows || failedRowNumbers.length ? [actionColumn] : []),
   ]
 
   return (
@@ -196,6 +228,12 @@ const TextTabDetails: React.FC<TextTabDetailsProps> = ({
       columns={columns}
       dataSource={rows}
       loading={loading}
+      rowClassName={(record: any) => {
+        const rowNumber = Number(record?.row_number)
+        if (failedRowNumbers.includes(rowNumber)) return 'bg-red-50 text-red-700'
+        if (deletingRowNumbers.includes(rowNumber)) return 'opacity-50 text-gray-400'
+        return ''
+      }}
       rowKey={(record: any) => record?.key ?? `row-${record?.row_number ?? ''}`}
       pagination={{
         current: page,

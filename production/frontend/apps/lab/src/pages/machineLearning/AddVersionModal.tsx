@@ -121,8 +121,16 @@ const AddVersionModal: React.FC<AddVersionModalProps> = ({
     }
   }
 
+  const isPublishedVersion = (version: ItemList) => {
+    if (version.is_published !== undefined && version.is_published !== null) {
+      return version.is_published === true
+    }
+    return (version.publish_display || version.status_display) === '已发布'
+  }
+  const publishedHistoryVersions = historyVersions.filter(isPublishedVersion)
+
   const getSelectedSourceVersion = (sourceVersionId?: number) => {
-    return historyVersions.find((v) => v.id === sourceVersionId)
+    return publishedHistoryVersions.find((v) => v.id === sourceVersionId)
   }
 
   const handleSourceVersionChange = (sourceVersionId?: number) => {
@@ -240,13 +248,13 @@ const AddVersionModal: React.FC<AddVersionModalProps> = ({
           <Form.Item
             name="sourceVersionId"
             label="历史版本:"
-            rules={[{ required: true, message: '请选择版本' }]}
+            rules={[{ required: true, message: '请选择已发布版本' }]}
           >
             <Select
-              placeholder="请选择版本"
+              placeholder="请选择已发布版本"
               allowClear
               onChange={handleSourceVersionChange}
-              options={historyVersions.map((v) => ({
+              options={publishedHistoryVersions.map((v) => ({
                 value: v.id,
                 label: `${v.version}（${v.is_annotated ? '有标注信息' : '无标注信息'}）`,
               }))}

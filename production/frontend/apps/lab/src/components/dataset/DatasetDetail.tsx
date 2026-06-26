@@ -1,4 +1,4 @@
-import { Button, Card, Col, Dropdown, Modal, Popconfirm, Row, Spin, Table, Tag, Typography, message } from 'antd'
+import { Alert, Button, Card, Col, Dropdown, Modal, Popconfirm, Row, Spin, Table, Tag, Tooltip, Typography, message } from 'antd'
 import { ArrowLeftOutlined, DatabaseOutlined, DownOutlined, FileTextOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -11,13 +11,11 @@ import ExpandableCell from '@/components/common/ExpandableCell.tsx'
 import { expandImageData, replaceImagePlaceholders } from '@/utils/imageUtils.ts'
 import { isInteractiveElement } from '@/utils/domUtils'
 import { downloadBlobFile, extractFilenameFromHeaders, getContentType, processFilenameExtension } from '@/utils/download.ts'
+import { formatDatasetVersionStatus, isDatasetCreateFailed, isDatasetCreateSucceeded, isDatasetCreating } from '@/utils/datasetStatus'
 import './DatasetDetail.css'
 
 const { Text } = Typography
-const DELETE_ROW_POLL_INTERVAL = 300
-const DELETE_ROW_POLL_MAX_TIMES = 10
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const DELETE_ROW_POLL_INTERVAL = 2500
 
 const PREVIEW_META_KEYS = new Set(['key', 'id', 'item', 'row_number', 'base_url', 'images'])
 
@@ -175,6 +173,17 @@ interface DatasetAsyncExportResponse {
   message?: string
 }
 
+interface DatasetVersionOperation {
+  operation_id?: string
+  operation_type?: string
+  status?: 'queued' | 'running' | 'succeeded' | 'failed' | string
+  row_numbers?: number[]
+  requested_count?: number
+  removed_count?: number
+  error_message?: string
+  updated_at?: string
+}
+
 interface DatasetDetailProps {
   type: 'training' | 'test' | 'validation'
   usage: string
@@ -200,6 +209,7 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
   const [deletingVersion, setDeletingVersion] = useState<string | null>(null)
   const [publishingVersion, setPublishingVersion] = useState<string | null>(null)
   const [deletingRowNumber, setDeletingRowNumber] = useState<number | null>(null)
+  const [dismissedOperationIds, setDismissedOperationIds] = useState<Set<string>>(new Set())
   // 添加展开状态管理，key格式: `${rowKey}-${columnKey}`
   const [expandedCells, setExpandedCells] = useState<Set<string>>(new Set())
   // 添加单元格高度跟踪，key格式: `${rowKey}-${columnKey}`
@@ -324,60 +334,101 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
 
   const isVersionUnpublished = (versionItem: any) => {
     if (!versionItem) return false
-    const publishDisplay = versionItem.status_display ?? versionItem.publish_display
-    if (publishDisplay !== undefined && publishDisplay !== null && publishDisplay !== '') {
-      return publishDisplay !== '已发布'
-    }
-    if (versionItem.is_published !== undefined && versionItem.is_published !== null) {
-      return versionItem.is_published === false
-    }
-    return false
+    return formatDatasetVersionStatus(versionItem) === '未发布'
   }
 
   const renderPublishStatusBadge = (versionItem: any) => {
-    const publishDisplay = versionItem?.status_display
-    if (!publishDisplay) return null
+    const versionStatus = formatDatasetVersionStatus(versionItem)
+    if (!versionStatus || versionStatus === '-') return null
 
-    const unpublished = isVersionUnpublished(versionItem)
-    const colorClass = unpublished
-      ? 'bg-orange-50 text-orange-500'
-      : 'bg-green-50 text-green-600'
+    const colorClassMap: Record<string, string> = {
+      创建中: 'bg-blue-50 text-blue-500',
+      创建失败: 'bg-red-50 text-red-500',
+      未发布: 'bg-orange-50 text-orange-500',
+      已发布: 'bg-green-50 text-green-600',
+    }
+    const colorClass = colorClassMap[versionStatus] || 'bg-gray-50 text-gray-500'
 
     return (
       <span className={`absolute right-3 top-2 rounded-full px-3 py-[2px] text-xs leading-5 font-medium ${colorClass}`}>
-        {publishDisplay}
+        {versionStatus}
       </span>
     )
   }
 
-  const canDeletePreviewRows = () => {
-    return selectedVersion?.processing_status_display === '处理完成'
-      && isVersionUnpublished(selectedVersion)
+  const getLatestDatasetVersion = () => {
+    if (Array.isArray(dataset)) {
+      return dataset[dataset.length - 1]
+    }
+    return dataset
   }
 
-  const waitForDeleteRowProcessingComplete = async (currentVersion: any) => {
-    let latestVersion = currentVersion
+  const getDeleteRowsOperation = (versionItem: any): DatasetVersionOperation | null => {
+    const operation = versionItem?.active_operation
+    if (!operation || operation.operation_type !== 'delete_rows') return null
+    return operation
+  }
 
-    for (let times = 0; times < DELETE_ROW_POLL_MAX_TIMES; times++) {
-      const result = await refetch()
-      if (result.data) {
-        latestVersion = pickSelectedVersionFromDetail(result.data, latestVersion)
-        setSelectedVersion(latestVersion)
-      }
+  const isDeleteOperationRunning = (operation?: DatasetVersionOperation | null) => {
+    return operation?.status === 'queued' || operation?.status === 'running'
+  }
 
-      const processingStatus = latestVersion?.processing_status_display || ''
-      if (processingStatus === '处理完成') {
-        return latestVersion
-      }
+  const activeDeleteOperation = getDeleteRowsOperation(selectedVersion)
+  const isActiveDeleteOperationRunning = isDeleteOperationRunning(activeDeleteOperation)
+  const isActiveDeleteOperationFailed = activeDeleteOperation?.status === 'failed'
+  const isFailedOperationDismissed = Boolean(
+    activeDeleteOperation?.operation_id && dismissedOperationIds.has(activeDeleteOperation.operation_id),
+  )
+  const activeDeleteRequestedCount = activeDeleteOperation?.requested_count
+    || activeDeleteOperation?.row_numbers?.length
+    || 1
+  const activeDeleteRemovedCount = activeDeleteOperation?.removed_count || 0
+  const activeDeleteFailedCount = Math.max(activeDeleteRequestedCount - activeDeleteRemovedCount, 0)
+  const activeDeleteRowNumbers = new Set(
+    isActiveDeleteOperationRunning ? (activeDeleteOperation?.row_numbers || []).map(Number) : [],
+  )
+  const failedDeleteRowNumbers = new Set(
+    isActiveDeleteOperationFailed
+      ? (activeDeleteOperation?.row_numbers || []).map(Number)
+      : [],
+  )
+  const isRowInActiveDeleteOperation = (record: any) => {
+    const rowNumber = getPreviewRowNumber(record)
+    return rowNumber !== undefined && activeDeleteRowNumbers.has(rowNumber)
+  }
+  const isRowInFailedDeleteOperation = (record: any) => {
+    const rowNumber = getPreviewRowNumber(record)
+    return rowNumber !== undefined && failedDeleteRowNumbers.has(rowNumber)
+  }
 
-      if (processingStatus !== '处理中') {
-        return latestVersion
-      }
+  const getNewVersionBlockedReason = () => {
+    const latestVersion = getLatestDatasetVersion()
+    if (!latestVersion) return ''
 
-      await sleep(DELETE_ROW_POLL_INTERVAL)
+    const latestOperation = getDeleteRowsOperation(latestVersion)
+    if (isDeleteOperationRunning(latestOperation)) {
+      return '最新版本有删除任务处理中，请完成后再新增下一版本'
     }
 
-    return latestVersion
+    const latestVersionStatus = formatDatasetVersionStatus(latestVersion)
+    if (latestVersionStatus === '已发布') return ''
+
+    if (latestVersionStatus === '创建失败') {
+      return '最新版本创建失败，不能新增下一个版本'
+    }
+    if (latestVersionStatus === '未发布') {
+      return '最新版本未发布，发布后才能新增下一个版本'
+    }
+    if (latestVersionStatus === '创建中') {
+      return '最新版本创建中，创建完成并发布后才能新增下一个版本'
+    }
+    return '最新版本需已发布后才能新增下一个版本'
+  }
+
+  const canDeletePreviewRows = () => {
+    return isDatasetCreateSucceeded(selectedVersion?.processing_status_display)
+      && isVersionUnpublished(selectedVersion)
+      && !isActiveDeleteOperationRunning
   }
 
   const pickSelectedVersionFromDetail = (detail: any, currentVersion: any) => {
@@ -389,6 +440,53 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
       || detail[detail.length - 1]
       || currentVersion
   }
+
+  useEffect(() => {
+    if (!isActiveDeleteOperationRunning || !selectedVersion) return
+
+    const rowNumbers = activeDeleteOperation?.row_numbers || []
+    const timer = window.setInterval(async () => {
+      const result = await refetch()
+      if (!result.data) return
+
+      const latestVersion = pickSelectedVersionFromDetail(result.data, selectedVersion)
+      const latestOperation = getDeleteRowsOperation(latestVersion)
+      setSelectedVersion(latestVersion)
+
+      if (isDeleteOperationRunning(latestOperation)) return
+
+      window.clearInterval(timer)
+      if (latestOperation?.status === 'failed') {
+        return
+      }
+
+      message.success('删除完成')
+      const nextPage = previewData.length <= rowNumbers.length && dataContentPage > 1
+        ? dataContentPage - 1
+        : dataContentPage
+      await handleVersionChange(latestVersion, nextPage, dataContentPageSize)
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const queryKey = query.queryKey
+          return Array.isArray(queryKey)
+            && queryKey.length > 0
+            && queryKey[0] === 'training-datasets'
+        },
+      })
+    }, DELETE_ROW_POLL_INTERVAL)
+
+    return () => window.clearInterval(timer)
+  }, [
+    activeDeleteOperation?.operation_id,
+    activeDeleteOperation?.status,
+    dataContentPage,
+    dataContentPageSize,
+    isActiveDeleteOperationRunning,
+    previewData.length,
+    queryClient,
+    refetch,
+    selectedVersion,
+  ])
 
   const handleEditBasicInfo = async (values: { name?: string, description?: string }) => {
     if (!selectedVersion?.id || !projectId) return
@@ -471,42 +569,17 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
     return Number.isFinite(normalized) ? normalized : undefined
   }
 
-  const handleDeletePreviewRow = async (record: any) => {
+  const submitDeleteRows = async (rowNumbers: number[]) => {
     if (!selectedVersion?.id || !projectId) return
 
-    const rowNumber = getPreviewRowNumber(record)
-    if (!rowNumber) {
-      message.error('无法获取行号，删除失败')
-      return
-    }
-
-    setDeletingRowNumber(rowNumber)
     try {
-      await trainingDatasetService.deleteRow(Number(projectId), selectedVersion.id, [rowNumber])
-      message.success('删除成功')
-
-      const nextPage = previewData.length <= 1 && dataContentPage > 1
-        ? dataContentPage - 1
-        : dataContentPage
+      await trainingDatasetService.deleteRow(Number(projectId), selectedVersion.id, rowNumbers)
+      message.success('删除任务已提交，正在后台处理')
 
       const result = await refetch()
-      const latestVersion = result.data
-        ? pickSelectedVersionFromDetail(result.data, selectedVersion)
-        : selectedVersion
-      setSelectedVersion(latestVersion)
-
-      if (latestVersion?.processing_status_display === '处理中') {
-        setIsPreviewLoading(true)
-        const completedVersion = await waitForDeleteRowProcessingComplete(latestVersion)
-        if (completedVersion?.processing_status_display === '处理完成') {
-          await handleVersionChange(completedVersion, nextPage, dataContentPageSize)
-        }
-        else {
-          setIsPreviewLoading(false)
-        }
-      }
-      else {
-        await handleVersionChange(latestVersion, nextPage, dataContentPageSize)
+      if (result.data) {
+        const latestVersion = pickSelectedVersionFromDetail(result.data, selectedVersion)
+        setSelectedVersion(latestVersion)
       }
 
       queryClient.invalidateQueries({
@@ -519,12 +592,39 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
       })
     }
     catch (error) {
-      console.error('删除行数据失败:', error)
-      message.error('删除失败')
+      console.error('提交删除行任务失败:', error)
+      message.error((error as any)?.response?.data?.detail || '删除任务提交失败')
+    }
+  }
+
+  const handleDeletePreviewRow = async (record: any) => {
+    const rowNumber = getPreviewRowNumber(record)
+    if (!rowNumber) {
+      message.error('无法获取行号，删除失败')
+      return
+    }
+
+    setDeletingRowNumber(rowNumber)
+    try {
+      await submitDeleteRows([rowNumber])
     }
     finally {
       setDeletingRowNumber(null)
     }
+  }
+
+  const handleRetryDeleteRows = async () => {
+    const rowNumbers = activeDeleteOperation?.row_numbers || []
+    if (rowNumbers.length === 0) {
+      message.error('无法获取需要重试的行号')
+      return
+    }
+    await submitDeleteRows(rowNumbers.map(Number))
+  }
+
+  const handleDismissOperationAlert = () => {
+    if (!activeDeleteOperation?.operation_id) return
+    setDismissedOperationIds((prev) => new Set([...prev, activeDeleteOperation.operation_id!]))
   }
 
   const deleteDatasetVersion = async (version: string) => {
@@ -1118,6 +1218,12 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
   ], [keys, expandedCells, toggleCellExpand, handleCellHeightChange, getRowMaxHeight])
 
   const handleNewVersionClick = () => {
+    const blockedReason = getNewVersionBlockedReason()
+    if (blockedReason) {
+      message.warning(blockedReason)
+      return
+    }
+
     if (type === 'training') {
       navigate(`/project/${projectId}/datasets/training/${datasetId}/new-version`)
     }
@@ -1222,9 +1328,12 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
             <div className="flex gap-6">
               {(() => {
                 const statusDisplay = selectedVersion?.processing_status_display || ''
-                const isProcessingOrFailed = ['处理中', '处理失败'].includes(statusDisplay)
+                const isCreating = isDatasetCreating(statusDisplay)
+                const isCreateFailed = isDatasetCreateFailed(statusDisplay)
                 const isPublishing = publishingVersion === selectedVersion?.version
-                const isButtonDisabled = deletingVersion === selectedVersion?.version || isPublishing || isProcessingOrFailed
+                const isRowDeleting = deletingRowNumber !== null || isActiveDeleteOperationRunning
+                const isButtonDisabled = deletingVersion === selectedVersion?.version || isPublishing || isCreating || isCreateFailed || isRowDeleting
+                const isDeleteVersionDisabled = deletingVersion === selectedVersion?.version || isPublishing || isCreating || isRowDeleting
                 const isUnpublished = isVersionUnpublished(selectedVersion)
                 return (
                   <>
@@ -1291,7 +1400,7 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
                       <Button
                         danger
                         loading={deletingVersion === selectedVersion.version}
-                        disabled={deletingVersion === selectedVersion.version}
+                        disabled={isDeleteVersionDisabled}
                       >
                         删除
                       </Button>
@@ -1306,14 +1415,28 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
       <Row gutter={16} className="flex flex-nowrap">
         <Col flex="0 0 160px" className="min-w-0">
           <div className="text-center mb-4">
-            <Button
-              type="primary"
-              size="large"
-              block
-              onClick={handleNewVersionClick}
-            >
-              新增版本
-            </Button>
+            {(() => {
+              const blockedReason = getNewVersionBlockedReason()
+              const disabled = deletingRowNumber !== null || isActiveDeleteOperationRunning || !!blockedReason
+              const button = (
+                <Button
+                  type="primary"
+                  size="large"
+                  block
+                  disabled={disabled}
+                  onClick={handleNewVersionClick}
+                >
+                  新增版本
+                </Button>
+              )
+              return disabled
+                ? (
+                    <Tooltip title={blockedReason || '数据处理中，请稍后再试'}>
+                      <span className="block">{button}</span>
+                    </Tooltip>
+                  )
+                : button
+            })()}
           </div>
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             {Array.isArray(dataset) ? dataset.map((item) => (
@@ -1339,6 +1462,48 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
         </Col>
         <Col flex="1" className="px-[24px] min-w-[400px]">
           <div className="border-l border-[#e8e8e8] px-[12px] py-[12px]">
+            {isActiveDeleteOperationRunning && (
+              <Alert
+                type="warning"
+                showIcon
+                className="mb-4"
+                message={`版本操作状态：删除中`}
+                description={`正在删除 ${activeDeleteRequestedCount} 条数据，数据集较大时可能需要几分钟。你可以离开页面，回来后会继续展示处理状态。`}
+              />
+            )}
+            {isActiveDeleteOperationFailed && !isFailedOperationDismissed && (
+              <Alert
+                type="error"
+                showIcon
+                className="mb-4"
+                message="版本操作状态：删除失败"
+                description={(
+                  <div>
+                    <div>
+                      已成功
+                      {activeDeleteRemovedCount}
+                      条，已失败
+                      {activeDeleteFailedCount}
+                      条
+                    </div>
+                    <div>
+                      删除失败：
+                      {activeDeleteOperation?.error_message || '目标数据已变化，请刷新后重试'}
+                    </div>
+                  </div>
+                )}
+                action={(
+                  <div className="flex gap-2">
+                    <Button size="small" danger onClick={handleRetryDeleteRows}>
+                      重试删除
+                    </Button>
+                    <Button size="small" onClick={handleDismissOperationAlert}>
+                      关闭提示
+                    </Button>
+                  </div>
+                )}
+              />
+            )}
             {/* 数据集基本信息 */}
             <Card
               title={(
@@ -1405,7 +1570,7 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
 
                 // 生成最终的 columns
                 const currentColumns = createColumnsFn(getRowKey)
-                const tableColumns = canDeletePreviewRows()
+                const tableColumns = (canDeletePreviewRows() || isActiveDeleteOperationRunning || isActiveDeleteOperationFailed)
                   ? [
                       ...currentColumns,
                       {
@@ -1422,27 +1587,52 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
                         }),
                         render: (_: unknown, record: any) => {
                           const rowNumber = getPreviewRowNumber(record)
+                          const isTargetDeleting = rowNumber !== undefined && activeDeleteRowNumbers.has(rowNumber)
+                          const isTargetDeleteFailed = rowNumber !== undefined && failedDeleteRowNumbers.has(rowNumber)
                           return (
                             <div className="dataset-detail-action-wrapper">
-                              <Popconfirm
-                                title="确认删除"
-                                description="确定要删除该行数据吗？删除后将无法恢复。"
-                                okText="确认删除"
-                                cancelText="取消"
-                                okButtonProps={{ danger: true }}
-                                onConfirm={() => handleDeletePreviewRow(record)}
-                                disabled={!rowNumber}
-                              >
+                              {isTargetDeleting ? (
                                 <Button
                                   type="link"
                                   size="small"
                                   className="dataset-detail-action-delete"
-                                  loading={deletingRowNumber === rowNumber}
-                                  disabled={!rowNumber}
+                                  loading
+                                  disabled
                                 >
-                                  删除
+                                  删除中
                                 </Button>
-                              </Popconfirm>
+                              ) : isTargetDeleteFailed ? (
+                                <Tooltip title="重新提交该条数据的删除任务">
+                                  <Button
+                                    type="link"
+                                    size="small"
+                                    danger
+                                    onClick={() => rowNumber !== undefined && submitDeleteRows([rowNumber])}
+                                  >
+                                    重试删除
+                                  </Button>
+                                </Tooltip>
+                              ) : (
+                                <Popconfirm
+                                  title="确认删除该条数据？"
+                                  description="数据集较大时删除可能需要较长时间。确认后将进入后台处理，处理完成前该版本不可发布、删除、创建新版本或合并版本。"
+                                  okText="确认删除"
+                                  cancelText="取消"
+                                  okButtonProps={{ danger: true }}
+                                  onConfirm={() => handleDeletePreviewRow(record)}
+                                  disabled={!rowNumber || isActiveDeleteOperationRunning}
+                                >
+                                  <Button
+                                    type="link"
+                                    size="small"
+                                    className="dataset-detail-action-delete"
+                                    loading={deletingRowNumber === rowNumber}
+                                    disabled={!rowNumber || isActiveDeleteOperationRunning}
+                                  >
+                                    删除
+                                  </Button>
+                                </Popconfirm>
+                              )}
                             </div>
                           )
                         },
@@ -1484,8 +1674,15 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
                     scroll={{ x: 1200 }}
                     size="middle"
                     bordered
-                    rowClassName={(record, index) =>
-                      index % 2 === 0 ? 'bg-gray-50 hover:bg-blue-50' : 'bg-white hover:bg-blue-50'}
+                    rowClassName={(record, index) => {
+                      const baseClass = index % 2 === 0 ? 'bg-gray-50 hover:bg-blue-50' : 'bg-white hover:bg-blue-50'
+                      if (isRowInFailedDeleteOperation(record)) {
+                        return 'bg-red-50 hover:bg-red-50 text-red-700'
+                      }
+                      return isRowInActiveDeleteOperation(record)
+                        ? `${baseClass} opacity-50`
+                        : baseClass
+                    }}
                     className="dataset-detail-preview-table bg-white"
                     rowKey={(record) => {
                       return getRecordRowKey(record, tableColumns)
@@ -1498,7 +1695,11 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
                           toggleRowExpand(record, currentColumns)
                         }
                       },
-                      style: { cursor: 'pointer' },
+                      style: {
+                        cursor: 'pointer',
+                        ...(isRowInFailedDeleteOperation(record) ? { color: '#cf1322' } : {}),
+                        ...(isRowInActiveDeleteOperation(record) ? { color: '#8c8c8c' } : {}),
+                      },
                     })}
                   />
                 )

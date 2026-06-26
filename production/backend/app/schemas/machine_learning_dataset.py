@@ -5,6 +5,7 @@ from typing import Any, List, Optional, Dict
 from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.common import BaseModelWithTimezone
+from app.schemas.dataset_operation import DatasetVersionOperationResponse
 
 
 class MachineLearningDatasetCategory(str, Enum):
@@ -399,6 +400,7 @@ class MachineLearningDatasetCreateResponse(BaseModelWithTimezone):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
     created_by: Optional[str] = Field(None, description="创建人")
+    active_operation: Optional[DatasetVersionOperationResponse] = Field(None, description="当前未完成的版本操作")
 
     class Config:
         from_attributes = True

@@ -7,6 +7,7 @@ export interface getDataParams {
   dataset_type?: string
   usage?: string
   training_method_type?: string
+  publish?: number
   page?: number
   size?: number
 }

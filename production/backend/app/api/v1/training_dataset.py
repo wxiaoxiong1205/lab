@@ -27,6 +27,7 @@ from app.schemas.training_dataset import (
     TrainingDatasetBasicInfoUpdate,
     TrainingDatasetDeleteRowsRequest,
 )
+from app.schemas.dataset_operation import DatasetVersionOperationResponse
 from app.schemas.training_task import TrainingTypeCategory, TrainingMethodType
 from app.services.training_dataset.interface import TrainingDatasetService
 from app.utils.dependencies import get_db_and_user
@@ -312,7 +313,7 @@ async def update_training_dataset_publish_status(
 
 
 
-@router.delete("/project/{project_id}/dataset/{dataset_id}/rows", response_model=bool)
+@router.delete("/project/{project_id}/dataset/{dataset_id}/rows", response_model=DatasetVersionOperationResponse)
 @inject
 async def delete_training_dataset_rows(
     project_id: int = Path(..., description="项目ID"),
@@ -320,7 +321,7 @@ async def delete_training_dataset_rows(
     request: TrainingDatasetDeleteRowsRequest = Body(..., description="删除指定行请求"),
     deps: Tuple[AsyncSession, JwtUserInfo] = Depends(get_db_and_user),
     training_dataset_service: TrainingDatasetService = Depends(Provide[AutoContainer.training_dataset_service])
-) -> bool:
+) -> DatasetVersionOperationResponse:
     """异步删除训练数据集文件中的指定行。
 
     前端需要传全局行号，不传当前页内序号；全局行号使用预览接口返回的 `row_number`。
@@ -329,8 +330,8 @@ async def delete_training_dataset_rows(
     处理规则：
     - 仅 `processing_status = completed` 已完成的数据集允许删除；
     - 仅 `publish = 0` 未发布的数据集允许删除；
-    - 接口提交成功后会立即把处理状态改为 `pending`；
-    - 如果当前已是 `pending`，说明数据集有任务正在处理，需要等待处理完成，请刷新后重试；
+    - 接口提交成功后返回后台删除任务信息；
+    - 如果当前已有删除任务处理中，直接返回当前任务；
 
     请求示例：
     ```json
@@ -340,8 +341,9 @@ async def delete_training_dataset_rows(
     }
     ```
     """
-    _ = deps
+    _, current_user = deps
     return await training_dataset_service.delete_training_dataset_rows(
+        current_user=current_user,
         project_id=project_id,
         dataset_id=dataset_id,
         row_numbers=request.row_numbers,

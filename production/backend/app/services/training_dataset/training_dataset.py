@@ -5,6 +5,7 @@ import shutil
 import tempfile
 import urllib.parse
 import zipfile
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import List, Optional, Any, Dict
@@ -22,6 +23,7 @@ from app.models.evaluation_task_manager import EvaluationTask, EvaluationTaskDat
 from app.models.inference_result_manager import InferenceResultDataset
 from app.models.label_manager import LabelDataset, LabelTask
 from app.models.models import BusinessAttrValue, BusinessAttrValueOption
+from app.models.dataset_operation_manager import DatasetVersionOperation
 from app.models.models import JwtUserInfo
 from app.models.training_dataset_manager import TrainingDataset
 from app.schemas.business_attr_value import (
@@ -38,6 +40,7 @@ from app.schemas.training_dataset import (
     TrainingDatasetExportTypeCategory, TrainingDatasetAggregationResponse, CountByValueItem,
     AttrOptionGroupItem, TrainingDatasetBasicInfoUpdate,
 )
+from app.schemas.dataset_operation import DatasetOperationStatus, DatasetOperationType, DatasetKind, DatasetVersionOperationResponse
 from app.schemas.training_task import TrainingTypeCategory, TrainingMethodType
 from app.utils.business_attr_utils import BusinessAttrValueHelper
 from app.utils.dataset_file_parser import (
@@ -56,6 +59,7 @@ from app.utils.dataset_file_parser import (
     FILE_TYPE_CONFIG
 )
 from app.utils.timezone_utils import to_local_tz
+from app.utils.timezone_utils import get_current_shanghai_time
 from app.utils.validators import CLEANING_TASK_IN_PROGRESS_STATUSES
 from app.utils.validators import validate_project_exists, validate_training_dataset_by_name_version_usage_not_exists, \
     validate_training_dataset_by_name_version_usage
@@ -107,6 +111,42 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
         else:
             target.status_display = processing_status_display
 
+    @staticmethod
+    def _operation_to_response(operation: Optional[DatasetVersionOperation]) -> Optional[DatasetVersionOperationResponse]:
+        if not operation:
+            return None
+        response = DatasetVersionOperationResponse.model_validate(operation)
+        if response.created_at:
+            response.created_at = to_local_tz(operation.created_at)
+        if response.updated_at:
+            response.updated_at = to_local_tz(operation.updated_at)
+        if response.finished_at:
+            response.finished_at = to_local_tz(operation.finished_at)
+        return response
+
+    async def _get_latest_delete_rows_operation(
+        self,
+        dataset_id: int,
+        include_failed: bool = True,
+    ) -> Optional[DatasetVersionOperation]:
+        statuses = [
+            DatasetOperationStatus.QUEUED.value,
+            DatasetOperationStatus.RUNNING.value,
+        ]
+        if include_failed:
+            statuses.append(DatasetOperationStatus.FAILED.value)
+        return await self.training_dataset_mapper.query_one(
+            select(DatasetVersionOperation).filter(
+                DatasetVersionOperation.dataset_kind == DatasetKind.LLM_DATASET.value,
+                DatasetVersionOperation.dataset_id == dataset_id,
+                DatasetVersionOperation.operation_type == DatasetOperationType.DELETE_ROWS.value,
+                DatasetVersionOperation.status.in_(statuses),
+            ).order_by(DatasetVersionOperation.updated_at.desc()).limit(1)
+        )
+
+    async def _attach_active_operation(self, response: TrainingDatasetResponse) -> None:
+        operation = await self._get_latest_delete_rows_operation(response.id)
+        response.active_operation = self._operation_to_response(operation)
 
     @staticmethod
     def generate_dataset_path(
@@ -1111,6 +1151,9 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 status_code=404,
                 detail=f"项目中不存在指定的数据集：dataset_id={dataset_id}"
             )
+        active_operation = await self._get_latest_delete_rows_operation(dataset_id, include_failed=False)
+        if active_operation:
+            raise HTTPException(status_code=400, detail="当前版本有删除任务处理中，请完成后再操作")
 
         if dataset.publish == DatasetPublishStatus.PUBLISHED.value:
             raise HTTPException(status_code=400, detail="数据集已发布，不用重新发布")
@@ -1125,11 +1168,12 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
         return True
 
     async def delete_training_dataset_rows(
-        self,
-        project_id: int,
-        dataset_id: int,
-        row_numbers: List[int],
-    ) -> bool:
+            self,
+            current_user: JwtUserInfo,
+            project_id: int,
+            dataset_id: int,
+            row_numbers: List[int],
+    ) -> DatasetVersionOperationResponse:
         await validate_project_exists(await self.training_dataset_mapper.get_session(), project_id)
 
         normalized_rows = sorted(set(row_numbers or []))
@@ -1146,8 +1190,9 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
         )
         if not dataset:
             raise HTTPException(status_code=404, detail="数据集不存在")
-        if dataset.processing_status == DatasetProcessingStatus.PENDING.value:
-            raise HTTPException(status_code=400, detail="数据集有任务正在处理中，请刷新后重试")
+        active_operation = await self._get_latest_delete_rows_operation(dataset_id, include_failed=False)
+        if active_operation:
+            return self._operation_to_response(active_operation)
         if dataset.processing_status != DatasetProcessingStatus.COMPLETED.value:
             raise HTTPException(status_code=400, detail="只有已完成状态的数据集才能删除指定行")
         if dataset.publish != DatasetPublishStatus.UNPUBLISHED.value:
@@ -1161,28 +1206,36 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
         if len(normalized_rows) >= sample_count:
             raise HTTPException(status_code=400, detail="删除后数据集至少需要保留一行数据")
 
-        dataset.processing_status = DatasetProcessingStatus.PENDING.value
-        dataset.publish = DatasetPublishStatus.PROCESSING.value
-        dataset.processing_error = None
+        operation = DatasetVersionOperation(
+            operation_id=uuid.uuid4().hex,
+            dataset_kind=DatasetKind.LLM_DATASET.value,
+            dataset_id=dataset.id,
+            version=dataset.version,
+            operation_type=DatasetOperationType.DELETE_ROWS.value,
+            status=DatasetOperationStatus.QUEUED.value,
+            row_numbers=normalized_rows,
+            requested_count=len(normalized_rows),
+            removed_count=0,
+            error_message=None,
+            created_by=current_user.username,
+        )
+        session = await self.training_dataset_mapper.get_session()
+        session.add(operation)
         await self.training_dataset_mapper.commit()
 
         try:
             from app.tasks.dataset_processing_tasks import delete_training_dataset_rows
             delete_training_dataset_rows.apply_async(
-                args=[dataset_id, normalized_rows],
+                args=[dataset_id, normalized_rows, operation.operation_id],
                 countdown=1,
             )
-            return True
+            return self._operation_to_response(operation)
         except Exception as exc:
             logger.error(f"提交删除数据集行任务失败: dataset_id={dataset_id}, error={str(exc)}", exc_info=True)
-            latest_dataset = await self.training_dataset_mapper.query_one(
-                select(TrainingDataset).filter(TrainingDataset.id == dataset_id)
-            )
-            if latest_dataset:
-                latest_dataset.processing_status = DatasetProcessingStatus.FAILED.value
-                latest_dataset.publish = DatasetPublishStatus.FAILED.value
-                latest_dataset.processing_error = f"提交删除数据集行任务失败: {str(exc)}"[:1000]
-                await self.training_dataset_mapper.commit()
+            operation.status = DatasetOperationStatus.FAILED.value
+            operation.error_message = f"提交删除数据集行任务失败: {str(exc)}"[:1000]
+            operation.finished_at = get_current_shanghai_time()
+            await self.training_dataset_mapper.commit()
             raise HTTPException(status_code=500, detail=f"提交删除数据集行任务失败: {str(exc)}") from exc
 
     async def _sync_training_task_dataset_names(
@@ -1445,6 +1498,11 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
             chunk_upload_ids_list = [str(cuid.strip()) for cuid in chunk_upload_ids.split(',') if cuid.strip()]
         else:
             raise HTTPException(status_code=404, detail="请提供数据集文件")
+        config_dict = {
+            **(config_dict or {}),
+            "data_source_type": "local_upload",
+            "has_uploaded_files": True,
+        }
 
         # 创建数据集记录
         try:
@@ -1653,6 +1711,25 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
             usage
         )
 
+        latest_dataset = await self.training_dataset_mapper.query_one(
+            select(TrainingDataset).filter(
+                TrainingDataset.project_id == project.id,
+                TrainingDataset.name == name,
+                TrainingDataset.usage == usage
+            ).order_by(
+                cast(func.replace(TrainingDataset.version, 'V', ''), Integer).desc()
+            ).limit(1)
+        )
+        if not latest_dataset:
+            raise HTTPException(status_code=404, detail=f"数据集 '{name}' 不存在")
+        active_operation = await self._get_latest_delete_rows_operation(latest_dataset.id, include_failed=False)
+        if active_operation:
+            raise HTTPException(status_code=400, detail="当前版本有删除任务处理中，请完成后再操作")
+        if latest_dataset.processing_status != DatasetProcessingStatus.COMPLETED.value:
+            raise HTTPException(status_code=400, detail="最新版本创建成功后才允许新增下一版本")
+        if latest_dataset.publish != DatasetPublishStatus.PUBLISHED.value:
+            raise HTTPException(status_code=400, detail="最新版本发布后才允许新增下一版本")
+
         # 获取源版本数据集信息
         source_dataset = await self._get_source_dataset(inherit_from_version, project.id, name, usage, source_version)
 
@@ -1728,6 +1805,18 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 if has_uploaded_files or inherit_from_version
                 else DatasetProcessingStatus.COMPLETED.value
             )
+            config_dict = {
+                **(config_dict or {}),
+                "data_source_type": "inherit_upload" if inherit_from_version and has_uploaded_files
+                else "inherit" if inherit_from_version
+                else "local_upload",
+                "has_uploaded_files": has_uploaded_files,
+            }
+            if inherit_from_version and source_version:
+                config_dict = {
+                    **config_dict,
+                    "inherit_source_version": source_version,
+                }
 
             new_dataset = TrainingDataset(
                 name=name,
@@ -1997,6 +2086,11 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 detail=f"项目中不存在名为 '{dataset_name}' 的训练数据集"
             )
 
+        for dataset in datasets:
+            active_operation = await self._get_latest_delete_rows_operation(dataset.id, include_failed=False)
+            if active_operation:
+                raise HTTPException(status_code=400, detail="当前版本有删除任务处理中，请完成后再操作")
+
         # 校验是否被使用
         for dataset in datasets:
             await self.ensure_dataset_not_referenced(
@@ -2091,6 +2185,10 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 status_code=404,
                 detail=f"项目中不存在指定的数据集版本：名称={dataset_name}, 版本={version}"
             )
+
+        active_operation = await self._get_latest_delete_rows_operation(dataset.id, include_failed=False)
+        if active_operation:
+            raise HTTPException(status_code=400, detail="当前版本有删除任务处理中，请完成后再操作")
 
         # 校验是否被使用（依赖已解析的 dataset.id）
         await self.ensure_dataset_not_referenced(
