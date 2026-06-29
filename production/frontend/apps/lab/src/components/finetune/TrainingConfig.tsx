@@ -41,6 +41,16 @@ const DEEPSPEED_OPTIONS = [
   { value: 'ZeRO-2', title: 'ZeRO-2', desc: '均衡策略', tooltip: '在显存占用与训练效率之间取得均衡' },
   { value: 'ZeRO-3', title: 'ZeRO-3', desc: '最大节省', tooltip: '最大化节省显存' },
 ]
+const FALLBACK_TRAINING_TYPE_OPTIONS = [
+  { value: 'text-generation', name: '文本生成', description: '文本生成训练' },
+  { value: 'image-generation', name: '图像生成', description: '图像生成训练' },
+  { value: 'image-understanding', name: '图像理解', description: '图像理解训练' },
+]
+const FALLBACK_TRAINING_METHOD_OPTIONS = [
+  { value: 'sft', name: 'SFT', description: '有监督微调' },
+  { value: 'dpo', name: 'DPO', description: '偏好优化训练' },
+  { value: 'grpo', name: 'RFT-GRPO', description: '基于奖励规则的强化学习训练' },
+]
 
 const normalizeTrainingMethodType = (value?: string) => {
   if (typeof value !== 'string')
@@ -76,10 +86,20 @@ const TrainingConfig: React.FC<TrainingConfigProps> = ({
   const trainTypeCategory = Form.useWatch('train_type_category', form)
   const deepspeedEnabled = Form.useWatch('deepspeed_enabled', form)
   const isImageUnderstanding = trainTypeCategory === 'image-understanding'
+  const isImageGeneration = trainTypeCategory === 'image-generation'
   const [rewardSampleDownloading, setRewardSampleDownloading] = useState(false)
-  const trainingMethodOptions = TrainingMethodCategory?.options
+  const visibleTrainingTypeOptions = (TrainingTypeCategory?.options ?? [])
+    .filter((item: any) => item.value !== 'business' && FINETUNE_VISIBLE_TRAINING_TYPES.includes(item.value))
+  const trainingTypeOptions = visibleTrainingTypeOptions.length > 0 ? visibleTrainingTypeOptions : FALLBACK_TRAINING_TYPE_OPTIONS
+  const visibleTrainingMethodOptions = (TrainingMethodCategory?.options ?? [])
     .filter((type: any) => !TrainingMethodTypeMapping(type.value).disabled)
-    .filter((type: any) => !(isImageUnderstanding && type.value === 'dpo')) ?? []
+    .filter((type: any) => !(isImageUnderstanding && type.value === 'dpo'))
+    .filter((type: any) => !(isImageGeneration && normalizeTrainingMethodType(type.value) !== 'sft'))
+  const trainingMethodOptions = visibleTrainingMethodOptions.length > 0
+    ? visibleTrainingMethodOptions
+    : FALLBACK_TRAINING_METHOD_OPTIONS
+        .filter((type) => !(isImageUnderstanding && type.value === 'dpo'))
+        .filter((type) => !(isImageGeneration && normalizeTrainingMethodType(type.value) !== 'sft'))
   const [trainingType, setTrainingType] = useState<string>(fineTuningTypeValue || type || '')
   useEffect(() => {
     if (fineTuningTypeValue) {
@@ -94,7 +114,11 @@ const TrainingConfig: React.FC<TrainingConfigProps> = ({
       form.setFieldValue('training_type', 'sft')
       onTrainingMethodChange?.()
     }
-  }, [effectiveTrainingMethod, form, isImageUnderstanding, onTrainingMethodChange])
+    if (isImageGeneration && normalizeTrainingMethodType(effectiveTrainingMethod) !== 'sft') {
+      form.setFieldValue('training_type', 'sft')
+      onTrainingMethodChange?.()
+    }
+  }, [effectiveTrainingMethod, form, isImageGeneration, isImageUnderstanding, onTrainingMethodChange])
   const handleTrainingTypeChange = (e: any) => {
     setTrainingType(e.target.value)
   }
@@ -108,11 +132,22 @@ const TrainingConfig: React.FC<TrainingConfigProps> = ({
     onTrainingMethodChange?.()
   }
 
-  const handleTrainTypeCategoryChange = () => {
+  const handleTrainTypeCategoryChange = (event?: any) => {
+    const nextTrainTypeCategory = event?.target?.value
     form.setFieldsValue({
       data_config: createEmptyDataConfig(),
       data_format: undefined,
-      ...(form.getFieldValue('training_type') === 'dpo' ? { training_type: 'sft' } : {}),
+      ...((nextTrainTypeCategory === 'image-generation' || form.getFieldValue('training_type') === 'dpo') ? { training_type: 'sft' } : {}),
+      ...(nextTrainTypeCategory === 'image-generation'
+        ? {
+            data_format: 'image-prompt',
+            image_resolution: 1024,
+            max_images_per_sample: 1,
+            prompt_max_length: 512,
+            negative_prompt_max_length: 256,
+            image_resize_mode: 'keep_ratio',
+          }
+        : {}),
     })
   }
 
@@ -155,17 +190,15 @@ const TrainingConfig: React.FC<TrainingConfigProps> = ({
           <Col span={24}>
             <Form.Item name="train_type_category" label="选择训练类型" rules={[{ required: true, message: '请选择训练类型' }]}>
               <SegmentedRadioGroup onChange={handleTrainTypeCategoryChange}>
-                {TrainingTypeCategory?.options
-                  .filter((item: any) => item.value !== 'business' && FINETUNE_VISIBLE_TRAINING_TYPES.includes(item.value))
-                  .map((item: any) => (
-                    <SegmentedRadioButton key={item.value} value={item.value} disabled={ModelTypeMapping(item.value).disabled} className="relative">
-                      {ModelTypeMapping(item.value).text}
-                      {ModelTypeMapping(item.value).disabled && (
-                        <Tooltip title={ModelTypeMapping(item.value).disabledTooltip}>
-                        </Tooltip>
-                      )}
-                    </SegmentedRadioButton>
-                  ))}
+                {trainingTypeOptions.map((item: any) => (
+                  <SegmentedRadioButton key={item.value} value={item.value} disabled={ModelTypeMapping(item.value).disabled} className="relative">
+                    {ModelTypeMapping(item.value).text}
+                    {ModelTypeMapping(item.value).disabled && (
+                      <Tooltip title={ModelTypeMapping(item.value).disabledTooltip}>
+                      </Tooltip>
+                    )}
+                  </SegmentedRadioButton>
+                ))}
               </SegmentedRadioGroup>
             </Form.Item>
           </Col>

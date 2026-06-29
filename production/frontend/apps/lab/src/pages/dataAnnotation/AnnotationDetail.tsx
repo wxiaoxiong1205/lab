@@ -1,5 +1,5 @@
 import React from 'react'
-import { Badge, Button, Input, Popover, Radio, Space, Tag, Typography } from 'antd'
+import { Badge, Button, Card, Input, Popover, Radio, Space, Tag, Typography } from 'antd'
 import { FilterOutlined, RobotOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import ExpandableCell from '../../components/common/ExpandableCell'
@@ -11,7 +11,7 @@ import { useAnnotationDetailController } from './useAnnotationDetailController'
 import MdPreview from '@/components/md-preview'
 
 const AnnotationDetail: React.FC = () => {
-  const { projectId, taskId, formerListData, taskName, loading, dataList, pagination, annotationFilter, isCompleted, isSubmitted, isReauditRound, manualContent, dpoContents, dpoProcessingTarget, assistantContents, savingDraft, auditSubmitting, auditSubmitLoading, auditRejectModalVisible, auditRejectReason, resolvedContentTab, isImageAnnotation, expandedCells, rowHeights, currentProcessingIndex, imagePreviewVisible, previewImageUrl, streamingContent, aiLoading, configModalVisible, annotationConfig, isMultiPerson, isAuditMode, isMultiPersonPassedLocked, setManualContent, setDpoContents, setAssistantContents, setAuditRejectReason, setAuditRejectModalVisible, setConfigModalVisible, setImagePreviewVisible, handleFilterChange, handlePageChange, handleSaveDraft, handleSubmit, handleAuditPass, handleAuditFailOpen, handleAuditFailConfirm, handleSubmitAudit, handleOpenConfig, handleConfigConfirm, toggleRowExpand, toggleCellExpand, handleHeightChange, handleImageClick, handleOpenAIAnnotation } = useAnnotationDetailController()
+  const { projectId, taskId, formerListData, taskName, loading, dataList, pagination, annotationFilter, isCompleted, isSubmitted, isReauditRound, manualContent, imagePromptFields, imagePromptProcessingTarget, dpoContents, dpoProcessingTarget, assistantContents, savingDraft, auditSubmitting, auditSubmitLoading, auditRejectModalVisible, auditRejectReason, resolvedContentTab, isImageAnnotation, isImagePromptAnnotation, expandedCells, rowHeights, currentProcessingIndex, imagePreviewVisible, previewImageUrl, streamingContent, aiLoading, configModalVisible, annotationConfig, isMultiPerson, isAuditMode, isMultiPersonPassedLocked, setManualContent, setImagePromptFields, setDpoContents, setAssistantContents, setAuditRejectReason, setAuditRejectModalVisible, setConfigModalVisible, setImagePreviewVisible, handleFilterChange, handlePageChange, handleSaveDraft, handleSubmit, handleAuditPass, handleAuditFailOpen, handleAuditFailConfirm, handleSubmitAudit, handleOpenConfig, handleConfigConfirm, toggleRowExpand, toggleCellExpand, handleHeightChange, handleImageClick, handleOpenAIAnnotation } = useAnnotationDetailController()
   const isDpoAnnotation = formerListData?.training_method_type === 'dpo'
   const isGrpoAnnotation = formerListData?.training_method_type === 'grpo' || formerListData?.dataset_format === 'grpo'
   const isDpoRoleBased = isDpoAnnotation && formerListData?.dataset_format === 'role-based'
@@ -28,6 +28,29 @@ const AnnotationDetail: React.FC = () => {
     <div className="max-w-full max-h-[calc(100vh-400px)] overflow-y-auto break-words whitespace-pre-wrap">
       {content || '-'}
     </div>
+  )
+  const getImageUrl = (imagePath: string, record: AnnotationDataItem<string>) => {
+    if (/^(https?:|data:|blob:)/.test(imagePath)) {
+      return imagePath
+    }
+
+    const fileName = imagePath.includes('/') ? imagePath.split('/').pop() : imagePath
+    const imageBaseUrl = import.meta.env.DEV
+      ? `${import.meta.env.VITE_PREFIX_BASE_URL}/api/v1/storage/download/`
+      : '/lab-backend/api/v1/storage/download/'
+    return `${imageBaseUrl}${record.base_url || ''}/${fileName}`
+  }
+  const renderImagePromptAiButton = (target: 'prompt' | 'negative_prompt' | 'metadata') => (
+    !isSubmitted && !isAuditMode && (
+      <Button
+        size="small"
+        icon={<RobotOutlined />}
+        onClick={() => handleOpenAIAnnotation(target)}
+        loading={aiLoading && imagePromptProcessingTarget === target}
+      >
+        AI标注
+      </Button>
+    )
   )
   const renderDpoEditor = (
     value: string,
@@ -82,6 +105,129 @@ const AnnotationDetail: React.FC = () => {
       </div>
     )
   }
+
+  if (isImagePromptAnnotation) {
+    const currentRecord = dataList[0]
+    const rawImages = currentRecord?._rawImages || []
+    const readOnly = isSubmitted || isAuditMode || isMultiPersonPassedLocked
+    const auditActionDisabled = auditSubmitting || (isReauditRound && currentRecord?.audit_result === 'passed')
+
+    return (
+      <AnnotationDetailContent title={`${isAuditMode ? '审核详情' : '标注详情'}${taskName ? ` - ${taskName}` : ''}`}>
+        <AnnotationDetailToolbar isSubmitted={isSubmitted} annotationFilter={annotationFilter} isAuditMode={isAuditMode} onFilterChange={handleFilterChange} onOpenConfig={handleOpenConfig} />
+
+        <div className="grid min-h-[calc(100vh-270px)] grid-cols-[minmax(360px,44%)_minmax(460px,1fr)] gap-4 overflow-x-auto">
+          <Card title="图片预览" loading={loading} className="min-w-[360px]">
+            {rawImages.length > 0
+              ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {rawImages.map((imagePath, index) => (
+                      <button
+                        key={`${imagePath}-${index}`}
+                        type="button"
+                        className="group overflow-hidden rounded border border-gray-200 bg-gray-50 p-2 text-left transition hover:border-blue-400"
+                        onClick={() => currentRecord && handleImageClick(index, currentRecord)}
+                      >
+                        <img
+                          src={currentRecord ? getImageUrl(imagePath, currentRecord) : ''}
+                          alt={`样本图片 ${index + 1}`}
+                          className="h-48 w-full rounded bg-white object-contain"
+                        />
+                        <div className="mt-2 text-xs text-gray-500">{`样本图片 ${index + 1}`}</div>
+                      </button>
+                    ))}
+                  </div>
+                )
+              : <div className="py-16 text-center text-gray-400">暂无图片</div>}
+          </Card>
+
+          <Card
+            title="文字标注"
+            loading={loading}
+            className="min-w-[460px]"
+            extra={isAuditMode && (
+              <Space>
+                <Button onClick={handleAuditPass} disabled={auditActionDisabled} loading={auditSubmitting}>审核通过</Button>
+                <Button danger onClick={handleAuditFailOpen} disabled={auditActionDisabled}>审核不通过</Button>
+              </Space>
+            )}
+          >
+            <div className="space-y-4">
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <Typography.Text strong>Prompt</Typography.Text>
+                  {renderImagePromptAiButton('prompt')}
+                </div>
+                <Input.TextArea
+                  value={imagePromptFields.prompt}
+                  onChange={(event) => setImagePromptFields((prev) => ({ ...prev, prompt: event.target.value }))}
+                  placeholder="请输入图片对应的生成提示词"
+                  readOnly={readOnly}
+                  autoSize={{ minRows: 7, maxRows: 12 }}
+                  status={!readOnly && !imagePromptFields.prompt.trim() ? 'error' : undefined}
+                />
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <Typography.Text strong>Negative Prompt</Typography.Text>
+                  {renderImagePromptAiButton('negative_prompt')}
+                </div>
+                <Input.TextArea
+                  value={imagePromptFields.negative_prompt}
+                  onChange={(event) => setImagePromptFields((prev) => ({ ...prev, negative_prompt: event.target.value }))}
+                  placeholder="可选，描述不希望生成的内容"
+                  readOnly={readOnly}
+                  autoSize={{ minRows: 4, maxRows: 8 }}
+                />
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <Typography.Text strong>Metadata</Typography.Text>
+                  {renderImagePromptAiButton('metadata')}
+                </div>
+                <Input.TextArea
+                  value={imagePromptFields.metadataText}
+                  onChange={(event) => setImagePromptFields((prev) => ({ ...prev, metadataText: event.target.value }))}
+                  placeholder='可选，仅支持 JSON Object，例如 {"style":"写实","source":"manual"}'
+                  readOnly={readOnly}
+                  autoSize={{ minRows: 5, maxRows: 10 }}
+                />
+              </div>
+
+              {!isSubmitted && !isAuditMode && (
+                <div className="flex justify-end">
+                  <Button type="primary" onClick={handleSaveDraft} loading={savingDraft} disabled={aiLoading || savingDraft || isMultiPersonPassedLocked}>
+                    完成标注
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        <AnnotationDetailFooter pagination={pagination} aiLoading={aiLoading} isSubmitted={isSubmitted} isAuditMode={isAuditMode} auditSubmitLoading={auditSubmitLoading} isCompleted={isCompleted} onPageChange={handlePageChange} onSubmitAudit={handleSubmitAudit} onSubmit={handleSubmit} />
+
+        <AnnotationConfigModal
+          visible={configModalVisible}
+          taskId={taskId ? Number(taskId) : undefined}
+          projectId={projectId}
+          initialConfig={annotationConfig}
+          modelType="图像生成"
+          onCancel={() => {
+            setConfigModalVisible(false)
+          }}
+          onConfirm={handleConfigConfirm}
+        />
+
+        <AuditRejectModal visible={auditRejectModalVisible} reason={auditRejectReason} loading={auditSubmitting} onReasonChange={setAuditRejectReason} onCancel={() => setAuditRejectModalVisible(false)} onConfirm={handleAuditFailConfirm} />
+
+        <ImagePreviewModal visible={imagePreviewVisible} imageUrl={previewImageUrl} onClose={() => setImagePreviewVisible(false)} />
+      </AnnotationDetailContent>
+    )
+  }
+
   const columns: ColumnsType<AnnotationDataItem<string>> = [
     {
       title: '序号',
@@ -540,7 +686,7 @@ const AnnotationDetail: React.FC = () => {
         taskId={taskId ? Number(taskId) : undefined}
         projectId={projectId}
         initialConfig={annotationConfig}
-        modelType={resolvedContentTab === 'image' ? '图像理解' : '文本生成'}
+        modelType={resolvedContentTab === 'image-generation' ? '图像生成' : resolvedContentTab === 'image-understanding' ? '图像理解' : '文本生成'}
         onCancel={() => {
           setConfigModalVisible(false)
         }}

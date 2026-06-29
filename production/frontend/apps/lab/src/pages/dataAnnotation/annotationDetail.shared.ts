@@ -3,6 +3,8 @@ export interface AnnotationDataItem<T> {
   row_number: number
   system?: string
   prompt?: string
+  negative_prompt?: string
+  metadataText?: string
   ground_truth?: string
   data_source?: string
   ability?: string

@@ -208,7 +208,7 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
           rules={[{ required: true, message: '请选择模型类型' }]}
         >
           <Select mode="multiple" placeholder="请选择模型类型" onChange={handleModelTypeChange}>
-            {modelTypeList?.filter((item) => ['text-generation', 'image-understanding'].includes(item?.value)).map((item, index) => (
+            {modelTypeList?.filter((item) => ['text-generation', 'image-generation', 'image-understanding'].includes(item?.value)).map((item, index) => (
               <Select.Option key={item?.name || index} value={item?.value}>
                 {item?.value && ModelTypeMapping(item.value).text}
               </Select.Option>

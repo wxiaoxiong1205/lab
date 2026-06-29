@@ -405,8 +405,8 @@ def validate_dataset_upload_file_type(dataset_upload_file_type: str, dataset_typ
                 status_code=400,
                 detail=f"文件格式错误：当前类型数据集不支持{dataset_upload_file_type}格式"
             )
-    # 图像理解格式校验
-    elif dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING:
+    # 图像理解/图像生成格式校验
+    elif dataset_type in (TrainingTypeCategory.IMAGE_UNDERSTANDING, TrainingTypeCategory.IMAGE_GENERATION):
         if dataset_upload_file_type.lower() not in [
             TrainingDatasetUploadTypeCategory.ZIP_TYPE
         ]:

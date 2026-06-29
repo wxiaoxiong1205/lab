@@ -1,0 +1,3 @@
+{"image":"assets/cell-001.jpg","width":1024,"height":768,"annotations":[{"label":"目标区域","points":[[120,140],[520,150],[500,500],[140,480]]}]}
+{"image":"assets/cell-002.jpg","width":1024,"height":768,"annotations":[{"label":"孔洞实例","outer":[[180,160],[680,170],[660,560],[200,540]],"holes":[[[320,280],[430,280],[420,380],[330,370]]]}]}
+{"image":"assets/cell-003.jpg","width":1024,"height":768,"annotations":[{"label":"语义区域","points":[[90,220],[850,210],[820,650],[110,660]]}]}

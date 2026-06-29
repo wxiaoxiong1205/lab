@@ -80,6 +80,11 @@ export interface FormValues {
   data_format?: string
   cutoff_len?: number // 新增：截断长度
   preprocessing_num_workers?: number // 新增：预处理工作进程数
+  image_resolution?: number
+  max_images_per_sample?: number
+  prompt_max_length?: number
+  negative_prompt_max_length?: number
+  image_resize_mode?: string
   // 评估相关字段
   eval_split_ratio: number
   eval_steps: number

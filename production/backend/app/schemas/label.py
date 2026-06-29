@@ -28,6 +28,7 @@ class LabelDatasetFormat(str, Enum):
     PROMPT_RESPONSE = "prompt-response"
     ALPACA = "alpaca"
     ROLE_BASED = "role-based"
+    IMAGE_PROMPT = "image-prompt"
     PREFIX_SUFFIX_MIDDLE = "prefix-suffix-middle"
     GRPO = "grpo"
 

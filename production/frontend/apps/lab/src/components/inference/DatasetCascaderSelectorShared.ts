@@ -32,6 +32,8 @@ export function formatDatasetFormatDisplay(v: string) {
     'question-answer': 'QUESTION_ANSWER',
     'text-completion': 'TEXT_COMPLETION',
     'alpaca': 'ALPACA',
+    'image-prompt': 'IMAGE_PROMPT',
+    'grpo': 'GRPO',
   }
   return map[v] || v
 }
@@ -59,6 +61,8 @@ export interface DatasetCascaderSelectorProps {
   requiredSelection?: boolean
   placeholder?: string
   modalTitle?: string
+  /** 弹窗右侧顶部提示文案；不传时使用推理结果集默认限制说明 */
+  selectionNotice?: string
   selectButtonText?: string
   /** 路由无 projectId 时传入（如微调页 projectIdParam） */
   projectIdOverride?: number

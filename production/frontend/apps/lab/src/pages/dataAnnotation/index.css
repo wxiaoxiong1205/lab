@@ -162,11 +162,12 @@
 }
 
 .data-annotation-segmented {
-  width: 182px;
+  width: 270px;
   height: 40px;
   padding: 3px;
   border-radius: 6px;
   background: rgba(236, 238, 239, 1.0);
+  flex-shrink: 0;
 }
 
 .data-annotation-segmented .ant-segmented-group {

@@ -68,6 +68,27 @@ const getProductionBuiltinMachineLearningNotebookCases = (): NotebookSquare[] =>
   ]
 }
 
+const getProductionBuiltinLlmNotebookCases = (): NotebookSquare[] => {
+  const now = new Date().toISOString()
+  const cases = [
+    ['大模型数据处理入门案例', '覆盖训练数据读取、字段检查、空值识别、重复样本定位和处理后数据导出。'],
+    ['SFT 指令微调训练案例', '演示文本生成 SFT 数据集从数据准备、训练参数配置、启动训练到查看指标的完整流程。'],
+    ['DPO 偏好优化训练案例', '演示 chosen/rejected 偏好数据检查、DPO 训练参数配置和训练结果验证流程。'],
+    ['GRPO 强化学习训练案例', '演示 GRPO 数据准备、奖励函数检查、三阶段资源配置和训练日志观察。'],
+    ['大模型评估与报告案例', '演示从推理结果集读取样本、计算基础指标、整理人工评估记录并生成实验结论。'],
+  ]
+  return cases.map(([name, description], index) => ({
+    id: 11001 + index,
+    name,
+    describe: `# ${name}\n\n${description}\n\n## 推荐流程\n\n1. 复制案例创建 Notebook。\n2. 挂载平台数据集、模型或推理结果集。\n3. 按 Notebook 单元逐步运行。\n4. 将产物写回平台业务对象。`,
+    is_available: true,
+    created_at: now,
+    updated_at: now,
+    created_by: 'system',
+    created_id: 0,
+  }))
+}
+
 const getMockNotebookSquareList = async (
   params: NotebookSquareSearchParams,
 ): Promise<NotebookSquareListResponse> => {
@@ -88,6 +109,18 @@ const getMockNotebookSquareList = async (
     }
   }
 
+  const builtinLlmCases = getProductionBuiltinLlmNotebookCases()
+  const normalizedSearch = params.name?.trim().toLowerCase()
+  const filteredBuiltinLlmCases = normalizedSearch
+    ? builtinLlmCases.filter((item) => item.name.toLowerCase().includes(normalizedSearch))
+    : builtinLlmCases
+  if (params.example_id) {
+    const matched = builtinLlmCases.filter((item) => String(item.id) === String(params.example_id))
+    if (matched.length) {
+      return { items: matched, total: matched.length, page, size }
+    }
+  }
+
   const mockCases = await mockNotebookService.getNotebookCases({
     search: params.name,
     skip: offset,
@@ -105,9 +138,10 @@ const getMockNotebookSquareList = async (
     created_id: 0,
   }))
 
+  const mergedItems = [...filteredBuiltinLlmCases, ...items]
   return {
-    items,
-    total: mockCases.total,
+    items: mergedItems.slice(offset, offset + size),
+    total: filteredBuiltinLlmCases.length + mockCases.total,
     page,
     size,
   }

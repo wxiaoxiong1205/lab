@@ -944,7 +944,10 @@ class DefaultMultiLabelService(MultiLabelService):
                 base_url += "/"
             logger.debug(f"生成多人标注机器学习 base_url: {base_url}")
             return base_url
-        if isinstance(dataset, LabelDataset) and dataset.dataset_type == LabelDatasetType.IMAGE_UNDERSTANDING.value:
+        if isinstance(dataset, LabelDataset) and dataset.dataset_type in {
+            LabelDatasetType.IMAGE_UNDERSTANDING.value,
+            LabelDatasetType.IMAGE_GENERATION.value,
+        }:
             image_folder_path = self._generate_image_folder_path(namespace, dataset.id)
             rel = image_folder_path.lstrip("/")
             base_url = f"{tenant_id}/{rel}/"
@@ -1748,7 +1751,10 @@ class DefaultMultiLabelService(MultiLabelService):
                     ).rstrip("/")
                     target_path = os.path.dirname(dataset_path)
                 else:
-                    if dataset.dataset_type == LabelDatasetType.IMAGE_UNDERSTANDING:
+                    if dataset.dataset_type in {
+                        LabelDatasetType.IMAGE_UNDERSTANDING.value,
+                        LabelDatasetType.IMAGE_GENERATION.value,
+                    }:
                         source_path = os.path.dirname(source_dataset.dataset_path)
                         target_path = os.path.dirname(dataset_path)
                         source_file_name = os.path.basename(source_dataset.dataset_path)

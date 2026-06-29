@@ -28,6 +28,7 @@ type TaskQueryParams = {
 
 type TaskLayoutMeta = {
   isImageType: boolean
+  isImagePromptType: boolean
   isTextWithMessages: boolean
   useMessagesLayout: boolean
   isDpoType: boolean
@@ -81,7 +82,7 @@ const getDpoRole = (value: unknown): string => {
 
 const getTaskLayoutMeta = (
   item: any,
-  contentTab: 'text' | 'image',
+  contentTab: 'text' | 'image-understanding' | 'image-generation',
   trainingMethodType?: string,
   datasetFormat?: string,
 ): TaskLayoutMeta => {
@@ -93,18 +94,58 @@ const getTaskLayoutMeta = (
   const normalizedDatasetFormat = String(datasetFormat || '').toLowerCase()
   const isDpoType = normalizedTrainingMethodType === 'dpo'
   const isGrpoType = normalizedTrainingMethodType === 'grpo' || normalizedDatasetFormat === 'grpo'
-  const isImageType = contentTab === 'image' || hasRawImages
+  const isImagePromptType = normalizedDatasetFormat === 'image-prompt' || contentTab === 'image-generation'
+  const isImageType = contentTab === 'image-understanding' || (hasRawImages && !isImagePromptType)
   const isTextWithMessages = !isImageType
+    && !isImagePromptType
     && rawMessages.length > 0
 
   return {
     isImageType,
+    isImagePromptType,
     isTextWithMessages,
-    useMessagesLayout: !isDpoType && !isGrpoType && (isImageType || isTextWithMessages),
+    useMessagesLayout: !isDpoType && !isGrpoType && !isImagePromptType && (isImageType || isTextWithMessages),
     isDpoType,
     isGrpoType,
     dpoFormat: isDpoType && normalizedDatasetFormat === 'role-based' ? 'role-based' : (isDpoType ? 'alpaca' : ''),
   }
+}
+
+const stringifyMetadata = (value: unknown): string => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return ''
+  return JSON.stringify(value, null, 2)
+}
+
+const buildImagePromptTableData = (
+  item: any,
+  page: number,
+  baseUrl: string,
+  trainingMethodType?: string,
+  datasetFormat?: string,
+): AnnotationDataItem<string>[] => {
+  const rawData = getNormalizedRawData(item.raw_data)
+  const annotation = item.annotation && typeof item.annotation === 'object' && !Array.isArray(item.annotation)
+    ? item.annotation as Record<string, unknown>
+    : {}
+  const metadata = annotation.metadata ?? rawData.metadata
+
+  return [{
+    id: Number(item.item_id) || page,
+    row_number: item.row_number || page,
+    training_method_type: trainingMethodType,
+    dataset_format: datasetFormat,
+    prompt: getStringValue(annotation.prompt) || getStringValue(rawData.prompt),
+    negative_prompt: getStringValue(annotation.negative_prompt) || getStringValue(rawData.negative_prompt),
+    metadataText: stringifyMetadata(metadata),
+    is_annotated: item.is_annotated,
+    status: item.status,
+    audit_result: item.audit_result,
+    audit_reason: item.audit_reason,
+    annotation: item.annotation || null,
+    base_url: baseUrl,
+    _rawData: rawData,
+    _rawImages: getRawDataImages(rawData),
+  }]
 }
 
 const buildMessageTableData = (
@@ -256,6 +297,10 @@ const buildTaskTableData = (
     return buildDpoTableData(item, page, layout.dpoFormat || 'alpaca', trainingMethodType, datasetFormat)
   }
 
+  if (layout.isImagePromptType) {
+    return buildImagePromptTableData(item, page, baseUrl, trainingMethodType, datasetFormat)
+  }
+
   if (layout.isImageType) {
     const messagesToUse = item.annotation?.messages && Array.isArray(item.annotation.messages)
       ? item.annotation.messages
@@ -337,7 +382,17 @@ export function useAnnotationDetailController() {
   const isMultiPerson = fromParam === 'multi-person' || location.state?.isMultiPerson === true
   const isAuditMode = auditParam === '1' || location.state?.isAuditMode === true
   const isMachineLearningBiz = bizTypeParam === 'machine_learning'
-  const contentTab = contentParam === 'image' ? 'image' : (contentParam === 'text' ? 'text' : (location.state?.contentTab || 'text'))
+  const contentTab: 'text' | 'image-understanding' | 'image-generation' = contentParam === 'image-generation'
+    ? 'image-generation'
+    : contentParam === 'image-understanding' || contentParam === 'image'
+      ? 'image-understanding'
+      : contentParam === 'text'
+        ? 'text'
+        : (location.state?.contentTab === 'image-generation'
+            ? 'image-generation'
+            : location.state?.contentTab === 'image-understanding' || location.state?.contentTab === 'image'
+              ? 'image-understanding'
+              : 'text')
 
   const [loading, setLoading] = useState(false)
   const [dataList, setDataList] = useState<AnnotationDataItem<string>[]>([])
@@ -360,6 +415,8 @@ export function useAnnotationDetailController() {
   const [manualContent, setManualContent] = useState<string>('')
   const [dpoContents, setDpoContents] = useState<{ chosen: string, rejected: string }>({ chosen: '', rejected: '' })
   const [dpoProcessingTarget, setDpoProcessingTarget] = useState<'chosen' | 'rejected' | null>(null)
+  const [imagePromptFields, setImagePromptFields] = useState<{ prompt: string, negative_prompt: string, metadataText: string }>({ prompt: '', negative_prompt: '', metadataText: '' })
+  const [imagePromptProcessingTarget, setImagePromptProcessingTarget] = useState<'prompt' | 'negative_prompt' | 'metadata' | null>(null)
   const [assistantContents, setAssistantContents] = useState<Record<number, string>>({})
   const [savingDraft, setSavingDraft] = useState<boolean>(false)
   const [auditSubmitting, setAuditSubmitting] = useState<boolean>(false)
@@ -367,7 +424,12 @@ export function useAnnotationDetailController() {
   const [auditRejectModalVisible, setAuditRejectModalVisible] = useState(false)
   const [auditRejectReason, setAuditRejectReason] = useState('')
   const [isImageTask, setIsImageTask] = useState<boolean>(false)
-  const resolvedContentTab: 'text' | 'image' = isImageTask || contentTab === 'image' ? 'image' : 'text'
+  const [isImagePromptAnnotation, setIsImagePromptAnnotation] = useState<boolean>(false)
+  const resolvedContentTab: 'text' | 'image-understanding' | 'image-generation' = isImagePromptAnnotation
+    ? 'image-generation'
+    : isImageTask || contentTab === 'image-understanding'
+      ? 'image-understanding'
+      : 'text'
   const [isImageAnnotation, setIsImageAnnotation] = useState<boolean>(false)
   const [baseUrl, setBaseUrl] = useState<string>('')
   const [expandedCells, setExpandedCells] = useState<Set<string>>(new Set())
@@ -406,6 +468,12 @@ export function useAnnotationDetailController() {
           [dpoProcessingTarget]: streamingContent,
         }))
       }
+      else if (imagePromptProcessingTarget) {
+        setImagePromptFields((prev) => ({
+          ...prev,
+          [imagePromptProcessingTarget === 'metadata' ? 'metadataText' : imagePromptProcessingTarget]: streamingContent,
+        }))
+      }
       else if (isImageAnnotation && currentProcessingIndex !== null) {
         setAssistantContents((prev) => ({
           ...prev,
@@ -419,7 +487,7 @@ export function useAnnotationDetailController() {
         setManualContent(streamingContent)
       }
     }
-  }, [streamingContent, dpoProcessingTarget, isImageAnnotation, currentProcessingIndex, assistantMessagesLength])
+  }, [streamingContent, dpoProcessingTarget, imagePromptProcessingTarget, isImageAnnotation, currentProcessingIndex, assistantMessagesLength])
 
   const fetchAnnotationConfig = async () => {
     if (!taskId) {
@@ -438,10 +506,10 @@ export function useAnnotationDetailController() {
       if (isValidConfig && config.param_config_json) {
         setAnnotationConfig({
           model_id: config.model_id,
-          max_token: config.param_config_json.max_token || 2048,
-          temperature: config.param_config_json.temperature || 0.7,
-          top_p: config.param_config_json.top_p || 1.0,
-          presence_penalty: config.param_config_json.presence_penalty || 1.0,
+          max_token: config.param_config_json.max_token ?? config.param_config_json.max_tokens ?? 2048,
+          temperature: config.param_config_json.temperature ?? 0.7,
+          top_p: config.param_config_json.top_p ?? 1.0,
+          presence_penalty: config.param_config_json.presence_penalty ?? 0.0,
         })
       }
       else {
@@ -518,8 +586,10 @@ export function useAnnotationDetailController() {
       const initialContent = getInitialContent(item, layout.useMessagesLayout)
       const nextAssistantContents = buildAssistantContentsMap(tableData, initialContent, layout.useMessagesLayout)
       const dpoItem = tableData[0]
+      const imagePromptItem = tableData[0]
 
       setIsImageTask(!layout.isDpoType && layout.isImageType)
+      setIsImagePromptAnnotation(layout.isImagePromptType)
       setIsImageAnnotation(layout.useMessagesLayout)
       setBaseUrl(responseBaseUrl)
 
@@ -530,12 +600,18 @@ export function useAnnotationDetailController() {
       setEditingContent('')
       setCurrentProcessingIndex(null)
       setDpoProcessingTarget(null)
+      setImagePromptProcessingTarget(null)
       setExpandedCells(new Set())
       setRowHeights({})
       setManualContent(initialContent)
       setDpoContents({
         chosen: dpoItem?.chosen || '',
         rejected: dpoItem?.rejected || '',
+      })
+      setImagePromptFields({
+        prompt: imagePromptItem?.prompt || '',
+        negative_prompt: imagePromptItem?.negative_prompt || '',
+        metadataText: imagePromptItem?.metadataText || '',
       })
       setAssistantContents(nextAssistantContents)
 
@@ -626,7 +702,11 @@ export function useAnnotationDetailController() {
 
   const getListUrl = () => {
     const tab = isMultiPerson ? 'multi-person' : 'online'
-    const datasetType = resolvedContentTab === 'image' ? 'image-understanding' : 'text-generation'
+    const datasetType = resolvedContentTab === 'image-generation'
+      ? 'image-generation'
+      : resolvedContentTab === 'image-understanding'
+        ? 'image-understanding'
+        : 'text-generation'
     const params = new URLSearchParams({ tab, dataset_type: datasetType })
     if (isMultiPerson) params.set('sub_tab', subTabParam || 'overview')
     if (bizTypeParam) params.set('biz_type', bizTypeParam)
@@ -765,6 +845,29 @@ export function useAnnotationDetailController() {
     }
   }
 
+  const buildImagePromptAnnotationData = () => {
+    const prompt = imagePromptFields.prompt?.trim()
+    if (!prompt) {
+      return null
+    }
+
+    let metadata: Record<string, unknown> = {}
+    const metadataText = imagePromptFields.metadataText?.trim()
+    if (metadataText) {
+      const parsed = JSON.parse(metadataText)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('Metadata 必须是合法 JSON Object')
+      }
+      metadata = parsed
+    }
+
+    return {
+      prompt,
+      negative_prompt: imagePromptFields.negative_prompt || '',
+      metadata,
+    }
+  }
+
   const handleSaveDraft = async () => {
     if (!taskId) return
     const currentItem = dataList[0]
@@ -803,6 +906,15 @@ export function useAnnotationDetailController() {
           return
         }
         annotationData = dpoAnnotationData
+      }
+      else if (isImagePromptAnnotation) {
+        const imagePromptAnnotationData = buildImagePromptAnnotationData()
+        if (!imagePromptAnnotationData) {
+          message.warning('Prompt 不能为空，请先补充图像生成文本')
+          setSavingDraft(false)
+          return
+        }
+        annotationData = imagePromptAnnotationData
       }
       else if (isImageAnnotation) {
         const messages = buildImageAnnotationMessages()
@@ -1057,6 +1169,11 @@ export function useAnnotationDetailController() {
 
     if (imageIndex >= 0 && imageIndex < rawImages.length) {
       const imagePath = rawImages[imageIndex]
+      if (/^(https?:|data:|blob:)/.test(imagePath)) {
+        setPreviewImageUrl(imagePath)
+        setImagePreviewVisible(true)
+        return
+      }
       const fileName = imagePath.includes('/') ? imagePath.split('/').pop() : imagePath
       const imageBaseUrl = import.meta.env.DEV
         ? `${import.meta.env.VITE_PREFIX_BASE_URL}/api/v1/storage/download/`
@@ -1068,7 +1185,7 @@ export function useAnnotationDetailController() {
     }
   }
 
-  const handleOpenAIAnnotation = async (index?: number | 'chosen' | 'rejected') => {
+  const handleOpenAIAnnotation = async (index?: number | 'chosen' | 'rejected' | 'prompt' | 'negative_prompt' | 'metadata') => {
     if (!taskId) {
       message.error('任务ID不存在')
       return
@@ -1089,14 +1206,22 @@ export function useAnnotationDetailController() {
     if (index === 'chosen' || index === 'rejected') {
       setDpoProcessingTarget(index)
       setCurrentProcessingIndex(null)
+      setImagePromptProcessingTarget(null)
+    }
+    else if (index === 'prompt' || index === 'negative_prompt' || index === 'metadata') {
+      setImagePromptProcessingTarget(index)
+      setDpoProcessingTarget(null)
+      setCurrentProcessingIndex(null)
     }
     else if (isImageAnnotation && index !== undefined) {
       setCurrentProcessingIndex(index)
       setDpoProcessingTarget(null)
+      setImagePromptProcessingTarget(null)
     }
     else {
       setCurrentProcessingIndex(null)
       setDpoProcessingTarget(null)
+      setImagePromptProcessingTarget(null)
     }
 
     setManualContent('')
@@ -1104,7 +1229,37 @@ export function useAnnotationDetailController() {
     setEditingContent('')
 
     try {
-      if (currentData.training_method_type === 'dpo') {
+      if (isImagePromptAnnotation) {
+        const rawImages = currentData._rawImages || []
+        if (!rawImages || rawImages.length === 0) {
+          message.error('图像生成标注数据不完整，缺少图片')
+          return
+        }
+
+        const target = index === 'prompt' || index === 'negative_prompt' || index === 'metadata' ? index : 'prompt'
+        const currentPrompt = imagePromptFields.prompt || currentData.prompt || ''
+        const currentNegativePrompt = imagePromptFields.negative_prompt || currentData.negative_prompt || ''
+        const currentMetadata = imagePromptFields.metadataText || currentData.metadataText || ''
+        const targetInstruction = target === 'prompt'
+          ? '请根据图片生成或优化适合图像生成训练的中文 Prompt。'
+          : target === 'negative_prompt'
+            ? '请根据图片生成适合图像生成训练的 Negative Prompt，用于描述不希望出现的内容。'
+            : '请根据图片和已有文本生成 JSON Object 格式 metadata，只输出 JSON。'
+
+        await startAnnotation(Number(taskId), undefined, {
+          messages: [{
+            role: 'user',
+            content: [
+              targetInstruction,
+              currentPrompt ? `已有 Prompt：${currentPrompt}` : '',
+              currentNegativePrompt ? `已有 Negative Prompt：${currentNegativePrompt}` : '',
+              currentMetadata ? `已有 Metadata：${currentMetadata}` : '',
+            ].filter(Boolean).join('\n'),
+          }],
+          images: rawImages,
+        })
+      }
+      else if (currentData.training_method_type === 'dpo') {
         const annotationTarget = index === 'chosen' || index === 'rejected' ? index : undefined
         if (currentData.dataset_format === 'role-based') {
           const rawMessages = currentData._rawMessages || []
@@ -1168,7 +1323,7 @@ export function useAnnotationDetailController() {
         }
 
         const assistantMessages = currentData._assistantMessages || []
-        const targetIndex = index !== undefined ? index : (assistantMessages.length > 0 ? assistantMessages.length - 1 : 0)
+        const targetIndex = typeof index === 'number' ? index : (assistantMessages.length > 0 ? assistantMessages.length - 1 : 0)
 
         let assistantCount = 0
         let targetAssistantIndex = -1
@@ -1224,6 +1379,7 @@ export function useAnnotationDetailController() {
     finally {
       setCurrentProcessingIndex(null)
       setDpoProcessingTarget(null)
+      setImagePromptProcessingTarget(null)
     }
   }
 
@@ -1245,6 +1401,8 @@ export function useAnnotationDetailController() {
     isSubmitted,
     isReauditRound,
     manualContent,
+    imagePromptFields,
+    imagePromptProcessingTarget,
     dpoContents,
     dpoProcessingTarget,
     assistantContents,
@@ -1256,6 +1414,7 @@ export function useAnnotationDetailController() {
     isImageTask,
     resolvedContentTab,
     isImageAnnotation,
+    isImagePromptAnnotation,
     baseUrl,
     expandedCells,
     rowHeights,
@@ -1270,6 +1429,7 @@ export function useAnnotationDetailController() {
     isAuditMode,
     isMultiPersonPassedLocked,
     setManualContent,
+    setImagePromptFields,
     setDpoContents,
     setAssistantContents,
     setAuditRejectReason,

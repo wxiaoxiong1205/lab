@@ -9,6 +9,8 @@ class DatasetSampleFileCategory(str, Enum):
     """测试/训练/验证数据集样例文件文件名称与下载名称配置枚举字典"""
     IMAGE_UNDERSTANDING_ROLE_BASED = ("image_understand_qa_role_based", "图像理解对话样例(role-based)")
     IMAGE_UNDERSTANDING_GRPO = ("image_understand_qa_grpo", "图像理解强化学习样例(grpo)")
+    IMAGE_GENERATION_IMAGE_PROMPT_ANNOTATED = ("image_generation_image_prompt_annotated", "图像生成有标注样例(image-prompt)")
+    IMAGE_GENERATION_IMAGE_PROMPT_UNANNOTATED = ("image_generation_image_prompt_unannotated", "图像生成未标注样例(仅图片)")
     TEXT_GENERATION_PROMPT_RESPONSE = ("text_generation_qa_prompt_response", "文本生成对话样例(prompt-response)")
     TEXT_GENERATION_ALPACA = ("text_generation_qa_alpaca", "文本生成样例(alpaca)")
     TEXT_GENERATION_DPO_ALPACA = ("text_generation_qa_dpo_alpaca", "文本生成偏好样例(alpaca)")
@@ -43,6 +45,7 @@ class DatasetSampleFileCategory(str, Enum):
 class InferenceResultSampleFileCategory(str, Enum):
     """推理结果集样例文件文件名称与下载名称配置枚举字典"""
     IMAGE_UNDERSTANDING_ROLE_BASED = ("inference_image_understanding_qa_role_based", "图像理解推理结果集样例(role-based)")
+    IMAGE_GENERATION_IMAGE_PROMPT = ("inference_image_generation_image_prompt", "图像生成推理结果集样例(image-prompt)")
     TEXT_GENERATION_PROMPT_RESPONSE = ("inference_text_generation_qa_prompt_response", "文本生成推理结果集样例(prompt-response)")
     TEXT_GENERATION_ROLE_BASED = ("inference_text_generation_qa_role_based", "文本生成推理结果集样例(role-based)")
     TEXT_GENERATION_ROLE_BASED_JSON = ("inference_text_generation_qa_role_based_json", "文本生成推理结果集样例json(role-based)")

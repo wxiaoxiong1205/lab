@@ -1,0 +1,3 @@
+{"messages":[{"role":"system","content":"你是质检助手。"},{"role":"user","content":"请判断图片中的商品包装是否完好。","images":["assets/quality-check-001.jpg"]},{"role":"assistant","content":"包装整体完好，未发现明显破损。"}]}
+{"messages":[{"role":"system","content":"你是质检助手。"},{"role":"user","content":"图片中是否存在瑕疵？","images":["assets/quality-check-002.jpg"]},{"role":"assistant","content":"左下角存在轻微压痕，建议复核。"}]}
+{"messages":[{"role":"system","content":"你是质检助手。"},{"role":"user","content":"请给出图片质检结论。","images":["assets/quality-check-003.jpg"]},{"role":"assistant","content":"标签区域有遮挡，建议转人工确认。"}]}

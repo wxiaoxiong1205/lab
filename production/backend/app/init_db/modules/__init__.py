@@ -11,6 +11,7 @@ from .permission import PermissionSeeder
 from .benchmark_datasets import BenchmarkDatasetsSeeder
 from .example_notebook.seeder import ExampleNotebookSeeder
 from .advanced_templates import AdvancedTemplateSeeder
+from .demo_showcase import DemoShowcaseSeeder
 
 # 所有可用的种子管理器（按执行顺序排列）
 SEEDERS = [
@@ -23,8 +24,9 @@ SEEDERS = [
     ExampleNotebookSeeder,
     AdvancedTemplateSeeder,
     ImageTagsSeeder,
+    DemoShowcaseSeeder,
 ]
 
 __all__ = ['SEEDERS', 'DataCleaningSeeder', 'ImageSeeder', 'EvaluationMetricsSeeder', 'CommonConfigSeeder',
            'PermissionSeeder', 'BenchmarkDatasetsSeeder', 'ExampleNotebookSeeder', 'AdvancedTemplateSeeder',
-           'ImageTagsSeeder']
+           'ImageTagsSeeder', 'DemoShowcaseSeeder']

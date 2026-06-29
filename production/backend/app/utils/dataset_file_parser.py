@@ -2861,23 +2861,31 @@ class ImageUnderstandingDatasetFileParser:
                         if basename.endswith('.jsonl'):
                             data_jsonl_files.append(file_name)
 
-                    # 验证 .jsonl数据集 文件
-                    if len(data_jsonl_files) == 0:
+                    is_image_prompt = dataset_format == DatasetFormat.IMAGE_PROMPT.value
+
+                    # 验证 .jsonl数据集 文件。图像生成 image-prompt 允许未标注素材包仅包含 images/。
+                    if len(data_jsonl_files) == 0 and not is_image_prompt:
                         logger.error("zip文件中未找到.jsonl数据集文件")
                         raise ValueError("文件格式错误")
                     if len(data_jsonl_files) > 1:
                         logger.error(f"zip文件中包含多个.jsonl数据集文件: {data_jsonl_files}")
                         raise ValueError("文件格式错误")
 
-                    # 读取 .jsonl数据集 文件内容
-                    data_jsonl_file = data_jsonl_files[0]
-                    jsonl_content = zip_ref.read(data_jsonl_file)
-                    dataset_dir = os.path.dirname(self._normalize_zip_member_path(data_jsonl_file)).replace('\\', '/')
+                    dataset_dir = ""
+                    if data_jsonl_files:
+                        # 读取 .jsonl数据集 文件内容
+                        data_jsonl_file = data_jsonl_files[0]
+                        jsonl_content = zip_ref.read(data_jsonl_file)
+                        dataset_dir = os.path.dirname(self._normalize_zip_member_path(data_jsonl_file)).replace('\\', '/')
 
-                    # 查找与 data.jsonl 同级的 images 文件夹
+                    # 查找 images 文件夹。有 data.jsonl 时要求与其同级；无 data.jsonl 时使用 zip 中的 images/。
                     images_folder_found = False
                     for file_name in file_list:
-                        image_relative_path = self._image_relative_path_from_sibling_images_dir(file_name, dataset_dir)
+                        image_relative_path = (
+                            self._image_relative_path_from_sibling_images_dir(file_name, dataset_dir)
+                            if data_jsonl_files
+                            else self._image_relative_path_from_zip_member(file_name)
+                        )
                         # 检查是否是 data.jsonl 同级 images 文件夹下的文件，兼容 xxx/images/1.jpg 等多层目录
                         if image_relative_path and not (file_name or '').replace('\\', '/').endswith('/'):
                             images_folder_found = True
@@ -2894,18 +2902,34 @@ class ImageUnderstandingDatasetFileParser:
                         logger.error("images文件夹中未找到任何图片文件")
                         raise ValueError("文件格式错误")
 
+                    if is_image_prompt and not jsonl_content:
+                        lines = [
+                            json.dumps(
+                                {"prompt": "", "images": [f"images/{image_name}"]},
+                                ensure_ascii=False,
+                            )
+                            for image_name in sorted(images.keys())
+                        ]
+                        jsonl_content = ("\n".join(lines) + "\n").encode("utf-8")
+
             finally:
                 # 清理临时文件
                 if os.path.exists(tmp_file_path):
                     os.unlink(tmp_file_path)
 
             # 验证 jsonl 内容格式
-            total_samples, total_characters = await self.analyze_jsonl_content(
-                jsonl_content,
-                images,
-                dataset_format=dataset_format,
-                training_method_type=training_method_type,
-            )
+            if dataset_format == DatasetFormat.IMAGE_PROMPT.value and data_jsonl_files:
+                total_samples, total_characters = await validate_image_generation_jsonl_content(jsonl_content, images)
+            elif dataset_format == DatasetFormat.IMAGE_PROMPT.value:
+                total_samples = len(images)
+                total_characters = 0
+            else:
+                total_samples, total_characters = await self.analyze_jsonl_content(
+                    jsonl_content,
+                    images,
+                    dataset_format=dataset_format,
+                    training_method_type=training_method_type,
+                )
 
             return ImageUnderstandingParseResult(
                 jsonl_content=jsonl_content,
@@ -3182,6 +3206,93 @@ async def analyze_image_understanding_dataset_file_content(
         training_method_type=training_method_type,
     )
 
+async def analyze_image_generation_dataset_file_content(
+        file_content: bytes,
+        file_type: str,
+) -> ImageUnderstandingParseResult:
+    """
+    图像生成 image-prompt zip 解析入口。
+
+    有标注 zip 结构：data.jsonl + images/。
+    未标注 zip 结构：仅 images/，系统会按图片生成空 prompt 样本。
+    data.jsonl 每行包含 prompt、images[]，可选 negative_prompt、metadata。
+    """
+    if file_type != TrainingDatasetUploadTypeCategory.ZIP_TYPE:
+        logger.error(f"图像生成数据集仅支持zip格式，当前为: {file_type}")
+        raise ValueError("文件格式错误")
+
+    parser = ImageUnderstandingDatasetFileParser()
+    return await parser.process_image_understanding_file(
+        file_content,
+        dataset_format=DatasetFormat.IMAGE_PROMPT.value,
+        training_method_type=TrainingMethodType.SFT.value,
+    )
+
+
+async def validate_image_generation_jsonl_content(
+        jsonl_content: bytes,
+        images: Dict[str, bytes],
+) -> Tuple[int, int]:
+    """校验 image-prompt 格式：prompt、images[] 必填，negative_prompt/metadata 可选。"""
+    total_samples = 0
+    total_characters = 0
+    try:
+        content_str = jsonl_content.decode('utf-8')
+        image_names = set(images.keys())
+        for line_num, line in enumerate(content_str.splitlines(), 1):
+            line = line.strip()
+            if not line or line.lstrip().startswith('#'):
+                continue
+
+            try:
+                parsed_data = json.loads(line)
+            except json.JSONDecodeError as e:
+                logger.error(f"第{line_num}行JSON格式错误: {str(e)}")
+                raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+            if not isinstance(parsed_data, dict):
+                logger.error(f"第{line_num}行：数据应是JSON对象格式")
+                raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+            prompt = parsed_data.get('prompt')
+            if not isinstance(prompt, str) or not prompt.strip():
+                logger.error(f"第{line_num}行：prompt不能为空")
+                raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+            images_list = parsed_data.get('images')
+            if not isinstance(images_list, list) or len(images_list) == 0:
+                logger.error(f"第{line_num}行：images必须是非空数组")
+                raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+            negative_prompt = parsed_data.get('negative_prompt')
+            if negative_prompt is not None and not isinstance(negative_prompt, str):
+                logger.error(f"第{line_num}行：negative_prompt必须是字符串")
+                raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+            metadata = parsed_data.get('metadata')
+            if metadata is not None and not isinstance(metadata, dict):
+                logger.error(f"第{line_num}行：metadata必须是对象")
+                raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+            for img_name in images_list:
+                if not isinstance(img_name, str) or not img_name.strip():
+                    logger.error(f"第{line_num}行：images数组中的元素必须是非空字符串")
+                    raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+                if not (ImageUnderstandingDatasetFileParser._image_reference_candidates(img_name) & image_names):
+                    logger.error(f"第{line_num}行：images中引用的图片在zip中不存在: {img_name}")
+                    raise ValueError(f"第 {line_num} 个样本：字段/格式错误")
+
+            total_samples += 1
+            total_characters += len(line)
+
+        if total_samples == 0:
+            raise ValueError("无有效数据")
+
+        return total_samples, total_characters
+    except UnicodeDecodeError as e:
+        logger.error(f"文件编码错误: {str(e)}")
+        raise ValueError("文件格式错误")
+
 # ========= 其他基础公共方法 ==========
 
 def generate_filenames(base_filename: str) -> List[str]:
@@ -3298,10 +3409,10 @@ def generate_dataset_path(
     # 先生成基础目录
     base_path = generate_base_path(namespace, usage)
 
-    # 图像理解数据集需要额外添加 imageUnderstanding 子目录和版本目录
-    if dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING.value:
-        # 图像理解数据集
-        base_path = os.path.join(base_path, 'imageUnderstanding')
+    # 图像类数据集需要额外添加类型子目录和版本目录
+    if dataset_type in (TrainingTypeCategory.IMAGE_UNDERSTANDING.value, TrainingTypeCategory.IMAGE_GENERATION.value):
+        image_dir = 'imageGeneration' if dataset_type == TrainingTypeCategory.IMAGE_GENERATION.value else 'imageUnderstanding'
+        base_path = os.path.join(base_path, image_dir)
         dataset_dir = os.path.join(base_path, f"{dataset_name}_{version}")
         filename = f"data.{file_extension}"
         return os.path.join(dataset_dir, filename).replace('\\', '/')
@@ -3326,7 +3437,8 @@ def generate_image_folder_path(
     namespace: str,
     dataset_name: str,
     version: str,
-    usage: str
+    usage: str,
+    dataset_type: str = TrainingTypeCategory.IMAGE_UNDERSTANDING.value,
 ) -> str:
     """
     生成图像理解数据集的图片文件夹路径
@@ -3345,8 +3457,8 @@ def generate_image_folder_path(
     # 先生成基础目录
     base_path = generate_base_path(namespace, usage)
 
-    # 图像理解数据集的图片存储在 imageUnderstanding/{dataset_name}_{version}/images 目录下
-    base_path = os.path.join(base_path, 'imageUnderstanding')
+    image_dir = 'imageGeneration' if dataset_type == TrainingTypeCategory.IMAGE_GENERATION.value else 'imageUnderstanding'
+    base_path = os.path.join(base_path, image_dir)
     dataset_dir = os.path.join(base_path, f"{dataset_name}_{version}")
     return os.path.join(dataset_dir, 'images').replace('\\', '/')
 
@@ -3354,7 +3466,8 @@ def generate_image_dataset_directory_path(
         namespace: str,
         dataset_name: str,
         version: str,
-        usage: str
+        usage: str,
+        dataset_type: str = TrainingTypeCategory.IMAGE_UNDERSTANDING.value,
 ) -> str:
     """
     生成图像理解数据集的目录路径（用于删除整个数据集目录）
@@ -3374,8 +3487,8 @@ def generate_image_dataset_directory_path(
     # 这里调用file_parser内的公共方法
     base_path = generate_base_path(namespace, usage)
 
-    # 图像理解数据集目录：imageUnderstanding/{dataset_name}_{version}/
-    base_path = os.path.join(base_path, 'imageUnderstanding')
+    image_dir = 'imageGeneration' if dataset_type == TrainingTypeCategory.IMAGE_GENERATION.value else 'imageUnderstanding'
+    base_path = os.path.join(base_path, image_dir)
     return os.path.join(base_path, f"{dataset_name}_{version}").replace('\\', '/')
 
 # ------------------ JFS操作相关函数 --------------------
@@ -3733,14 +3846,17 @@ async def analyze_save_dataset_file_multi(
             validate_dataset_upload_file_type(file_type, dataset_type)
 
             # 根据数据集类型处理文件
-            if dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING:
-                # 图像理解数据集：处理zip文件
-                zip_result = await analyze_image_understanding_dataset_file_content(
-                    file_content,
-                    file_type,
-                    dataset_format.value if hasattr(dataset_format, "value") else dataset_format,
-                    training_method_type.value if hasattr(training_method_type, "value") else training_method_type,
-                )
+            if dataset_type in (TrainingTypeCategory.IMAGE_UNDERSTANDING, TrainingTypeCategory.IMAGE_GENERATION):
+                # 图像类数据集：处理zip文件
+                if dataset_type == TrainingTypeCategory.IMAGE_GENERATION:
+                    zip_result = await analyze_image_generation_dataset_file_content(file_content, file_type)
+                else:
+                    zip_result = await analyze_image_understanding_dataset_file_content(
+                        file_content,
+                        file_type,
+                        dataset_format.value if hasattr(dataset_format, "value") else dataset_format,
+                        training_method_type.value if hasattr(training_method_type, "value") else training_method_type,
+                    )
                 jsonl_content = zip_result.jsonl_content
                 images = zip_result.images
                 parse_total_samples = zip_result.total_samples
@@ -3755,7 +3871,7 @@ async def analyze_save_dataset_file_multi(
                     total_samples += parse_total_samples
                     total_characters += parse_total_characters
 
-                image_folder_path = generate_image_folder_path(namespace, name, version, usage.value)
+                image_folder_path = generate_image_folder_path(namespace, name, version, usage.value, dataset_type.value)
                 image_dir = image_folder_path
                 if not jfs.exists(image_dir):
                     jfs.makedirs(image_dir, exist_ok=True)

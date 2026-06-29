@@ -503,7 +503,7 @@ const CreateModelPage: React.FC = () => {
 
             <Form.Item name="model_type" label="模型类型" rules={[{ required: true, message: '请选择模型类型' }]}>
               <Radio.Group onChange={handleModelTypeChange}>
-                {ModelTypeCategory?.options.map((item: any) => (['text-generation', 'image-understanding'].includes(item.value) && (
+                {ModelTypeCategory?.options.map((item: any) => (['text-generation', 'image-generation', 'image-understanding'].includes(item.value) && (
                   <Radio.Button key={item.value} value={item.value}>
                     {ModelTypeMapping(item.value).text}
                     {ModelTypeMapping(item.value).disabled && (

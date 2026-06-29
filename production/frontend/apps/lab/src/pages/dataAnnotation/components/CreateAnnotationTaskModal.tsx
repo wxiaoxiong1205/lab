@@ -21,6 +21,7 @@ const { Text } = Typography
 const datasetTypeOptions = [
   { value: 'text-generation', label: '文本生成', icon: <FileTextOutlined /> },
   { value: 'image-understanding', label: '图像理解', icon: <PictureOutlined /> },
+  { value: 'image-generation', label: '图像生成', icon: <PictureOutlined /> },
 ]
 
 const CreateAnnotationTaskModal: React.FC = () => {
@@ -35,7 +36,9 @@ const CreateAnnotationTaskModal: React.FC = () => {
 
   const initialDatasetType = useMemo(() => {
     const datasetType = searchParams.get('dataset_type')
-    return datasetType === 'image-understanding' ? 'image-understanding' : 'text-generation'
+    return datasetType === 'image-understanding' || datasetType === 'image-generation'
+      ? datasetType
+      : 'text-generation'
   }, [searchParams])
 
   const [datasetType, setDatasetType] = useState<string>(initialDatasetType)
@@ -206,6 +209,7 @@ const CreateAnnotationTaskModal: React.FC = () => {
                   form={form}
                   placeholder="请选择需要标注的数据集"
                   modalTitle="待标注数据集"
+                  selectionNotice="请选择已发布的数据集版本作为标注数据源；图像生成首版仅支持 SFT image-prompt 数据，标注时只能补充或修改文字。"
                   onChange={handleDatasetCascaderChange}
                   label=""
                   selectButtonText="+ 选择"

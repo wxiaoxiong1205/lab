@@ -48,7 +48,7 @@ router = APIRouter(prefix="/api/v1/inference-result-datasets", tags=["inference-
 @inject
 async def download_sample_inference_result_dataset(
     current_user: JwtUserInfo = Depends(get_current_user),
-    file_type: InferenceResultDatasetUploadType = Query(..., description="样例文件类型（jsonl/json/xlsx/csv/zip，其中 zip 仅用于 image-understanding+role-based）"),
+    file_type: InferenceResultDatasetUploadType = Query(..., description="样例文件类型（jsonl/json/xlsx/csv/zip，其中 zip 用于 image-understanding+role-based 或 image-generation+image-prompt）"),
     dataset_type: TrainingTypeCategory = Query(..., description="数据集类型"),
     dataset_format: DatasetFormat = Query(..., description="数据格式，与 dataset_type 组合决定样例文件路径与下载名，见样例下载说明"),
     inference_result_service: InferenceResultDatasetService = Depends(Provide[AutoContainer.inference_result_dataset_service])
@@ -63,6 +63,7 @@ async def download_sample_inference_result_dataset(
     - **text-generation** + **prompt-response**：jsonl/json/xlsx/csv → 文本生成对话样例(prompt-response).{ext}
     - **text-generation** + **role-based**：jsonl/json/xlsx（zip）→ 文本生成对话样例{type}(role-based).zip
     - **image-understanding** + **role-based**：zip → 图像理解对话样例(role-based).zip
+    - **image-generation** + **image-prompt**：zip → 图像生成推理结果集样例(image-prompt).zip
 
     ## 样例请求
     ```
@@ -1135,4 +1136,3 @@ async def list_inference_result_datasets_by_filters(
         attr_name=attr_name,
         option_value=option_value,
     )
-

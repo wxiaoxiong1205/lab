@@ -20,6 +20,7 @@ class DatasetFormat(str, Enum):
     PROMPT_RESPONSE = "prompt-response"
     ALPACA = "alpaca"
     ROLE_BASED = "role-based"
+    IMAGE_PROMPT = "image-prompt"
     PREFIX_SUFFIX_MIDDLE = "prefix-suffix-middle"
     GRPO = "grpo"
 
@@ -388,6 +389,8 @@ class OpenAICompatibleCaller(BaseModelCaller):
                 format_rules = "这是对话数据生成场景，答案应直接可作为 assistant 单轮回复内容。"
             elif dataset_format == DatasetFormat.GRPO.value:
                 format_rules = "这是 GRPO 训练样本标注场景，答案应直接可作为 reward_model.ground_truth。"
+            elif dataset_format == DatasetFormat.IMAGE_PROMPT.value:
+                format_rules = "这是图像生成训练样本标注场景，答案应直接可作为 image-prompt 的文字字段内容。"
             elif dataset_format == DatasetFormat.PREFIX_SUFFIX_MIDDLE.value:
                 format_rules = "这是补全文本场景，只输出需要补全的内容本身。"
             else:
@@ -525,6 +528,23 @@ class OpenAICompatibleCaller(BaseModelCaller):
                             # 如果没有images字段或为空，说明这条数据确实没有图片，正常处理即可
                         
                         messages.append(message_dict)
+
+        elif dataset_format == DatasetFormat.IMAGE_PROMPT.value:
+            prompt = raw_data.get("prompt", "") or "请根据图片生成适合图像生成训练的文字描述。"
+            messages.append({"role": "system", "content": _default_system_prompt()})
+            images_base64 = raw_data.get("images_base64", [])
+            if images_base64 and isinstance(images_base64, list):
+                content_parts = []
+                if prompt:
+                    content_parts.append({"type": "text", "text": prompt})
+                for image_base64 in images_base64:
+                    content_parts.append({
+                        "type": "image_url",
+                        "image_url": {"url": image_base64}
+                    })
+                messages.append({"role": "user", "content": content_parts})
+            else:
+                messages.append({"role": "user", "content": prompt})
                             
         elif dataset_format == DatasetFormat.PREFIX_SUFFIX_MIDDLE.value:
             # prefix-suffix-middle格式：构建填充中间内容的提示
@@ -580,6 +600,9 @@ class OpenAICompatibleCaller(BaseModelCaller):
         elif dataset_format == DatasetFormat.PREFIX_SUFFIX_MIDDLE.value:
             # prefix-suffix-middle格式：响应内容放入middle字段
             annotation["middle"] = result.content
+
+        elif dataset_format == DatasetFormat.IMAGE_PROMPT.value:
+            annotation["prompt"] = result.content
 
         elif dataset_format == DatasetFormat.GRPO.value:
             annotation["reward_model"] = {
@@ -756,6 +779,8 @@ def _build_annotation(content: str, dataset_format: str, raw_data: Optional[Dict
             annotation["messages"] = [{"role": "assistant", "content": content}]
     elif dataset_format == DatasetFormat.PREFIX_SUFFIX_MIDDLE.value:
         annotation["middle"] = content
+    elif dataset_format == DatasetFormat.IMAGE_PROMPT.value:
+        annotation["prompt"] = content
     else:
         annotation["response"] = content
     

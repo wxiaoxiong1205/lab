@@ -24,6 +24,20 @@ import './index.css'
 
 const { Title, Text } = Typography
 
+export type AnnotationContentTab = 'text' | 'image-understanding' | 'image-generation'
+
+const contentTabToDatasetType = (tab: AnnotationContentTab) => {
+  if (tab === 'image-understanding') return 'image-understanding'
+  if (tab === 'image-generation') return 'image-generation'
+  return 'text-generation'
+}
+
+const datasetTypeToContentTab = (datasetType?: string | null): AnnotationContentTab => {
+  if (datasetType === 'image-understanding') return 'image-understanding'
+  if (datasetType === 'image-generation') return 'image-generation'
+  return 'text'
+}
+
 // 标注任务数据类型
 export interface AnnotationTask {
   id: number
@@ -105,8 +119,8 @@ export interface TaskListTableProps {
 
 // 在线标注 Tab 内容
 export interface OnlineAnnotationTabProps {
-  contentTab: 'text' | 'image'
-  setContentTab: (tab: 'text' | 'image') => void
+  contentTab: AnnotationContentTab
+  setContentTab: (tab: AnnotationContentTab) => void
   searchParams: URLSearchParams
   setSearchParams: (params: URLSearchParams, opts?: { replace?: boolean }) => void
   columns: ColumnsType<AnnotationTask>
@@ -136,7 +150,7 @@ const DataAnnotation: React.FC = () => {
     subTabFromUrl && ['overview', 'task', 'review'].includes(subTabFromUrl) ? subTabFromUrl : 'overview',
   )
   // 内容标签页状态
-  const [contentTab, setContentTab] = useState<'text' | 'image'>(searchParams.get('dataset_type') === 'image-understanding' ? 'image' : 'text')
+  const [contentTab, setContentTab] = useState<AnnotationContentTab>(datasetTypeToContentTab(searchParams.get('dataset_type')))
 
   // 数据状态
   const [loading, setLoading] = useState(false)
@@ -195,7 +209,7 @@ const DataAnnotation: React.FC = () => {
           task_name: onlineTaskName || undefined,
           page,
           size,
-          dataset_type: contentTab === 'text' ? 'text-generation' : 'image-understanding',
+          dataset_type: contentTabToDatasetType(contentTab),
         }
         response = await labelTaskService.getList(params)
       }
@@ -332,8 +346,8 @@ const DataAnnotation: React.FC = () => {
     }
 
     const urlDatasetType = searchParams.get('dataset_type')
-    if (urlDatasetType === 'image-understanding') {
-      setContentTab('image')
+    if (urlDatasetType === 'image-understanding' || urlDatasetType === 'image-generation') {
+      setContentTab(datasetTypeToContentTab(urlDatasetType))
     }
     else if (urlDatasetType === 'text-generation' || !urlDatasetType) {
       if (!urlDatasetType) {
@@ -416,15 +430,15 @@ const DataAnnotation: React.FC = () => {
       navigate(`/project/${projectId}/data-annotation/create-multi-person`)
       return
     }
-    navigate(`/project/${projectId}/data-annotation/create?dataset_type=${contentTab === 'text' ? 'text-generation' : 'image-understanding'}`)
+    navigate(`/project/${projectId}/data-annotation/create?dataset_type=${contentTabToDatasetType(contentTab)}`)
   }
 
-  const inferContentTabFromRecord = useCallback((record: Record<string, unknown> | AnnotationTask): 'text' | 'image' => {
+  const inferContentTabFromRecord = useCallback((record: Record<string, unknown> | AnnotationTask): AnnotationContentTab => {
     const datasetType = record?.dataset_type
       ?? ((record as { dataset?: { dataset_type?: string } })?.dataset?.dataset_type)
       ?? ((record as { source_dataset_type?: string })?.source_dataset_type)
 
-    return datasetType === 'image-understanding' ? 'image' : 'text'
+    return datasetTypeToContentTab(String(datasetType || ''))
   }, [])
 
   // 查看详情（在线标注传 contentTab，多人标注传 isMultiPerson）；来源写入 URL，刷新不丢失

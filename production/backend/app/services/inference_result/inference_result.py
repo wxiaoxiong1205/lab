@@ -23,6 +23,7 @@ from twine.commands.upload import upload
 
 from app.core.config import settings
 from app.core.logging import logger
+from app.utils.showcase_sample_files import is_showcase_sample_path, read_showcase_jsonl_page
 
 from app.models import TrainedModel
 from app.models.models import (
@@ -169,6 +170,18 @@ class DefaultInferenceResultDatasetService(InferenceResultDatasetService):
 
             else:
                 # 不支持的数据集格式
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"暂无当前数据集格式：{dataset_format} 的样例数据集"
+                )
+
+        elif dataset_type == TrainingTypeCategory.IMAGE_GENERATION:
+            if dataset_format == DatasetFormat.IMAGE_PROMPT:
+                sample_path = os.path.join(
+                    base_sample_dir,
+                    InferenceResultSampleFileCategory.IMAGE_GENERATION_IMAGE_PROMPT + "." + file_type
+                )
+            else:
                 raise HTTPException(
                     status_code=400,
                     detail=f"暂无当前数据集格式：{dataset_format} 的样例数据集"
@@ -874,13 +887,57 @@ class DefaultInferenceResultDatasetService(InferenceResultDatasetService):
         
         if not dataset.file_path:
             raise HTTPException(status_code=404, detail="数据集文件不存在")
+
+        is_business_inference = dataset.usage == InferenceDatasetUsage.BUSINESS_INFERENCE.value
+        if is_showcase_sample_path(dataset.file_path):
+            page_items, total, total_pages = read_showcase_jsonl_page(dataset.file_path, page, size)
+            base_url = self._build_base_url(project_id=project_id, dataset_id=dataset_id, data_format=dataset.dataset_format)
+            if is_business_inference:
+                return InferenceResultItemFlexibleResponsePage(
+                    items=[
+                        InferenceResultItemFlexibleResponse(
+                            id=row_number,
+                            dataset_id=dataset_id,
+                            sequence=row_number,
+                            data=item,
+                        )
+                        for row_number, item in page_items
+                    ],
+                    total=total,
+                    page=page,
+                    size=size,
+                    pages=total_pages,
+                    base_url=base_url,
+                )
+            return InferenceResultItemResponsePage(
+                items=[
+                    InferenceResultItemResponse(
+                        id=row_number,
+                        dataset_id=dataset_id,
+                        sequence=row_number,
+                        system=item.get("system", ""),
+                        prompt=item.get("prompt", ""),
+                        standard_response=item.get("standard_response") or item.get("response", ""),
+                        model_response=item.get("model_response", ""),
+                        messages=item.get("messages"),
+                        images=item.get("images"),
+                        error=item.get("error", False),
+                        error_message=item.get("error_message", ""),
+                    )
+                    for row_number, item in page_items
+                ],
+                total=total,
+                page=page,
+                size=size,
+                pages=total_pages,
+                base_url=base_url,
+            )
         
         # 从 JuiceFS 读取文件
         jfs = await self._get_juicefs_client()
         if not jfs.exists(dataset.file_path):
             raise HTTPException(status_code=404, detail=f"数据集文件不存在: {dataset.file_path}")
         
-        is_business_inference = dataset.usage == InferenceDatasetUsage.BUSINESS_INFERENCE.value
         total_items = dataset.total_items or 0
         if total_items == 0:
             empty_page_class = InferenceResultItemFlexibleResponsePage if is_business_inference else InferenceResultItemResponsePage
@@ -2376,4 +2433,3 @@ class DefaultInferenceResultDatasetService(InferenceResultDatasetService):
             InferenceResultDatasetSummaryResponse.model_validate(item) for item in result.items
         ]
         return result
-

@@ -149,7 +149,7 @@ const EditBaseModelModal: React.FC<EditBaseModelModalProps> = ({
           rules={[{ required: true, message: '请选择模型类型' }]}
         >
           <Select mode="multiple" placeholder="请选择模型类型">
-            {['text-generation', 'image-understanding'].map((value) => (
+            {['text-generation', 'image-generation', 'image-understanding'].map((value) => (
               <Select.Option key={value} value={value}>
                 {ModelTypeMapping(value).text}
               </Select.Option>
