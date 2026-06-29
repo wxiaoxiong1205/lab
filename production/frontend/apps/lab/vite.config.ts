@@ -6,7 +6,8 @@
  * @FilePath: \deepexi-lab-web\vite.config.ts
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { createRequire } from 'node:module'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -15,6 +16,17 @@ import AutoImport from 'unplugin-auto-import/vite'
 import { codeInspectorPlugin } from 'code-inspector-plugin'
 import { visualizer } from 'rollup-plugin-visualizer'
 import qiankun from 'vite-plugin-qiankun'
+
+const require = createRequire(import.meta.url)
+
+const resolvePackageDir = (packageName: string, fallback: string) => {
+  try {
+    return dirname(require.resolve(`${packageName}/package.json`))
+  }
+  catch {
+    return fallback
+  }
+}
 
 export default defineConfig(({ mode, command }) => {
   // 加载环境变量
@@ -99,8 +111,8 @@ export default defineConfig(({ mode, command }) => {
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src'),
-        '@antv/g-math': resolve(__dirname, '../../node_modules/.pnpm/@antv+g-math@0.1.9/node_modules/@antv/g-math'),
-        '@antv/util': resolve(__dirname, '../../node_modules/.pnpm/@antv+util@2.0.17/node_modules/@antv/util'),
+        '@antv/g-math': resolvePackageDir('@antv/g-math', resolve(__dirname, '../../node_modules/.pnpm/@antv+g-math@0.1.9/node_modules/@antv/g-math')),
+        '@antv/util': resolvePackageDir('@antv/util', resolve(__dirname, '../../node_modules/.pnpm/@antv+util@2.0.17/node_modules/@antv/util')),
         // 确保 @annotorious/openseadragon 能正确解析 peer 依赖
         'openseadragon': resolve(__dirname, 'node_modules/openseadragon'),
       },
