@@ -401,6 +401,56 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
     return rowNumber !== undefined && failedDeleteRowNumbers.has(rowNumber)
   }
 
+  const renderDataDetailTitle = () => {
+    const title = (
+      <span className="text-blue-400 shrink-0">
+        <DatabaseOutlined />
+        {' '}
+        数据详情
+      </span>
+    )
+
+    if (isActiveDeleteOperationRunning) {
+      return (
+        <div className="flex flex-wrap items-center gap-3">
+          {title}
+          <Alert
+            type="warning"
+            showIcon
+            className="min-w-[420px] flex-1 !py-2"
+            message={`版本操作状态：删除中。正在删除 ${activeDeleteRequestedCount} 条数据，数据集较大时可能需要几分钟。你可以离开页面，回来后会继续展示处理状态。`}
+          />
+        </div>
+      )
+    }
+
+    if (isActiveDeleteOperationFailed && !isFailedOperationDismissed) {
+      return (
+        <div className="flex flex-wrap items-center gap-3">
+          {title}
+          <Alert
+            type="error"
+            showIcon
+            className="min-w-[420px] flex-1 !py-2"
+            message={`版本操作状态：删除失败。已成功 ${activeDeleteRemovedCount} 条，已失败 ${activeDeleteFailedCount} 条。${activeDeleteOperation?.error_message || '目标数据已变化，请刷新后重试'}`}
+            action={(
+              <div className="flex gap-2">
+                <Button size="small" danger onClick={handleRetryDeleteRows}>
+                  重试删除
+                </Button>
+                <Button size="small" onClick={handleDismissOperationAlert}>
+                  关闭提示
+                </Button>
+              </div>
+            )}
+          />
+        </div>
+      )
+    }
+
+    return title
+  }
+
   const getNewVersionBlockedReason = () => {
     const latestVersion = getLatestDatasetVersion()
     if (!latestVersion) return ''
@@ -1462,48 +1512,6 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
         </Col>
         <Col flex="1" className="px-[24px] min-w-[400px]">
           <div className="border-l border-[#e8e8e8] px-[12px] py-[12px]">
-            {isActiveDeleteOperationRunning && (
-              <Alert
-                type="warning"
-                showIcon
-                className="mb-4"
-                message={`版本操作状态：删除中`}
-                description={`正在删除 ${activeDeleteRequestedCount} 条数据，数据集较大时可能需要几分钟。你可以离开页面，回来后会继续展示处理状态。`}
-              />
-            )}
-            {isActiveDeleteOperationFailed && !isFailedOperationDismissed && (
-              <Alert
-                type="error"
-                showIcon
-                className="mb-4"
-                message="版本操作状态：删除失败"
-                description={(
-                  <div>
-                    <div>
-                      已成功
-                      {activeDeleteRemovedCount}
-                      条，已失败
-                      {activeDeleteFailedCount}
-                      条
-                    </div>
-                    <div>
-                      删除失败：
-                      {activeDeleteOperation?.error_message || '目标数据已变化，请刷新后重试'}
-                    </div>
-                  </div>
-                )}
-                action={(
-                  <div className="flex gap-2">
-                    <Button size="small" danger onClick={handleRetryDeleteRows}>
-                      重试删除
-                    </Button>
-                    <Button size="small" onClick={handleDismissOperationAlert}>
-                      关闭提示
-                    </Button>
-                  </div>
-                )}
-              />
-            )}
             {/* 数据集基本信息 */}
             <Card
               title={(
@@ -1520,13 +1528,7 @@ const DatasetDetail: React.FC<DatasetDetailProps> = ({ type, usage }) => {
 
             {/* 数据预览 */}
             <Card
-              title={(
-                <span className="text-blue-400">
-                  <DatabaseOutlined />
-                  {' '}
-                  数据详情
-                </span>
-              )}
+              title={renderDataDetailTitle()}
               className="!mt-4"
             >
               {isPreviewLoading ? (

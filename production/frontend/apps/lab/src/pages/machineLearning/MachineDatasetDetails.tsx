@@ -131,6 +131,49 @@ const MachineDatasetDetails: React.FC = () => {
     [activeDeleteOperation?.row_numbers, isActiveDeleteOperationFailed],
   )
   const isVersionOperationLocked = deletingRowNumber !== null || isActiveDeleteOperationRunning
+  const renderDataDetailTitle = () => {
+    const title = <span className="shrink-0">数据详情</span>
+
+    if (isActiveDeleteOperationRunning) {
+      return (
+        <div className="flex flex-wrap items-center gap-3">
+          {title}
+          <Alert
+            type="warning"
+            showIcon
+            className="min-w-[420px] flex-1 !py-2"
+            message={`版本操作状态：删除中。正在删除 ${activeDeleteRequestedCount} 条数据，数据集较大时可能需要几分钟。你可以离开页面，回来后会继续展示处理状态。`}
+          />
+        </div>
+      )
+    }
+
+    if (isActiveDeleteOperationFailed && !isFailedOperationDismissed) {
+      return (
+        <div className="flex flex-wrap items-center gap-3">
+          {title}
+          <Alert
+            type="error"
+            showIcon
+            className="min-w-[420px] flex-1 !py-2"
+            message={`版本操作状态：删除失败。已成功 ${activeDeleteRemovedCount} 条，已失败 ${activeDeleteFailedCount} 条。${activeDeleteOperation?.error_message || '目标数据已变化，请刷新后重试'}`}
+            action={(
+              <div className="flex gap-2">
+                <Button size="small" danger onClick={handleRetryDeleteRows}>
+                  重试删除
+                </Button>
+                <Button size="small" onClick={handleDismissOperationAlert}>
+                  关闭提示
+                </Button>
+              </div>
+            )}
+          />
+        </div>
+      )
+    }
+
+    return title
+  }
   useEffect(() => {
     if (!isActiveDeleteOperationRunning) return
 
@@ -564,48 +607,6 @@ const MachineDatasetDetails: React.FC = () => {
         </div>
 
         <div className="flex-1 min-w-0">
-          {isActiveDeleteOperationRunning && (
-            <Alert
-              type="warning"
-              showIcon
-              className="mb-4"
-              message="版本操作状态：删除中"
-              description={`正在删除 ${activeDeleteRequestedCount} 条数据，数据集较大时可能需要几分钟。你可以离开页面，回来后会继续展示处理状态。`}
-            />
-          )}
-          {isActiveDeleteOperationFailed && !isFailedOperationDismissed && (
-            <Alert
-              type="error"
-              showIcon
-              className="mb-4"
-              message="版本操作状态：删除失败"
-              description={(
-                <div>
-                  <div>
-                    已成功
-                    {activeDeleteRemovedCount}
-                    条，已失败
-                    {activeDeleteFailedCount}
-                    条
-                  </div>
-                  <div>
-                    删除失败：
-                    {activeDeleteOperation?.error_message || '目标数据已变化，请刷新后重试'}
-                  </div>
-                </div>
-              )}
-              action={(
-                <div className="flex gap-2">
-                  <Button size="small" danger onClick={handleRetryDeleteRows}>
-                    重试删除
-                  </Button>
-                  <Button size="small" onClick={handleDismissOperationAlert}>
-                    关闭提示
-                  </Button>
-                </div>
-              )}
-            />
-          )}
           <Card className="!mb-4" title="基本信息">
             {detailsLoading ? (
               <div className="py-8 w-full flex justify-center">
@@ -678,7 +679,7 @@ const MachineDatasetDetails: React.FC = () => {
             )}
           </Card>
 
-          <Card title="数据详情">
+          <Card title={renderDataDetailTitle()}>
             {detailsLoading ? (
               <div className="text-center py-10">
                 <Spin />
