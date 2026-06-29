@@ -8,6 +8,8 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "audit:demo-showcase": "python3 production/backend/scripts/audit_demo_showcase.py",
+    "verify:github-push": "node scripts/verify-github-push-readiness.mjs",
     "verify:lab-deployment": "node scripts/verify-lab-deployment.mjs"
   },
   "repository": {

@@ -191,9 +191,16 @@ function AppContent() {
           return
         }
 
-        const user = isLocalPreview && cleanToken === previewTenantAdminToken
-          ? previewTenantAdminUser
-          : await authApi.getCurrentUser()
+        let user = previewTenantAdminUser
+        try {
+          user = await authApi.getCurrentUser()
+        }
+        catch (userError) {
+          if (!(isLocalPreview && cleanToken === previewTenantAdminToken)) {
+            throw userError
+          }
+          console.warn('本地预览：/users/me 获取失败，使用演示用户兜底。', userError)
+        }
         setAuth(user, cleanToken, menus)
 
         try {

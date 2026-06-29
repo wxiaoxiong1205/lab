@@ -101,8 +101,8 @@ class DemoShowcaseSeeder:
         await self._ensure_file_management(session, llm_project, ml_project, user, now, counters)
         await self._ensure_annotation_services(session, ml_project, user, now, counters)
         benchmark_tasks = await self._ensure_benchmark_showcase(session, llm_project, base_models, k8s, user, now, counters)
-        await self._ensure_image_build_logs(session, llm_project, ml_project, notebooks, repository_images, k8s, user, now, counters)
-        await self._ensure_task_executions(session, training_tasks, inference_results, evaluation_tasks, processing_tasks, benchmark_tasks, inference_tasks, user, now, counters)
+        image_build_logs = await self._ensure_image_build_logs(session, llm_project, ml_project, notebooks, repository_images, k8s, user, now, counters)
+        await self._ensure_task_executions(session, training_tasks, inference_results, evaluation_tasks, processing_tasks, benchmark_tasks, inference_tasks, image_build_logs, user, now, counters)
 
         return counters
 
@@ -563,7 +563,10 @@ class DemoShowcaseSeeder:
         specs = [
             ("showcase-客服问答推理结果", "completed", 100, "default-inference"),
             ("showcase-推理结果处理中", "processing", 45, "default-inference"),
+            ("showcase-推理结果失败", TaskStatus.FAILED.value, 100, "default-inference"),
             ("showcase-业务推理结果集", "completed", 100, "business-inference"),
+            ("showcase-业务推理字段映射中", "processing", 35, "business-inference"),
+            ("showcase-业务推理接口失败", TaskStatus.FAILED.value, 100, "business-inference"),
         ]
         rows: list[InferenceResultDataset] = []
         for name, status, progress, usage in specs:
@@ -595,6 +598,7 @@ class DemoShowcaseSeeder:
                 progress=progress,
                 started_at=now,
                 finished_at=now if status == "completed" else None,
+                processing_error="演示失败任务：第三方业务接口返回字段缺失。" if status == TaskStatus.FAILED.value else None,
                 manual_trigger_required=False,
             )
             self._mark_created(row, user, now)
@@ -1112,7 +1116,7 @@ class DemoShowcaseSeeder:
         await session.flush()
         return tasks
 
-    async def _ensure_image_build_logs(self, session, llm_project, ml_project, notebooks, repository_images, k8s, user, now, counters) -> None:
+    async def _ensure_image_build_logs(self, session, llm_project, ml_project, notebooks, repository_images, k8s, user, now, counters) -> list[ImageBuildLog]:
         notebook = notebooks[0] if notebooks else None
         base_image = repository_images[0].image if repository_images else "harbor-preview.example.local/deepexilab/pytorch:2.3-cuda12.1"
         specs = [
@@ -1120,10 +1124,12 @@ class DemoShowcaseSeeder:
             (ml_project, "showcase-ML Notebook镜像构建中", TaskStatus.RUNNING.value, "manual"),
             (llm_project, "showcase-推理镜像构建失败", TaskStatus.FAILED.value, "manual"),
         ]
+        rows: list[ImageBuildLog] = []
         for project, name, status, trigger_type in specs:
             existing = await self._one(session, ImageBuildLog, ImageBuildLog.project_id == project.id, ImageBuildLog.name == name, ImageBuildLog.tenant_id == TENANT_ID)
             if existing:
                 counters["skipped"] += 1
+                rows.append(existing)
                 continue
             row = ImageBuildLog(
                 name=name,
@@ -1143,11 +1149,15 @@ class DemoShowcaseSeeder:
             )
             self._mark_created(row, user, now)
             session.add(row)
+            await session.flush()
             counters["created"] += 1
+            rows.append(row)
         await session.flush()
+        return rows
 
-    async def _ensure_task_executions(self, session, training_tasks, inference_results, evaluation_tasks, processing_tasks, benchmark_tasks, inference_tasks, user, now, counters) -> None:
+    async def _ensure_task_executions(self, session, training_tasks, inference_results, evaluation_tasks, processing_tasks, benchmark_tasks, inference_tasks, image_build_logs, user, now, counters) -> None:
         specs: list[tuple[str, int, str, str, str]] = []
+        specs.extend((TaskExecutionBusinessType.IMAGE_BUILD_LOG.value, task.id, task.status, TaskExecutionExecutor.NOTEBOOK_IMAGE.value, "start") for task in image_build_logs)
         specs.extend((TaskExecutionBusinessType.TRAINING_TASK.value, task.id, task.status, TaskExecutionExecutor.TRAINING_TASK.value, "start") for task in training_tasks)
         specs.extend((TaskExecutionBusinessType.INFERENCE_RESULT_DATASETS.value, item.id, item.status, TaskExecutionExecutor.INFERENCE_RESULT_DATASETS.value, "start") for item in inference_results if item.usage == "default-inference")
         specs.extend((TaskExecutionBusinessType.BUSINESS_INFERENCE_RESULT_DATASETS.value, item.id, item.status, TaskExecutionExecutor.BUSINESS_INFERENCE_RESULT_DATASETS.value, "start") for item in inference_results if item.usage == "business-inference")

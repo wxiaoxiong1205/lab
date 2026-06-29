@@ -21,6 +21,7 @@
 
 ```bash
 git status --short --branch
+npm run verify:github-push
 ```
 
 确认只包含本次要发布的文件。不要提交：
@@ -32,7 +33,7 @@ git status --short --branch
 - `.playwright-cli/`
 - `Project/`
 
-在 `production/frontend` 执行本地构建：
+在 `production/frontend` 执行本地构建。当前生产基线存在 React 18 与 `@types/react@19` 混装导致的 TypeScript JSX 类型冲突，`pnpm --filter lab build` 会在 `tsc -b` 阶段失败；发布门禁暂时使用与 Vercel 一致的 Vite 构建，TypeScript 门禁需作为独立依赖治理项恢复：
 
 ```bash
 VITE_PUBLIC_PATH=/ VITE_API_BASE_URL=https://deepexilab-dev.deepexi.com/lab-backend VITE_SHOWCASE_PREVIEW=true pnpm --filter lab exec vite build
@@ -56,6 +57,12 @@ Production 环境变量必须包含：
 - `VITE_PUBLIC_PATH=/`
 - `VITE_API_BASE_URL=https://deepexilab-dev.deepexi.com/lab-backend`
 - `VITE_SHOWCASE_PREVIEW=true`
+
+如果后端环境用于独立域名演示，并且该后端是隔离的演示后端，可以显式开启：
+
+- `SHOWCASE_PREVIEW_AUTH=true`
+
+该开关只允许固定演示 token 读取后端种子数据，不允许写操作；不应在真实生产租户或共享开发后端开启。
 
 检查命令：
 
@@ -134,10 +141,10 @@ node scripts/verify-lab-deployment.mjs
 
 ### 仍未解决的问题
 
-1. 普通 `git push` 仍不可用，本机 Git HTTPS 凭据需要单独修复；当前只能通过 GitHub API 兜底。
+1. 普通 `git push` 的认证链路已恢复：仓库本地 credential helper 会从 `.github-token.local` 读取 GitHub token，且 `npm run verify:github-push` 会在发布前验证凭据、远端读取、fetch 和 `git push --dry-run --porcelain` 写入门禁；当前仍观察到 `git ls-remote` 偶发 `Operation too slow` / timeout，这属于 GitHub Git 传输链路或本机网络问题，不应再误判为 token 权限问题。
 2. Vercel 仍会按项目创建时间默认使用 pnpm 10，仓库 lockfile 是 pnpm 9 生成；目前可构建，但长期应统一 package manager 版本策略。
-3. `VITE_SHOWCASE_PREVIEW=true` 是前端演示兜底，不是最终的后端演示数据闭环；后续仍应让演示主路径依赖后端 seed 数据。
-4. 部分模块仍有前端 fallback/mock，可能在真实后端接口返回 401、空数组或字段变化时出现局部异常。
+3. `pnpm --filter lab build` 当前因 React 18 与 `@types/react@19` 混装触发大量 JSX 类型错误；Vercel 和本地发布检查暂用 `vite build`，后续需要收敛 React 类型版本并恢复 TypeScript 门禁。
+4. `VITE_SHOWCASE_PREVIEW=true` 已改为后端优先、前端兜底，但 Notebook 周边、预置模型、已发布模型选择等模块仍有前端 mock 主导路径，需后续补真实 API 或单列迁移边界。
 5. 当前静态检查不能替代浏览器冒烟；后续应补一个稳定的 Playwright/Chrome 检查，覆盖登录后首页、项目列表、数据集入口和右下角需求文档入口。
 
 ## 下次发布的快速决策树
@@ -191,6 +198,14 @@ npx vercel@52.2.0 env ls --scope wxiaoxiong1205s-projects
 - `could not read Username for 'https://github.com'`：本机 Git 凭据缺失。
 - `Operation timed out`：到 `github.com` Git 传输链路异常。
 - `api.github.com` 正常但 Git 不正常：可临时使用 GitHub Git Database API 推送，但必须避免重复提交历史。
+
+固定检查入口：
+
+```bash
+npm run verify:github-push
+```
+
+如果该检查能读出 `username`、隐藏后的 `password=<redacted>`、远端分支 SHA，并通过 `push --dry-run`，说明认证和写入门禁在当前网络条件下是通的；后续失败优先看网络、非快进或远端保护规则。
 
 ## 下次发布完成定义
 

@@ -11,6 +11,8 @@ from app.schemas.menu import MenuItem, MenuVoResponse
 from app.services.user.interface import UserService
 from app.utils.dependencies import get_db_and_user
 from app.utils.http_util import get_api_client, SafeHTTPClient
+from app.utils.showcase_auth import SHOWCASE_TENANT_ID, is_showcase_preview_auth_enabled
+from app.utils.showcase_menu import build_showcase_menu
 
 router = APIRouter(
     prefix="/api/v1/menu",
@@ -28,8 +30,13 @@ async def menu_list(
         client: SafeHTTPClient = Depends(get_api_client)
 ):
     app_id = settings.APP_ID
-    res = await client.get(path=f"/v1/menu/{app_id}/appMenu")
-    obj = MenuVoResponse.parse_obj(res)
+    try:
+        res = await client.get(path=f"/v1/menu/{app_id}/appMenu")
+        obj = MenuVoResponse.parse_obj(res)
+    except Exception as exc:
+        if is_showcase_preview_auth_enabled() and deps[1].tenantId == SHOWCASE_TENANT_ID:
+            return build_showcase_menu()
+        raise exc
 
     # 获取菜单的时候触发一下admin的角色的刷新
     await user_service.refresh_main()
@@ -39,6 +46,8 @@ async def menu_list(
         else:
             return []
     else:
+        if is_showcase_preview_auth_enabled() and deps[1].tenantId == SHOWCASE_TENANT_ID:
+            return build_showcase_menu()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=obj.msg

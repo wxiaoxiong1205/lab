@@ -162,11 +162,17 @@ export const authApi = {
    * 获取菜单可见性配置
    */
   getMenuVisible: async () => {
-    if (isLocalPreview) {
-      return { visible: true, reason: 'showcase preview' }
+    try {
+      const response = await api.get<{ visible: boolean, reason: string }>('/permissions/menu/visible')
+      return response.data
     }
-    const response = await api.get<{ visible: boolean, reason: string }>('/permissions/menu/visible')
-    return response.data
+    catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：权限菜单可见性获取失败，使用演示管理员兜底。', error)
+        return { visible: true, reason: 'showcase preview fallback' }
+      }
+      throw error
+    }
   },
 }
 
@@ -1053,10 +1059,6 @@ export const userApi = {
   menuList: async () => {
     // 用于测试菜单获取失败的情况
     // throw new Error('模拟菜单获取失败 - 用于测试错误处理功能');
-
-    if (isLocalPreview) {
-      return getLocalPreviewMenuData()
-    }
 
     try {
       const response = await api.get<unknown>('/menu')

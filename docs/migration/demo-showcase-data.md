@@ -8,6 +8,7 @@
 - 演示数据通过生产 API 被前端读取。
 - `builtin-sample://` 只读样例路径可以支持列表、详情和预览，不伪装成真实外部存储。
 - 前端 `src/mock` 仅作为显式兜底，不能因开发模式自动覆盖后端数据。
+- 独立演示域名如需免 IAM 读取后端演示数据，必须使用隔离演示后端，并显式设置 `SHOWCASE_PREVIEW_AUTH=true`；该 token 只允许读请求，默认生产环境不开启。
 
 ## 初始化
 
@@ -16,6 +17,14 @@
 ```bash
 python -m app.init_db.init demo_showcase
 ```
+
+独立演示环境还需要：
+
+```bash
+SHOWCASE_PREVIEW_AUTH=true
+```
+
+前端仍使用 `VITE_SHOWCASE_PREVIEW=true` 自动放入演示 token，但菜单、用户、项目、数据集等主路径会先请求后端；只有后端不可用、返回空数据或未启动演示鉴权时，才使用前端兜底数据。演示 token 不允许写操作，创建、删除、启动、停止等真实变更仍需要正式 IAM/JWT。
 
 该命令会初始化：
 
@@ -34,9 +43,9 @@ python -m app.init_db.init demo_showcase
 演示 seed 要覆盖每个可达生产模块的不同展示类型：
 
 - 基础资源：至少包含可用项目、用户、集群、存储、镜像仓库、Notebook 镜像、推理镜像和数据处理镜像。
-- 数据模块：训练、验证、测试、业务训练、机器学习、推理结果、业务推理结果都要有已完成、处理中或失败等不同状态。
+- 数据模块：训练、验证、测试、业务训练、业务测试、机器学习、推理结果、业务推理结果都要有已完成、处理中或失败等不同状态；业务训练/业务测试使用 `business` 格式。
 - 模型模块：基础模型、训练后模型、机器学习模型都要覆盖可用、运行中或失败状态。
-- 任务模块：训练、推理、评估、清洗、增强、洞察、标注、基准评测、镜像构建都要有列表可展示数据，并同步写入统一任务执行表。
+- 任务模块：训练、推理、评估、清洗、增强、洞察、标注、基准评测、镜像构建都要有列表可展示数据；其中已有正式 `TaskExecutionBusinessType` 的训练、推理结果、业务推理结果、评估、清洗、基准评测、镜像构建必须同步写入统一任务执行表。
 - 开放与集成模块：在线推理服务、第三方接口、OpenAPI 应用、文件管理、在线标注服务都要有安全占位数据，不能包含真实 Token、密钥或外部系统凭据。
 
 ## 生产代码更新后的检查
@@ -44,10 +53,19 @@ python -m app.init_db.init demo_showcase
 每次同步或覆盖生产代码后，先运行：
 
 ```bash
-python production/backend/scripts/audit_demo_showcase.py
+python3 production/backend/scripts/audit_demo_showcase.py
 ```
 
 如果审计失败，说明演示数据入口、样例协议、预览读取或前端显式兜底约束被覆盖，需要按最新生产代码恢复等价能力。
+
+当前审计会检查：
+
+- `demo_showcase` seeder、CLI、样例协议和前端显式兜底入口没有被删。
+- 训练数据集覆盖 `training`、`validation`、`test`、`business_training`、`business_test`。
+- 训练/机器学习数据集覆盖 `completed`、`pending`、`failed` 状态。
+- 机器学习数据集覆盖文本分类、实体识别、图像分类、物体检测、图像分割。
+- 样例路径使用可提交的 `builtin-sample://` 协议。
+- 推理结果和业务推理结果包含失败态，镜像构建写入统一任务执行表。
 
 ## 调整原则
 

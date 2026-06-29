@@ -16,6 +16,7 @@ from sqlalchemy import select
 from app.core.depend_manager import AutoContainer
 from app.models.models import User, JWTPayLoad
 from app.utils.auth import decode_token, get_user_by_username
+from app.utils.showcase_auth import build_showcase_preview_payload, is_showcase_preview_request
 from app.utils.db_session_context import reset_db_session, set_db_session
 from app.database.base import AsyncSessionLocal, IS_DM, sync_engine
 from app.utils.http_util import set_current_token
@@ -115,7 +116,7 @@ async def auth_middleware(request: Request, call_next):
     token = authorization.split(" ")[1]
     
     # 验证JWT token的有效性
-    payload = decode_token(token)
+    payload = build_showcase_preview_payload() if is_showcase_preview_request(request, token) else decode_token(token)
     if not payload:
         logger.warning(f"认证失败：无效的JWT token | 路径: {path} | IP: {request.client.host if request.client else 'unknown'}")
         return create_auth_error_response("Invalid token")

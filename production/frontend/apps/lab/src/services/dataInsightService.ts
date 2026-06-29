@@ -323,7 +323,7 @@ const fallbackInsightTasks: DataInsightTask[] = [
 ]
 
 function isLocalPreviewEnabled() {
-  return import.meta.env.VITE_LOCAL_PREVIEW === 'true' || import.meta.env.DEV
+  return import.meta.env.VITE_SHOWCASE_PREVIEW === 'true' || import.meta.env.VITE_LOCAL_PREVIEW === 'true'
 }
 
 function mergeFallbackTasks(pageData: DataInsightTaskPage, params?: { name?: string, status?: string, page?: number, size?: number }): DataInsightTaskPage {
@@ -364,9 +364,6 @@ export const dataInsightService = {
   },
   detail: async (projectId: number, taskId: number): Promise<DataInsightTask> => {
     const fallbackTask = fallbackInsightTasks.find((item) => item.id === taskId)
-    if (isLocalPreviewEnabled() && fallbackTask) {
-      return fallbackTask
-    }
     try {
       const response = await apiClient.get<DataInsightTask>(`/data-insights/project/${projectId}/tasks/${taskId}`)
       if (isLocalPreviewEnabled() && !response.data?.id) {

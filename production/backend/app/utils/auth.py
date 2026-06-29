@@ -16,6 +16,7 @@ from app.schemas.user import TokenData
 from app.core.config import settings
 from app.utils import app_runtime_context
 from app.utils.user_info_context import get_current_jwt_payload as get_context_jwt_payload, set_current_user_info
+from app.utils.showcase_auth import build_showcase_preview_payload, is_showcase_preview_request
 
 # Security utilities
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -73,6 +74,7 @@ async def authenticate_user(db: AsyncSession, username: str, password: str) -> O
 
 
 async def get_current_user(
+        request: Request,
         credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)
 ) -> JwtUserInfo:
     """Get the current authenticated user."""
@@ -85,7 +87,9 @@ async def get_current_user(
     try:
         # 从credentials中提取token
         token = credentials.credentials
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = build_showcase_preview_payload() if is_showcase_preview_request(request, token) else decode_token(token)
+        if not payload:
+            raise JWTError()
         obj = JWTPayLoad.model_validate(payload)
         # 设置tenantId到当前上下文，给后边使用
         info = obj.userInfo
@@ -116,7 +120,9 @@ async def get_current_user_from_token(token: str) -> JwtUserInfo:
     )
 
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = decode_token(token)
+        if not payload:
+            raise JWTError()
         obj = JWTPayLoad.model_validate(payload)
         # 设置tenantId到当前上下文，给后边使用
         info = obj.userInfo

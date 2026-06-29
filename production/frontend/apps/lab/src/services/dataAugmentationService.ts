@@ -233,7 +233,7 @@ const fallbackAugmentationTasks: DataAugmentationTask[] = [
 ]
 
 function isLocalPreviewEnabled() {
-  return import.meta.env.VITE_LOCAL_PREVIEW === 'true' || import.meta.env.DEV
+  return import.meta.env.VITE_SHOWCASE_PREVIEW === 'true' || import.meta.env.VITE_LOCAL_PREVIEW === 'true'
 }
 
 function mergeFallbackTasks(pageData: DataAugmentationTaskPage, params?: { name?: string, status?: string, page?: number, size?: number }): DataAugmentationTaskPage {
@@ -274,9 +274,6 @@ export const dataAugmentationService = {
   },
   detail: async (projectId: number, taskId: number): Promise<DataAugmentationTask> => {
     const fallbackTask = fallbackAugmentationTasks.find((item) => item.id === taskId)
-    if (isLocalPreviewEnabled() && fallbackTask) {
-      return fallbackTask
-    }
     try {
       const response = await apiClient.get<DataAugmentationTask>(`/data-augmentations/project/${projectId}/tasks/${taskId}`)
       if (isLocalPreviewEnabled() && !response.data?.id) {
