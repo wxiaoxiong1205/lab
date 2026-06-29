@@ -18,7 +18,7 @@ import qiankun from 'vite-plugin-qiankun'
 
 export default defineConfig(({ mode, command }) => {
   // 加载环境变量
-  const env = loadEnv(mode, process.cwd())
+  const env = { ...loadEnv(mode, process.cwd()), ...process.env }
   const useMicroAppDevMode = mode === 'development' && env.VITE_QIANKUN_DEV === 'true'
 
   return {
