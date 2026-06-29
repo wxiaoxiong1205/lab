@@ -28,7 +28,7 @@ from app.api.v1 import (project, user, repository, storage, notebook, repository
                         common_config, training_dataset, inference_task, applications, label, multi_label, data_cleaning,
                         admin_permissions, third_party_api, business_inference_result_dataset, task_execution, benchmark_task,
                         machine_learning_dataset, online_annotation_service, ml_backend_proxy, tag, openapi_application,
-                        compute_task_overview, advanced_template, reward)
+                        compute_task_overview, advanced_template, reward, data_insight, data_augmentation)
 from app.api.openapi.v1.router import router as openapi_v1_router
 from app.api.v1 import k8s
 from app.tasks.sync_k8s_labels import KubernetesLabelsSync
@@ -322,6 +322,8 @@ def create_app() -> FastAPI:
     app.include_router(label.router)
     app.include_router(multi_label.router)
     app.include_router(data_cleaning.router)
+    app.include_router(data_insight.router)
+    app.include_router(data_augmentation.router)
 
     app.include_router(online_inference_service.router)
     app.include_router(chunk_upload.router)

@@ -103,13 +103,20 @@ class SeedManager:
             print(f"❌ 未找到 {seeder_name} 的种子管理器")
             return {"success": False, "error": f"未找到 {seeder_name} 的种子管理器"}
         
-        try:
-            seeder = seeder_class()
-            result = await seeder.seed()
-            return {"success": True, "result": result}
-        except Exception as e:
-            print(f"❌ {seeder_name} 初始化失败: {str(e)}")
-            return {"success": False, "error": str(e)}
+        async with get_db_session() as session:
+            try:
+                seeder = seeder_class()
+                result = await seeder.seed(session)
+                if result.get("errors", 0) > 0:
+                    await session.rollback()
+                    return {"success": False, "result": result}
+                await session.commit()
+                return {"success": True, "result": result}
+            except Exception as e:
+                await session.rollback()
+                print(f"❌ {seeder_name} 初始化失败: {str(e)}")
+                logger.exception(f"Seeder '{seeder_name}' 初始化失败")
+                return {"success": False, "error": str(e)}
     
     async def _check_db_connection(self) -> bool:
         """检查数据库连接"""

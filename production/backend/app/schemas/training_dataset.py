@@ -13,6 +13,7 @@ class DatasetFormat(str, Enum):
     PROMPT_RESPONSE = "prompt-response"  # 提示词+回复格式
     ALPACA = "alpaca"  # DPO Alpaca 偏好格式
     ROLE_BASED = "role-based"  # 基于角色的对话格式
+    IMAGE_PROMPT = "image-prompt"  # 图像生成提示词+图片格式
     PREFIX_SUFFIX_MIDDLE = "prefix-suffix-middle"  # 前缀+后缀+中间格式
     GRPO = "grpo"  # GRPO verl JSONL格式
     # 添加了业务数据集的特殊格式business
@@ -28,6 +29,8 @@ class TrainingDatasetUploadTypeCategory(str, Enum):
     JSON_TYPE = "json"
     ZIP_TYPE = "zip"
     CSV_TYPE = "csv"
+    IMAGE_PROMPT_ANNOTATED_ZIP = "image-prompt-annotated-zip"
+    IMAGE_PROMPT_UNANNOTATED_ZIP = "image-prompt-unannotated-zip"
 
 # 下载数据集文件类型枚举
 # 此处配置的是数据集文件可以导出的所有格式

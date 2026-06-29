@@ -46,6 +46,7 @@ from app.utils.dataset_file_parser import (
     collect_metadata_fields_from_jsonl_iterable_with_stats,
     MetadataFieldsJsonlParseError,
 )
+from app.utils.showcase_sample_files import is_showcase_sample_path, read_showcase_jsonl_page
 from app.services.chunk_upload.interface import ChunkUploadService
 from app.services.storage.interface import StorageService
 from app.utils.machine_learning_dataset_parser import parse_machine_learning_dataset_files
@@ -1358,6 +1359,57 @@ class DefaultMachineLearningDatasetService(MachineLearningDatasetService):
         )
         if not dataset:
             raise HTTPException(status_code=404, detail="机器学习数据集不存在")
+
+        if is_showcase_sample_path(dataset.dataset_path):
+            page_items, total_samples, pages = read_showcase_jsonl_page(dataset.dataset_path, page, size)
+            items = [
+                MachineLearningDatasetSampleResponse(
+                    row_number=row_number,
+                    sample_data=sample,
+                )
+                for row_number, sample in page_items
+            ]
+            response = MachineLearningDatasetDetailResponse(
+                id=dataset.id,
+                name=dataset.name,
+                description=dataset.description,
+                project_id=dataset.project_id,
+                version=dataset.version,
+                dataset_category=dataset.dataset_category,
+                task_type=dataset.task_type,
+                data_type=dataset.data_type,
+                data_source=dataset.data_source,
+                notebook_id=dataset.notebook_id,
+                notebook_name=dataset.notebook_name,
+                notebook_path=dataset.notebook_path,
+                annotation_type=dataset.annotation_type,
+                template_type=dataset.template_type,
+                is_annotated=dataset.is_annotated,
+                source_type=dataset.source_type,
+                storage_path=dataset.storage_path,
+                dataset_path=dataset.dataset_path,
+                label_schema_path=dataset.label_schema_path,
+                metadata_fields=dataset.metadata_fields,
+                sample_count=dataset.sample_count,
+                file_size=dataset.file_size,
+                processing_status=dataset.processing_status,
+                publish=dataset.publish,
+                created_at=dataset.created_at,
+                updated_at=dataset.updated_at,
+                created_by=dataset.created_by,
+                base_url=None,
+                label_schema=None,
+                items=items,
+                total=total_samples,
+                page=page,
+                size=size,
+                pages=pages,
+            )
+            self.set_processing_status_display(response)
+            self.set_publish_display(response)
+            self.set_status_display(response)
+            await self._attach_active_operation(response)
+            return response
 
         jfs = await self.storage.JUICEFS_CLIENT()
         if not dataset.dataset_path or not jfs.exists(dataset.dataset_path):

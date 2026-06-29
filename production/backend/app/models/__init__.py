@@ -1,6 +1,7 @@
 from .model_manager import BaseModel, TrainedModel, MLModel
 from .training_task_manager import TrainingTask
 from .training_dataset_manager import TrainingDataset
+from .data_insight_manager import DataInsightTask, DataAugmentationTask
 from .dataset_operation_manager import DatasetVersionOperation
 from .label_manager import (
     LabelDataset, LabelTask, LabelProgress, LabelAutoModel,

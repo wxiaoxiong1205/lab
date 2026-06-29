@@ -91,6 +91,8 @@ const menuSeeds: MenuSeed[] = [
             children: [
               { code: 'data_annotation', name: '数据标注', sort: 10, pathUrl: '/data-annotation' },
               { code: 'data_cleaning', name: '数据清洗', sort: 20, pathUrl: '/data-cleaning' },
+              { code: 'data_augmentation', name: '数据增强', sort: 30, pathUrl: '/data-augmentation' },
+              { code: 'data_insight', name: '数据洞察', sort: 40, pathUrl: '/data-insight' },
             ],
           },
         ],

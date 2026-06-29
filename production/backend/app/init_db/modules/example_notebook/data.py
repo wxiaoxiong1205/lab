@@ -9,6 +9,86 @@ def get_example_notebook_data() -> List[Dict[str, Any]]:
     """获取内置 Notebook 案例种子数据"""
     return [
         {
+            "name": "大模型数据处理入门案例",
+            "biz_type": "llm",
+            "is_available": True,
+            "describe": """# 大模型数据处理入门案例
+
+覆盖训练数据读取、字段检查、空值识别、重复样本定位和处理后数据导出。适用于文本生成 SFT 数据集进入训练前的质量准备。
+
+## 推荐流程
+
+1. 读取平台挂载的训练数据集。
+2. 检查 system、prompt、response 字段完整性。
+3. 统计字符数、重复率和异常符号。
+4. 输出清洗后的 jsonl 文件，用于写回平台数据集版本。
+""",
+        },
+        {
+            "name": "SFT 指令微调训练案例",
+            "biz_type": "llm",
+            "is_available": True,
+            "describe": """# SFT 指令微调训练案例
+
+演示文本生成 SFT 数据集从数据准备、训练参数配置、启动训练到查看指标的完整流程。
+
+## 推荐流程
+
+1. 挂载文本生成 prompt-response 或 role-based 数据集。
+2. 检查基础模型与 tokenizer 路径。
+3. 配置 LoRA 或全参训练参数。
+4. 启动训练并查看 loss、学习率和保存产物。
+""",
+        },
+        {
+            "name": "DPO 偏好优化训练案例",
+            "biz_type": "llm",
+            "is_available": True,
+            "describe": """# DPO 偏好优化训练案例
+
+演示 chosen/rejected 偏好数据检查、DPO 训练参数配置和训练结果验证流程。
+
+## 推荐流程
+
+1. 读取 Alpaca 或 Role-based 偏好数据。
+2. 检查 chosen/rejected 字段配对完整性。
+3. 配置 beta、学习率、batch size 等训练参数。
+4. 对比训练前后偏好样本输出。
+""",
+        },
+        {
+            "name": "GRPO 强化学习训练案例",
+            "biz_type": "llm",
+            "is_available": True,
+            "describe": """# GRPO 强化学习训练案例
+
+演示 GRPO 数据准备、奖励函数检查、Hand/Work/Submit 三阶段资源配置和训练日志观察。
+
+## 推荐流程
+
+1. 读取 GRPO verl JSONL 数据。
+2. 校验 reward function 代码入口。
+3. 配置采样、策略优化和奖励缩放参数。
+4. 启动训练并观察 rollout 与 reward 指标。
+""",
+        },
+        {
+            "name": "大模型评估与报告案例",
+            "biz_type": "llm",
+            "is_available": True,
+            "describe": """# 大模型评估与报告案例
+
+演示从推理结果集读取样本、计算基础指标、整理人工评估记录并生成实验结论。
+
+## 推荐流程
+
+1. 读取测试数据或推理结果集。
+2. 计算基础文本指标与样本级错误类型。
+3. 汇总人工评估意见。
+4. 形成可复用的评估结论和下一步训练建议。
+""",
+        },
+        {
             "name": "YOLO目标检测案例",
             "describe": """# YOLO目标检测案例
 

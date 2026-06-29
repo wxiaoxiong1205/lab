@@ -65,6 +65,11 @@ class DefaultLabelService(LabelService):
     # 标签删除影响行数保护阈值：
     # 超限直接拒绝，避免误操作导致全量任务被“强制回滚”。
     ML_LABEL_DELETE_ROLLBACK_LIMIT = 10000
+
+    IMAGE_ASSET_DATASET_TYPES = {
+        LabelDatasetType.IMAGE_UNDERSTANDING.value,
+        LabelDatasetType.IMAGE_GENERATION.value,
+    }
     
     def __init__(
         self,
@@ -578,7 +583,7 @@ class DefaultLabelService(LabelService):
                         if annotation and isinstance(annotation, dict):
                             item = self._merge_annotation_to_item(item, annotation, dataset.dataset_format)
                         if (
-                            dataset.dataset_type == LabelDatasetType.IMAGE_UNDERSTANDING.value
+                            dataset.dataset_type in self.IMAGE_ASSET_DATASET_TYPES
                             or dataset.dataset_format == LabelDatasetFormat.GRPO.value
                         ):
                             merged_line = json.dumps(item, ensure_ascii=False)
@@ -655,7 +660,8 @@ class DefaultLabelService(LabelService):
         namespace: str,
         dataset_name: str,
         version: str,
-        usage: DatasetUsage
+        usage: DatasetUsage,
+        dataset_type: str = LabelDatasetType.IMAGE_UNDERSTANDING.value,
     ) -> str:
         """
         生成训练数据集的图片文件夹路径
@@ -681,8 +687,8 @@ class DefaultLabelService(LabelService):
         else:
             raise HTTPException(status_code=400, detail=f"不支持当前所选的数据集类型：{usage}")
         
-        # 图像理解数据集的图片存储在 imageUnderstanding/{dataset_name}_{version}/images 目录下
-        base_path = os.path.join(base_path, 'imageUnderstanding')
+        image_dir = 'imageGeneration' if dataset_type == LabelDatasetType.IMAGE_GENERATION.value else 'imageUnderstanding'
+        base_path = os.path.join(base_path, image_dir)
         dataset_dir = os.path.join(base_path, f"{dataset_name}_{version}")
         return os.path.join(dataset_dir, 'images').replace('\\', '/')
 
@@ -867,7 +873,7 @@ class DefaultLabelService(LabelService):
                 )
                 target_path = os.path.dirname(dataset_path)
             else:
-                if dataset.dataset_type == LabelDatasetType.IMAGE_UNDERSTANDING:
+                if dataset.dataset_type in self.IMAGE_ASSET_DATASET_TYPES:
                     # 图像理解使用dataset_path中的文件夹为路径
                     source_path = os.path.dirname(llm_dataset_path)
                     target_path = os.path.dirname(dataset_path)
@@ -1279,7 +1285,7 @@ class DefaultLabelService(LabelService):
                     training_method_type = TrainingMethodType(source_training_dataset.training_method_type)
                 except ValueError:
                     training_method_type = None
-        if task.biz_type == LabelTaskBizType.LLM and dataset.dataset_type == LabelDatasetType.IMAGE_UNDERSTANDING.value:
+        if task.biz_type == LabelTaskBizType.LLM and dataset.dataset_type in self.IMAGE_ASSET_DATASET_TYPES:
             base_url = await self._build_base_url_for_label_dataset(dataset.project_id, dataset)
         elif task.biz_type == LabelTaskBizType.MACHINE_LEARNING:
             base_url = await self._build_base_url_for_label_dataset(dataset.project_id, dataset, task.biz_type)
@@ -1689,10 +1695,10 @@ class DefaultLabelService(LabelService):
                     jfs.rmr(dataset_dir)
                     logger.info(f"删除机器学习标注任务目录: {dataset_dir}")
             else:
-                if dataset.dataset_type == LabelDatasetType.IMAGE_UNDERSTANDING.value:
+                if dataset.dataset_type in self.IMAGE_ASSET_DATASET_TYPES:
                     if dataset_dir and jfs.exists(dataset_dir):
                         jfs.rmr(dataset_dir)
-                        logger.info(f"删除图像理解标注任务目录: {dataset_dir}")
+                        logger.info(f"删除图像类标注任务目录: {dataset_dir}")
                 else:
                     if dataset.dataset_path and jfs.exists(dataset.dataset_path):
                         jfs.remove(dataset.dataset_path)
@@ -2828,6 +2834,16 @@ class DefaultLabelService(LabelService):
                     current_reward_model = {}
                 current_reward_model['ground_truth'] = ground_truth
                 item['reward_model'] = current_reward_model
+        elif dataset_format == LabelDatasetFormat.IMAGE_PROMPT.value:
+            # 图像生成 image-prompt：只更新文字字段，保留 images[] 和图片文件不变。
+            if 'prompt' in annotation:
+                item['prompt'] = annotation['prompt']
+            if 'negative_prompt' in annotation:
+                item['negative_prompt'] = annotation['negative_prompt']
+            if 'metadata' in annotation:
+                metadata = annotation['metadata']
+                if isinstance(metadata, dict):
+                    item['metadata'] = metadata
         else:
             # 通用处理：直接合并标注内容
             item.update(annotation)
@@ -2993,18 +3009,22 @@ class DefaultLabelService(LabelService):
         若标注数据集为图像理解类型，将图片文件夹从标注数据集复制到训练数据集目录。
         失败时仅记录日志，不影响主流程。
         """
-        if label_dataset.dataset_type != LabelDatasetType.IMAGE_UNDERSTANDING.value:
+        if label_dataset.dataset_type not in self.IMAGE_ASSET_DATASET_TYPES:
             return
         try:
             namespace = f"{os.getenv('KUBERNETES_NAMESPACE_PREFIX', 'deepexilab')}-{project_id}"
             label_image_folder_path = self._generate_image_folder_path(namespace, label_dataset.id)
             training_image_folder_path = self._generate_training_image_folder_path(
-                namespace, target_dataset_name, target_version, target_usage
+                namespace,
+                target_dataset_name,
+                target_version,
+                target_usage,
+                label_dataset.dataset_type,
             )
             await self._copy_dataset_directory(label_image_folder_path, training_image_folder_path)
-            logger.info(f"成功复制图像理解数据集图片文件夹: {label_image_folder_path} -> {training_image_folder_path}")
+            logger.info(f"成功复制图像类数据集图片文件夹: {label_image_folder_path} -> {training_image_folder_path}")
         except Exception as e:
-            logger.error(f"复制图像理解数据集图片文件夹失败（不影响文件写入）: {str(e)}")
+            logger.error(f"复制图像类数据集图片文件夹失败（不影响文件写入）: {str(e)}")
 
     def _generate_next_version(self, existing_versions: list) -> str:
         """根据现有版本号生成下一个版本号"""
@@ -3182,9 +3202,9 @@ class DefaultLabelService(LabelService):
             api_key = inference_service.api_key
             param_config_json = auto_model_config.param_config_json
             
-            # 如果是图像理解数据集，生成base_url用于图片路径转换
+            # 如果是图像类数据集，生成base_url用于图片路径转换
             image_base_url = None
-            if dataset_type == LabelDatasetType.IMAGE_UNDERSTANDING.value:
+            if dataset_type in self.IMAGE_ASSET_DATASET_TYPES:
                 image_base_url = await self._build_base_url_for_label_dataset(dataset.project_id, dataset)
         
         # 会话已关闭，现在开始流式输出
@@ -3193,8 +3213,8 @@ class DefaultLabelService(LabelService):
             input_data, dataset_format, image_base_url, annotation_target
         )
         
-        # 5.1 如果是图像理解数据集，读取图片并转换为base64
-        if dataset_type == LabelDatasetType.IMAGE_UNDERSTANDING.value and input_data.images and image_base_url:
+        # 5.1 如果是图像类数据集，读取图片并转换为base64
+        if dataset_type in self.IMAGE_ASSET_DATASET_TYPES and input_data.images and image_base_url:
             try:
                 jfs = await self._get_juicefs_client()
                 import base64
@@ -3381,6 +3401,15 @@ class DefaultLabelService(LabelService):
             if input_data.messages:
                 raw_data["messages"] = input_data.messages
             # 图像理解数据集：处理images字段
+            if input_data.images:
+                raw_data["images"] = input_data.images
+
+        elif dataset_format == LabelDatasetFormat.IMAGE_PROMPT.value:
+            # image-prompt 格式：图像生成标注只补充/优化文字，图片作为只读上下文。
+            if input_data.prompt:
+                raw_data["prompt"] = input_data.prompt
+            elif input_data.messages:
+                _derive_from_messages()
             if input_data.images:
                 raw_data["images"] = input_data.images
 

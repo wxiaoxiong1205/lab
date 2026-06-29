@@ -36,8 +36,9 @@ export const replaceImagePlaceholders = (
 
     const imagePath = images[imageIndex]
     const fileName = imagePath.includes('/') ? imagePath.split('/').pop() : imagePath
-
-    const imageUrl = `${imageBaseUrl}${baseUrl}/${fileName}`
+    const imageUrl = /^(https?:|data:|blob:)/.test(imagePath)
+      ? imagePath
+      : `${imageBaseUrl}${baseUrl}/${fileName}`
 
     imageIndex++
 

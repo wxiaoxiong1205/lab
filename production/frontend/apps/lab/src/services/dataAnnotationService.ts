@@ -1,4 +1,12 @@
 import apiClient from './apiClient'
+import { isLocalPreview } from '@/mock/localPreviewData'
+import {
+  isPreviewLabelTaskId,
+  mergePreviewLabelTaskList,
+  previewLabelCompletionStatus,
+  previewLabelTaskData,
+  previewLabelTaskList,
+} from '@/mock/previewDataAnnotation'
 
 export type TaskType = 'online' | 'multi_person'
 export type SourceType = 'existed_dataset' | 'new_dataset'
@@ -230,8 +238,19 @@ export const labelTaskService = {
    */
   getList: async (params: GetLabelTasksParams) => {
     const { project_id, ...restParams } = params
-    const response = await apiClient.get(`/label/${project_id}/tasks`, { params: restParams })
-    return response.data
+    try {
+      const response = await apiClient.get(`/label/${project_id}/tasks`, { params: restParams })
+      return isLocalPreview
+        ? mergePreviewLabelTaskList(response.data, params)
+        : response.data
+    }
+    catch (error) {
+      if (isLocalPreview) {
+        console.warn('本地预览：标注任务列表获取失败，使用演示数据兜底。', error)
+        return previewLabelTaskList(params)
+      }
+      throw error
+    }
   },
 
   /**
@@ -384,6 +403,9 @@ export const labelTaskService = {
    * @returns 单条数据响应
    */
   getData: async (taskId: number, params: GetLabelTaskDataParams) => {
+    if (isLocalPreview && isPreviewLabelTaskId(taskId)) {
+      return previewLabelTaskData(taskId, params)
+    }
     const response = await apiClient.get(`/label/tasks/${taskId}`, { params })
     return response.data
   },
@@ -500,6 +522,9 @@ export const labelTaskService = {
    * @returns 保存结果响应
    */
   save: async (data: SaveAnnotationRequest) => {
+    if (isLocalPreview && isPreviewLabelTaskId(data.task_id)) {
+      return { success: true, message: '演示数据已暂存' }
+    }
     const response = await apiClient.post(`/label/annotations/save`, data)
     return response.data
   },
@@ -568,6 +593,9 @@ export const labelTaskService = {
    * @returns 标注任务完成状态响应
    */
   getCompletionStatus: async (task_id: number, biz_type?: string) => {
+    if (isLocalPreview && isPreviewLabelTaskId(task_id)) {
+      return previewLabelCompletionStatus(task_id)
+    }
     const response = await apiClient.get(`/label/tasks/${task_id}/completion-status`, {
       params: biz_type ? { biz_type } : undefined,
     })

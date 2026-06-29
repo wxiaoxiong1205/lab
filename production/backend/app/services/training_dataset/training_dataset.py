@@ -60,6 +60,7 @@ from app.utils.dataset_file_parser import (
 )
 from app.utils.timezone_utils import to_local_tz
 from app.utils.timezone_utils import get_current_shanghai_time
+from app.utils.showcase_sample_files import is_showcase_sample_path, read_showcase_jsonl_page
 from app.utils.validators import CLEANING_TASK_IN_PROGRESS_STATUSES
 from app.utils.validators import validate_project_exists, validate_training_dataset_by_name_version_usage_not_exists, \
     validate_training_dataset_by_name_version_usage
@@ -169,10 +170,10 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
         # 先生成基础目录
         base_path = generate_base_path_util(namespace, usage)
 
-        # 图像理解数据集需要额外添加 imageUnderstanding 子目录和版本目录
-        if dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING:
-            # 图像理解数据集
-            base_path = os.path.join(base_path, 'imageUnderstanding')
+        # 图像类数据集需要额外添加类型子目录和版本目录
+        if dataset_type in (TrainingTypeCategory.IMAGE_UNDERSTANDING, TrainingTypeCategory.IMAGE_GENERATION):
+            image_dir = 'imageGeneration' if dataset_type == TrainingTypeCategory.IMAGE_GENERATION else 'imageUnderstanding'
+            base_path = os.path.join(base_path, image_dir)
             dataset_dir = os.path.join(base_path, f"{dataset_name}_{version}")
             filename = f"data.{file_extension}"
             return os.path.join(dataset_dir, filename).replace('\\', '/')
@@ -212,7 +213,34 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 detail=f"暂无 {training_method_type.value} 样例数据集"
             )
 
-        if dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING:
+        if dataset_type == TrainingTypeCategory.IMAGE_GENERATION:
+            if training_method_type != TrainingMethodType.SFT or dataset_format != DatasetFormat.IMAGE_PROMPT:
+                raise HTTPException(
+                    status_code=400,
+                    detail="图像生成 V1.15 仅支持 SFT image-prompt 样例数据集"
+                )
+            if file_type not in (
+                TrainingDatasetUploadTypeCategory.ZIP_TYPE,
+                TrainingDatasetUploadTypeCategory.IMAGE_PROMPT_ANNOTATED_ZIP,
+                TrainingDatasetUploadTypeCategory.IMAGE_PROMPT_UNANNOTATED_ZIP,
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="图像生成样例当前仅支持zip格式"
+                )
+            sample_file_name = (
+                DatasetSampleFileCategory.IMAGE_GENERATION_IMAGE_PROMPT_UNANNOTATED
+                if file_type == TrainingDatasetUploadTypeCategory.IMAGE_PROMPT_UNANNOTATED_ZIP
+                else DatasetSampleFileCategory.IMAGE_GENERATION_IMAGE_PROMPT_ANNOTATED
+            )
+            sample_path = os.path.join(
+                base_sample_dir,
+                method_dir,
+                "qa",
+                f"{sample_file_name.value}.zip"
+            )
+
+        elif dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING:
             # 图像理解数据集特殊处理
             if training_method_type == TrainingMethodType.GRPO:
                 if dataset_format != DatasetFormat.GRPO:
@@ -482,7 +510,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
             usage: DatasetUsage,
             file_type: TrainingDatasetExportTypeCategory,
     ):
-        if dataset.dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING and file_type.value != "zip":
+        if dataset.dataset_type in (TrainingTypeCategory.IMAGE_UNDERSTANDING, TrainingTypeCategory.IMAGE_GENERATION) and file_type.value != "zip":
             raise HTTPException(
                 status_code=500,
                 detail=f"当前导出格式不支持：{file_type.value}"
@@ -601,14 +629,14 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
 
         # 生成数据集目录路径和文件路径
         dataset_dir_path = generate_image_dataset_directory_path_util(
-            namespace, dataset_name, version, dataset.usage
+            namespace, dataset_name, version, dataset.usage, dataset.dataset_type.value
         )
         dataset_file_path = dataset.dataset_path  # data.jsonl路径（已经是完整的JuiceFS路径）
         images_folder_path = generate_image_folder_path_util(
-            namespace, dataset_name, version, dataset.usage
+            namespace, dataset_name, version, dataset.usage, dataset.dataset_type.value
         )
 
-        logger.info(f"准备打包图像理解数据集: {dataset_dir_path}")
+        logger.info(f"准备打包图像类数据集: {dataset_dir_path}")
         logger.debug(f"数据集文件路径: {dataset_file_path}")
         logger.debug(f"图片文件夹路径: {images_folder_path}")
 
@@ -1022,6 +1050,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
             response.processing_error = dataset.processing_error
             self.set_publish_display(response)
             self.set_status_display(response)
+            await self._attach_active_operation(response)
 
             # 添加格式化的文件大小显示（前端友好）
             if hasattr(response, 'file_size') and dataset.file_size:
@@ -1350,6 +1379,21 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
                 detail=f"数据集不存在：项目ID={project_id}, 名称={name}, 版本={version}"
             )
 
+        if is_showcase_sample_path(dataset.dataset_path):
+            page_items, total, pages = read_showcase_jsonl_page(dataset.dataset_path, page, size)
+            samples = [
+                DatasetSampleResponse(row_number=row_number, sample_data=sample)
+                for row_number, sample in page_items
+            ]
+            return DatasetSamplePageResponse(
+                items=samples,
+                total=total,
+                page=page,
+                size=size,
+                pages=pages,
+                base_url=None,
+            )
+
         # 获取JuiceFS客户端
         jfs = await self._get_juicefs_client()
 
@@ -1408,7 +1452,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
 
             # 如果是图像理解数据集，生成 base_url
             base_url = None
-            if dataset.dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING:
+            if dataset.dataset_type in (TrainingTypeCategory.IMAGE_UNDERSTANDING, TrainingTypeCategory.IMAGE_GENERATION):
                 base_url = await self._build_base_url(project_id, dataset)
 
             # 返回自定义分页响应模型（包含 base_url）
@@ -1778,12 +1822,12 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
             # 生成项目命名空间
             new_dataset_path = generate_dataset_path_util(namespace, name, new_version, "jsonl", usage, dataset_type)
 
-            if dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING:
+            if dataset_type in (TrainingTypeCategory.IMAGE_UNDERSTANDING, TrainingTypeCategory.IMAGE_GENERATION):
                 source_dataset_dir_path = generate_image_dataset_directory_path_util(
-                    namespace, name, source_version, usage
+                    namespace, name, source_version, usage, dataset_type.value
                 )
                 new_dataset_dir_path = generate_image_dataset_directory_path_util(
-                    namespace, name, new_version, usage
+                    namespace, name, new_version, usage, dataset_type.value
                 )
             else:
                 index_source_dataset = get_index_cache_path_util(source_dataset.dataset_path)
@@ -2107,18 +2151,18 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
 
         for dataset in datasets:
             try:
-                if dataset.dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING:
-                    # 图像理解数据集，删除整个数据集目录
+                if dataset.dataset_type in (TrainingTypeCategory.IMAGE_UNDERSTANDING, TrainingTypeCategory.IMAGE_GENERATION):
+                    # 图像类数据集，删除整个数据集目录
                     try:
                         # 生成数据集目录路径（包含 data.jsonl 和 images 文件夹）
                         dataset_dir_path = generate_image_dataset_directory_path_util(
-                            namespace, dataset.name, dataset.version, usage
+                            namespace, dataset.name, dataset.version, usage, dataset.dataset_type.value
                         )
                         await self._delete_dataset_directory(dataset_dir_path)
-                        logger.info(f"成功删除图像理解数据集目录: {dataset_dir_path}")
+                        logger.info(f"成功删除图像类数据集目录: {dataset_dir_path}")
                     except Exception as e:
                         # 删除目录失败不影响主流程，只记录日志
-                        logger.warning(f"删除图像理解数据集目录失败 {dataset.name} v{dataset.version}: {str(e)}")
+                        logger.warning(f"删除图像类数据集目录失败 {dataset.name} v{dataset.version}: {str(e)}")
                 else:
                     # 文本生成数据集：删除文件
                     # 检查是否存在同名的原始文件，如果存在也一并删除
@@ -2196,8 +2240,8 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
         )
 
         try:
-            if dataset.dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING:
-                # 图像理解数据集，删除整个数据集目录
+            if dataset.dataset_type in (TrainingTypeCategory.IMAGE_UNDERSTANDING, TrainingTypeCategory.IMAGE_GENERATION):
+                # 图像类数据集，删除整个数据集目录
                 try:
                     # 获取项目信息以生成命名空间
                     project = await validate_project_exists(await self.training_dataset_mapper.get_session(), project_id)
@@ -2205,13 +2249,13 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
 
                     # 生成数据集目录路径（包含 data.jsonl 和 images 文件夹）
                     dataset_dir_path = generate_image_dataset_directory_path_util(
-                        namespace, dataset_name, version, usage
+                        namespace, dataset_name, version, usage, dataset.dataset_type.value
                     )
                     await self._delete_dataset_directory(dataset_dir_path)
-                    logger.info(f"成功删除图像理解数据集目录: {dataset_dir_path}")
+                    logger.info(f"成功删除图像类数据集目录: {dataset_dir_path}")
                 except Exception as e:
                     # 删除目录失败不影响主流程，只记录日志
-                    logger.warning(f"删除图像理解数据集目录失败 {dataset_name} v{version}: {str(e)}")
+                    logger.warning(f"删除图像类数据集目录失败 {dataset_name} v{version}: {str(e)}")
             else:
                 # 文本生成数据集：删除文件
                 # 检查是否存在同名的原始文件，如果存在也一并删除
@@ -2336,7 +2380,7 @@ class DefaultTrainingDatasetService(TrainingDatasetService):
 
             # 如果是图像理解数据集，生成 base_url
             base_url = None
-            if dataset.dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING:
+            if dataset.dataset_type in (TrainingTypeCategory.IMAGE_UNDERSTANDING, TrainingTypeCategory.IMAGE_GENERATION):
                 base_url = await self._build_base_url(project_id, dataset)
 
             # 返回自定义分页响应模型（包含 base_url）

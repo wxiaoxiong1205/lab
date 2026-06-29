@@ -83,6 +83,12 @@ const ExperimentRunDetail = lazy(() => import('../pages/ExperimentRunDetail'))
 const DataCleaning = lazy(() => import('../pages/DataCleaning'))
 const CreateCleaningTask = lazy(() => import('../pages/CreateCleaningTask'))
 const CleaningTaskDetail = lazy(() => import('../pages/CleaningTaskDetail'))
+const DataInsight = lazy(() => import('../pages/dataInsight/DataInsight'))
+const CreateDataInsightTask = lazy(() => import('../pages/dataInsight/CreateDataInsightTask'))
+const DataInsightDetail = lazy(() => import('../pages/dataInsight/DataInsightDetail'))
+const DataAugmentation = lazy(() => import('../pages/dataAugmentation/DataAugmentation'))
+const CreateDataAugmentationTask = lazy(() => import('../pages/dataAugmentation/CreateDataAugmentationTask'))
+const DataAugmentationDetail = lazy(() => import('../pages/dataAugmentation/DataAugmentationDetail'))
 
 // 妯″瀷绠＄悊椤甸潰
 const ModelList = lazy(() => import('../pages/ModelList'))
@@ -350,6 +356,12 @@ const AppRoutes = () => {
         <Route path="data-cleaning" element={<DataCleaning />} />
         <Route path="data-cleaning/create" element={<CreateCleaningTask />} />
         <Route path="data-cleaning/:taskId" element={<CleaningTaskDetail />} />
+        <Route path="data-insight" element={<DataInsight />} />
+        <Route path="data-insight/create" element={<CreateDataInsightTask />} />
+        <Route path="data-insight/:taskId" element={<DataInsightDetail />} />
+        <Route path="data-augmentation" element={<DataAugmentation />} />
+        <Route path="data-augmentation/create" element={<CreateDataAugmentationTask />} />
+        <Route path="data-augmentation/:taskId" element={<DataAugmentationDetail />} />
 
         {/* project.detail.model.* 妯″瀷绠＄悊 */}
         <Route path="model" element={<ModelList />} />

@@ -58,6 +58,8 @@ import './CreateInferenceResultSetPage.css'
 const { Option } = Select
 const TEXT_FILE_MAX_SIZE_MB = 500
 const IMAGE_FILE_MAX_SIZE_MB = 1024
+const IMAGE_DATASET_TYPES = ['image-understanding', 'image-generation']
+const IMAGE_PROMPT_FORMAT_OPTION = { value: 'image-prompt', name: 'IMAGE_PROMPT', description: '图像生成提示词+图片' }
 
 // 映射项接口
 interface MappingItem {
@@ -178,6 +180,12 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
   const [scheduleEnabled, setScheduleEnabled] = useState<boolean>(false)
   const dataFormat = Form.useWatch('dataFormat', form)
   const selectedModelField = Form.useWatch('model_to_infer', form)
+  const isImageLikeDataSource = IMAGE_DATASET_TYPES.includes(dataSource)
+  const datasetStatsQuery = useMemo(() => ({
+    training_method_type: ['sft'],
+    dataset_type: [dataSource],
+    ...(dataSource === 'image-generation' ? { dataset_format: ['image-prompt'] } : {}),
+  }), [dataSource])
 
   // 标记是否已经回显过数据（避免重复回显覆盖用户选择）
   const hasPopulatedRef = useRef<boolean>(false)
@@ -834,6 +842,9 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
       if (projectEnumValues) {
         const formatOptions = projectEnumValues.all_enums.find((item: any) => item.enum_name === 'DatasetFormat')
         formatOptions.options = formatOptions.options.filter((item: any) => !['business', 'prefix-suffix-middle', 'alpaca'].includes(item.value))
+        if (!formatOptions.options.some((item: any) => item.value === IMAGE_PROMPT_FORMAT_OPTION.value)) {
+          formatOptions.options.push(IMAGE_PROMPT_FORMAT_OPTION)
+        }
         setDataFormatOptions(formatOptions)
       }
     }
@@ -852,6 +863,9 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
         if (dataSource === 'image-understanding') {
           form.setFieldValue('dataFormat', 'role-based')
         }
+        else if (dataSource === 'image-generation') {
+          form.setFieldValue('dataFormat', 'image-prompt')
+        }
         else if (dataSource === 'text-generation') {
           form.setFieldValue('dataFormat', 'prompt-response')
         }
@@ -866,7 +880,7 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
   const dataSourceOptions = [
     { value: 'text-generation', label: '文本生成', disabled: false, icon: <FileTextOutlined /> },
     { value: 'image-understanding', label: '图像理解', disabled: false, icon: <CloudUploadOutlined /> },
-    // { value: 'image-generation', label: '图像生成', disabled: true, icon: <DatabaseOutlined /> },
+    { value: 'image-generation', label: '图像生成', disabled: false, icon: <DatabaseOutlined /> },
   ]
 
   // 处理数据用途变化
@@ -876,6 +890,9 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
     // 如果选择图像理解，自动设置数据格式为 role-based
     if (value === 'image-understanding') {
       form.setFieldValue('dataFormat', 'role-based')
+    }
+    else if (value === 'image-generation') {
+      form.setFieldValue('dataFormat', 'image-prompt')
     }
     else if (value === 'text-generation') {
       // 如果选择文本生成，自动设置数据格式为 prompt-response
@@ -888,7 +905,7 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
 
   // 根据数据源类型获取允许的文件类型
   const getAcceptType = () => {
-    if (dataSource === 'image-understanding') {
+    if (isImageLikeDataSource) {
       return '.zip'
     }
     else if (usage === 'business-inference') {
@@ -899,19 +916,19 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
     }
   }
   const getMaxFileSizeMB = () => {
-    return dataSource === 'image-understanding' ? IMAGE_FILE_MAX_SIZE_MB : TEXT_FILE_MAX_SIZE_MB
+    return isImageLikeDataSource ? IMAGE_FILE_MAX_SIZE_MB : TEXT_FILE_MAX_SIZE_MB
   }
   const getMaxFileSizeLabel = () => {
-    return dataSource === 'image-understanding' ? '1G' : '500M'
+    return isImageLikeDataSource ? '1G' : '500M'
   }
 
   // 文件验证函数
   const validateFile = (file: RcFile): boolean => {
-    // 图像理解类型只支持 zip 文件
-    if (dataSource === 'image-understanding') {
+    // 图片类数据只支持 zip 文件
+    if (isImageLikeDataSource) {
       const isZip = file.name.endsWith('.zip') || file.type === 'application/zip' || file.type === 'application/x-zip-compressed'
       if (!isZip) {
-        message.error('图像理解类型只支持 zip 文件格式!')
+        message.error('图片类数据只支持 zip 文件格式!')
         return false
       }
     }
@@ -950,6 +967,14 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
         <>
           <p className="ant-upload-hint">支持ZIP压缩包，图片文件包含jpg、png格式，文本文件包含jsonl格式</p>
           {/* <p className="ant-upload-hint">单张图片限制在5M内，最多支持1000张</p> */}
+          <p className="ant-upload-hint">文件大小不能超过1G</p>
+        </>
+      )
+    }
+    if (dataSource === 'image-generation') {
+      return (
+        <>
+          <p className="ant-upload-hint">支持 ZIP 压缩包，需包含 data.jsonl 与 images/ 图片目录</p>
           <p className="ant-upload-hint">文件大小不能超过1G</p>
         </>
       )
@@ -1923,7 +1948,13 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                   // 切换数据用途时重置上传的文件
                   setSelectedFile(null)
                   setChunkUploadId(null)
+                  const nextDataFormat = value === 'image-understanding'
+                    ? 'role-based'
+                    : value === 'image-generation'
+                      ? 'image-prompt'
+                      : 'prompt-response'
                   form.setFieldsValue({
+                    dataFormat: nextDataFormat,
                     model_to_infer: undefined,
                     service_to_infer: undefined,
                     model_version: undefined,
@@ -1933,6 +1964,7 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
               >
                 <Radio value="text-generation">文本生成</Radio>
                 <Radio value="image-understanding">图像理解</Radio>
+                <Radio value="image-generation">图像生成</Radio>
               </Radio.Group>
             </Form.Item>
           )}
@@ -1966,7 +1998,7 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                 filter={filterDatasetCascader}
                 loading={dataLoading.datasets}
                 onModalOpenChange={setDatasetSelectorModalOpen}
-                statsQuery={{ training_method_type: ['sft'], dataset_type: [dataSource] }}
+                statsQuery={datasetStatsQuery}
                 includeAllStatsDatasetFormats={false}
                 listDatasetType={dataSource}
               />
@@ -2019,7 +2051,7 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                 filter={filterDatasetCascader}
                 loading={dataLoading.datasets}
                 onModalOpenChange={setDatasetSelectorModalOpen}
-                statsQuery={{ training_method_type: ['sft'], dataset_type: [dataSource] }}
+                statsQuery={datasetStatsQuery}
                 includeAllStatsDatasetFormats={false}
                 listDatasetType={dataSource}
               />
@@ -2101,6 +2133,10 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                       {dataFormatOptions?.options
                         ?.filter((option) => {
                           const isImageUnderstanding = dataSource === 'image-understanding'
+                          const isImageGeneration = dataSource === 'image-generation'
+                          if (isImageGeneration) {
+                            return option.value === 'image-prompt'
+                          }
                           if (isImageUnderstanding && option.value === 'prompt-response') {
                             return false
                           }
@@ -2108,8 +2144,11 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                         })
                         ?.map((option) => {
                           const isImageUnderstanding = dataSource === 'image-understanding'
+                          const isImageGeneration = dataSource === 'image-generation'
                           const shouldDisable = isImageUnderstanding
                             ? option.value !== 'role-based'
+                            : isImageGeneration
+                              ? option.value !== 'image-prompt'
                             : option.value === 'prefix-suffix-middle'
                           return (
                             <div key={option.value} className="create-inference-format-option">
@@ -2188,7 +2227,17 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                       icon={<DatabaseOutlined />}
                       onClick={() => downloadSample('zip')}
                     >
-                      ZIP 格式
+                              ZIP 格式
+                            </Button>
+                          </Space>
+                ) : dataSource === 'image-generation' ? (
+                  <Space>
+                    <Button
+                      type="link"
+                      icon={<DatabaseOutlined />}
+                      onClick={() => downloadSample('zip')}
+                    >
+                      image-prompt ZIP
                     </Button>
                   </Space>
                 ) : (

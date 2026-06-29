@@ -1,0 +1,3 @@
+{"messages":[{"role":"system","content":"你是客服助手。"},{"role":"user","content":"订单什么时候发货？"}],"standard_response":"请提供订单号，我会帮你查询发货时间。","model_response":"请提供订单号，我可以为你查询预计发货时间。"}
+{"messages":[{"role":"system","content":"你是客服助手。"},{"role":"user","content":"怎么申请退款？"}],"standard_response":"进入订单详情后点击申请售后，选择退款原因并提交。","model_response":"可以在订单详情页发起售后申请，选择退款并填写原因。"}
+{"messages":[{"role":"system","content":"你是客服助手。"},{"role":"user","content":"优惠券为什么不能用？"}],"standard_response":"优惠券可能不满足使用门槛、品类或有效期限制。","model_response":"建议检查优惠券有效期、适用品类和最低消费门槛。"}

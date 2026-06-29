@@ -247,7 +247,7 @@ const CreateDatasetVersionPage: React.FC<CreateDatasetVersionPageProps> = ({ typ
   // 根据数据集类型获取允许的文件类型
   const getAcceptType = () => {
     const datasetType = getDatasetType()
-    if (datasetType === 'image-understanding') {
+    if (datasetType === 'image-understanding' || datasetType === 'image-generation') {
       return '.zip'
     }
     else if (usage === 'business_test') {
@@ -259,21 +259,21 @@ const CreateDatasetVersionPage: React.FC<CreateDatasetVersionPageProps> = ({ typ
     }
   }
   const getMaxFileSizeMB = () => {
-    return getDatasetType() === 'image-understanding' ? IMAGE_FILE_MAX_SIZE_MB : TEXT_FILE_MAX_SIZE_MB
+    return (getDatasetType() === 'image-understanding' || getDatasetType() === 'image-generation') ? IMAGE_FILE_MAX_SIZE_MB : TEXT_FILE_MAX_SIZE_MB
   }
   const getMaxFileSizeLabel = () => {
-    return getDatasetType() === 'image-understanding' ? '1G' : '500M'
+    return (getDatasetType() === 'image-understanding' || getDatasetType() === 'image-generation') ? '1G' : '500M'
   }
 
   // 文件验证函数
   const validateFile = (file: RcFile): boolean => {
     const datasetType = getDatasetType()
 
-    // 图像理解类型只支持 zip 文件
-    if (datasetType === 'image-understanding') {
+    // 图像类数据集只支持 zip 文件
+    if (datasetType === 'image-understanding' || datasetType === 'image-generation') {
       const isZip = file.name.endsWith('.zip') || file.type === 'application/zip' || file.type === 'application/x-zip-compressed'
       if (!isZip) {
-        message.error('图像理解类型只支持 zip 文件格式!')
+        message.error('图像类数据集只支持 zip 文件格式!')
         return false
       }
     }
@@ -311,10 +311,18 @@ const CreateDatasetVersionPage: React.FC<CreateDatasetVersionPageProps> = ({ typ
   // 获取提示文本
   const getHintText = () => {
     const datasetType = getDatasetType()
+    if (datasetType === 'image-generation') {
+      return (
+        <>
+          <p className="ant-upload-hint">有标注ZIP包含 data.jsonl 与 images/；未标注ZIP仅包含 images/ 图片目录</p>
+          <p className="ant-upload-hint">文件大小不能超过1G</p>
+        </>
+      )
+    }
     if (datasetType === 'image-understanding') {
       return (
         <>
-          <p className="ant-upload-hint">支持ZIP压缩包，图片文件包含jpg、png格式，文本文件包含jsonl格式</p>
+          <p className="ant-upload-hint">支持ZIP压缩包，包含 data.jsonl 与 images/ 目录</p>
           <p className="ant-upload-hint">文件大小不能超过1G</p>
         </>
       )
@@ -558,7 +566,20 @@ const CreateDatasetVersionPage: React.FC<CreateDatasetVersionPageProps> = ({ typ
 
               <div className="create-dataset-example-row">
                 <span>下载示例文件</span>
-                {getDatasetType() === 'image-understanding' ? (
+                {getDatasetType() === 'image-generation' ? (
+                  <Space size={4} wrap>
+                    <Tooltip title="有标注模板：zip 根目录包含 data.jsonl 与 images/，data.jsonl 每行包含 prompt、images[]，可选 negative_prompt、metadata">
+                      <Button type="link" icon={<DownloadOutlined />} onClick={() => downloadTemplate('image-prompt-annotated-zip')}>
+                        有标注模板
+                      </Button>
+                    </Tooltip>
+                    <Tooltip title="未标注模板：zip 仅包含 images/ 图片目录，用于先上传图片素材后续补充提示词标注">
+                      <Button type="link" icon={<DownloadOutlined />} onClick={() => downloadTemplate('image-prompt-unannotated-zip')}>
+                        未标注模板
+                      </Button>
+                    </Tooltip>
+                  </Space>
+                ) : getDatasetType() === 'image-understanding' ? (
                   <Space>
                     <Button
                       type="link"

@@ -5,24 +5,8 @@ import type { RegistryMirrorImage, RegistryMirrorImageListResponse } from '@/ser
 
 const now = '2026-06-24T15:30:00+08:00'
 
-export const isLocalPreview = import.meta.env.DEV || import.meta.env.VITE_SHOWCASE_PREVIEW === 'true'
-
-export const previewTenantAdminCredentials = {
-  account: 'lab@lab',
-  username: 'lab',
-  enterpriseCode: 'lab',
-  password: 'abcd1234',
-}
-
-export const previewTenantAdminUser: User = {
-  userId: 10001,
-  username: previewTenantAdminCredentials.username,
-  accountId: 10001,
-  tenantId: 'lab',
-  enterpriseCode: previewTenantAdminCredentials.enterpriseCode,
-}
-
-export const previewTenantAdminToken = 'local-preview-lab-tenant-admin-token'
+// 演示数据主路径应来自后端 demo_showcase seed；前端预览数据只允许通过显式开关兜底。
+export const isLocalPreview = import.meta.env.VITE_SHOWCASE_PREVIEW === 'true'
 
 export const previewTenantAdminCredentials = {
   account: 'lab@lab',

@@ -98,6 +98,11 @@ const defaultValues = {
   max_length: 4096,
   remove_unused_columns: false,
   cutoff_len: 4096,
+  image_resolution: 1024,
+  max_images_per_sample: 1,
+  prompt_max_length: 512,
+  negative_prompt_max_length: 256,
+  image_resize_mode: 'keep_ratio',
   logging_interval: 1,
   warmup_steps: 100,
   weight_decay: 0,
@@ -139,6 +144,24 @@ const defaultValues = {
     worker_replicas: 1,
     worker_graphics_card_resource: createDefaultRayNodeResource(),
   },
+}
+
+const FALLBACK_TRAINING_TYPE_CATEGORY = {
+  enum_name: 'TrainingTypeCategory',
+  options: [
+    { value: 'text-generation', name: '文本生成', description: '文本生成训练' },
+    { value: 'image-generation', name: '图像生成', description: '图像生成训练' },
+    { value: 'image-understanding', name: '图像理解', description: '图像理解训练' },
+  ],
+}
+
+const FALLBACK_TRAINING_METHOD_CATEGORY = {
+  enum_name: 'TrainingMethodType',
+  options: [
+    { value: 'sft', name: 'SFT', description: '有监督微调' },
+    { value: 'dpo', name: 'DPO', description: '偏好优化训练' },
+    { value: 'grpo', name: 'RFT-GRPO', description: '基于奖励规则的强化学习训练' },
+  ],
 }
 
 const buildRayNodeResourceFormValue = (resource?: {
@@ -244,20 +267,21 @@ const CreateFinetuneRun: React.FC = () => {
   useEffect(() => {
     const fetchProjectEnumValues = async () => {
       let cachedEnumValues = JSON.parse(localStorage.getItem('projectEnumValues') || '{}')
-      if (!cachedEnumValues) {
+      if (!cachedEnumValues?.all_enums) {
         const data = await getProjectEnum()
         localStorage.setItem('projectEnumValues', JSON.stringify(data))
         cachedEnumValues = data
       }
       if (cachedEnumValues) {
-        setTrainingTypeCategory(cachedEnumValues.all_enums.find((item) => item.enum_name === 'TrainingTypeCategory'))
-        setModelProviderCategory(cachedEnumValues.all_enums.find((item) => item.enum_name === 'ModelProvider'))
-        setTrainingMethodCategory(cachedEnumValues.all_enums.find((item) => item.enum_name === 'TrainingMethodType'))
-        setMonitoringConfigCategory(cachedEnumValues.all_enums.find((item) => item.enum_name === 'RoPEType'))
-        setEvalStrategyCategory(cachedEnumValues.all_enums.find((item) => item.enum_name === 'EvalStrategy'))
-        setLrSchedulerTypeCategory(cachedEnumValues.all_enums.find((item) => item.enum_name === 'LRSchedulerType'))
-        setSaveStrategyCategory(cachedEnumValues.all_enums.find((item) => item.enum_name === 'SaveStrategy'))
-        setSupportedGpuCategory(cachedEnumValues.all_enums.find((item) => item.enum_name === 'CardModel')?.options)
+        const allEnums = Array.isArray(cachedEnumValues.all_enums) ? cachedEnumValues.all_enums : []
+        setTrainingTypeCategory(allEnums.find((item) => item.enum_name === 'TrainingTypeCategory') || FALLBACK_TRAINING_TYPE_CATEGORY)
+        setModelProviderCategory(allEnums.find((item) => item.enum_name === 'ModelProvider'))
+        setTrainingMethodCategory(allEnums.find((item) => item.enum_name === 'TrainingMethodType') || FALLBACK_TRAINING_METHOD_CATEGORY)
+        setMonitoringConfigCategory(allEnums.find((item) => item.enum_name === 'RoPEType'))
+        setEvalStrategyCategory(allEnums.find((item) => item.enum_name === 'EvalStrategy'))
+        setLrSchedulerTypeCategory(allEnums.find((item) => item.enum_name === 'LRSchedulerType'))
+        setSaveStrategyCategory(allEnums.find((item) => item.enum_name === 'SaveStrategy'))
+        setSupportedGpuCategory(allEnums.find((item) => item.enum_name === 'CardModel')?.options)
       }
     }
     fetchProjectEnumValues()
@@ -359,7 +383,9 @@ const CreateFinetuneRun: React.FC = () => {
         deepspeed: taskInfo?.deepspeed || 'ZeRO-0',
         train_type_category: trainCategory ?? 'text-generation',
         data_format: taskInfo?.training_type?.dataset_format
-          || (taskInfo?.training_type?.train_type_category === 'image-understanding' ? 'role-based' : 'prompt-response'),
+          || (taskInfo?.training_type?.train_type_category === 'image-generation'
+              ? 'image-prompt'
+              : taskInfo?.training_type?.train_type_category === 'image-understanding' ? 'role-based' : 'prompt-response'),
         // 基础参数
         bf16: taskInfo.basic.bf16,
         gradient_accumulation_steps: taskInfo.basic.gradient_accumulation_steps,
@@ -404,6 +430,11 @@ const CreateFinetuneRun: React.FC = () => {
         // 数据处理参数
         cutoff_len: taskInfo?.data_processing.cutoff_len,
         preprocessing_num_workers: taskInfo?.data_processing.preprocessing_num_workers,
+        image_resolution: taskInfo?.additional_params?.image_resolution ?? 1024,
+        max_images_per_sample: taskInfo?.additional_params?.max_images_per_sample ?? 1,
+        prompt_max_length: taskInfo?.additional_params?.prompt_max_length ?? 512,
+        negative_prompt_max_length: taskInfo?.additional_params?.negative_prompt_max_length ?? 256,
+        image_resize_mode: taskInfo?.additional_params?.image_resize_mode ?? 'keep_ratio',
 
         // 评估参数
         ...(taskInfo?.evaluation?.eval_split_ratio !== undefined && taskInfo?.evaluation?.eval_split_ratio !== null && {
@@ -483,6 +514,17 @@ const CreateFinetuneRun: React.FC = () => {
         ...(trainingMethodType ? { training_type: trainingMethodType } : {}),
         ...(datasetInfo.dataset_type ? { train_type_category: datasetInfo.dataset_type } : {}),
         ...(datasetInfo.dataset_format ? { data_format: datasetInfo.dataset_format } : {}),
+        ...(datasetInfo.dataset_type === 'image-generation'
+          ? {
+              training_type: 'sft',
+              data_format: 'image-prompt',
+              image_resolution: 1024,
+              max_images_per_sample: 1,
+              prompt_max_length: 512,
+              negative_prompt_max_length: 256,
+              image_resize_mode: 'keep_ratio',
+            }
+          : {}),
       })
     }
     else if (datasetName === 'validation') {
@@ -567,6 +609,7 @@ const CreateFinetuneRun: React.FC = () => {
         : values.training_type
       const normalizedTrainMethodType = normalizeTrainingMethodType(trainMethodType)
       const isGrpoTraining = normalizedTrainMethodType === 'grpo' || trainMethodType === 'rft'
+      const isImageGenerationTraining = values.train_type_category === 'image-generation'
       const isBelleProvider = config?.PROVIDER_TYPE === providerType
 
       const datasetFormat = values.data_config.training_datasets?.[0]?.dataset_format || values.data_format
@@ -714,6 +757,15 @@ const CreateFinetuneRun: React.FC = () => {
             // 额外参数
             additional_params: {
               dataloader_num_workers: values.dataloader_num_workers,
+              ...(isImageGenerationTraining
+                ? {
+                    image_resolution: values.image_resolution,
+                    max_images_per_sample: values.max_images_per_sample,
+                    prompt_max_length: values.prompt_max_length,
+                    negative_prompt_max_length: values.negative_prompt_max_length,
+                    image_resize_mode: values.image_resize_mode,
+                  }
+                : {}),
             },
             ...(trainMethodType === 'dpo' && {
               dpo_config: {

@@ -4,7 +4,7 @@
 """
 from app.schemas.model import ModelType
 from app.tasks.service.inference.adapters.base_adapter import BaseDataFormatAdapter
-from app.tasks.service.inference.adapters.prompt_response_adapter import PromptResponseAdapter
+from app.tasks.service.inference.adapters.prompt_response_adapter import ImagePromptAdapter, PromptResponseAdapter
 from app.tasks.service.inference.adapters.role_based_adapter import RoleBasedImageUnderstandingAdapter, \
     RoleBasedTextGenerationAdapter
 from app.tasks.service.inference.adapters.prefix_suffix_middle_adapter import PrefixSuffixMiddleAdapter
@@ -39,6 +39,8 @@ class AdapterFactory:
         # 根据格式创建适配器
         if dataset_format == DatasetFormat.PROMPT_RESPONSE.value:
             return PromptResponseAdapter(dataset)
+        elif dataset_format == DatasetFormat.IMAGE_PROMPT.value and dataset_type == ModelType.IMAGE_GENERATION.value:
+            return ImagePromptAdapter(dataset)
         elif dataset_format == DatasetFormat.ROLE_BASED.value and dataset_type == ModelType.IMAGE_UNDERSTANDING.value:
             return RoleBasedImageUnderstandingAdapter(dataset)
         elif dataset_format == DatasetFormat.ROLE_BASED.value and dataset_type == ModelType.TEXT_GENERATION.value:

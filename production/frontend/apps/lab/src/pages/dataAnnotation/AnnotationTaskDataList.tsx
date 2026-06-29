@@ -220,6 +220,11 @@ const AnnotationTaskDataList: React.FC = () => {
     const base = record.base_url ?? baseUrl
     if (imageIndex >= 0 && imageIndex < rawImages.length) {
       const imagePath = rawImages[imageIndex]
+      if (/^(https?:|data:|blob:)/.test(imagePath)) {
+        setPreviewImageUrl(imagePath)
+        setImagePreviewVisible(true)
+        return
+      }
       const fileName = imagePath.includes('/') ? imagePath.split('/').pop() : imagePath
       const imageBaseUrl = import.meta.env.DEV
         ? `${import.meta.env.VITE_PREFIX_BASE_URL}/api/v1/storage/download/`

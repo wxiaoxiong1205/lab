@@ -179,9 +179,9 @@ async def _build_training_dataset_export_cache_async(
         if not dataset.dataset_path or not jfs.exists(dataset.dataset_path):
             raise ValueError(f"数据集文件不存在: {dataset.dataset_path}")
 
-        if dataset_type == TrainingTypeCategory.IMAGE_UNDERSTANDING.value:
+        if dataset_type in (TrainingTypeCategory.IMAGE_UNDERSTANDING.value, TrainingTypeCategory.IMAGE_GENERATION.value):
             if export_file_type != TrainingDatasetExportTypeCategory.ZIP_TYPE.value:
-                raise ValueError(f"图像理解数据集只支持 zip 导出，当前格式: {export_file_type}")
+                raise ValueError(f"图像类数据集只支持 zip 导出，当前格式: {export_file_type}")
 
             temp_dir = tempfile.mkdtemp(prefix=f"training_export_{dataset_id}_{export_file_type}_")
             local_data_path = os.path.join(temp_dir, "data.jsonl")
@@ -194,6 +194,7 @@ async def _build_training_dataset_export_cache_async(
                 dataset_name,
                 version,
                 DatasetUsage(usage).value,
+                dataset_type,
             )
             if jfs.exists(images_folder_path):
                 JFSUtils.copy_dir_to_local(jfs, images_folder_path, local_images_dir)

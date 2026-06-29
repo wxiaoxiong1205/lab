@@ -33,6 +33,7 @@ export interface DatasetCascaderFiltersSidebarProps {
   parentLocksDatasetFormatFilter: boolean
   datasetTypeOptions: FilterItem[]
   datasetFormatOptions: FilterItem[]
+  lockedDatasetFormatOptions: FilterItem[]
   datasetTypePick: string | undefined
   setDatasetTypePick: React.Dispatch<React.SetStateAction<string | undefined>>
   datasetFormatPick: string | undefined
@@ -57,6 +58,7 @@ export const DatasetCascaderFiltersSidebar: React.FC<DatasetCascaderFiltersSideb
   parentLocksDatasetFormatFilter,
   datasetTypeOptions,
   datasetFormatOptions,
+  lockedDatasetFormatOptions,
   datasetTypePick,
   setDatasetTypePick,
   datasetFormatPick,
@@ -125,16 +127,18 @@ export const DatasetCascaderFiltersSidebar: React.FC<DatasetCascaderFiltersSideb
             </div>
           )}
 
-          {!hideStatsDatasetTypeAndFormatFilters && !parentLocksDatasetFormatFilter && (
+          {!hideStatsDatasetTypeAndFormatFilters && (
             <div>
               <div className={sectionTitleClass}>数据格式</div>
               <div className="flex flex-col gap-1">
-                {datasetFormatOptions.map((it) => (
+                {(parentLocksDatasetFormatFilter ? lockedDatasetFormatOptions : datasetFormatOptions).map((it) => (
                   <button
                     key={it.value}
                     type="button"
-                    className={statBtn(datasetFormatPick === it.value)}
+                    className={statBtn(parentLocksDatasetFormatFilter || datasetFormatPick === it.value)}
+                    disabled={parentLocksDatasetFormatFilter}
                     onClick={() => {
+                      if (parentLocksDatasetFormatFilter) return
                       setDatasetFormatPick(it.value)
                       bumpPage()
                     }}
@@ -147,39 +151,43 @@ export const DatasetCascaderFiltersSidebar: React.FC<DatasetCascaderFiltersSideb
             </div>
           )}
 
-          {attrGroups.length > 0 && (
+          {!hideStatsDatasetTypeAndFormatFilters && (
             <div>
-              <div className={sectionTitleClass}>数据分类</div>
-              <div className="flex flex-col gap-2">
-                {attrGroups.map((ag) => (
-                  <div key={ag.name}>
-                    <div className="mb-1 text-[14px] font-normal leading-5 text-foreground-muted">{ag.name}</div>
-                    <div className="flex flex-col gap-1 pl-1">
-                      {ag.options?.map((op) => (
-                        <button
-                          key={`${ag.name}-${op.value}`}
-                          type="button"
-                          className={statBtn(attrNamePick === ag.name && attrValuePick === op.value)}
-                          onClick={() => {
-                            if (attrNamePick === ag.name && attrValuePick === op.value) {
-                              setAttrNamePick(undefined)
-                              setAttrValuePick(undefined)
-                            }
-                            else {
-                              setAttrNamePick(ag.name)
-                              setAttrValuePick(op.value)
-                            }
-                            bumpPage()
-                          }}
-                        >
-                          <span>{op.value}</span>
-                          <span>{op.count ?? 0}</span>
-                        </button>
-                      ))}
+              <div className={sectionTitleClass}>数据属性</div>
+              {attrGroups.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  {attrGroups.map((ag) => (
+                    <div key={ag.name}>
+                      <div className="mb-1 text-[14px] font-normal leading-5 text-foreground-muted">{ag.name}</div>
+                      <div className="flex flex-col gap-1 pl-1">
+                        {ag.options?.map((op) => (
+                          <button
+                            key={`${ag.name}-${op.value}`}
+                            type="button"
+                            className={statBtn(attrNamePick === ag.name && attrValuePick === op.value)}
+                            onClick={() => {
+                              if (attrNamePick === ag.name && attrValuePick === op.value) {
+                                setAttrNamePick(undefined)
+                                setAttrValuePick(undefined)
+                              }
+                              else {
+                                setAttrNamePick(ag.name)
+                                setAttrValuePick(op.value)
+                              }
+                              bumpPage()
+                            }}
+                          >
+                            <span>{op.value}</span>
+                            <span>{op.count ?? 0}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-2 text-[13px] leading-5 text-foreground-muted">暂无可筛选属性</div>
+              )}
             </div>
           )}
         </div>

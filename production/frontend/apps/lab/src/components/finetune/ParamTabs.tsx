@@ -47,6 +47,8 @@ const ParamTabs: React.FC<ParamTabsProps> = ({
   SaveStrategyCategory,
 }) => {
   const effectiveTrainingMethod = normalizeTrainingMethodType(trainingMethod)
+  const trainTypeCategory = Form.useWatch('train_type_category', form)
+  const isImageGeneration = trainTypeCategory === 'image-generation'
   const selectedTemplateId = Form.useWatch('advanced_template_id', form)
   const selectedTemplateMode = Form.useWatch('advanced_template_mode', form) || 'template'
 
@@ -214,6 +216,174 @@ const ParamTabs: React.FC<ParamTabsProps> = ({
 
   if (effectiveTrainingMethod === 'grpo') {
     return renderGrpoTemplateConfig()
+  }
+
+  const renderDataProcessingConfig = () => {
+    if (isImageGeneration) {
+      return (
+        <div className="param-config-container">
+          <Row gutter={[16, 16]}>
+            <Col span={12}>
+              <div className="param-item">
+                <div className="param-header">
+                  <span className="param-name">图片分辨率</span>
+                </div>
+                <div className="param-content">
+                  <div className="param-control">
+                    <Form.Item name="image_resolution" className="m-0" initialValue={1024}>
+                      <Select placeholder="选择图片分辨率">
+                        <Option value={512}>512 x 512</Option>
+                        <Option value={768}>768 x 768</Option>
+                        <Option value={1024}>1024 x 1024</Option>
+                      </Select>
+                    </Form.Item>
+                  </div>
+                  <div className="param-description">
+                    训练前统一处理图片的目标分辨率。分辨率越高，细节保留越多，显存占用也越高。
+                  </div>
+                </div>
+              </div>
+            </Col>
+
+            <Col span={12}>
+              <div className="param-item">
+                <div className="param-header">
+                  <span className="param-name">单样本最大图片数</span>
+                </div>
+                <div className="param-content">
+                  <div className="param-control">
+                    <Form.Item name="max_images_per_sample" className="m-0" initialValue={1}>
+                      <InputNumber min={1} max={8} precision={0} className="w-full" />
+                    </Form.Item>
+                  </div>
+                  <div className="param-description">
+                    image-prompt 单条样本可携带多张图片，超出上限的图片不进入本次训练。
+                  </div>
+                </div>
+              </div>
+            </Col>
+
+            <Col span={12}>
+              <div className="param-item">
+                <div className="param-header">
+                  <span className="param-name">Prompt 最大长度</span>
+                </div>
+                <div className="param-content">
+                  <div className="param-control">
+                    <Form.Item name="prompt_max_length" className="m-0" initialValue={512}>
+                      <InputNumber min={1} max={4096} precision={0} className="w-full" />
+                    </Form.Item>
+                  </div>
+                  <div className="param-description">
+                    控制正向提示词的最大 token 长度，超过后按数据处理策略截断。
+                  </div>
+                </div>
+              </div>
+            </Col>
+
+            <Col span={12}>
+              <div className="param-item">
+                <div className="param-header">
+                  <span className="param-name">Negative Prompt 最大长度</span>
+                </div>
+                <div className="param-content">
+                  <div className="param-control">
+                    <Form.Item name="negative_prompt_max_length" className="m-0" initialValue={256}>
+                      <InputNumber min={0} max={2048} precision={0} className="w-full" />
+                    </Form.Item>
+                  </div>
+                  <div className="param-description">
+                    控制反向提示词的最大 token 长度。没有 negative_prompt 的样本可为空。
+                  </div>
+                </div>
+              </div>
+            </Col>
+
+            <Col span={12}>
+              <div className="param-item">
+                <div className="param-header">
+                  <span className="param-name">图片缩放方式</span>
+                </div>
+                <div className="param-content">
+                  <div className="param-control">
+                    <Form.Item name="image_resize_mode" className="m-0" initialValue="keep_ratio">
+                      <Select placeholder="选择图片缩放方式">
+                        <Option value="keep_ratio">保持比例补边</Option>
+                        <Option value="center_crop">居中裁剪</Option>
+                        <Option value="stretch">拉伸到目标尺寸</Option>
+                      </Select>
+                    </Form.Item>
+                  </div>
+                  <div className="param-description">
+                    控制原图进入训练前的尺寸适配方式。默认保持比例补边，减少主体变形。
+                  </div>
+                </div>
+              </div>
+            </Col>
+
+            <Col span={12}>
+              <div className="param-item">
+                <div className="param-header">
+                  <span className="param-name">预处理进程数</span>
+                </div>
+                <div className="param-content">
+                  <div className="param-control">
+                    <Form.Item name="preprocessing_num_workers" className="m-0">
+                      <InputNumber min={0} max={100} className="w-full" />
+                    </Form.Item>
+                  </div>
+                  <div className="param-description">
+                    控制图片读取、缩放和 prompt 解析等预处理任务的并发进程数。
+                  </div>
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </div>
+      )
+    }
+
+    return (
+      <div className="param-config-container">
+        <Row gutter={[16, 16]}>
+          <Col span={12}>
+            <div className="param-item">
+              <div className="param-header">
+                <span className="param-name">训练样本的最大token长度限制</span>
+              </div>
+              <div className="param-content">
+                <div className="param-control">
+                  <Form.Item name="cutoff_len" className="m-0">
+                    <InputNumber className="w-full" />
+                  </Form.Item>
+                </div>
+                <div className="param-description">
+                  训练样本的最大token长度限制（Cutoff Len），训练样本的最大token长度限制。
+                </div>
+              </div>
+            </div>
+          </Col>
+
+          <Col span={12}>
+            <div className="param-item">
+              <div className="param-header">
+                <span className="param-name">预处理各种进程数</span>
+              </div>
+              <div className="param-content">
+                <div className="param-control">
+                  <Form.Item name="preprocessing_num_workers" className="m-0">
+                    <InputNumber min={0} max={100} className="w-full" />
+                  </Form.Item>
+                </div>
+                <div className="param-description">
+                  预处理各种进程数（Preprocessing Num Workers），控制预处理各种进程数。
+                </div>
+              </div>
+            </div>
+          </Col>
+        </Row>
+      </div>
+    )
   }
 
   const items = [
@@ -491,49 +661,7 @@ const ParamTabs: React.FC<ParamTabsProps> = ({
       key: 'lrScheduler',
       label: '数据处理配置',
       forceRender: true,
-      children: (
-        <div className="param-config-container">
-          <Row gutter={[16, 16]}>
-            <Col span={12}>
-              <div className="param-item">
-                <div className="param-header">
-                  <span className="param-name">训练样本的最大token长度限制</span>
-                </div>
-                <div className="param-content">
-                  <div className="param-control">
-                    <Form.Item name="cutoff_len" className="m-0">
-                      <InputNumber
-                        className="w-full"
-                      />
-                    </Form.Item>
-                  </div>
-                  <div className="param-description">
-                    训练样本的最大token长度限制（Cutoff Len），训练样本的最大token长度限制。
-                  </div>
-                </div>
-              </div>
-            </Col>
-
-            <Col span={12}>
-              <div className="param-item">
-                <div className="param-header">
-                  <span className="param-name">预处理各种进程数</span>
-                </div>
-                <div className="param-content">
-                  <div className="param-control">
-                    <Form.Item name="preprocessing_num_workers" className="m-0">
-                      <InputNumber min={0} max={100} className="w-full" />
-                    </Form.Item>
-                  </div>
-                  <div className="param-description">
-                    预处理各种进程数（Preprocessing Num Workers），控制预处理各种进程数。
-                  </div>
-                </div>
-              </div>
-            </Col>
-          </Row>
-        </div>
-      ),
+      children: renderDataProcessingConfig(),
     },
     // LoRA配置标签页（条件渲染）
     ...(trainingType === 'lora' ? [{

@@ -13,14 +13,14 @@ interface AnnotationConfigModalProps {
   initialConfig?: AnnotationConfig | null
   onCancel: () => void
   onConfirm?: (config: AnnotationConfig) => void
-  modelType?: '文本生成' | '图像理解' // 模型类型，用于筛选服务列表
+  modelType?: '文本生成' | '图像理解' | '图像生成' // 模型类型，用于筛选服务列表
 }
 export interface AnnotationConfig {
   model_id?: number
   max_token?: number
-  temperature: number
-  top_p: number
-  presence_penalty: number
+  temperature?: number
+  top_p?: number
+  presence_penalty?: number
 }
 const AnnotationConfigModal: React.FC<AnnotationConfigModalProps> = ({ visible, taskId, projectId, initialConfig, onCancel, onConfirm, modelType }) => {
   const [form] = Form.useForm()
@@ -39,6 +39,7 @@ const AnnotationConfigModal: React.FC<AnnotationConfigModalProps> = ({ visible, 
         const modelTypeMap: Record<string, string> = {
           文本生成: 'text-generation',
           图像理解: 'image-understanding',
+          图像生成: 'image-generation',
         }
         const mappedModelType = modelType ? modelTypeMap[modelType] : 'text-generation'
         const response = await inferenceServiceApi.list({
@@ -69,9 +70,9 @@ const AnnotationConfigModal: React.FC<AnnotationConfigModalProps> = ({ visible, 
       form.setFieldsValue({
         model_id: initialConfig.model_id,
         max_token: initialConfig.max_token,
-        temperature: initialConfig.temperature,
-        top_p: initialConfig.top_p,
-        presence_penalty: initialConfig.presence_penalty,
+        temperature: initialConfig.temperature ?? 0.7,
+        top_p: initialConfig.top_p ?? 1.0,
+        presence_penalty: initialConfig.presence_penalty ?? 0.0,
       })
     }
     else {
@@ -96,26 +97,25 @@ const AnnotationConfigModal: React.FC<AnnotationConfigModalProps> = ({ visible, 
         return
       }
       setLoading(true)
+      const paramConfig = {
+        max_token: values.max_token,
+        max_tokens: values.max_token,
+        temperature: values.temperature,
+        top_p: values.top_p,
+        presence_penalty: values.presence_penalty,
+      }
       // 保存配置
       await labelTaskService.saveModelConfig({
         task_id: taskId,
         model_id: values.model_id,
-        param_config_json: {
-          max_token: values.max_token,
-          temperature: values.temperature,
-          top_p: values.top_p,
-          presence_penalty: values.presence_penalty,
-        },
+        param_config_json: paramConfig,
       })
       message.success('配置保存成功')
       // 调用回调函数
       if (onConfirm) {
         onConfirm({
           model_id: values.model_id,
-          max_token: values.max_token,
-          temperature: values.temperature,
-          top_p: values.top_p,
-          presence_penalty: values.presence_penalty,
+          ...paramConfig,
         })
       }
       onCancel()
@@ -169,7 +169,7 @@ const AnnotationConfigModal: React.FC<AnnotationConfigModalProps> = ({ visible, 
             )}
             className="mb-4"
           >
-            <InputNumber className="w-full w-[30%]" min={1} max={100000} placeholder="留空表示不限制" />
+            <InputNumber className="w-full" min={1} max={100000} placeholder="留空表示不限制" />
           </Form.Item>
 
           {/* Temperature */}

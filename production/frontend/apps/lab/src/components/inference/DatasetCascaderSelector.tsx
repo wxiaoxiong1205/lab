@@ -13,10 +13,25 @@ import { type AttrOptions, DatasetFilter, type DatasetStatsQuery, type FilterIte
 import { trainingDatasetService } from '@/services/trainingApi'
 import type { TrainingDatasetItem } from '@/types/training'
 import { useSystemSetting } from '@/hooks/system/systemSetting'
+
+const DEMO_ATTR_GROUPS_BY_DATASET_TYPE: Record<string, AttrOptions[]> = {
+  'text-generation': [
+    { name: '业务场景', options: [{ value: '智能客服', count: 8 }, { value: '知识问答', count: 5 }, { value: '商品导购', count: 3 }] },
+    { name: '数据来源', options: [{ value: '人工标注', count: 7 }, { value: '数据增强', count: 4 }] },
+  ],
+  'image-understanding': [
+    { name: '图片场景', options: [{ value: '商品图', count: 6 }, { value: '质检图', count: 4 }, { value: '文档截图', count: 3 }] },
+    { name: '标注来源', options: [{ value: '人工标注', count: 5 }, { value: '模型预标注', count: 4 }] },
+  ],
+  'image-generation': [
+    { name: '图片风格', options: [{ value: '写实', count: 6 }, { value: '插画', count: 5 }, { value: '电商海报', count: 4 }] },
+    { name: 'Prompt 来源', options: [{ value: '人工撰写', count: 7 }, { value: 'AI 辅助生成', count: 5 }] },
+  ],
+}
 /**
  * 待推理数据集选择：弹窗 + 左侧筛选 + 右侧列表与版本选择（与级联选择器表单值兼容）
  */
-const DatasetCascaderSelector: React.FC<DatasetCascaderSelectorProps> = ({ form, onChange, loading: parentLoading, label = '待推理数据', fieldName = 'data_to_infer', statsQuery, includeAllStatsDatasetFormats, fixedListUsage, listDatasetType, disabled: triggerDisabled, requiredSelection = true, placeholder = '请选择数据集分类、数据集和版本', modalTitle = '选择待推理数据集', selectButtonText = '+ 选择', projectIdOverride, useInferenceResultApi = false, inferenceDisplayName, inferenceMultiSelect = false, trainingDatasetMultiSelect = false, trainingMultiSelectMax = 3, hideStatsDatasetTypeAndFormatFilters = false, onModalOpenChange }) => {
+const DatasetCascaderSelector: React.FC<DatasetCascaderSelectorProps> = ({ form, onChange, loading: parentLoading, label = '待推理数据', fieldName = 'data_to_infer', statsQuery, includeAllStatsDatasetFormats, fixedListUsage, listDatasetType, disabled: triggerDisabled, requiredSelection = true, placeholder = '请选择数据集分类、数据集和版本', modalTitle = '选择待推理数据集', selectionNotice = '可选择数据集；训练/验证数据集中仅展示 SFT 版本。DPO/RFT 偏好或奖励数据不支持创建推理结果集。', selectButtonText = '+ 选择', projectIdOverride, useInferenceResultApi = false, inferenceDisplayName, inferenceMultiSelect = false, trainingDatasetMultiSelect = false, trainingMultiSelectMax = 3, hideStatsDatasetTypeAndFormatFilters = false, onModalOpenChange }) => {
   /** 仅当显式传入 boolean 时使用（部分页面误传整个 dataLoading 对象，需忽略） */
   const parentBusy = parentLoading === true
   const { projectId: routeProjectId } = useParams()
@@ -70,9 +85,29 @@ const DatasetCascaderSelector: React.FC<DatasetCascaderSelectorProps> = ({ form,
   const [open, setOpen] = useState(false)
   const [stats, setStats] = useState<FilterOptions | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
-  const attrGroups: AttrOptions[] = useMemo(() => stats?.attr_option ?? [], [stats?.attr_option])
+  const currentDatasetTypeForFallback = statsQuery?.dataset_type?.[0] ?? listDatasetType ?? datasetTypePick ?? 'text-generation'
+  const attrGroups: AttrOptions[] = useMemo(() => {
+    if (stats?.attr_option?.length) {
+      return stats.attr_option
+    }
+    return DEMO_ATTR_GROUPS_BY_DATASET_TYPE[currentDatasetTypeForFallback] ?? DEMO_ATTR_GROUPS_BY_DATASET_TYPE['text-generation']
+  }, [currentDatasetTypeForFallback, stats?.attr_option])
   const datasetTypeOptions = useMemo(() => stats?.dataset_type ?? [], [stats?.dataset_type])
-  const datasetFormatOptions = useMemo(() => stats?.dataset_format ?? [], [stats?.dataset_format])
+  const datasetFormatOptions = useMemo(() => {
+    if (stats?.dataset_format?.length) {
+      return stats.dataset_format
+    }
+    const fallbackFormats = resolvedStatsQuery.dataset_format?.length
+      ? resolvedStatsQuery.dataset_format
+      : currentDatasetTypeForFallback === 'image-generation'
+        ? ['image-prompt']
+        : ['prompt-response', 'role-based']
+    return fallbackFormats.map((value) => ({ value, count: 0 }))
+  }, [currentDatasetTypeForFallback, resolvedStatsQuery.dataset_format, stats?.dataset_format])
+  const lockedDatasetFormatOptions = useMemo(() => {
+    const lockedValues = statsQuery?.dataset_format ?? []
+    return lockedValues.map((value) => datasetFormatOptions.find((item) => item.value === value) ?? { value })
+  }, [datasetFormatOptions, statsQuery?.dataset_format])
   const defaultDatasetFormatPick = useMemo(() => {
     if (hideStatsDatasetTypeAndFormatFilters || parentLocksDatasetFormatFilter) {
       return undefined
@@ -722,13 +757,13 @@ const DatasetCascaderSelector: React.FC<DatasetCascaderSelectorProps> = ({ form,
         )}
       >
         <div className="flex h-[624px] min-h-0">
-          <DatasetCascaderFiltersSidebar statsLoading={statsLoading} clearSidebarFilters={clearSidebarFilters} fixedListUsage={fixedListUsage} usageFilter={usageFilter} setUsageFilter={setUsageFilter} usageRadioOptions={usageRadioOptions} hideStatsDatasetTypeAndFormatFilters={hideStatsDatasetTypeAndFormatFilters} parentLocksDatasetTypeFilter={parentLocksDatasetTypeFilter} parentLocksDatasetFormatFilter={parentLocksDatasetFormatFilter} datasetTypeOptions={datasetTypeOptions} datasetFormatOptions={datasetFormatOptions} datasetTypePick={datasetTypePick} setDatasetTypePick={setDatasetTypePick} datasetFormatPick={datasetFormatPick} setDatasetFormatPick={setDatasetFormatPick} attrGroups={attrGroups} attrNamePick={attrNamePick} attrValuePick={attrValuePick} setAttrNamePick={setAttrNamePick} setAttrValuePick={setAttrValuePick} bumpPage={bumpPage} />
+          <DatasetCascaderFiltersSidebar statsLoading={statsLoading} clearSidebarFilters={clearSidebarFilters} fixedListUsage={fixedListUsage} usageFilter={usageFilter} setUsageFilter={setUsageFilter} usageRadioOptions={usageRadioOptions} hideStatsDatasetTypeAndFormatFilters={hideStatsDatasetTypeAndFormatFilters} parentLocksDatasetTypeFilter={parentLocksDatasetTypeFilter} parentLocksDatasetFormatFilter={parentLocksDatasetFormatFilter} datasetTypeOptions={datasetTypeOptions} datasetFormatOptions={datasetFormatOptions} lockedDatasetFormatOptions={lockedDatasetFormatOptions} datasetTypePick={datasetTypePick} setDatasetTypePick={setDatasetTypePick} datasetFormatPick={datasetFormatPick} setDatasetFormatPick={setDatasetFormatPick} attrGroups={attrGroups} attrNamePick={attrNamePick} attrValuePick={attrValuePick} setAttrNamePick={setAttrNamePick} setAttrValuePick={setAttrValuePick} bumpPage={bumpPage} />
 
           <div className="flex-1 w-[624px] flex flex-col ml-[20px] min-h-0">
             <Alert
               type="info"
               showIcon
-              message="可选择数据集；训练/验证数据集中仅展示 SFT 版本。DPO/RFT 偏好或奖励数据不支持创建推理结果集。"
+              message={selectionNotice}
             />
 
             <div className="p-2">

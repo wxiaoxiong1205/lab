@@ -1,5 +1,6 @@
 import { Descriptions, Tag, Typography, message } from 'antd'
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { ModelTypeMapping, TrainingMethodTypeMapping } from '@/utils/EnumMaping.ts'
 import type { Attribute } from '@/types/training'
 import { formatDatasetCreationStatus, formatDatasetVersionStatus, isDatasetCreateSucceeded } from '@/utils/datasetStatus'
@@ -49,12 +50,60 @@ const getPublishTag = (data: BasicViewDataType) => {
 
 const formatAttributeValue = (item: Attribute) => {
   const optionValues = item.options
-    ?.map((option) => option.option_value)
+    ?.map((option) => {
+      if (typeof option === 'string') return option
+      return option.option_value
+    })
     .filter(Boolean)
     .join('、')
   const manualValue = (item as any).attr_value
-  const value = optionValues || (manualValue !== undefined && manualValue !== null && manualValue !== '' ? String(manualValue) : '-')
-  return `${item.name || '未命名属性'}: ${value}`
+  if (optionValues) return optionValues
+  if (Array.isArray(manualValue)) return manualValue.filter(Boolean).join('、') || '-'
+  return manualValue !== undefined && manualValue !== null && manualValue !== '' ? String(manualValue) : '-'
+}
+
+const getAttributeGroupName = (item: Attribute) => {
+  const group = (item as any).group
+  return typeof group === 'string' && group.trim() ? group.trim() : '未分组'
+}
+
+const renderAttributeGroups = (attrValues?: Attribute[]) => {
+  if (!attrValues?.length) return <Text>-</Text>
+
+  const groupMap = new Map<string, Attribute[]>()
+  attrValues.forEach((item) => {
+    const groupName = getAttributeGroupName(item)
+    const current = groupMap.get(groupName) || []
+    current.push(item)
+    groupMap.set(groupName, current)
+  })
+
+  const orderedGroups = [
+    ...(['未分组'].filter((groupName) => groupMap.has(groupName))),
+    ...Array.from(groupMap.keys()).filter((groupName) => groupName !== '未分组'),
+  ]
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+      {orderedGroups.map((groupName) => (
+        <div key={groupName} className="inline-flex max-w-full items-center gap-2">
+          <div className="shrink-0 text-xs font-medium text-gray-500">{groupName}</div>
+          <div className="inline-flex min-w-0 flex-wrap gap-2">
+            {groupMap.get(groupName)?.map((item, index) => (
+              <span
+                key={`${groupName}-${item.attr_id || item.name}-${index}`}
+                className="inline-flex max-w-full items-center gap-1 rounded border border-gray-200 bg-gray-50 px-2.5 py-1 text-sm leading-5"
+              >
+                <span className="shrink-0 text-gray-500">{item.name || '未命名属性'}</span>
+                <span className="text-gray-400">:</span>
+                <span className="min-w-0 break-words text-gray-900">{formatAttributeValue(item)}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 const normalizeSourceVersions = (value: unknown) => {
@@ -134,7 +183,7 @@ const DatasetDetailBasicView = ({
     }
   }
 
-  const items = [
+  const items: Array<{ key: string, label: string, children: ReactNode, span?: number }> = [
     {
       key: 'name',
       label: '数据集名称',
@@ -223,30 +272,36 @@ const DatasetDetailBasicView = ({
       ),
     },
     {
-      key: 'created_at',
-      label: '创建时间',
-      children: <Text>{data.created_at ? new Date(data.created_at).toLocaleString() : ''}</Text>,
-    },
-    {
-      key: 'attr_values',
-      label: '数据属性',
-      children: <Text>{data.attr_values?.length ? data.attr_values.map(formatAttributeValue).join('；') : '-'}</Text>,
-    },
-    {
       key: 'data_source',
       label: '数据来源',
       children: <Text>{formatDatasetSource(data)}</Text>,
     },
+    {
+      key: 'created_at',
+      label: '创建时间',
+      children: <Text>{data.created_at ? new Date(data.created_at).toLocaleString() : ''}</Text>,
+    },
   ]
 
   return (
-    <Descriptions column={2} size="middle">
-      {items.map((item) => (
-        <Descriptions.Item key={item.key} label={item.label}>
-          {item.children}
-        </Descriptions.Item>
-      ))}
-    </Descriptions>
+    <div>
+      <Descriptions column={2} size="middle">
+        {items.map((item) => (
+          <Descriptions.Item key={item.key} label={item.label} span={item.span}>
+            {item.children}
+          </Descriptions.Item>
+        ))}
+      </Descriptions>
+
+      <div className="mt-4 border-t border-gray-100 pt-4">
+        <div className="flex items-start gap-4">
+          <div className="w-[76px] shrink-0 text-sm text-gray-400">数据属性</div>
+          <div className="min-w-0 flex-1">
+            {renderAttributeGroups(data.attr_values)}
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 

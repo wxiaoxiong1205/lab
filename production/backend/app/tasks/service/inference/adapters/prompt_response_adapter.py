@@ -89,4 +89,14 @@ class PromptResponseAdapter(BaseDataFormatAdapter):
 
 
 
+class ImagePromptAdapter(PromptResponseAdapter):
+    """image-prompt 图像生成格式适配器。
+
+    image-prompt 数据集以 data.jsonl + images/ 目录存储，路径挂载方式与普通数据集一致。
+    """
+
+    @property
+    def data_format(self) -> str:
+        """返回适配器支持的数据格式"""
+        return "image-prompt"
 

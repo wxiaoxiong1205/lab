@@ -11,6 +11,8 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.base import get_db_session
+
 from .manager import SeedManager
 
 async def init_all_result(session: AsyncSession):
@@ -23,6 +25,17 @@ async def init_all(session:AsyncSession) -> bool:
     """初始化所有种子数据"""
     result = await init_all_result(session)
     return result["success"]
+
+
+async def init_all_standalone() -> bool:
+    """命令行入口使用的全量初始化。"""
+    async with get_db_session() as session:
+        result = await init_all_result(session)
+        if result["success"]:
+            await session.commit()
+            return True
+        await session.rollback()
+        return False
 
 
 async def init_images() -> bool:
@@ -67,6 +80,13 @@ async def init_advanced_templates() -> bool:
     return result["success"]
 
 
+async def init_demo_showcase() -> bool:
+    """仅初始化演示数据"""
+    manager = SeedManager()
+    result = await manager.run_single("demo_showcase")
+    return result["success"]
+
+
 async def main():
     """主函数 - 用于直接运行此脚本"""
     if len(sys.argv) > 1:
@@ -83,14 +103,16 @@ async def main():
             success = await init_example_notebook()
         elif arg == "advanced_templates":
             success = await init_advanced_templates()
+        elif arg == "demo_showcase":
+            success = await init_demo_showcase()
         elif arg == "all":
-            success = await init_all()
+            success = await init_all_standalone()
         else:
-            print(f"未知的参数: {arg}。支持的参数: images, data_cleaning, all")
+            print(f"未知的参数: {arg}。支持的参数: images, data_cleaning, evaluation_metrics, common_config, example_notebook, advanced_templates, demo_showcase, all")
             sys.exit(1)
     else:
         # 默认初始化所有数据
-        success = await init_all()
+        success = await init_all_standalone()
     
     if not success:
         sys.exit(1)

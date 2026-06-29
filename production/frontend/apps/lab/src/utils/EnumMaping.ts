@@ -1,4 +1,4 @@
-const FINETUNE_VISIBLE_TRAINING_TYPES: string[] = ['text-generation', 'image-understanding']
+const FINETUNE_VISIBLE_TRAINING_TYPES: string[] = ['text-generation', 'image-generation', 'image-understanding']
 export default FINETUNE_VISIBLE_TRAINING_TYPES
 
 export const ModelTypeMapping = (key: string) => {
@@ -8,7 +8,7 @@ export const ModelTypeMapping = (key: string) => {
     case 'image-understanding':
       return { text: '图像理解', disabled: false, disabledTooltip: '图像理解' }
     case 'image-generation':
-      return { text: '图像生成', disabled: true, disabledTooltip: '图像生成(即将上线)' }
+      return { text: '图像生成', disabled: false, disabledTooltip: '图像生成' }
     case 'audio-generation':
       return { text: '音频生成', disabled: true, disabledTooltip: '音频生成(即将上线)' }
     case 'audio-understanding':

@@ -12,6 +12,7 @@ from .init import (
     init_data_cleaning,
     init_example_notebook,
     init_advanced_templates,
+    init_demo_showcase,
 )
 from .manager import SeedManager
 
@@ -23,5 +24,6 @@ __all__ = [
     'init_data_cleaning',
     'init_example_notebook',
     'init_advanced_templates',
+    'init_demo_showcase',
     'SeedManager',
 ]

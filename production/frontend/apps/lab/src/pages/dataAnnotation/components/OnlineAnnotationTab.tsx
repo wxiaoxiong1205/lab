@@ -29,15 +29,21 @@ export const OnlineAnnotationTab: React.FC<OnlineAnnotationTabProps> = ({
         className="data-annotation-segmented"
         value={contentTab}
         onChange={(value) => {
-          const newTab = value as 'text' | 'image'
+          const newTab = value as 'text' | 'image-understanding' | 'image-generation'
           setContentTab(newTab)
           const newSearchParams = new URLSearchParams(searchParams)
-          newSearchParams.set('dataset_type', newTab === 'text' ? 'text-generation' : 'image-understanding')
+          const datasetType = newTab === 'image-understanding'
+            ? 'image-understanding'
+            : newTab === 'image-generation'
+              ? 'image-generation'
+              : 'text-generation'
+          newSearchParams.set('dataset_type', datasetType)
           setSearchParams(newSearchParams, { replace: true })
         }}
         options={[
-          { value: 'text', label: '文本标注' },
-          { value: 'image', label: '图像标注' },
+          { value: 'text', label: '文本生成' },
+          { value: 'image-understanding', label: '图像理解' },
+          { value: 'image-generation', label: '图像生成' },
         ]}
       />
     </div>
