@@ -32,11 +32,20 @@ interface ErrorResponse {
   detail: string
 }
 
-// 根据环境设置 baseURL
-// 本地开发环境使用环境变量配置的地址，其他环境使用 /lab-backend
+const normalizeApiBaseURL = (value?: string): string | null => {
+  if (!value) {
+    return null
+  }
+
+  const normalized = value.replace(/\/+$/, '')
+  return normalized.endsWith('/api/v1') ? normalized : `${normalized}/api/v1`
+}
+
+// 根据环境设置 baseURL。独立部署时优先使用 VITE_API_BASE_URL，控制台内仍可走 /lab-backend。
+const configuredBaseURL = normalizeApiBaseURL(import.meta.env.VITE_API_BASE_URL)
 const baseURL = import.meta.env.DEV
-  ? `${import.meta.env.VITE_PREFIX_BASE_URL}/api/v1`
-  : '/lab-backend/api/v1'
+  ? normalizeApiBaseURL(`${import.meta.env.VITE_PREFIX_BASE_URL || ''}`) || '/api/v1'
+  : configuredBaseURL || '/lab-backend/api/v1'
 
 const apiClient: AxiosInstance = axios.create({
   baseURL,
