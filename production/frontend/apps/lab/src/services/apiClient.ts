@@ -46,6 +46,12 @@ const configuredBaseURL = normalizeApiBaseURL(import.meta.env.VITE_API_BASE_URL)
 const baseURL = import.meta.env.DEV
   ? normalizeApiBaseURL(`${import.meta.env.VITE_PREFIX_BASE_URL || ''}`) || '/api/v1'
   : configuredBaseURL || '/lab-backend/api/v1'
+const showcasePreviewToken = 'local-preview-lab-tenant-admin-token'
+const isShowcasePreview = import.meta.env.VITE_SHOWCASE_PREVIEW === 'true'
+
+const isShowcasePreviewAuth = () => {
+  return isShowcasePreview && tokenStorage.getToken() === showcasePreviewToken
+}
 
 const apiClient: AxiosInstance = axios.create({
   baseURL,
@@ -110,6 +116,9 @@ const handleResponseError = (error: any) => {
 
   // 401 自动登出
   if (error?.response?.status === 401) {
+    if (isShowcasePreviewAuth()) {
+      return Promise.reject(error)
+    }
     return tryRefreshToken(error.response.config)
   }
 
