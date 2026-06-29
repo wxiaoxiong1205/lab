@@ -141,8 +141,12 @@ const MachineDatasetDetails: React.FC = () => {
           <Alert
             type="warning"
             showIcon
-            className="min-w-[420px] flex-1 !py-2"
-            message={`版本操作状态：删除中。正在删除 ${activeDeleteRequestedCount} 条数据，数据集较大时可能需要几分钟。你可以离开页面，回来后会继续展示处理状态。`}
+            className="min-w-[360px] max-w-full flex-1 !border-l-4 !border-amber-400 !bg-amber-50 !py-2 !px-3 !shadow-sm"
+            message={(
+              <span className="font-medium">
+                {`版本操作状态：删除中。正在删除 ${activeDeleteRequestedCount} 条数据，数据集较大时可能需要几分钟。你可以离开页面，回来后会继续展示处理状态。`}
+              </span>
+            )}
           />
         </div>
       )
@@ -155,8 +159,12 @@ const MachineDatasetDetails: React.FC = () => {
           <Alert
             type="error"
             showIcon
-            className="min-w-[420px] flex-1 !py-2"
-            message={`版本操作状态：删除失败。已成功 ${activeDeleteRemovedCount} 条，已失败 ${activeDeleteFailedCount} 条。${activeDeleteOperation?.error_message || '目标数据已变化，请刷新后重试'}`}
+            className="min-w-[360px] max-w-full flex-1 !border-l-4 !border-red-400 !bg-red-50 !py-2 !px-3 !shadow-sm"
+            message={(
+              <span className="font-medium">
+                {`版本操作状态：删除失败。已成功 ${activeDeleteRemovedCount} 条，已失败 ${activeDeleteFailedCount} 条。${activeDeleteOperation?.error_message || '目标数据已变化，请刷新后重试'}`}
+              </span>
+            )}
             action={(
               <div className="flex gap-2">
                 <Button size="small" danger onClick={handleRetryDeleteRows}>
