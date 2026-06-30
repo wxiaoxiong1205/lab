@@ -60,6 +60,45 @@ const TEXT_FILE_MAX_SIZE_MB = 500
 const IMAGE_FILE_MAX_SIZE_MB = 1024
 const IMAGE_DATASET_TYPES = ['image-understanding', 'image-generation']
 const IMAGE_PROMPT_FORMAT_OPTION = { value: 'image-prompt', name: 'IMAGE_PROMPT', description: '图像生成提示词+图片' }
+const IMPORT_DATA_FORMAT_FALLBACK_OPTIONS = [
+  { value: 'prompt-response', name: 'PROMPT_RESPONSE', description: 'Prompt + Response' },
+  { value: 'role-based', name: 'ROLE_BASED', description: 'Role Based Messages' },
+  IMAGE_PROMPT_FORMAT_OPTION,
+]
+const IMPORT_DATA_FORMAT_LABEL_MAP: Record<string, string> = {
+  'prompt-response': 'PROMPT_RESPONSE',
+  'role-based': 'ROLE_BASED',
+  'image-prompt': 'IMAGE_PROMPT',
+}
+
+function getImportDataFormatOptions(dataSource: string, dataFormatOptions: DatasetEnumConfig | null) {
+  const optionMap = new Map<string, DatasetEnumConfig['options'][number]>()
+
+  IMPORT_DATA_FORMAT_FALLBACK_OPTIONS.forEach((option) => {
+    optionMap.set(option.value, option)
+  })
+
+  dataFormatOptions?.options?.forEach((option) => {
+    if (!option?.value || !IMPORT_DATA_FORMAT_LABEL_MAP[option.value]) {
+      return
+    }
+    optionMap.set(option.value, {
+      ...option,
+      name: option.name || IMPORT_DATA_FORMAT_LABEL_MAP[option.value],
+    })
+  })
+
+  const allowedValuesByDataSource: Record<string, string[]> = {
+    'text-generation': ['prompt-response', 'role-based'],
+    'image-understanding': ['role-based'],
+    'image-generation': ['image-prompt'],
+  }
+  const allowedValues = allowedValuesByDataSource[dataSource] ?? allowedValuesByDataSource['text-generation']
+
+  return allowedValues
+    .map(value => optionMap.get(value))
+    .filter((option): option is DatasetEnumConfig['options'][number] => Boolean(option))
+}
 
 // 映射项接口
 interface MappingItem {
@@ -181,6 +220,10 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
   const dataFormat = Form.useWatch('dataFormat', form)
   const selectedModelField = Form.useWatch('model_to_infer', form)
   const isImageLikeDataSource = IMAGE_DATASET_TYPES.includes(dataSource)
+  const importDataFormatOptions = useMemo(
+    () => getImportDataFormatOptions(dataSource, dataFormatOptions),
+    [dataSource, dataFormatOptions],
+  )
   const datasetStatsQuery = useMemo(() => ({
     training_method_type: ['sft'],
     dataset_type: [dataSource],
@@ -836,10 +879,13 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
   // 加载数据格式选项
   useEffect(() => {
     try {
-      const projectEnumValues = JSON.parse(localStorage.getItem('projectEnumValues') || '[]')
-      if (projectEnumValues) {
-        const formatOptions = projectEnumValues.all_enums.find((item: any) => item.enum_name === 'DatasetFormat')
-        formatOptions.options = formatOptions.options.filter((item: any) => !['business', 'prefix-suffix-middle', 'alpaca'].includes(item.value))
+      const projectEnumValues = JSON.parse(localStorage.getItem('projectEnumValues') || '{}')
+      const allEnums = Array.isArray(projectEnumValues?.all_enums) ? projectEnumValues.all_enums : []
+      const formatOptions = allEnums.find((item: any) => item.enum_name === 'DatasetFormat')
+      if (formatOptions) {
+        formatOptions.options = Array.isArray(formatOptions.options)
+          ? formatOptions.options.filter((item: any) => !['business', 'prefix-suffix-middle', 'alpaca'].includes(item.value))
+          : []
         if (!formatOptions.options.some((item: any) => item.value === IMAGE_PROMPT_FORMAT_OPTION.value)) {
           formatOptions.options.push(IMAGE_PROMPT_FORMAT_OPTION)
         }
@@ -853,10 +899,10 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
 
   // 根据数据源类型设置默认数据格式
   useEffect(() => {
-    if (dataFormatOptions && dataFormatOptions.options && dataFormatOptions.options.length > 0) {
+    if (importDataFormatOptions.length > 0) {
       const currentDataFormat = form.getFieldValue('dataFormat')
       // 如果数据格式未设置或者是 undefined/null，则根据数据源类型设置默认值
-      const availableDataFormats = dataFormatOptions.options.map((option) => option.value)
+      const availableDataFormats = importDataFormatOptions.map((option) => option.value)
       if (!currentDataFormat || !availableDataFormats.includes(currentDataFormat)) {
         if (dataSource === 'image-understanding') {
           form.setFieldValue('dataFormat', 'role-based')
@@ -868,11 +914,11 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
           form.setFieldValue('dataFormat', 'prompt-response')
         }
         else {
-          form.setFieldValue('dataFormat', dataFormatOptions.options[0].value)
+          form.setFieldValue('dataFormat', importDataFormatOptions[0].value)
         }
       }
     }
-  }, [form, dataSource, dataFormatOptions])
+  }, [form, dataSource, importDataFormatOptions])
 
   // 数据用途选项
   const dataSourceOptions = [
@@ -1783,12 +1829,8 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                 else if (newMethod === InferenceMethod.IMPORT) {
                   // 如果是导入推理结果集，设置数据用途和数据格式
                   setDataSource('text-generation')
-                  // 如果数据格式选项已加载，设置默认数据格式
-                  const defaultDataFormat = dataFormatOptions && dataFormatOptions.options && dataFormatOptions.options.length > 0
-                    ? 'prompt-response' // 文本生成的默认格式
-                    : undefined
                   resetInferenceFormFields({
-                    dataFormat: defaultDataFormat,
+                    dataFormat: getImportDataFormatOptions('text-generation', dataFormatOptions)[0]?.value ?? 'prompt-response',
                   })
                 }
                 else {
@@ -2152,22 +2194,8 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                     }}
                   >
                     <Space direction="horizontal" size="middle">
-                      {dataFormatOptions?.options
-                        ?.filter((option) => {
-                          if (!option?.value) {
-                            return false
-                          }
-                          const isImageUnderstanding = dataSource === 'image-understanding'
-                          const isImageGeneration = dataSource === 'image-generation'
-                          if (isImageGeneration) {
-                            return option.value === 'image-prompt'
-                          }
-                          if (isImageUnderstanding && option.value === 'prompt-response') {
-                            return false
-                          }
-                          return ['prompt-response', 'role-based'].includes(option.value)
-                        })
-                        ?.map((option) => {
+                      {importDataFormatOptions
+                        .map((option) => {
                           const isImageUnderstanding = dataSource === 'image-understanding'
                           const isImageGeneration = dataSource === 'image-generation'
                           const shouldDisable = isImageUnderstanding
@@ -2175,16 +2203,11 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                             : isImageGeneration
                               ? option.value !== 'image-prompt'
                             : option.value === 'prefix-suffix-middle'
-                          const formatLabelMap: Record<string, string> = {
-                            'prompt-response': 'PROMPT_RESPONSE',
-                            'role-based': 'ROLE_BASED',
-                            'image-prompt': 'IMAGE_PROMPT',
-                          }
                           return (
                             <div key={option.value} className="create-inference-format-option">
                               <Radio value={option.value} disabled={shouldDisable}>
                                 <span className="create-inference-format-content">
-                                  <span>{option.name || formatLabelMap[option.value] || option.value}</span>
+                                  <span>{option.name || IMPORT_DATA_FORMAT_LABEL_MAP[option.value] || option.value}</span>
                                   {(option.value === 'role-based' || option.value === 'prompt-response') && (
                                     <Popover
                                       content={(
