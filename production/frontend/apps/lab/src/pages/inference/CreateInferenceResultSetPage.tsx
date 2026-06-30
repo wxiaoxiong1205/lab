@@ -882,6 +882,11 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
     { value: 'image-understanding', label: '图像理解', disabled: false, icon: <CloudUploadOutlined /> },
     { value: 'image-generation', label: '图像生成', disabled: false, icon: <DatabaseOutlined /> },
   ]
+  const importDataSourceOptions = [
+    { value: 'text-generation', label: '文本生成', disabled: false, icon: <FileTextOutlined /> },
+    { value: 'image-understanding', label: '图像理解', disabled: false, icon: <CloudUploadOutlined /> },
+    { value: 'image-generation', label: '图像生成', disabled: false, icon: <DatabaseOutlined /> },
+  ]
 
   // 处理数据用途变化
   const handleDataSourceChange = (e: any) => {
@@ -2102,7 +2107,7 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                   <div className="mb-4">
                     <Radio.Group onChange={handleDataSourceChange} value={dataSource}>
                       <Space direction="horizontal">
-                        {dataSourceOptions.map((option) => (
+                        {importDataSourceOptions.map((option) => (
                           <Tooltip title={option.disabled ? '即将上线' : null} color="blue" key={option.value}>
                             <Radio.Button disabled={option.disabled} value={option.value}>
                               <Space>
