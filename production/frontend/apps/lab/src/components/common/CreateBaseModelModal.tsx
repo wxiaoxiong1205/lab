@@ -7,7 +7,7 @@
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 import React, { useEffect, useMemo, useState } from 'react'
-import { Col, DatePicker, Form, Input, Modal, Radio, Row, Select, Space, Switch, TimePicker } from 'antd'
+import { AutoComplete, Col, DatePicker, Form, Input, Modal, Radio, Row, Select, Space, Switch, TimePicker } from 'antd'
 import dayjs from 'dayjs'
 import { useQuery } from '@tanstack/react-query'
 import type { CreateBaseModelParams, ModelProviderOption } from '@/types/model'
@@ -15,6 +15,19 @@ import { ModelService } from '@/services/modelsApi'
 import { getCanUseKubernetesClusters } from '@/services/kubernetesService'
 import type { KubernetesCluster } from '@/types'
 import { useConfigStore } from '@/stores/configStore'
+
+const COMMON_MODEL_PROVIDERS = [
+  'Qwen',
+  'DeepSeek',
+  'Llama',
+  'Baichuan',
+  'ChatGLM',
+  'Yi',
+  'InternLM',
+  'Mistral',
+  'Gemma',
+  'Phi',
+]
 
 interface CreateBaseModelModalProps {
   visible: boolean
@@ -77,6 +90,21 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
     })),
     [modelSourceOptions],
   )
+
+  const modelProviderOptions = useMemo(() => {
+    const providerValues = new Set<string>()
+    for (const provider of COMMON_MODEL_PROVIDERS) {
+      providerValues.add(provider)
+    }
+    for (const item of modelProviderEnumValues) {
+      const value = item?.value || item?.name
+      if (value) {
+        providerValues.add(value)
+      }
+    }
+
+    return Array.from(providerValues).map((value) => ({ value }))
+  }, [modelProviderEnumValues])
 
   useEffect(() => {
     if (!visible)
@@ -159,18 +187,18 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
         <Form.Item
           name="model_provider"
           label="模型提供商"
-          rules={[{ required: true, message: '请选择模型提供商' }]}
+          rules={[
+            { required: true, message: '请选择或输入模型提供商' },
+            { max: 50, message: '模型提供商不能超过50个字符' },
+          ]}
         >
-          <Select
-            placeholder="请选择模型提供商"
+          <AutoComplete
+            options={modelProviderOptions}
+            placeholder="请选择或输入模型提供商"
+            filterOption={(inputValue, option) =>
+              String(option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase())}
             onChange={handleProviderChange}
-          >
-            {modelProviderEnumValues?.map((item: any, index) => (
-              <Select.Option key={item?.value || index} value={item?.value}>
-                {item?.value}
-              </Select.Option>
-            ))}
-          </Select>
+          />
         </Form.Item>
 
         <Form.Item
