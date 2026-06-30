@@ -19,6 +19,7 @@ interface BenchmarkDataset {
   description: string
   id: number
   code: string
+  modelTypes: string[]
 }
 const CreateBenchmarkEvaluationTask: React.FC = () => {
   const navigate = useNavigate()
@@ -48,6 +49,7 @@ const CreateBenchmarkEvaluationTask: React.FC = () => {
           description: item.description || '-',
           id: item.id,
           code: item.code,
+          modelTypes: item.model_types || [],
         }))
         setBenchmarkDatasets(formattedData)
       }
@@ -273,6 +275,30 @@ const CreateBenchmarkEvaluationTask: React.FC = () => {
       width: 100,
     },
     {
+      title: '适用类型',
+      dataIndex: 'modelTypes',
+      key: 'modelTypes',
+      width: 180,
+      render: (modelTypes: string[]) => {
+        const labels: Record<string, string> = {
+          'text-generation': '文本生成',
+          'image-understanding': '图像理解',
+          'image-generation': '图像生成',
+          multimodal: '多模态',
+        }
+        const values = modelTypes?.length ? modelTypes : ['全部']
+        return (
+          <Space wrap size={4}>
+            {values.map((type) => (
+              <Tag key={type} color={type === 'image-generation' ? 'purple' : 'blue'}>
+                {labels[type] || type}
+              </Tag>
+            ))}
+          </Space>
+        )
+      },
+    },
+    {
       title: '说明',
       dataIndex: 'description',
       key: 'description',
@@ -423,6 +449,7 @@ const CreateBenchmarkEvaluationTask: React.FC = () => {
                         (
                         {dataset.score}
                         )
+                        {dataset.modelTypes.includes('image-generation') ? ' · 图像生成' : ''}
                       </Tag>
                     ))}
                   </Space>

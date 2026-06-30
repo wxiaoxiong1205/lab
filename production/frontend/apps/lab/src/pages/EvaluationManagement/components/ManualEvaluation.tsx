@@ -4,7 +4,7 @@ import { BarChartOutlined, CopyOutlined, DatabaseOutlined, DeleteOutlined, EyeOu
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import type { ProjectEvaluationTaskListItem } from '@/services/manualEvaluationService'
+import type { EvaluationDatasetType, ProjectEvaluationTaskListItem } from '@/services/manualEvaluationService'
 import { manualEvaluationServices } from '@/services/manualEvaluationService'
 import WorkflowSteps from '@/components/common/WorkflowSteps'
 import type { TableActionItem } from '@/components/common/TableActionColumn'
@@ -38,11 +38,11 @@ const ManualEvaluation: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [datasetType, setDatasetType] = useState<'text-generation' | 'image-understanding'>((searchParams.get('dataset_type') as 'text-generation' | 'image-understanding') || 'text-generation')
+  const [datasetType, setDatasetType] = useState<EvaluationDatasetType>((searchParams.get('dataset_type') as EvaluationDatasetType) || 'text-generation')
   // 同步 URL 参数
   useEffect(() => {
-    const urlDatasetType = searchParams.get('dataset_type') as 'text-generation' | 'image-understanding' | null
-    if (urlDatasetType && (urlDatasetType === 'text-generation' || urlDatasetType === 'image-understanding')) {
+    const urlDatasetType = searchParams.get('dataset_type') as EvaluationDatasetType | null
+    if (urlDatasetType && ['text-generation', 'image-understanding', 'image-generation'].includes(urlDatasetType)) {
       setDatasetType(urlDatasetType)
     }
     else if (!urlDatasetType) {
@@ -72,7 +72,7 @@ const ManualEvaluation: React.FC = () => {
     setPageSize(size)
   }
   const handleDatasetTypeChange = (value: string) => {
-    const newType = value as 'text-generation' | 'image-understanding'
+    const newType = value as EvaluationDatasetType
     setDatasetType(newType)
     setCurrentPage(1)
     const newSearchParams = new URLSearchParams(searchParams)
@@ -240,7 +240,7 @@ const ManualEvaluation: React.FC = () => {
       {/* 顶部卡片说明区域 */}
       <WorkflowSteps steps={manualEvaluationSteps} />
 
-      {/* 评估任务 type 分为文本生成和图像理解 不同的表格 */}
+      {/* 评估任务 type 分为文本生成、图像理解和图像生成 */}
       <div className="mb-4 flex min-h-10 items-center justify-between gap-4 overflow-visible">
         <Segmented
           className="lab-segmented-switch"
@@ -254,6 +254,10 @@ const ManualEvaluation: React.FC = () => {
             {
               value: 'image-understanding',
               label: '图像理解',
+            },
+            {
+              value: 'image-generation',
+              label: '图像生成',
             },
           ]}
         />

@@ -5,8 +5,24 @@ import type { RegistryMirrorImage, RegistryMirrorImageListResponse } from '@/ser
 
 const now = '2026-06-24T15:30:00+08:00'
 
-// 演示数据主路径应来自后端 demo_showcase seed；前端预览数据只允许通过显式开关兜底。
-export const isLocalPreview = import.meta.env.VITE_SHOWCASE_PREVIEW === 'true'
+export const isLocalDevHost = () => {
+  if (!import.meta.env.DEV) {
+    return false
+  }
+
+  const hostname = globalThis.location?.hostname
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0'
+}
+
+export const isExplicitShowcasePreview = import.meta.env.VITE_SHOWCASE_PREVIEW === 'true' || import.meta.env.VITE_LOCAL_PREVIEW === 'true'
+
+// 演示数据主路径应来自后端 demo_showcase seed 或静态演示适配层。
+// 前端兜底分两层：
+// 1. 正式演示/预览环境必须显式开启 VITE_SHOWCASE_PREVIEW 或 VITE_LOCAL_PREVIEW。
+// 2. 本地开发 localhost 允许在接口空数据或不可用时自动兜底，避免生产代码同步后演示入口被空租户打断。
+export const isLocalPreview = isExplicitShowcasePreview || isLocalDevHost()
+
+export const isLocalDemoFallbackEnabled = () => isLocalPreview
 
 export const previewTenantAdminCredentials = {
   account: 'lab@lab',

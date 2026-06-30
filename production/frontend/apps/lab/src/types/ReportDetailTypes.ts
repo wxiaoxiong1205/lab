@@ -8,6 +8,10 @@ export interface EvaluationResultData {
   model_name?: string
   response: string
   modelResponse: string
+  negativePrompt?: string
+  metadata?: Record<string, unknown>
+  generatedImages?: string[]
+  referenceImages?: string[]
   reason: string
   scores: { [key: string]: number | null }
   metricReasons: { [key: string]: string }

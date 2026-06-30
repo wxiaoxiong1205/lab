@@ -529,7 +529,9 @@ const EvaluationReportDetail: React.FC<EvaluationReportDetailProps> = ({ evaluat
     const rowPrefix = rowKey?.toString() || '0'
     const expandColumnKeys = record.rawFields && Object.keys(record.rawFields).length > 0
       ? Object.keys(record.rawFields)
-      : ['system', 'prompt', 'response', 'modelResponse']
+      : taskDetail?.dataset_type === 'image-generation' || taskDetail?.dataset_format === 'image-prompt'
+        ? ['prompt', 'negativePrompt', 'referenceImage', 'generatedImage']
+        : ['system', 'prompt', 'response', 'modelResponse']
 
     setExpandedCells((prev) => {
       const newSet = new Set(prev)
@@ -550,7 +552,7 @@ const EvaluationReportDetail: React.FC<EvaluationReportDetailProps> = ({ evaluat
 
       return newSet
     })
-  }, [])
+  }, [taskDetail?.dataset_format, taskDetail?.dataset_type])
 
   const currentModelData = useMemo(() => buildCurrentModelData({
     evaluationType,
@@ -592,6 +594,7 @@ const EvaluationReportDetail: React.FC<EvaluationReportDetailProps> = ({ evaluat
     evaluationPrefix,
     evaluationType,
     businessDynamicFieldKeys,
+    isImageGeneration: taskDetail?.dataset_type === 'image-generation' || taskDetail?.dataset_format === 'image-prompt',
     availableMetrics: buildAvailableMetrics({
       evaluationType,
       manualEvaluationResults,
@@ -611,6 +614,8 @@ const EvaluationReportDetail: React.FC<EvaluationReportDetailProps> = ({ evaluat
     toggleCellExpand,
     evaluationResults,
     manualEvaluationResults,
+    taskDetail?.dataset_format,
+    taskDetail?.dataset_type,
   ])
   const tabItems = useMemo(() => {
     const tabs = [

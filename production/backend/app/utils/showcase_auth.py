@@ -21,6 +21,11 @@ SHOWCASE_ENTERPRISE_CODE = "showcase_preview"
 SHOWCASE_READ_METHODS = {"GET", "HEAD"}
 
 
+def _showcase_preview_user_id() -> int:
+    raw = os.getenv("SHOWCASE_PREVIEW_USER_ID", "0").strip()
+    return int(raw) if raw.isdigit() else 0
+
+
 def is_showcase_preview_auth_enabled() -> bool:
     return os.getenv("SHOWCASE_PREVIEW_AUTH", "").lower() in {"1", "true", "yes", "on"}
 
@@ -35,6 +40,7 @@ def is_showcase_preview_request(request: Request, token: str | None) -> bool:
 
 def build_showcase_preview_payload() -> dict[str, Any]:
     now = int(time.time())
+    user_id = _showcase_preview_user_id()
     return {
         "iamType": "showcase-preview",
         "isSanYuan": False,
@@ -46,8 +52,8 @@ def build_showcase_preview_payload() -> dict[str, Any]:
         "jti": "showcase-preview-token",
         "client_id": "showcase-preview",
         "userInfo": {
-            "accountId": 0,
-            "userId": 0,
+            "accountId": user_id,
+            "userId": user_id,
             "username": SHOWCASE_USERNAME,
             "tenantId": SHOWCASE_TENANT_ID,
             "enterpriseCode": SHOWCASE_ENTERPRISE_CODE,

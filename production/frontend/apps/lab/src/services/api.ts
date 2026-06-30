@@ -31,7 +31,7 @@ import type {
 } from '../types/dataset'
 import { downloadBlobFile } from '../utils/download'
 import { mockMenuData } from '../mock/mockMenuData'
-import { isLocalPreview, previewProjectList } from '../mock/localPreviewData'
+import { isLocalDemoFallbackEnabled, isLocalPreview, previewProjectList } from '../mock/localPreviewData'
 import apiClient from './apiClient'
 
 // 在types部分中添加PromptDirectory类型
@@ -282,13 +282,13 @@ export const projectApi = {
       const response = await api.get<ProjectListResponse>('/projects/list', {
         params: data,
       })
-      if (isLocalPreview && (!Array.isArray(response.data?.items) || response.data.items.length === 0)) {
+      if (isLocalDemoFallbackEnabled() && (!Array.isArray(response.data?.items) || response.data.items.length === 0)) {
         return previewProjectList(data.page, data.size)
       }
       return response.data
     }
     catch (error) {
-      if (isLocalPreview) {
+      if (isLocalDemoFallbackEnabled()) {
         console.warn('本地预览：项目列表获取失败，使用演示数据兜底。', error)
         return previewProjectList(data.page, data.size)
       }
@@ -1065,10 +1065,13 @@ export const userApi = {
       const menus = pickMenuArray(response.data)
 
       if (menus) {
+        if (isLocalDemoFallbackEnabled() && menus.length === 0) {
+          return getLocalPreviewMenuData()
+        }
         return menus
       }
 
-      if (isLocalPreview) {
+      if (isLocalDemoFallbackEnabled()) {
         console.warn('本地预览：/menu 未返回菜单数组，使用预览菜单数据兜底。', response.data)
         return getLocalPreviewMenuData()
       }
@@ -1076,7 +1079,7 @@ export const userApi = {
       return []
     }
     catch (error) {
-      if (isLocalPreview) {
+      if (isLocalDemoFallbackEnabled()) {
         console.warn('本地预览：/menu 获取失败，使用预览菜单数据兜底。', error)
         return getLocalPreviewMenuData()
       }

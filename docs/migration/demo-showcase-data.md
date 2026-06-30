@@ -8,7 +8,7 @@
 - 演示数据通过生产 API 被前端读取。
 - `VITE_SHOWCASE_STATIC=true` 可让正式演示域名不依赖远程后端，直接通过前端静态适配层读取提交到仓库的演示数据。
 - `builtin-sample://` 只读样例路径可以支持列表、详情和预览，不伪装成真实外部存储。
-- 前端 `src/mock` 仅作为显式兜底，不能因开发模式自动覆盖后端数据。
+- 前端 `src/mock` 仅作为演示覆盖层兜底，不能无条件覆盖后端数据；正式演示必须显式开关，本地 `localhost` 开发可在接口失败或返回空数据时自动兜底。
 - 独立演示域名如需免 IAM 读取后端演示数据，必须使用隔离演示后端，并显式设置 `SHOWCASE_PREVIEW_AUTH=true`；该 token 只允许读请求，默认生产环境不开启。
 
 ## 初始化
@@ -35,6 +35,8 @@ VITE_SHOWCASE_STATIC=true
 Vercel Production 环境变量需要配置这两个开关。当前正式域名 `lab.aidaxiong.fun` 采用静态演示模式：菜单、用户、项目、数据集、任务、模型、Notebook、推理、评估、标注和机器学习入口由 `src/showcase/staticApi.ts` 在统一请求层直接返回，浏览器不会真正请求远程后端。这样可以绕开公网后端鉴权、机器权限和服务可用性限制，保证演示域名稳定可打开。
 
 真实后端演示模式仍然保留：关闭 `VITE_SHOWCASE_STATIC` 后，前端会回到后端优先路径；此时后端必须显式设置 `SHOWCASE_PREVIEW_AUTH=true`，否则正式域名会出现页面可打开但接口 401、模块列表为空的情况。演示 token 不允许写操作，创建、删除、启动、停止等真实变更仍需要正式 IAM/JWT。
+
+本地开发演示模式单独处理：`localhost`、`127.0.0.1`、`0.0.0.0` 下允许前端在后端接口失败、租户没有项目、`/menu` 返回空数组或模块列表为空时使用提交到仓库的预览数据兜底。该能力集中在 `production/frontend/apps/lab/src/mock/localPreviewData.ts` 的 `isLocalPreview` / `isLocalDemoFallbackEnabled`，权限菜单统一通过 `src/utils/permission.ts` 的 `getEffectiveUserMenus` 消费。后续同步生产代码时，不能只恢复项目列表而遗漏菜单、路由守卫、布局菜单和 `hasAuth`，否则会再次出现“有项目但无入口”或“有入口但 403”。
 
 该命令会初始化：
 
@@ -71,6 +73,7 @@ python3 production/backend/scripts/audit_demo_showcase.py
 当前审计会检查：
 
 - `demo_showcase` seeder、CLI、样例协议和前端显式兜底入口没有被删。
+- 本地演示覆盖层仍保留统一入口：`localPreviewData.ts` 提供 `isLocalPreview` / `isLocalDemoFallbackEnabled`，`permission.ts` 提供 `getEffectiveUserMenus`，项目列表、菜单接口、路由守卫和布局菜单不得各自实现分散兜底。
 - 前端生产发布前置检查确认 Vercel Production 已配置 `VITE_SHOWCASE_PREVIEW`，且统一请求层会在演示预览模式下自动补只读 token。
 - 训练数据集覆盖 `training`、`validation`、`test`、`business_training`、`business_test`。
 - 训练/机器学习数据集覆盖 `completed`、`pending`、`failed` 状态。
@@ -102,4 +105,4 @@ npm run verify:showcase-backend
 - 不提交真实 `.env`、数据库文件、Token、SSH key 或外部系统凭据。
 - 如果生产 API 变更，优先适配 seed 到新 API/模型，不新增平行 mock 后端。
 - 正式域名对外演示优先使用 `VITE_SHOWCASE_STATIC=true`，确保不被远程后端不可达、401 或机器权限问题打断。
-- 如果确实需要临时前端兜底，必须通过 `VITE_SHOWCASE_PREVIEW=true` 或 `VITE_SHOWCASE_STATIC=true` 显式开启；后续接入真实后端时，要同步更新 seed、静态适配层和浏览器冒烟。
+- 如果确实需要正式环境临时前端兜底，必须通过 `VITE_SHOWCASE_PREVIEW=true` 或 `VITE_SHOWCASE_STATIC=true` 显式开启；本地开发兜底只允许在 localhost 生效。后续接入真实后端时，要同步更新 seed、静态适配层和浏览器冒烟。

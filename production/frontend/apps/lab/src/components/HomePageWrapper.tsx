@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useProjectStore } from '../stores/projectStore'
 import { projectApi } from '../services/api'
 import type { MenuItem, Project } from '../types'
+import { getEffectiveUserMenus } from '../utils/permission'
 import HomePage from '../pages/HomePage'
 
 /**
@@ -52,6 +53,7 @@ const HomePageWrapper = () => {
   const { projectId } = useParams<{ projectId?: string }>()
   const { userMenus } = useAuthStore()
   const { setCurrentProject } = useProjectStore()
+  const effectiveUserMenus = getEffectiveUserMenus(userMenus)
 
   // 获取项目列表
   const { data: projects = [] } = useQuery<Project[]>({
@@ -67,20 +69,20 @@ const HomePageWrapper = () => {
   })
 
   // 检查菜单中是否有 /home 路径
-  const hasHomeMenu = userMenus && userMenus.length > 0 && hasMenuPath(userMenus, '/home')
+  const hasHomeMenu = effectiveUserMenus && effectiveUserMenus.length > 0 && hasMenuPath(effectiveUserMenus, '/home')
 
   useEffect(() => {
     // 如果菜单中没有 /home，重定向到第一个菜单路径
-    if (!hasHomeMenu && userMenus && userMenus.length > 0) {
+    if (!hasHomeMenu && effectiveUserMenus && effectiveUserMenus.length > 0) {
       if (projectId) {
-        const firstMenuPath = findFirstMenuPath(userMenus)
+        const firstMenuPath = findFirstMenuPath(effectiveUserMenus)
         if (firstMenuPath) {
           navigate(`/project/${projectId}${firstMenuPath}`, { replace: true })
         }
       }
       else {
         if (projects.length > 0) {
-          const firstMenuPath = findFirstMenuPath(userMenus)
+          const firstMenuPath = findFirstMenuPath(effectiveUserMenus)
           if (firstMenuPath) {
             navigate(`/project/${projects[0].id}${firstMenuPath}`, { replace: true })
             setCurrentProject(projects[0])
@@ -88,7 +90,7 @@ const HomePageWrapper = () => {
         }
       }
     }
-  }, [navigate, projectId, userMenus, projects, setCurrentProject, hasHomeMenu])
+  }, [navigate, projectId, effectiveUserMenus, projects, setCurrentProject, hasHomeMenu])
 
   // 如果菜单中没有 /home，返回 null 避免渲染 HomePage（useEffect 会重定向）
   if (!hasHomeMenu) {

@@ -13,7 +13,7 @@ import { useProjectStore } from '../stores/projectStore'
 import type { Project } from '../types'
 import useI18n from '../hooks/useI18n'
 import { useAuthStore } from '../stores/authStore'
-import { isAdminUser, normalizePath } from '../utils/permission'
+import { getEffectiveUserMenus, isAdminUser, normalizePath } from '../utils/permission'
 import MenuErrorFallback from '../components/MenuErrorFallback'
 import MainLayout from './MainLayout'
 import './ProjectLayout.css'
@@ -199,6 +199,7 @@ const ProjectLayout = ({ children }: {
   children?: React.ReactNode
 }) => {
   const { userMenus, menuLoadError } = useAuthStore()
+  const effectiveUserMenus = getEffectiveUserMenus(userMenus)
   const navigate = useNavigate()
   const location = useLocation()
   const { projectId } = useParams<{
@@ -249,7 +250,7 @@ const ProjectLayout = ({ children }: {
   // 判断是否是无界微前端子应用
   const isWujie = window.__POWERED_BY_WUJIE__
   // 通过菜单判断是否是管理员
-  const isAdmin = isAdminUser(userMenus)
+  const isAdmin = isAdminUser(effectiveUserMenus)
   // 获取菜单可见性配置
   const { data: menuVisibleConfig } = useQuery<{
     visible: boolean
@@ -290,13 +291,13 @@ const ProjectLayout = ({ children }: {
     return undefined
   }, [getFullPath])
   const systemRootMenu = useMemo(() => {
-    return sortMenus(userMenus?.filter(isMenuNode) ?? []).find(isSystemRootMenu)
-  }, [userMenus])
+    return sortMenus(effectiveUserMenus?.filter(isMenuNode) ?? []).find(isSystemRootMenu)
+  }, [effectiveUserMenus])
   const workspaceRootMenus = useMemo(() => {
-    return sortMenus(userMenus?.filter(isMenuNode) ?? [])
+    return sortMenus(effectiveUserMenus?.filter(isMenuNode) ?? [])
       .filter((item) => item.code !== HOME_MENU_CODE)
       .filter((item) => item.code !== systemRootMenu?.code)
-  }, [systemRootMenu?.code, userMenus])
+  }, [effectiveUserMenus, systemRootMenu?.code])
   const platformAdminMenu = useMemo<MenuItem | null>(() => {
     if (!menuVisibleConfig?.visible)
       return null
@@ -578,7 +579,7 @@ const ProjectLayout = ({ children }: {
     }
 
     const currentNormalizedPath = normalizePath(location.pathname)
-    const menuPaths = collectNavigableMenuPaths(userMenus?.filter(isMenuNode) ?? [])
+    const menuPaths = collectNavigableMenuPaths(effectiveUserMenus?.filter(isMenuNode) ?? [])
     const menuPathSet = new Set(menuPaths)
 
     if (menuPathSet.has(currentNormalizedPath)) {
@@ -625,7 +626,7 @@ const ProjectLayout = ({ children }: {
       path: `/project/${targetProjectId}/home`,
       keepSearchAndHash: false,
     }
-  }, [collectNavigableMenuPaths, getCommonPathPrefix, getProjectPathByMenuPath, location.pathname, projectId, userMenus])
+  }, [collectNavigableMenuPaths, effectiveUserMenus, getCommonPathPrefix, getProjectPathByMenuPath, location.pathname, projectId])
   // 如果菜单加载失败，显示错误页面（须放在所有 Hook 之后，避免条件调用 Hook）
   // 仅通过按钮切换折叠状态，并持久化到 localStorage
   const handleProjectChange = useCallback((value: number) => {
@@ -641,7 +642,7 @@ const ProjectLayout = ({ children }: {
       queryClient.resetQueries()
       // 然后设置新项目
       setCurrentProject(project)
-      const nearestMenuPath = findNearestMenuPath(userMenus?.filter(isMenuNode) ?? [], normalizedPath)
+      const nearestMenuPath = findNearestMenuPath(effectiveUserMenus?.filter(isMenuNode) ?? [], normalizedPath)
       const shouldBackToListPath = Boolean(projectId && nearestMenuPath && !nearestMenuPath.isExact)
       const nextPath = shouldBackToListPath
         ? getFullPath(nearestMenuPath.pathUrl, `/project/${project.id}`)
@@ -653,7 +654,7 @@ const ProjectLayout = ({ children }: {
         : `${nextPath}${location.search}${location.hash}`
       navigate(nextUrl, { replace: true })
     }
-  }, [getFullPath, location.hash, location.pathname, location.search, navigate, normalizedPath, projectId, projects, queryClient, setCurrentProject, userMenus])
+  }, [effectiveUserMenus, getFullPath, location.hash, location.pathname, location.search, navigate, normalizedPath, projectId, projects, queryClient, setCurrentProject])
   // 项目选择器配置
   const isNonAdminWithNoProject = projects.length === 0
   const projectOptions = projects.map((project) => ({
@@ -804,8 +805,9 @@ const ProjectLayout = ({ children }: {
     }
     // 获取用户菜单数据
     const { userMenus: currentUserMenus } = useAuthStore.getState()
+    const currentEffectiveUserMenus = getEffectiveUserMenus(currentUserMenus)
     // 如果没有菜单数据，返回默认值
-    if (!currentUserMenus?.length) {
+    if (!currentEffectiveUserMenus?.length) {
       return (normalizedPath === '/home' || normalizedPath === '/') ? ['home'] : []
     }
     // 特殊处理：admin/members 路径也激活项目管理菜单
@@ -823,13 +825,13 @@ const ProjectLayout = ({ children }: {
         }
         return null
       }
-      const adminProjectPath = findAdminProjectMenu(currentUserMenus)
+      const adminProjectPath = findAdminProjectMenu(currentEffectiveUserMenus)
       if (adminProjectPath) {
         return adminProjectPath
       }
     }
     // 在菜单树中查找匹配的菜单项
-    const menuMatch = findMenuPathByUrl(currentUserMenus, normalizedPath)
+    const menuMatch = findMenuPathByUrl(currentEffectiveUserMenus, normalizedPath)
     if (menuMatch?.path.length) {
       return menuMatch.path
     }
@@ -848,7 +850,7 @@ const ProjectLayout = ({ children }: {
         }
         return null
       }
-      return findHomeMenu(currentUserMenus) || ['home']
+      return findHomeMenu(currentEffectiveUserMenus) || ['home']
     }
     return []
   }, [findMenuPathByUrl, location.pathname, normalizedPath])

@@ -4,6 +4,16 @@
  */
 
 import type { MenuItem } from '@/types'
+import { mockMenuData } from '@/mock/mockMenuData'
+import { isLocalDemoFallbackEnabled } from '@/mock/localPreviewData'
+
+export const getEffectiveUserMenus = (userMenus: MenuItem[] = []): MenuItem[] => {
+  if (Array.isArray(userMenus) && userMenus.length > 0) {
+    return userMenus
+  }
+
+  return isLocalDemoFallbackEnabled() ? mockMenuData : []
+}
 
 /**
  * 通过菜单数据判断用户是否是管理员
@@ -11,13 +21,14 @@ import type { MenuItem } from '@/types'
  * @returns 是否是管理员
  */
 export const isAdminUser = (userMenus: MenuItem[]): boolean => {
+  const effectiveMenus = getEffectiveUserMenus(userMenus)
   // 检查菜单中是否包含管理员模式菜单（code 为 "admin"）
   // 如果用户菜单为空或不是数组，直接返回false
-  if (!userMenus || !Array.isArray(userMenus)) {
+  if (!effectiveMenus || !Array.isArray(effectiveMenus)) {
     return false
   }
 
-  const hasAdminMenu = userMenus.some((menu) => menu.code === 'admin')
+  const hasAdminMenu = effectiveMenus.some((menu) => menu.code === 'admin')
   return hasAdminMenu
 }
 
@@ -57,8 +68,9 @@ export const checkPathPermission = (
   userMenus: MenuItem[] = [],
   currentPath: string,
 ): boolean => {
+  const effectiveMenus = getEffectiveUserMenus(userMenus)
   // 通过菜单判断是否是管理员，管理员拥有所有权限
-  if (isAdminUser(userMenus)) {
+  if (isAdminUser(effectiveMenus)) {
     return true
   }
 
@@ -78,12 +90,12 @@ export const checkPathPermission = (
   }
 
   // 如果没有菜单权限，只能访问公共路径
-  if (!userMenus || userMenus.length === 0) {
+  if (!effectiveMenus || effectiveMenus.length === 0) {
     return false
   }
 
   // 收集所有允许访问的路径
-  const allowedPaths = collectAllowedPaths(userMenus)
+  const allowedPaths = collectAllowedPaths(effectiveMenus)
 
   // 检查是否有精确匹配
   if (allowedPaths.has(normalizedPath)) {

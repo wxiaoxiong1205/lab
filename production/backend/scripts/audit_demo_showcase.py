@@ -137,9 +137,14 @@ CHECKS = [
         ["is_showcase_sample_path", "read_showcase_jsonl_page"],
     ),
     (
-        "frontend preview is explicit",
+        "frontend preview overlay is centralized",
         ROOT / "frontend/apps/lab/src/mock/localPreviewData.ts",
-        ["export const isLocalPreview = import.meta.env.VITE_SHOWCASE_PREVIEW === 'true'"],
+        ["isExplicitShowcasePreview", "isLocalDevHost", "export const isLocalPreview = isExplicitShowcasePreview || isLocalDevHost()", "isLocalDemoFallbackEnabled"],
+    ),
+    (
+        "frontend effective menu fallback is centralized",
+        ROOT / "frontend/apps/lab/src/utils/permission.ts",
+        ["getEffectiveUserMenus", "isLocalDemoFallbackEnabled", "mockMenuData"],
     ),
     (
         "frontend showcase token is request-layer fallback",

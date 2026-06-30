@@ -21,7 +21,7 @@ import {
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import { type CreateManualEvaluationTaskParams, type InferenceParams, type NewDatasetModelRelation, type ProjectEvaluationTaskDetail, manualEvaluationServices } from '@/services/manualEvaluationService'
+import { type CreateManualEvaluationTaskParams, type EvaluationDatasetType, type InferenceParams, type NewDatasetModelRelation, type ProjectEvaluationTaskDetail, manualEvaluationServices } from '@/services/manualEvaluationService'
 import { modelEvaluationServices } from '@/services/modelEvaluationServices'
 import { inferenceDatasetsServices } from '@/services/inferenceDatasets'
 import { inferenceServiceApi } from '@/services/inferenceService'
@@ -60,7 +60,7 @@ const CreateManualEvaluationTask: React.FC = () => {
   const [form] = Form.useForm()
   const [evaluationDataSource, setEvaluationDataSource] = useState<string>('existing')
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false) // 提交加载状态
-  const urlDatasetType = searchParams.get('dataset_type') as 'text-generation' | 'image-understanding' | null
+  const urlDatasetType = searchParams.get('dataset_type') as EvaluationDatasetType | null
 
   // 评估指标数据
   const [evaluationCriteria, setEvaluationCriteria] = useState<EvaluationCriteria[]>([])
@@ -108,6 +108,8 @@ const CreateManualEvaluationTask: React.FC = () => {
   // 监听表单中的评估类别字段
   const datasetType = Form.useWatch('dataset_type', form) || 'text-generation'
   const prevDatasetTypeRef = useRef(datasetType)
+  const isImageGeneration = datasetType === 'image-generation'
+  const imageGenerationDatasetFormatQuery = isImageGeneration ? { dataset_format: ['image-prompt'] } : {}
 
   // 用户手动切换评估类别时：新建推理仅清空「待评估模型/服务」；已有推理结果集则按原逻辑清空关联数据。
   useEffect(() => {
@@ -139,6 +141,56 @@ const CreateManualEvaluationTask: React.FC = () => {
       data_to_infer: undefined,
     })
   }, [datasetType, evaluationDataSource, form])
+
+  useEffect(() => {
+    if (!isImageGeneration || evaluationCriteria.length > 0) return
+    setEvaluationCriteria([
+      {
+        key: 'image_metric_prompt_match',
+        metricId: 0,
+        name: '提示词匹配度',
+        description: '生成图片是否准确体现 Prompt 中的主体、风格和场景要求。',
+        metricsMapping: { input: 'prompt', actual_output: 'generated_images', expected_output: 'images' },
+        score_min: 0,
+        score_max: 10,
+        score_definitions: ['0-3:明显不匹配', '4-6:部分匹配', '7-10:高度匹配'],
+        isEnabled: true,
+      },
+      {
+        key: 'image_metric_quality',
+        metricId: 0,
+        name: '画面质量',
+        description: '评估构图、清晰度、主体完整性和视觉表现是否稳定。',
+        metricsMapping: { input: 'prompt', actual_output: 'generated_images' },
+        score_min: 0,
+        score_max: 10,
+        score_definitions: ['0-3:质量较差', '4-6:基本可用', '7-10:质量较高'],
+        isEnabled: true,
+      },
+      {
+        key: 'image_metric_detail',
+        metricId: 0,
+        name: '细节一致性',
+        description: '评估文字、颜色、材质、数量和约束条件是否与要求一致。',
+        metricsMapping: { input: 'metadata', actual_output: 'generated_images' },
+        score_min: 0,
+        score_max: 10,
+        score_definitions: ['0-3:明显冲突', '4-6:有轻微偏差', '7-10:细节一致'],
+        isEnabled: true,
+      },
+      {
+        key: 'image_metric_safety',
+        metricId: 0,
+        name: '安全合规',
+        description: '评估是否避免违禁、侵权、低俗或不适宜内容。',
+        metricsMapping: { input: 'negative_prompt', actual_output: 'generated_images' },
+        score_min: 0,
+        score_max: 10,
+        score_definitions: ['0-3:风险较高', '4-6:需要复核', '7-10:安全合规'],
+        isEnabled: true,
+      },
+    ])
+  }, [evaluationCriteria.length, isImageGeneration])
 
   // 使用 useInferenceData hook 获取推理数据（仅当选择新建推理结果集时）
   const datasetTypeForNewInference = evaluationDataSource === 'new' ? datasetType : undefined
@@ -427,7 +479,7 @@ const CreateManualEvaluationTask: React.FC = () => {
 
   // 初始化dataset_type
   useEffect(() => {
-    if (urlDatasetType && (urlDatasetType === 'text-generation' || urlDatasetType === 'image-understanding')) {
+    if (urlDatasetType && ['text-generation', 'image-understanding', 'image-generation'].includes(urlDatasetType)) {
       form.setFieldsValue({ dataset_type: urlDatasetType })
     }
   }, [urlDatasetType, form])
@@ -888,7 +940,7 @@ const CreateManualEvaluationTask: React.FC = () => {
         name: values.taskName,
         description: values.description || undefined,
         evaluation_type: evaluationType as 'single' | 'comparison',
-        dataset_type: (values.dataset_type || 'text-generation') as 'text-generation' | 'image-understanding',
+        dataset_type: (values.dataset_type || 'text-generation') as EvaluationDatasetType,
         data_source: evaluationDataSource as 'existing' | 'new',
         evaluation_method: 'manual', // 系统会自动设置为 manual
         data_format: values.dataFormat || undefined,
@@ -1196,6 +1248,7 @@ const CreateManualEvaluationTask: React.FC = () => {
                 <Radio.Group>
                   <Radio value="text-generation">文本生成</Radio>
                   <Radio value="image-understanding">图像理解</Radio>
+                  <Radio value="image-generation">图像生成</Radio>
                 </Radio.Group>
               </Form.Item>
 
@@ -1218,7 +1271,7 @@ const CreateManualEvaluationTask: React.FC = () => {
                   modalTitle="选择已有推理结果集"
                   selectButtonText="选择"
                   projectIdOverride={projectId ? Number(projectId) : undefined}
-                  statsQuery={{ usage: ['default-inference'], dataset_type: [datasetType] }}
+                  statsQuery={{ usage: ['default-inference'], dataset_type: [datasetType], ...imageGenerationDatasetFormatQuery }}
                   fixedListUsage="default-inference"
                   listDatasetType={datasetType}
                   useInferenceResultApi
@@ -1316,7 +1369,7 @@ const CreateManualEvaluationTask: React.FC = () => {
                     filter={filterNewDatasetCascader}
                     loading={inferenceDataLoading.datasets}
                     label="待推理数据"
-                    statsQuery={{ training_method_type: ['sft'], dataset_type: [datasetType] }}
+                    statsQuery={{ training_method_type: ['sft'], dataset_type: [datasetType], ...imageGenerationDatasetFormatQuery }}
                     listDatasetType={datasetType}
                   />
                 </>

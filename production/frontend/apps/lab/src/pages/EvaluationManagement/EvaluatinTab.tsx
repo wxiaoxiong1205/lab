@@ -63,7 +63,7 @@ const EffectEvaluationPage: React.FC<{ evaluationPrefix?: string }> = ({ evaluat
           {evaluationPrefix === 'BUSSINESS' ? `业务效果评估` : '效果评估'}
         </Title>
         <Text type="secondary">
-          对大模型的任务效果进行全方位评价，当前支持文本生成、图像理解模型。
+          对大模型的任务效果进行全方位评价，当前支持文本生成、图像理解、图像生成模型。
         </Text>
       </div>
 

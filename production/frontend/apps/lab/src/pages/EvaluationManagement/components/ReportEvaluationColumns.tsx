@@ -9,6 +9,7 @@ interface BuildEvaluationResultColumnsParams {
   evaluationPrefix?: string
   evaluationType: EvaluationType
   businessDynamicFieldKeys: string[]
+  isImageGeneration?: boolean
   availableMetrics: string[]
   itemIndexFirstRowMap: Map<number, number>
   itemIndexRowSpanMap: Map<number, number>
@@ -161,6 +162,7 @@ export function buildEvaluationResultColumns({
   evaluationPrefix,
   evaluationType,
   businessDynamicFieldKeys,
+  isImageGeneration = false,
   availableMetrics,
   itemIndexFirstRowMap,
   itemIndexRowSpanMap,
@@ -324,7 +326,132 @@ export function buildEvaluationResultColumns({
     },
   ]
 
-  const textColumns = isBusinessDynamicTable ? businessDynamicTextColumns : legacyTextColumns
+  const imageGenerationColumns: ColumnsType<EvaluationResultData> = [
+    {
+      title: 'Prompt',
+      dataIndex: 'prompt',
+      key: 'prompt',
+      width: 300,
+      ellipsis: { showTitle: false },
+      render: (text: string, record: EvaluationResultData, index: number) => {
+        if (evaluationType === 'manual' && record.item_index !== undefined) {
+          return renderMergedCell(record, index, maps, () =>
+            mergedExpandableCell(
+              expandableTextCell({
+                text: text || '',
+                record,
+                columnKey: 'prompt',
+                bgColor: '#fff7e6',
+                borderColor: '#faad14',
+                expandedCells,
+                toggleCellExpand,
+              }),
+            ))
+        }
+        return expandableTextCell({
+          text: text || '',
+          record,
+          columnKey: 'prompt',
+          bgColor: '#fff7e6',
+          borderColor: '#faad14',
+          expandedCells,
+          toggleCellExpand,
+        })
+      },
+    },
+    {
+      title: 'Negative Prompt',
+      dataIndex: 'negativePrompt',
+      key: 'negativePrompt',
+      width: 220,
+      ellipsis: { showTitle: false },
+      render: (text: string, record: EvaluationResultData, index: number) => {
+        if (evaluationType === 'manual' && record.item_index !== undefined) {
+          return renderMergedCell(record, index, maps, () =>
+            mergedExpandableCell(
+              expandableTextCell({
+                text: text || '-',
+                record,
+                columnKey: 'negativePrompt',
+                bgColor: '#fafafa',
+                borderColor: '#d9d9d9',
+                expandedCells,
+                toggleCellExpand,
+                parseTags: false,
+              }),
+            ))
+        }
+        return expandableTextCell({
+          text: text || '-',
+          record,
+          columnKey: 'negativePrompt',
+          bgColor: '#fafafa',
+          borderColor: '#d9d9d9',
+          expandedCells,
+          toggleCellExpand,
+          parseTags: false,
+        })
+      },
+    },
+    {
+      title: '参考图片',
+      dataIndex: 'response',
+      key: 'referenceImage',
+      width: 220,
+      ellipsis: { showTitle: false },
+      render: (text: string, record: EvaluationResultData, index: number) => {
+        const content = text || (record.images?.length ? '<image>' : '')
+        if (evaluationType === 'manual' && record.item_index !== undefined) {
+          return renderMergedCell(record, index, maps, () =>
+            mergedExpandableCell(
+              expandableTextCell({
+                text: content,
+                record,
+                columnKey: 'referenceImage',
+                bgColor: '#f6ffed',
+                borderColor: '#52c41a',
+                expandedCells,
+                toggleCellExpand,
+                startIndex: imageStartIndex(record, ['prompt']),
+                parseTags: false,
+              }),
+            ))
+        }
+        return expandableTextCell({
+          text: content,
+          record,
+          columnKey: 'referenceImage',
+          bgColor: '#f6ffed',
+          borderColor: '#52c41a',
+          expandedCells,
+          toggleCellExpand,
+          startIndex: imageStartIndex(record, ['prompt']),
+          parseTags: false,
+        })
+      },
+    },
+    {
+      title: '生成图片',
+      dataIndex: 'modelResponse',
+      key: 'generatedImage',
+      width: 220,
+      ellipsis: { showTitle: false },
+      render: (text: string, record: EvaluationResultData) =>
+        expandableTextCell({
+          text: text || (record.images?.length ? '<image>' : ''),
+          record,
+          columnKey: 'generatedImage',
+          bgColor: '#fff2f0',
+          borderColor: '#ff4d4f',
+          expandedCells,
+          toggleCellExpand,
+          startIndex: imageStartIndex(record, ['prompt', 'response']),
+          parseTags: false,
+        }),
+    },
+  ]
+
+  const textColumns = isImageGeneration ? imageGenerationColumns : isBusinessDynamicTable ? businessDynamicTextColumns : legacyTextColumns
 
   const allColumns: ColumnsType<EvaluationResultData> = [
     {

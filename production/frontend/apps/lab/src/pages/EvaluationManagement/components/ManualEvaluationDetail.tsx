@@ -275,6 +275,10 @@ const ManualEvaluationDetail: React.FC = () => {
           prompt: contentItem.prompt || '',
           standardAnswer: contentItem.response || '',
           modelResponse: contentItem.model_response || '',
+          negativePrompt: contentItem.negative_prompt || '',
+          metadata: contentItem.metadata || {},
+          generatedImages: contentItem.generated_images || [],
+          referenceImages: contentItem.reference_images || [],
           metrics,
           comment: commentParts.join('; '),
           status,
@@ -341,6 +345,7 @@ const ManualEvaluationDetail: React.FC = () => {
   }, [metricsConfig])
 
   const columns = useMemo(() => {
+    const isImageGenerationTask = taskDetail?.dataset_type === 'image-generation' || taskDetail?.dataset_format === 'image-prompt'
     // 获取第一条数据用于合并单元格
     const firstRecord = evaluationData.length > 0 ? evaluationData[0] : null
     const firstStandardAnswer = firstRecord?.standardAnswer || ''
@@ -359,6 +364,148 @@ const ManualEvaluationDetail: React.FC = () => {
       if (status === '已完成') return 'success'
       if (status === '未评估') return 'warning'
       return 'default'
+    }
+
+    const renderMergedImageGenerationCell = (
+      index: number,
+      children: React.ReactNode,
+    ) => {
+      if (index === 0) {
+        return {
+          children,
+          props: { rowSpan: evaluationData.length },
+        }
+      }
+      return {
+        children: null,
+        props: { rowSpan: 0 },
+      }
+    }
+
+    const renderImageHtml = (record: EvaluationItem, text: string, startIndex = 0) => {
+      const { processedContent } = replaceImagePlaceholders(
+        text || '',
+        record.images || [],
+        record.baseUrl || '',
+        startIndex,
+      )
+      return parseUserAssistantTags(processedContent || '-')
+    }
+
+    if (isImageGenerationTask) {
+      const promptImageCount = (firstPrompt.match(/<image>/g) || []).length
+      const responseImageCount = (firstStandardAnswer.match(/<image>/g) || []).length
+
+      return [
+        {
+          title: '待评估模型/服务',
+          dataIndex: 'model_name',
+          key: 'model_name',
+          width: 140,
+          render: (text: string) => (
+            <div className="text-[12px] leading-[1.4] whitespace-pre-wrap">
+              {text || '-'}
+            </div>
+          ),
+        },
+        {
+          title: 'Prompt',
+          dataIndex: 'prompt',
+          key: 'prompt',
+          width: 240,
+          render: (_text: string, _record: EvaluationItem, index: number) =>
+            renderMergedImageGenerationCell(index, (
+              <div className="max-h-[160px] overflow-auto text-[12px] leading-[1.5] whitespace-pre-wrap">
+                {firstPrompt || '-'}
+              </div>
+            )),
+        },
+        {
+          title: 'Negative Prompt',
+          dataIndex: 'negativePrompt',
+          key: 'negativePrompt',
+          width: 180,
+          render: (_text: string, _record: EvaluationItem, index: number) =>
+            renderMergedImageGenerationCell(index, (
+              <div className="max-h-[160px] overflow-auto text-[12px] leading-[1.5] whitespace-pre-wrap">
+                {firstRecord?.negativePrompt || '-'}
+              </div>
+            )),
+        },
+        {
+          title: 'Metadata',
+          dataIndex: 'metadata',
+          key: 'metadata',
+          width: 180,
+          render: (_value: Record<string, unknown>, _record: EvaluationItem, index: number) =>
+            renderMergedImageGenerationCell(index, (
+              <pre className="m-0 max-h-[160px] overflow-auto whitespace-pre-wrap text-[12px] leading-[1.5]">
+                {firstRecord?.metadata && Object.keys(firstRecord.metadata).length > 0
+                  ? JSON.stringify(firstRecord.metadata, null, 2)
+                  : '-'}
+              </pre>
+            )),
+        },
+        {
+          title: '参考图片',
+          dataIndex: 'standardAnswer',
+          key: 'standardAnswer',
+          width: 180,
+          render: (_text: string, _record: EvaluationItem, index: number) =>
+            renderMergedImageGenerationCell(index, (
+              <div
+                className="max-h-[180px] overflow-auto text-[12px]"
+                dangerouslySetInnerHTML={{ __html: renderImageHtml(firstRecord as EvaluationItem, firstStandardAnswer || '<image>', promptImageCount) }}
+              />
+            )),
+        },
+        {
+          title: '生成图片',
+          dataIndex: 'modelResponse',
+          key: 'modelResponse',
+          width: 200,
+          render: (text: string, record: EvaluationItem) => (
+            <div
+              className="max-h-[180px] overflow-auto text-[12px]"
+              dangerouslySetInnerHTML={{ __html: renderImageHtml(record, text || '<image>', promptImageCount + responseImageCount) }}
+            />
+          ),
+        },
+        {
+          title: '得分',
+          key: 'scores',
+          width: 300,
+          render: (_: any, record: EvaluationItem) => (
+            <ScoreInput
+              record={record}
+              metricsConfig={metricsConfig}
+              onScoreChange={handleScoreChange}
+              onReasonChange={handleReasonChange}
+            />
+          ),
+        },
+        {
+          title: '状态',
+          dataIndex: 'status',
+          key: 'status',
+          width: 100,
+          render: (_status: string, _record: EvaluationItem, index: number) =>
+            renderMergedImageGenerationCell(index, (
+              <Tag color={getStatusColor(firstStatus)}>
+                {firstStatus}
+              </Tag>
+            )),
+        },
+        {
+          title: '操作',
+          key: 'action',
+          width: 100,
+          render: (_: any, _record: EvaluationItem, index: number) =>
+            renderMergedImageGenerationCell(index, (
+              <Typography.Link onClick={handleSubmitEvaluation}>完成评估</Typography.Link>
+            )),
+        },
+      ]
     }
 
     // 处理 System 列的图片
@@ -594,7 +741,7 @@ const ManualEvaluationDetail: React.FC = () => {
         },
       },
     ]
-  }, [handleScoreChange, handleReasonChange, evaluationData, metricsConfig])
+  }, [handleScoreChange, handleReasonChange, evaluationData, metricsConfig, taskDetail])
 
   // 使用接口返回的统计数据（用于统计卡片显示）
   const totalCount = annotationStats?.total_tasks || 0
@@ -621,7 +768,7 @@ const ManualEvaluationDetail: React.FC = () => {
   }
 
   // 提交评估结果的处理函数
-  const handleSubmitEvaluation = useCallback(async () => {
+  async function handleSubmitEvaluation() {
     if (!projectId || !taskId) {
       return
     }
@@ -811,17 +958,7 @@ const ManualEvaluationDetail: React.FC = () => {
       console.error('提交失败:', error)
       message.error(error?.response?.data?.message || '提交失败，请重试')
     }
-  }, [
-    projectId,
-    taskId,
-    evaluationListResponse,
-    taskDetail,
-    evaluationData,
-    metricsConfig,
-    refetch,
-    refetchAnnotationStats,
-    currentPage,
-  ])
+  }
 
   // 提交评估任务
   const handleSubmitTask = useCallback(async () => {

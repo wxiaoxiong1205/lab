@@ -9,6 +9,7 @@ import { getCanUseKubernetesClusters } from '@/services/kubernetesService'
 import { useAuthStore } from '@/stores/authStore'
 import { useConfigStore } from '@/stores/configStore'
 import { useProjectStore } from '@/stores/projectStore'
+import { getEffectiveUserMenus } from '@/utils/permission'
 import SvgIcon from '@/components/common/SvgIcon'
 import ProjectFormModal, { type ProjectFormValues } from '@/components/project/ProjectFormModal'
 import type { CreateProjectRequest, KubernetesCluster, MenuItem, Project } from '@/types'
@@ -73,7 +74,8 @@ const ProjectSpacePage = () => {
       || project.description?.toLowerCase().includes(normalizedKeyword))
   }, [keyword, projects])
   const workspaceRootMenus = useMemo(() => {
-    return userMenus
+    const sourceMenus = getEffectiveUserMenus(userMenus)
+    return sourceMenus
       .filter((item) => item.code !== HOME_MENU_CODE)
       .filter((item) => !isSystemMenu(item))
   }, [userMenus])

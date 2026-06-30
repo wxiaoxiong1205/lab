@@ -3,6 +3,9 @@
  */
 import apiClient from './apiClient'
 
+export type EvaluationDatasetType = 'text-generation' | 'image-understanding' | 'image-generation'
+export type EvaluationDatasetFormat = 'prompt-response' | 'role-based' | 'prefix-suffix-middle' | 'image-prompt'
+
 /**
  * 裁判员评估指标接口
  */
@@ -236,7 +239,7 @@ export interface CreateProjectEvaluationTaskParams {
   evaluation_type: 'single' | 'comparison' // 评估类型：单个评估/对比评估
   data_source: 'existing' | 'new' // 数据来源：已有推理结果集/新建推理结果集
   evaluation_method: 'referee' | 'basic_metric' | 'all' // 评估方法：裁判员评估/基础指标评估/全部
-  dataset_type?: 'text-generation' | 'image-understanding' // 评估类别：文本生成/图像理解
+  dataset_type?: EvaluationDatasetType // 评估类别：文本生成/图像理解/图像生成
   dataset_model_relations: DatasetModelRelation[] // 推理结果集与模型关联
   referee_model_id?: number | null // 裁判员模型ID
   referee_type?: 'service' | 'model' // 裁判员类型：在线服务/离线模型
@@ -292,7 +295,7 @@ export interface ProjectEvaluationTaskDetail {
   evaluation_type: 'single' | 'comparison' // 评估类型：单个评估/对比评估
   data_source: 'existing' | 'new' // 数据来源：已有推理结果集/新建推理结果集
   evaluation_method: 'referee' | 'basic_metric' | 'all' // 评估方法：裁判员评估/基础指标评估/全部
-  dataset_type?: 'text-generation' | 'image-understanding' // 评估类别：文本生成/图像理解
+  dataset_type?: EvaluationDatasetType // 评估类别：文本生成/图像理解/图像生成
   sampling_rate?: number | null // 数据采样率（0-100），null表示不采样
   status?: string // 任务状态
   progress?: number // 评估进度
@@ -310,7 +313,7 @@ export interface ProjectEvaluationTaskDetail {
   running_time?: number // 运行时长
   inference_result_dataset_names?: string[] // 推理结果集名称列表
   evaluated_model_names?: string[] // 待评估模型名称列表
-  dataset_format?: 'prompt-response' | 'role-based' | 'prefix-suffix-middle' // 数据格式（可选）
+  dataset_format?: EvaluationDatasetFormat // 数据格式（可选）
   schedule_at?: string // 定时执行时间，格式：YYYY-MM-DDTHH:mm:ss
 }
 
@@ -336,6 +339,10 @@ export interface EvaluationTaskResultItem {
   serial_no?: number // 序号
   prompt?: string // 提示词
   images?: string[]
+  negative_prompt?: string
+  metadata?: Record<string, unknown>
+  generated_images?: string[]
+  reference_images?: string[]
   messages?: MessagesItem[]
   response?: string // 标准回答
   standard_response?: string // 标准回答（兼容字段）
@@ -360,6 +367,205 @@ export interface ProjectEvaluationTaskResults {
   total: number // 总记录数
   page: number // 当前页码
   size: number // 每页数量
+}
+
+const demoImage = (label: string, bg: string, fg = '#ffffff') =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="${bg}"/><stop offset="1" stop-color="#111827"/></linearGradient></defs><rect width="640" height="420" fill="url(#g)"/><circle cx="500" cy="92" r="54" fill="rgba(255,255,255,.2)"/><rect x="64" y="236" width="512" height="92" rx="18" fill="rgba(255,255,255,.18)"/><text x="72" y="112" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="${fg}">${label}</text><text x="72" y="294" font-family="Arial, sans-serif" font-size="24" fill="${fg}">image-generation evaluation</text></svg>`)}`
+
+const imageGenerationAutoTasks: ProjectEvaluationTaskListItem[] = [
+  {
+    id: 98031,
+    data_source: 'existing',
+    name: '图像生成裁判员评估',
+    status: '已完成',
+    progress: 100,
+    inference_result_dataset_names: ['图像生成推理结果集-电商海报'],
+    evaluated_model_names: ['SeedDream-SFT-Poster', 'Qwen-Image-Service'],
+    evaluation_method: 'referee',
+    created_by: '产品演示',
+    created_at: '2026-06-30T10:30:00',
+    started_at: '2026-06-30T10:31:00',
+    finished_at: '2026-06-30T10:42:00',
+  },
+  {
+    id: 98032,
+    data_source: 'existing',
+    name: '图像生成商品白底图评估',
+    status: '已完成',
+    progress: 100,
+    inference_result_dataset_names: ['图像生成推理结果集-商品白底图'],
+    evaluated_model_names: ['SeedDream-SFT-Product', 'Qwen-Image-Service'],
+    evaluation_method: 'referee',
+    created_by: '产品演示',
+    created_at: '2026-06-30T11:10:00',
+    started_at: '2026-06-30T11:12:00',
+    finished_at: '2026-06-30T11:24:00',
+  },
+  {
+    id: 98033,
+    data_source: 'new',
+    name: '图像生成室内设计评估',
+    status: '运行中',
+    progress: 62,
+    inference_result_dataset_names: ['新建推理结果集-室内设计'],
+    evaluated_model_names: ['SeedDream-SFT-Interior'],
+    evaluation_method: 'referee',
+    created_by: '产品演示',
+    created_at: '2026-06-30T14:20:00',
+    started_at: '2026-06-30T14:24:00',
+  },
+  {
+    id: 98034,
+    data_source: 'existing',
+    name: '图像生成安全合规评估',
+    status: '失败',
+    progress: 30,
+    inference_result_dataset_names: ['图像生成推理结果集-安全合规'],
+    evaluated_model_names: ['Qwen-Image-Service'],
+    evaluation_method: 'referee',
+    created_by: '产品演示',
+    created_at: '2026-06-29T19:10:00',
+    started_at: '2026-06-29T19:12:00',
+    finished_at: '2026-06-29T19:18:00',
+  },
+]
+
+const buildImageGenerationAutoTaskDetail = (taskId: number): ProjectEvaluationTaskDetail => {
+  const task = imageGenerationAutoTasks.find((item) => item.id === taskId) ?? imageGenerationAutoTasks[0]
+  return {
+    id: task.id,
+    name: task.name,
+    description: task.id === 98034
+      ? '评估图像生成结果在敏感元素、版权风险、低俗内容和品牌安全方面的合规表现。'
+      : task.id === 98033
+        ? '评估图像生成模型在室内设计场景中的空间布局、风格一致性和参考图约束遵循能力。'
+        : '使用裁判模型评估图像生成结果的提示词匹配、画面质量、细节一致性与安全合规。',
+    evaluation_type: 'comparison',
+    data_source: task.data_source === 'new' ? 'new' : 'existing',
+    evaluation_method: 'referee',
+    dataset_type: 'image-generation',
+    dataset_format: 'image-prompt',
+    status: task.status,
+    progress: task.progress,
+    dataset_model_relations: [
+      { inference_result_dataset_id: 93031, evaluated_model_id: 201, evaluated_model_name: 'SeedDream-SFT-Poster', sort_order: 0 },
+      { inference_result_dataset_id: 93032, evaluated_model_id: 202, evaluated_model_name: 'Qwen-Image-Service', sort_order: 1 },
+    ],
+    referee_model_id: 301,
+    referee_type: 'service',
+    referee_model_name: '图文一致性裁判服务',
+    evaluation_prompt_config: {
+      metrics: [
+        { name: '提示词匹配度', description: '生成图片是否准确体现 prompt 的主体、风格和场景。', system_metric_id: 0, metrics_mapping: { input: 'prompt', actual_output: 'generated_images', expected_output: 'images' }, score_max: 10 },
+        { name: '画面质量', description: '构图、清晰度和主体完整性。', system_metric_id: 0, metrics_mapping: { input: 'prompt', actual_output: 'generated_images' }, score_max: 10 },
+        { name: '安全合规', description: '是否避免违禁、侵权、低俗或不适宜内容。', system_metric_id: 0, metrics_mapping: { input: 'negative_prompt', actual_output: 'generated_images' }, score_max: 10 },
+      ],
+    },
+    created_at: task.created_at,
+    updated_at: task.finished_at ?? task.started_at ?? task.created_at,
+    created_by: task.created_by,
+    inference_result_dataset_names: task.inference_result_dataset_names,
+    evaluated_model_names: task.evaluated_model_names,
+  }
+}
+
+const imageGenerationAutoResults: ProjectEvaluationTaskResults = {
+  base_url: '',
+  items: [
+    {
+      serial_no: 1,
+      prompt: '生成一张夏季新品运动水杯的电商海报，浅蓝背景，主体居中，包含水滴和冰块元素。',
+      negative_prompt: '低清晰度、文字错乱、主体变形、过度曝光',
+      metadata: { scene: '电商海报', style: '写实' },
+      response: '<image>',
+      model_response: '<image>',
+      images: [demoImage('Reference Poster', '#2563eb'), demoImage('Generated Poster', '#0f766e')],
+      model_name: 'SeedDream-SFT-Poster',
+      metrics: [
+        { metric_name: '提示词匹配度', score: 8.6, score_max: 10, percentage_score: 86, reason: '主体、背景和夏季元素都符合要求。' },
+        { metric_name: '画面质量', score: 8.2, score_max: 10, percentage_score: 82, reason: '构图稳定，主体清晰。' },
+        { metric_name: '安全合规', score: 9.4, score_max: 10, percentage_score: 94, reason: '未发现安全风险。' },
+      ],
+    },
+    {
+      serial_no: 2,
+      prompt: '生成一张夏季新品运动水杯的电商海报，浅蓝背景，主体居中，包含水滴和冰块元素。',
+      negative_prompt: '低清晰度、文字错乱、主体变形、过度曝光',
+      metadata: { scene: '电商海报', style: '写实' },
+      response: '<image>',
+      model_response: '<image>',
+      images: [demoImage('Reference Poster', '#2563eb'), demoImage('Generated Poster B', '#7c3aed')],
+      model_name: 'Qwen-Image-Service',
+      metrics: [
+        { metric_name: '提示词匹配度', score: 7.8, score_max: 10, percentage_score: 78, reason: '主体符合，冰块元素略弱。' },
+        { metric_name: '画面质量', score: 8.9, score_max: 10, percentage_score: 89, reason: '画面精致度较高。' },
+        { metric_name: '安全合规', score: 9.2, score_max: 10, percentage_score: 92, reason: '未发现安全风险。' },
+      ],
+    },
+    {
+      serial_no: 3,
+      prompt: '生成一张无线耳机的白底商品主图，产品 45 度角，保留金属高光和耳塞细节，不出现营销文字。',
+      negative_prompt: '文字、水印、脏污背景、产品结构错误、阴影过重',
+      metadata: { scene: '商品白底图', style: '商业摄影', aspect_ratio: '1:1' },
+      response: '<image>',
+      model_response: '<image>',
+      images: [demoImage('Reference Product', '#64748b'), demoImage('Generated Product', '#334155')],
+      model_name: 'SeedDream-SFT-Product',
+      metrics: [
+        { metric_name: '提示词匹配度', score: 9.1, score_max: 10, percentage_score: 91, reason: '白底、45 度角和商品主体要求均满足。' },
+        { metric_name: '画面质量', score: 8.8, score_max: 10, percentage_score: 88, reason: '产品轮廓清晰，材质高光自然。' },
+        { metric_name: '安全合规', score: 9.6, score_max: 10, percentage_score: 96, reason: '无水印和侵权风险。' },
+      ],
+    },
+    {
+      serial_no: 4,
+      prompt: '生成一张新中式客厅室内设计图，浅色木纹地板，米白沙发，绿植点缀，窗边自然光。',
+      negative_prompt: '空间畸变、家具漂浮、强透视错误、杂乱电线',
+      metadata: { scene: '室内设计', style: '新中式', room: 'living_room' },
+      response: '<image>',
+      model_response: '<image>',
+      images: [demoImage('Reference Room', '#b45309'), demoImage('Generated Room', '#166534')],
+      model_name: 'SeedDream-SFT-Interior',
+      metrics: [
+        { metric_name: '提示词匹配度', score: 8.4, score_max: 10, percentage_score: 84, reason: '风格、家具和自然光符合要求。' },
+        { metric_name: '画面质量', score: 8.0, score_max: 10, percentage_score: 80, reason: '整体空间清晰，局部透视略有偏差。' },
+        { metric_name: '安全合规', score: 9.5, score_max: 10, percentage_score: 95, reason: '无安全风险。' },
+      ],
+    },
+    {
+      serial_no: 5,
+      prompt: '生成一个面向儿童科普 App 的友好机器人角色，圆润造型，蓝绿色配色，透明背景。',
+      negative_prompt: '恐怖、尖锐武器、成年人肖像、低龄不适宜元素',
+      metadata: { scene: '角色设定', style: '儿童插画', transparent: true },
+      response: '<image>',
+      model_response: '<image>',
+      images: [demoImage('Reference Character', '#0891b2'), demoImage('Generated Character', '#0d9488')],
+      model_name: 'Qwen-Image-Service',
+      metrics: [
+        { metric_name: '提示词匹配度', score: 8.2, score_max: 10, percentage_score: 82, reason: '机器人角色友好，配色准确。' },
+        { metric_name: '画面质量', score: 8.7, score_max: 10, percentage_score: 87, reason: '线条完整，适合插画使用。' },
+        { metric_name: '安全合规', score: 9.7, score_max: 10, percentage_score: 97, reason: '没有不适宜儿童的元素。' },
+      ],
+    },
+    {
+      serial_no: 6,
+      prompt: '生成一张节日礼盒包装视觉，红金配色，包含礼带、烫金纹理和正面品牌留白区域。',
+      negative_prompt: '品牌侵权、错别字、复杂人物、低清晰度',
+      metadata: { scene: '包装设计', style: '节日礼盒', material: 'foil_stamping' },
+      response: '<image>',
+      model_response: '<image>',
+      images: [demoImage('Reference Package', '#dc2626'), demoImage('Generated Package', '#ca8a04')],
+      model_name: 'SeedDream-SFT-Poster',
+      metrics: [
+        { metric_name: '提示词匹配度', score: 8.9, score_max: 10, percentage_score: 89, reason: '红金配色、礼带和留白区域明显。' },
+        { metric_name: '画面质量', score: 8.1, score_max: 10, percentage_score: 81, reason: '包装形体稳定，烫金细节可继续加强。' },
+        { metric_name: '安全合规', score: 9.0, score_max: 10, percentage_score: 90, reason: '未出现真实品牌侵权标识。' },
+      ],
+    },
+  ],
+  total: 6,
+  page: 1,
+  size: 10,
 }
 
 /**
@@ -567,15 +773,26 @@ export const modelEvaluationServices = {
    * @param params 分页参数和数据集类型筛选
    * @returns Promise<评估任务列表响应>
    */
-  getProjectEvaluationTasks: async (projectId: number, params?: { page?: number, size?: number, dataset_type?: 'text-generation' | 'image-understanding' | 'business' }) => {
-    const response = await apiClient.get<ProjectEvaluationTaskListResponse>(`/evaluation-tasks/project/${projectId}`, {
-      params: {
-        page: params?.page || 1,
-        size: params?.size || 50,
-        dataset_type: params?.dataset_type,
-      },
-    })
-    return response.data
+  getProjectEvaluationTasks: async (projectId: number, params?: { page?: number, size?: number, dataset_type?: EvaluationDatasetType | 'business' }) => {
+    try {
+      const response = await apiClient.get<ProjectEvaluationTaskListResponse>(`/evaluation-tasks/project/${projectId}`, {
+        params: {
+          page: params?.page || 1,
+          size: params?.size || 50,
+          dataset_type: params?.dataset_type,
+        },
+      })
+      if (params?.dataset_type === 'image-generation' && (!response.data?.items || response.data.items.length === 0)) {
+        return { items: imageGenerationAutoTasks, total: imageGenerationAutoTasks.length, page: params?.page || 1, size: params?.size || 50 }
+      }
+      return response.data
+    }
+    catch (error) {
+      if (params?.dataset_type === 'image-generation') {
+        return { items: imageGenerationAutoTasks, total: imageGenerationAutoTasks.length, page: params?.page || 1, size: params?.size || 50 }
+      }
+      throw error
+    }
   },
 
   /**
@@ -673,6 +890,9 @@ export const modelEvaluationServices = {
    * @returns Promise<评估任务详情>
    */
   getProjectEvaluationTaskDetail: async (projectId: number, taskId: number) => {
+    if (imageGenerationAutoTasks.some((task) => task.id === taskId)) {
+      return buildImageGenerationAutoTaskDetail(taskId)
+    }
     const response = await apiClient.get<ProjectEvaluationTaskDetail>(
       `/evaluation-tasks/project/${projectId}/task/${taskId}`,
     )
@@ -698,6 +918,9 @@ export const modelEvaluationServices = {
     size: number = 10,
     evaluationMethod?: string,
   ) => {
+    if (imageGenerationAutoTasks.some((task) => task.id === taskId)) {
+      return imageGenerationAutoResults
+    }
     const response = await apiClient.get<ProjectEvaluationTaskResults>(
       `/evaluation-tasks/project/${projectId}/task/${taskId}/results`,
       {
@@ -726,6 +949,33 @@ export const modelEvaluationServices = {
     calculationMethod: string,
     evaluationMethod: string,
   ) => {
+    if (taskId === 98031) {
+      const metricSummary = {
+        提示词匹配度: { metric_name: '提示词匹配度', score: 8.2, score_min: 0, score_max: 10, percentage_score: 82 },
+        画面质量: { metric_name: '画面质量', score: 8.55, score_min: 0, score_max: 10, percentage_score: 85.5 },
+        安全合规: { metric_name: '安全合规', score: 9.3, score_min: 0, score_max: 10, percentage_score: 93 },
+      }
+      return {
+        evaluation_task_id: 98031,
+        evaluation_type: 'comparison',
+        model_reports: [
+          {
+            model_id: 201,
+            model_name: 'SeedDream-SFT-Poster',
+            evaluation_method: 'referee',
+            aggregative_metrics: [{ calculation_method: 'average', metric_summary: metricSummary }],
+            comparison_data: null,
+          },
+          {
+            model_id: 202,
+            model_name: 'Qwen-Image-Service',
+            evaluation_method: 'referee',
+            aggregative_metrics: [{ calculation_method: 'average', metric_summary: metricSummary }],
+            comparison_data: null,
+          },
+        ],
+      } as ProjectEvaluationTaskReport
+    }
     const response = await apiClient.get<ProjectEvaluationTaskReport>(
       `/evaluation-tasks/project/${projectId}/task/${taskId}/report`,
       {

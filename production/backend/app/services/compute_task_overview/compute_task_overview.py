@@ -1,5 +1,6 @@
 import base64
 import math
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -953,6 +954,14 @@ class DefaultComputeTaskOverviewService(ComputeTaskOverviewService):
         task_scope: Optional[str] = None,
         pod_filter: Optional[Callable[[Any], bool]] = None,
     ) -> ResourceUsageResponse:
+        if self._is_local_preview():
+            return self._local_preview_resource_usage(
+                project_id=project_id,
+                cluster=cluster,
+                scope=scope,
+                task_scope=task_scope,
+            )
+
         if not cluster.config:
             raise HTTPException(status_code=404, detail="K8s集群配置为空")
 
@@ -1002,6 +1011,62 @@ class DefaultComputeTaskOverviewService(ComputeTaskOverviewService):
                 total=self._round_number(node_stats["memory"]),
                 unit="GB",
             ),
+        }
+        if task_scope is not None:
+            return ProjectResourceUsageResponse(task_scope=task_scope, **response_data)
+        return ResourceUsageResponse(**response_data)
+
+    def _is_local_preview(self) -> bool:
+        return os.getenv("LAB_LOCAL_PREVIEW", "").lower() in {"1", "true", "yes", "on"}
+
+    def _local_preview_resource_usage(
+        self,
+        project_id: int,
+        cluster: KubernetesResource,
+        scope: str,
+        task_scope: Optional[str] = None,
+    ) -> ResourceUsageResponse:
+        available_resources = [
+            ResourceTypeInfo(
+                resource_type="GPU",
+                resource_type_name="GPU",
+                total=16,
+                unit="卡",
+                card_models=[
+                    ResourceCardModelInfo(
+                        resource_card_model="NVIDIA A100",
+                        resource_card_memories=["80GB"],
+                        k8s_resource_type="nvidia.com/gpu",
+                        description="NVIDIA A100 (80GB)",
+                        total_cards=8,
+                        total_memory=640,
+                        node_count=2,
+                    ),
+                    ResourceCardModelInfo(
+                        resource_card_model="NVIDIA L20",
+                        resource_card_memories=["48GB"],
+                        k8s_resource_type="nvidia.com/gpu",
+                        description="NVIDIA L20 (48GB)",
+                        total_cards=8,
+                        total_memory=384,
+                        node_count=2,
+                    ),
+                ],
+            ),
+            ResourceTypeInfo(resource_type="CPU", resource_type_name="CPU", total=256, unit="核"),
+            ResourceTypeInfo(resource_type="MEMORY", resource_type_name="内存", total=1024, unit="GB"),
+        ]
+        is_project_scope = scope == "project"
+        response_data = {
+            "project_id": project_id,
+            "cluster_id": getattr(cluster, "id", None),
+            "cluster_name": getattr(cluster, "name", None),
+            "available_resources": available_resources,
+            "scope": scope,
+            "gpu_cards": ResourceMetric(used=5 if is_project_scope else 9, total=16, unit="卡"),
+            "gpu_memory": ResourceMetric(used=320 if is_project_scope else 568, total=1024, unit="GB"),
+            "cpu": ResourceMetric(used=72 if is_project_scope else 148, total=256, unit="核"),
+            "memory": ResourceMetric(used=288 if is_project_scope else 604, total=1024, unit="GB"),
         }
         if task_scope is not None:
             return ProjectResourceUsageResponse(task_scope=task_scope, **response_data)

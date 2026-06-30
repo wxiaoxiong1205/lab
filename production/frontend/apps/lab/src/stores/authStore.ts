@@ -4,6 +4,7 @@ import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper'
 import type { AuthState, FailedRequest, User } from '../types'
 import type { MenuItem } from '@/types'
 import apiClient from '@/services/apiClient'
+import { getEffectiveUserMenus } from '@/utils/permission'
 
 // 创建一个独立的token存储函数，确保token始终可用
 const tokenStorage = {
@@ -242,14 +243,20 @@ export const useAuthStore = create<AuthState>()(
 
       // 判断用户是否是管理员（通过菜单权限）
       isAdmin: () => {
-        const { menuCodeSet } = get()
-        return menuCodeSet.has('admin')
+        const { menuCodeSet, userMenus } = get()
+        if (menuCodeSet.has('admin')) {
+          return true
+        }
+        return extractMenuCodes(getEffectiveUserMenus(userMenus)).has('admin')
       },
 
       // 判断是否有指定 code 的菜单权限（优化版本，使用 Set 缓存）
       hasAuth: (code: string) => {
-        const { menuCodeSet } = get()
-        return menuCodeSet.has(code)
+        const { menuCodeSet, userMenus } = get()
+        if (menuCodeSet.has(code)) {
+          return true
+        }
+        return extractMenuCodes(getEffectiveUserMenus(userMenus)).has(code)
       },
     }),
     {

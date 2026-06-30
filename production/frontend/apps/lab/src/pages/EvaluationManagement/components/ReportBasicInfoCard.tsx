@@ -145,7 +145,11 @@ export default function ReportBasicInfoCard({
             <Space size={0}>
               <Text type="secondary">评估类别：</Text>
               <Text>
-                {['text-generation', 'business'].includes(taskDetail?.dataset_type || '') ? '文本生成' : '图像理解'}
+                {taskDetail?.dataset_type === 'image-generation'
+                  ? '图像生成'
+                  : ['text-generation', 'business'].includes(taskDetail?.dataset_type || '')
+                    ? '文本生成'
+                    : '图像理解'}
               </Text>
             </Space>
           </Col>

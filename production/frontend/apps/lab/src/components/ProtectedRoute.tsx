@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import React from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
-import { checkPathPermission, isAdminUser } from '../utils/permission'
+import { checkPathPermission, getEffectiveUserMenus, isAdminUser } from '../utils/permission'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -15,11 +15,12 @@ const ProtectedRoute = ({ children, adminOnly = false, requireMenuPermission = t
   const { isAuthenticated, userMenus, isLoggingOut } = useAuthStore()
   const [isMenuLoaded, setIsMenuLoaded] = useState(false)
   const location = useLocation()
+  const effectiveUserMenus = getEffectiveUserMenus(userMenus)
   // 监听菜单加载状态
   useEffect(() => {
     if (isAuthenticated) {
       // 如果已经有菜单数据，标记为已加载
-      if (userMenus && userMenus.length > 0) {
+      if (effectiveUserMenus && effectiveUserMenus.length > 0) {
         setIsMenuLoaded(true)
       }
       else {
@@ -34,7 +35,7 @@ const ProtectedRoute = ({ children, adminOnly = false, requireMenuPermission = t
     else {
       setIsMenuLoaded(false)
     }
-  }, [isAuthenticated, userMenus])
+  }, [effectiveUserMenus, isAuthenticated])
   // 如果正在退出登录，显示加载状态
   if (isLoggingOut) {
     return (
@@ -60,7 +61,7 @@ const ProtectedRoute = ({ children, adminOnly = false, requireMenuPermission = t
     )
   }
   // 如果是仅限管理员访问的页面，通过菜单检查用户是否是管理员
-  if (adminOnly && !isAdminUser(userMenus)) {
+  if (adminOnly && !isAdminUser(effectiveUserMenus)) {
     return (
       <Result
         status="403"
@@ -84,7 +85,7 @@ const ProtectedRoute = ({ children, adminOnly = false, requireMenuPermission = t
         </div>
       )
     }
-    const hasPermission = checkPathPermission(userMenus, location.pathname)
+    const hasPermission = checkPathPermission(effectiveUserMenus, location.pathname)
     if (!hasPermission) {
       return (
         <Result

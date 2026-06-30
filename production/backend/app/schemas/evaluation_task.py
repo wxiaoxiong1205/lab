@@ -332,9 +332,9 @@ class EvaluationTaskCreate(BaseModel):
         elif self.evaluation_method == EvaluationMethod.MANUAL:
             # 人工评估：必须提供dataset_type和evaluation_prompt_config（只包含metrics，不需要prompt_template），不能提供referee_model_id和basic_metric_config
             if not self.dataset_type:
-                raise ValueError("人工评估需要提供dataset_type（text-generation或image-understanding）")
-            if self.dataset_type not in ["text-generation", "image-understanding"]:
-                raise ValueError("dataset_type必须是text-generation（文本生成）或image-understanding（图像理解）")
+                raise ValueError("人工评估需要提供dataset_type（text-generation、image-understanding或image-generation）")
+            if self.dataset_type not in ["text-generation", "image-understanding", "image-generation"]:
+                raise ValueError("dataset_type必须是text-generation（文本生成）、image-understanding（图像理解）或image-generation（图像生成）")
             if not self.evaluation_prompt_config:
                 raise ValueError("人工评估需要提供evaluation_prompt_config（包含评估指标配置）")
             if not self.evaluation_prompt_config.metrics or len(self.evaluation_prompt_config.metrics) == 0:

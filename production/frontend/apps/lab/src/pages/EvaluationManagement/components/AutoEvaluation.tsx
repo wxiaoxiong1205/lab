@@ -18,6 +18,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import type { ProjectEvaluationTaskListItem } from '@/services/modelEvaluationServices'
+import type { EvaluationDatasetType } from '@/services/modelEvaluationServices'
 import { modelEvaluationServices } from '@/services/modelEvaluationServices'
 import { EvaluationMethodMapping } from '@/utils/EnumMaping'
 import type { TableActionItem } from '@/components/common/TableActionColumn'
@@ -51,8 +52,8 @@ const AutoEvaluation: React.FC<{ evaluationPrefix?: string }> = ({ evaluationPre
 
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [datasetType, setDatasetType] = useState<'text-generation' | 'image-understanding' | 'business'>(
-    (searchParams.get('dataset_type') as 'text-generation' | 'image-understanding') || 'text-generation',
+  const [datasetType, setDatasetType] = useState<EvaluationDatasetType | 'business'>(
+    (searchParams.get('dataset_type') as EvaluationDatasetType) || 'text-generation',
   )
 
   // 查询评估任务列表
@@ -75,8 +76,8 @@ const AutoEvaluation: React.FC<{ evaluationPrefix?: string }> = ({ evaluationPre
   const total = data?.total || 0
 
   useEffect(() => {
-    const urlDatasetType = searchParams.get('dataset_type') as 'text-generation' | 'image-understanding' | null
-    if (urlDatasetType && (urlDatasetType === 'text-generation' || urlDatasetType === 'image-understanding')) {
+    const urlDatasetType = searchParams.get('dataset_type') as EvaluationDatasetType | null
+    if (urlDatasetType && ['text-generation', 'image-understanding', 'image-generation'].includes(urlDatasetType)) {
       setDatasetType(urlDatasetType)
     }
     else if (!urlDatasetType) {
@@ -86,9 +87,9 @@ const AutoEvaluation: React.FC<{ evaluationPrefix?: string }> = ({ evaluationPre
     }
   }, [searchParams, setSearchParams])
 
-  // 当 evaluationPrefix 为 BUSSINESS时 防止直接更改url中dataset_type为image-understanding
+  // 当 evaluationPrefix 为 BUSSINESS时 防止直接更改url中dataset_type为非文本生成
   useEffect(() => {
-    if (evaluationPrefix === 'BUSSINESS' && datasetType === 'image-understanding') {
+    if (evaluationPrefix === 'BUSSINESS' && datasetType !== 'text-generation') {
       setDatasetType('text-generation')
       setCurrentPage(1)
       const newSearchParams = new URLSearchParams(searchParams)
@@ -122,7 +123,7 @@ const AutoEvaluation: React.FC<{ evaluationPrefix?: string }> = ({ evaluationPre
   }
 
   const handleDatasetTypeChange = (value: string) => {
-    const newType = value as 'text-generation' | 'image-understanding'
+    const newType = value as EvaluationDatasetType
     setDatasetType(newType)
     setCurrentPage(1)
     const newSearchParams = new URLSearchParams(searchParams)
@@ -434,7 +435,7 @@ const AutoEvaluation: React.FC<{ evaluationPrefix?: string }> = ({ evaluationPre
       {/* 顶部卡片说明区域 */}
       <WorkflowSteps steps={autoEvaluationSteps} />
 
-      {/* 评估任务 type 分为文本生成和图像理解 不同的表格 */}
+      {/* 评估任务 type 分为文本生成、图像理解和图像生成 */}
       <div className="mb-4 flex min-h-10 items-center justify-between gap-4 overflow-visible">
         <Segmented
           className="lab-segmented-switch"
@@ -448,6 +449,9 @@ const AutoEvaluation: React.FC<{ evaluationPrefix?: string }> = ({ evaluationPre
             ...(evaluationPrefix !== 'BUSSINESS' ? [{
               value: 'image-understanding',
               label: '图像理解',
+            }, {
+              value: 'image-generation',
+              label: '图像生成',
             }] : []),
           ]}
         />

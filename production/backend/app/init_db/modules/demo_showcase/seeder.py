@@ -5,7 +5,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.common.status import TaskStatus
+from app.common.status import AnnotationStatus, TaskStatus
 from app.common.task_execution import TaskExecutionBusinessType, TaskExecutionExecutor, TaskExecutionStatus
 from app.models.benchmark_task_manager import (
     BenchmarkDataset,
@@ -561,11 +561,11 @@ class DemoShowcaseSeeder:
     async def _ensure_inference_results(self, session, project, base_models, datasets, user, now, counters) -> list[InferenceResultDataset]:
         source = next((d for d in datasets if d.usage == "test" and d.processing_status == "pending"), datasets[0])
         specs = [
-            ("showcase-客服问答推理结果", "completed", 100, "default-inference"),
-            ("showcase-推理结果处理中", "processing", 45, "default-inference"),
+            ("showcase-客服问答推理结果", TaskStatus.COMPLETED.value, 100, "default-inference"),
+            ("showcase-推理结果处理中", TaskStatus.RUNNING.value, 45, "default-inference"),
             ("showcase-推理结果失败", TaskStatus.FAILED.value, 100, "default-inference"),
-            ("showcase-业务推理结果集", "completed", 100, "business-inference"),
-            ("showcase-业务推理字段映射中", "processing", 35, "business-inference"),
+            ("showcase-业务推理结果集", TaskStatus.COMPLETED.value, 100, "business-inference"),
+            ("showcase-业务推理字段映射中", TaskStatus.RUNNING.value, 35, "business-inference"),
             ("showcase-业务推理接口失败", TaskStatus.FAILED.value, 100, "business-inference"),
         ]
         rows: list[InferenceResultDataset] = []
@@ -597,7 +597,7 @@ class DemoShowcaseSeeder:
                 status=status,
                 progress=progress,
                 started_at=now,
-                finished_at=now if status == "completed" else None,
+                finished_at=now if status == TaskStatus.COMPLETED.value else None,
                 processing_error="演示失败任务：第三方业务接口返回字段缺失。" if status == TaskStatus.FAILED.value else None,
                 manual_trigger_required=False,
             )
@@ -787,7 +787,7 @@ class DemoShowcaseSeeder:
         specs = [
             ("showcase-自动评估已完成", "single", "all", TaskStatus.COMPLETED.value, 100),
             ("showcase-对比评估运行中", "comparison", "referee", TaskStatus.RUNNING.value, 35),
-            ("showcase-人工评估标注中", "single", "manual", "annotating", 50),
+            ("showcase-人工评估标注中", "single", "manual", AnnotationStatus.ANNOTATING.value, 50),
         ]
         rows: list[EvaluationTask] = []
         for name, evaluation_type, method, status, progress in specs:

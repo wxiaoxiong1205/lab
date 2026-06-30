@@ -5,7 +5,7 @@ import { ApiOutlined, AppstoreOutlined, BookOutlined, ClusterOutlined, DatabaseO
 import useI18n from '../hooks/useI18n'
 import { useProjectStore } from '../stores/projectStore'
 import { useAuthStore } from '../stores/authStore'
-import { collectAllowedPaths, normalizePath } from '../utils/permission'
+import { collectAllowedPaths, getEffectiveUserMenus, normalizePath } from '../utils/permission'
 import { withBasePath } from '../utils/path'
 import './styles/HomePage.css'
 
@@ -23,6 +23,7 @@ const HomePage: React.FC = () => {
   const navigate = useNavigate()
   const { currentProject } = useProjectStore()
   const { userMenus } = useAuthStore()
+  const effectiveUserMenus = getEffectiveUserMenus(userMenus)
   const baseUrl = `/project/${projectId}`
   // 全生命周期工作流步骤
   const workflowSteps = [
@@ -114,11 +115,11 @@ const HomePage: React.FC = () => {
       return
     }
     // 检查菜单权限：只有存在菜单数据中的路径才允许跳转
-    if (userMenus && userMenus.length > 0) {
+    if (effectiveUserMenus && effectiveUserMenus.length > 0) {
       // 标准化路径，移除项目ID前缀
       const normalizedPath = normalizePath(step.link)
       // 收集所有允许访问的路径
-      const allowedPaths = collectAllowedPaths(userMenus)
+      const allowedPaths = collectAllowedPaths(effectiveUserMenus)
       // 检查是否有精确匹配
       const hasExactMatch = allowedPaths.has(normalizedPath)
       // 检查是否有前缀匹配（支持子路由）

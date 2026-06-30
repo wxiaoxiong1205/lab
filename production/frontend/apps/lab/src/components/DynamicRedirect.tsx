@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
+import { getEffectiveUserMenus } from '../utils/permission'
 import type { MenuItem } from '../types'
 
 /**
@@ -47,17 +48,18 @@ const DynamicRedirect = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId?: string }>()
   const { userMenus } = useAuthStore()
+  const effectiveUserMenus = getEffectiveUserMenus(userMenus)
 
   useEffect(() => {
     if (projectId) {
       let targetPath = '/home'
 
-      if (userMenus && userMenus.length > 0) {
-        if (hasMenuPath(userMenus, '/home')) {
+      if (effectiveUserMenus && effectiveUserMenus.length > 0) {
+        if (hasMenuPath(effectiveUserMenus, '/home')) {
           targetPath = '/home'
         }
         else {
-          const firstMenuPath = findFirstMenuPath(userMenus)
+          const firstMenuPath = findFirstMenuPath(effectiveUserMenus)
           if (firstMenuPath) {
             targetPath = firstMenuPath
           }
@@ -69,7 +71,7 @@ const DynamicRedirect = () => {
     }
 
     navigate('/home', { replace: true })
-  }, [navigate, projectId, userMenus])
+  }, [effectiveUserMenus, navigate, projectId])
 
   return null
 }

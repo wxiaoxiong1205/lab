@@ -476,7 +476,7 @@ async def create_manual_evaluation_task(
     if not task.dataset_type:
         raise HTTPException(
             status_code=400,
-            detail="人工评估任务必须提供dataset_type（text-generation或image-understanding）"
+            detail="人工评估任务必须提供dataset_type（text-generation、image-understanding或image-generation）"
         )
     
     return await evaluation_task_service.create_evaluation_task(
@@ -1007,4 +1007,3 @@ async def download_manual_evaluation_results(
         task_id=task_id,
         format=format
     )
-

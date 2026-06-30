@@ -37,6 +37,7 @@ import {
 } from './BusinessInferenceParamsMappingCard'
 import type {
   CreateProjectEvaluationTaskParams,
+  EvaluationDatasetType,
   GraphicsCardResource,
   InferenceParams,
   NewDatasetModelRelation,
@@ -111,7 +112,9 @@ const CreateAutoEvaluationTask: React.FC<CreateAutoEvaluationTaskProps> = ({ eva
   const prevInferenceDatasetIdRef = useRef<number | undefined>(undefined)
   const [evaluationDataSource, setEvaluationDataSource] = useState<string>('existing')
   const [evaluationMethod, setEvaluationMethod] = useState<string[]>(['referee'])
-  const [evaluationCategory, setEvaluationCategory] = useState<string>('text-generation') // 评估类别：text-generation=文本生成，image-understanding=图像理解
+  const [evaluationCategory, setEvaluationCategory] = useState<EvaluationDatasetType>('text-generation') // 评估类别：text-generation=文本生成，image-understanding=图像理解，image-generation=图像生成
+  const isImageGeneration = evaluationCategory === 'image-generation'
+  const imageGenerationDatasetFormatQuery = isImageGeneration ? { dataset_format: ['image-prompt'] } : {}
 
   // 弹窗状态
   const [isModalVisible, setIsModalVisible] = useState(false)
@@ -771,8 +774,15 @@ const CreateAutoEvaluationTask: React.FC<CreateAutoEvaluationTaskProps> = ({ eva
 
   // 处理评估类别切换
   const handleEvaluationCategoryChange = (value: string) => {
-    setEvaluationCategory(value)
+    const nextCategory = value as EvaluationDatasetType
+    setEvaluationCategory(nextCategory)
     form.setFieldsValue({ evaluationCategory: value })
+    if (nextCategory === 'image-generation' && evaluationMethod.includes('basic_metric')) {
+      const nextMethods = evaluationMethod.filter((method) => method !== 'basic_metric')
+      setEvaluationMethod(nextMethods.length > 0 ? nextMethods : ['referee'])
+      form.setFieldsValue({ evaluationMethod: nextMethods.length > 0 ? nextMethods : ['referee'] })
+      setSelectedBasicMetrics([])
+    }
     // 切换评估类别时，清空推理结果集选择
     setSelectedInferenceDataset(null)
     setSelectedInferenceDatasets([])
@@ -810,15 +820,15 @@ const CreateAutoEvaluationTask: React.FC<CreateAutoEvaluationTaskProps> = ({ eva
       // 如果 evaluationPrefix 为 BUSSINESS，强制使用 text-generation
       const categoryValue = evaluationPrefix === 'BUSSINESS'
         ? 'text-generation'
-        : (datasetType === 'text-generation' ? 'text-generation' : 'image-understanding')
+        : (['text-generation', 'image-understanding', 'image-generation'].includes(datasetType) ? datasetType : 'text-generation')
       setEvaluationCategory(categoryValue)
       form.setFieldsValue({ evaluationCategory: categoryValue })
     }
   }, [datasetType, cloneTaskId, restartTaskId, editTaskId, evaluationPrefix, form])
 
-  // 当 evaluationPrefix 为 BUSSINESS时 防止直接更改url中dataset_type为image-understanding
+  // 当 evaluationPrefix 为 BUSSINESS时 防止直接更改url中dataset_type为非文本生成
   useEffect(() => {
-    if (evaluationPrefix === 'BUSSINESS' && evaluationCategory === 'image-understanding') {
+    if (evaluationPrefix === 'BUSSINESS' && evaluationCategory !== 'text-generation') {
       setEvaluationCategory('text-generation')
       form.setFieldsValue({ evaluationCategory: 'text-generation' })
       // 切换评估类别时，清空推理结果集选择
@@ -914,11 +924,14 @@ const CreateAutoEvaluationTask: React.FC<CreateAutoEvaluationTaskProps> = ({ eva
       // 如果 evaluationPrefix 为 BUSSINESS，强制使用 text-generation
       const categoryValue = evaluationPrefix === 'BUSSINESS'
         ? 'text-generation'
-        : (taskDetail.dataset_type === 'text-generation' ? 'text-generation' : (taskDetail.dataset_type === 'image-understanding' ? 'image-understanding' : 'text-generation'))
+        : (['text-generation', 'image-understanding', 'image-generation'].includes(taskDetail.dataset_type || '') ? taskDetail.dataset_type as EvaluationDatasetType : 'text-generation')
       setEvaluationCategory(categoryValue)
 
       // 设置评估方法
-      if (taskDetail.evaluation_method === 'all') {
+      if (categoryValue === 'image-generation') {
+        setEvaluationMethod(['referee'])
+      }
+      else if (taskDetail.evaluation_method === 'all') {
         setEvaluationMethod(['referee', 'basic_metric'])
       }
       else if (taskDetail.evaluation_method === 'referee') {
@@ -1826,6 +1839,10 @@ const CreateAutoEvaluationTask: React.FC<CreateAutoEvaluationTaskProps> = ({ eva
       message.error('请至少选择一种评估方法')
       return
     }
+    if (isImageGeneration && evaluationMethod.includes('basic_metric')) {
+      message.error('图像生成 V1.15 暂未接入基础指标评估，请使用裁判员评估')
+      return
+    }
 
     // 验证裁判员评估的必填项
     if (evaluationMethod.includes('referee')) {
@@ -2062,6 +2079,7 @@ const CreateAutoEvaluationTask: React.FC<CreateAutoEvaluationTaskProps> = ({ eva
         evaluation_type: evaluationType,
         data_source: values.evaluationDataSource as 'existing' | 'new',
         evaluation_method: evaluationMethodValue,
+        dataset_type: evaluationPrefix === 'BUSSINESS' ? 'text-generation' : evaluationCategory,
 
         // 推理结果集与模型关联
         dataset_model_relations: datasetModelRelations,
@@ -2543,7 +2561,10 @@ $`
                   >
                     <Radio value="text-generation">文本生成</Radio>
                     {evaluationPrefix !== 'BUSSINESS' && (
-                      <Radio value="image-understanding">图像理解</Radio>
+                      <>
+                        <Radio value="image-understanding">图像理解</Radio>
+                        <Radio value="image-generation">图像生成</Radio>
+                      </>
                     )}
                   </Radio.Group>
                 </Form.Item>
@@ -2570,6 +2591,7 @@ $`
                     statsQuery={{
                       usage: [evaluationPrefix === 'BUSSINESS' ? 'business-inference' : 'default-inference'],
                       dataset_type: [evaluationPrefix === 'BUSSINESS' ? 'business' : evaluationCategory],
+                      ...imageGenerationDatasetFormatQuery,
                     }}
                     fixedListUsage={evaluationPrefix === 'BUSSINESS' ? 'business-inference' : 'default-inference'}
                     listDatasetType={evaluationPrefix === 'BUSSINESS' ? 'business' : evaluationCategory}
@@ -2723,7 +2745,7 @@ $`
                           filter={filterNewDatasetCascader}
                           loading={inferenceDataLoading.datasets}
                           label="待推理数据"
-                          statsQuery={{ training_method_type: ['sft'], dataset_type: [evaluationCategory] }}
+                          statsQuery={{ training_method_type: ['sft'], dataset_type: [evaluationCategory], ...imageGenerationDatasetFormatQuery }}
                           listDatasetType={evaluationCategory}
                         />
                       </>
@@ -2786,27 +2808,30 @@ $`
 
                     {/* 基础指标评估 */}
                     {evaluationPrefix !== 'BUSSINESS' && (
-                      <Checkbox
-                        checked={evaluationMethod.includes('basic_metric')}
-                        onChange={(e) => {
-                          const checked = e.target.checked
-                          let newMethods: string[]
-                          if (checked) {
-                            newMethods = evaluationMethod.includes('basic_metric')
-                              ? evaluationMethod
-                              : [...evaluationMethod, 'basic_metric']
-                          }
-                          else {
-                            newMethods = evaluationMethod.filter((m) => m !== 'basic_metric')
-                          }
-                          setEvaluationMethod(newMethods)
-                          form.setFieldsValue({ evaluationMethod: newMethods })
-                          // 触发表单验证
-                          form.validateFields(['evaluationMethod'])
-                        }}
-                      >
-                        基础指标评估
-                      </Checkbox>
+                      <Tooltip title={isImageGeneration ? 'V1.15 图像生成暂未接入 CLIPScore、审美、安全等基础指标流水线，首版请使用裁判员评估。' : ''}>
+                        <Checkbox
+                          checked={!isImageGeneration && evaluationMethod.includes('basic_metric')}
+                          disabled={isImageGeneration}
+                          onChange={(e) => {
+                            const checked = e.target.checked
+                            let newMethods: string[]
+                            if (checked) {
+                              newMethods = evaluationMethod.includes('basic_metric')
+                                ? evaluationMethod
+                                : [...evaluationMethod, 'basic_metric']
+                            }
+                            else {
+                              newMethods = evaluationMethod.filter((m) => m !== 'basic_metric')
+                            }
+                            setEvaluationMethod(newMethods)
+                            form.setFieldsValue({ evaluationMethod: newMethods })
+                            // 触发表单验证
+                            form.validateFields(['evaluationMethod'])
+                          }}
+                        >
+                          基础指标评估
+                        </Checkbox>
+                      </Tooltip>
                     )}
                   </div>
                 </Form.Item>
