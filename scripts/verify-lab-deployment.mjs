@@ -17,8 +17,12 @@ const requiredMainBundleMarkers = [
     pattern: 'VITE_SHOWCASE_PREVIEW',
   },
   {
-    name: 'showcase static env guard',
-    pattern: 'VITE_SHOWCASE_STATIC',
+    name: 'showcase static adapter',
+    pattern: 'Unhandled showcase static endpoint',
+  },
+  {
+    name: 'showcase static project endpoint',
+    pattern: '/projects/list',
   },
 ]
 
