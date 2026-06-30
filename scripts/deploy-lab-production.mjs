@@ -24,6 +24,7 @@ async function main() {
   await run('npm', ['run', 'verify:vercel-preflight'])
   await run('npx', ['vercel@52.2.0', '--prod', '--yes', '--scope', 'wxiaoxiong1205s-projects'])
   await run('npm', ['run', 'verify:lab-deployment'])
+  await run('npm', ['run', 'verify:lab-browser'])
 }
 
 main().catch((error) => {

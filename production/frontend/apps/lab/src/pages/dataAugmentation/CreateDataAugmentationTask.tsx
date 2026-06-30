@@ -12,6 +12,12 @@ const { Title, Text } = Typography
 type ServiceType = 'deployment' | 'online_inference'
 type ServiceCascaderValue = [ServiceType, string]
 type DirectionRow = PromptDirectionConfig & { custom?: boolean, row_id?: string }
+type SelectableService = {
+  id?: string | number
+  name?: string
+  model_name?: string
+  server_name?: string
+}
 
 const DEFAULT_DIRECTIONS: DirectionRow[] = [
   { direction: '同类泛化', sample_count: 50, enabled: false, description: '问题类型不变，变换发生场景和情境' },
@@ -47,6 +53,11 @@ function getNextVersionFromDataset(dataset: any) {
   const matched = version.match(/V?(\d+)/i)
   if (!matched) return 'V1'
   return `V${Number(matched[1]) + 1}`
+}
+
+function getServiceName(service?: SelectableService) {
+  if (!service) return ''
+  return service.server_name || service.name || service.model_name || ''
 }
 
 export default function CreateDataAugmentationTask() {
@@ -133,12 +144,12 @@ export default function CreateDataAugmentationTask() {
   const resolveService = (value?: ServiceCascaderValue) => {
     if (!value || value.length !== 2) return {}
     const [serviceType, serviceId] = value
-    const serviceList = serviceType === 'deployment' ? deploymentServices : onlineInferenceServices
-    const service = serviceList.find((item: any) => String(item.id) === String(serviceId))
+    const serviceList: SelectableService[] = serviceType === 'deployment' ? deploymentServices : onlineInferenceServices
+    const service = serviceList.find((item) => String(item.id) === String(serviceId))
     return {
       service_type: serviceType,
       service_id: Number(serviceId),
-      service_name: service?.server_name || service?.name || service?.model_name || '',
+      service_name: getServiceName(service),
     }
   }
 

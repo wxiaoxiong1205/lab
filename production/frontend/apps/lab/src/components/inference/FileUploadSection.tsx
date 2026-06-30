@@ -101,14 +101,14 @@ const FileUploadSection: React.FC<FileUploadSectionProps> = ({
                 try {
                   const response = await inferenceResultSetService.downloadSample(fileType)
 
-                  const contentDisposition
+                  const rawContentDisposition
                     = response.headers['content-disposition']
                       || response.headers['Content-Disposition']
-                      || ''
-                  const contentType
+                  const rawContentType
                     = response.headers['content-type']
                       || response.headers['Content-Type']
-                      || ''
+                  const contentDisposition = typeof rawContentDisposition === 'string' ? rawContentDisposition : ''
+                  const contentType = typeof rawContentType === 'string' ? rawContentType : ''
 
                   let filename = `inference_result_sample.${fileType}`
                   if (contentDisposition) {

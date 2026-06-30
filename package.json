@@ -14,6 +14,7 @@
     "verify:vercel-preflight": "node scripts/verify-vercel-preflight.mjs",
     "verify:release": "npm run verify:github-push && npm run verify:vercel-preflight",
     "verify:lab-deployment": "node scripts/verify-lab-deployment.mjs",
+    "verify:lab-browser": "pnpm --dir production/frontend --filter lab verify:browser-smoke",
     "deploy:lab:prod": "node scripts/deploy-lab-production.mjs"
   },
   "repository": {

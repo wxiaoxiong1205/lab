@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "verify:browser-smoke": "node scripts/verify-browser-smoke.mjs",
     "lint": "eslint . --config eslint.config.mjs",
     "style:audit": "node ../../scripts/style-audit.mjs src",
     "style:audit:strict": "node ../../scripts/style-audit.mjs src --strict",
@@ -77,6 +78,7 @@
     "http-proxy-middleware": "^3.0.3",
     "lightningcss": "^1.30.2",
     "lightningcss-win32-x64-msvc": "^1.30.2",
+    "playwright": "1.58.0",
     "rollup-plugin-visualizer": "^6.0.5",
     "sass-embedded": "^1.89.0",
     "tailwindcss": "^4.1.0",

@@ -5,18 +5,18 @@ import { userApi } from '@/services/api'
 
 export interface MenuItemType {
   code: string
-  description: string
-  elementResourceId: number
-  elementStatus: number
-  highLightIconUrl: string | null
-  iconUrl: string
+  description?: string
+  elementResourceId?: number
+  elementStatus?: number
+  highLightIconUrl?: string | null
+  iconUrl?: string
   id: number
   idPath: string
   name: string
   parentId: number
-  pathUrl: string
-  remark: string | null
-  secretLevel: number
+  pathUrl?: string
+  remark?: string | null
+  secretLevel?: number
   sort: number
   type: number
   children?: MenuItemType[]
@@ -50,7 +50,7 @@ export function useSystemSetting() {
   const allMenItems = useMemo(() => parseMenuData(systemMenuData), [systemMenuData])
   const endItems = useMemo(() => {
     return parseMenuData(systemMenuData)
-      .filter((item) => item[0].children.length === 0)
+      .filter((item) => (item[0].children?.length ?? 0) === 0)
       .map((item) => ({
         preLevelItem: item[1],
         item: item[0],

@@ -32,6 +32,7 @@ type DistributionBucket = {
   min?: number
   max?: number
 }
+type DistributionBucketTemplate = Omit<DistributionBucket, 'count'>
 
 type DetailFilter = {
   id: number
@@ -81,7 +82,7 @@ function getSpecialRateBucket(rate: number) {
   return { range: '10%+', min: 10 }
 }
 
-function makeDistribution(keys: string[], orderedBuckets: DistributionBucket[]) {
+function makeDistribution(keys: string[], orderedBuckets: DistributionBucketTemplate[]) {
   const counts = new Map<string, number>()
   keys.forEach((key) => counts.set(key, (counts.get(key) || 0) + 1))
   return orderedBuckets.map((bucket) => ({ ...bucket, count: counts.get(bucket.range) || 0 }))

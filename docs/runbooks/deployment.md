@@ -70,10 +70,10 @@ npm run verify:vercel-preflight
 - Vercel 线上项目 ID、Root Directory、Build Command、Output Directory、Install Command 都与正式配置一致
 - 归档目录如果仍有指向正式 `lab` 的 `.vercel` 绑定，会打印风险警告
 
-在 `production/frontend` 执行本地构建。当前生产基线存在 React 18 与 `@types/react@19` 混装导致的 TypeScript JSX 类型冲突，`pnpm --filter lab build` 会在 `tsc -b` 阶段失败；发布门禁暂时使用与 Vercel 一致的 Vite 构建，TypeScript 门禁需作为独立依赖治理项恢复：
+在 `production/frontend` 执行本地构建。当前发布门禁已经恢复为完整 `tsc -b && vite build`：
 
 ```bash
-VITE_PUBLIC_PATH=/ VITE_API_BASE_URL=https://deepexilab-dev.deepexi.com/lab-backend VITE_SHOWCASE_PREVIEW=true pnpm --filter lab exec vite build
+pnpm --filter lab build
 ```
 
 如果本地构建失败，不要进入 Vercel 部署。
@@ -120,6 +120,7 @@ npm run deploy:lab:prod
 - `readyState` 为 `READY`
 - `Aliased: https://lab.aidaxiong.fun`
 - `npm run verify:lab-deployment` 自动通过
+- `npm run verify:lab-browser` 自动通过
 
 ### 4. 部署后检查
 
@@ -139,10 +140,18 @@ node scripts/verify-lab-deployment.mjs
 
 再做浏览器检查：
 
-1. 打开 `https://lab.aidaxiong.fun/home`
-2. 强制刷新：`Cmd + Shift + R`
-3. 如果仍看到旧认证状态，清理该域名站点数据后重试
-4. 预期不再出现：
+```bash
+npm run verify:lab-browser
+```
+
+成功时会用 Playwright 验证：
+
+- 首页项目列表渲染正常
+- 项目首页渲染正常
+- 训练数据集列表渲染正常且有 showcase 数据
+- 右下角“需求文档 / 需求评审”入口仍可见
+
+必要时再手工打开 `https://lab.aidaxiong.fun/home` 强制刷新：`Cmd + Shift + R`。如果仍看到旧认证状态，清理该域名站点数据后重试。预期不再出现：
    - 白屏
    - `Request failed with status code 404`
    - `未授权访问`
@@ -180,14 +189,15 @@ node scripts/verify-lab-deployment.mjs
 - 新增 `scripts/verify-vercel-preflight.mjs`，发布前校验正式 Vercel 项目、Root Directory、构建配置和本地绑定，降低误发到 `frontend` 或归档目录的风险。
 - 新增 `scripts/deploy-lab-production.mjs` 和 `npm run deploy:lab:prod`，把 GitHub 门禁、Vercel 门禁、正式部署、正式域名验收串成固定入口。
 - `.github-token.local`、`.playwright-cli/`、`Project/` 已加入仓库级忽略规则，降低误提交本地 token、浏览器调试产物和外部项目副本的风险。
+- 通过 workspace overrides 收敛 `@types/react` / `@types/react-dom` 到 React 18 类型版本，`pnpm --filter lab build` 已恢复为完整 TypeScript + Vite 门禁。
+- 新增 `production/frontend/apps/lab/scripts/verify-browser-smoke.mjs` 和 `npm run verify:lab-browser`，发布后自动覆盖首页、项目首页、训练数据集列表和右下角需求文档入口。
 
 ### 仍未解决的问题
 
 1. 普通 `git push` 的认证链路已恢复：仓库本地 credential helper 会从 `.github-token.local` 读取 GitHub token，且 `npm run verify:github-push` 会在发布前验证凭据、远端读取、fetch 和 `git push --dry-run --porcelain` 写入门禁；当前仍观察到 `git ls-remote` 偶发 `Operation too slow` / timeout，这属于 GitHub Git 传输链路或本机网络问题，不应再误判为 token 权限问题。
 2. Vercel 仍会按项目创建时间默认使用 pnpm 10，仓库 lockfile 是 pnpm 9 生成；目前可构建，但长期应统一 package manager 版本策略。
-3. `pnpm --filter lab build` 当前因 React 18 与 `@types/react@19` 混装触发大量 JSX 类型错误；Vercel 和本地发布检查暂用 `vite build`，后续需要收敛 React 类型版本并恢复 TypeScript 门禁。
-4. `VITE_SHOWCASE_PREVIEW=true` 已改为后端优先、前端兜底，但 Notebook 周边、预置模型、已发布模型选择等模块仍有前端 mock 主导路径，需后续补真实 API 或单列迁移边界。
-5. 当前静态检查不能替代浏览器冒烟；后续应补一个稳定的 Playwright/Chrome 检查，覆盖登录后首页、项目列表、数据集入口和右下角需求文档入口。
+3. `VITE_SHOWCASE_PREVIEW=true` 已改为后端优先、前端兜底，但 Notebook 周边、预置模型、已发布模型选择等模块仍有前端 mock 主导路径，需后续补真实 API 或单列迁移边界。
+4. 浏览器冒烟当前覆盖首页、项目首页、训练数据集列表和需求文档入口；后续可继续扩展到创建训练、推理、评估、清洗、增强、洞察、标注入口。
 
 ## 下次发布的快速决策树
 
@@ -260,4 +270,4 @@ npm run verify:github-push
 4. Vercel deployment 为 Ready。
 5. `lab.aidaxiong.fun` alias 指向最新 deployment。
 6. `npm run verify:lab-deployment` 通过。
-7. 浏览器强刷后首页不再出现白屏、404、未授权、认证失效。
+7. `npm run verify:lab-browser` 通过。
