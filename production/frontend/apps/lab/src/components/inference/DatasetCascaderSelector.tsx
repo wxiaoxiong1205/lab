@@ -85,6 +85,7 @@ const DatasetCascaderSelector: React.FC<DatasetCascaderSelectorProps> = ({ form,
   const [open, setOpen] = useState(false)
   const [stats, setStats] = useState<FilterOptions | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
+  const [datasetTypePick, setDatasetTypePick] = useState<string | undefined>()
   const currentDatasetTypeForFallback = statsQuery?.dataset_type?.[0] ?? listDatasetType ?? datasetTypePick ?? 'text-generation'
   const attrGroups: AttrOptions[] = useMemo(() => {
     if (stats?.attr_option?.length) {
@@ -137,7 +138,6 @@ const DatasetCascaderSelector: React.FC<DatasetCascaderSelectorProps> = ({ form,
   const defaultUsageFilter = useMemo(() => (fixedListUsage ?? resolvedStatsQuery.usage[resolvedStatsQuery.usage.length - 1] ?? ''), [fixedListUsage, resolvedStatsQuery.usage])
   const [usageFilter, setUsageFilter] = useState<string>('')
   const noVersionInferenceMode = useMemo(() => useInferenceResultApi && isNoVersionInferenceUsage(fixedListUsage ?? usageFilter), [useInferenceResultApi, fixedListUsage, usageFilter])
-  const [datasetTypePick, setDatasetTypePick] = useState<string | undefined>()
   const [datasetFormatPick, setDatasetFormatPick] = useState<string | undefined>()
   const [attrNamePick, setAttrNamePick] = useState<string | undefined>()
   const [attrValuePick, setAttrValuePick] = useState<string | undefined>()
