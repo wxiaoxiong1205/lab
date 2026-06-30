@@ -28,4 +28,5 @@ archive/1.0-demo/app/server/document-agent-db.json
 .playwright-cli/
 Project/
 .vercel
+.vercel.disabled-*/
 .superpowers/
