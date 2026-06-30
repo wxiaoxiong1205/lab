@@ -250,8 +250,6 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
     loading: dataLoading,
     errors: dataErrors,
     isLoading: isDataLoading,
-    hasError: hasDataError,
-    retryAll,
     retry,
   } = useInferenceData(projectId, datasetTypeForFilter, modelTypeForFilter)
 
@@ -1633,22 +1631,41 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
   // 获取错误信息列表
   const getErrorMessages = () => {
     const errorList: string[] = []
-    if (dataErrors.baseModels) {
+    const needsModels = inferenceMethod === InferenceMethod.OFFLINE
+    const needsDatasets = inferenceMethod === InferenceMethod.OFFLINE || inferenceMethod === InferenceMethod.ONLINE
+    const needsInferenceServices = inferenceMethod === InferenceMethod.ONLINE
+    const needsGpuResources = inferenceMethod === InferenceMethod.OFFLINE
+
+    if (needsModels && dataErrors.baseModels) {
       errorList.push('基础模型列表加载失败')
     }
-    if (dataErrors.trainedModels) {
+    if (needsModels && dataErrors.trainedModels) {
       errorList.push('训练模型列表加载失败')
     }
-    if (dataErrors.datasets) {
+    if (needsDatasets && dataErrors.datasets) {
       errorList.push('数据集列表加载失败')
     }
-    if (dataErrors.inferenceServices) {
+    if (needsInferenceServices && dataErrors.inferenceServices) {
       errorList.push('推理服务列表加载失败')
     }
-    if (dataErrors.gpuResources) {
+    if (needsGpuResources && dataErrors.gpuResources) {
       errorList.push('GPU资源列表加载失败')
     }
     return errorList
+  }
+  const errorMessages = getErrorMessages()
+  const hasVisibleDataError = errorMessages.length > 0
+  const retryVisibleData = () => {
+    if (inferenceMethod === InferenceMethod.OFFLINE) {
+      retry.baseModels()
+      retry.trainedModels()
+      retry.datasets()
+      retry.gpuResources()
+    }
+    else if (inferenceMethod === InferenceMethod.ONLINE) {
+      retry.datasets()
+      retry.inferenceServices()
+    }
   }
 
   return (
@@ -1669,7 +1686,7 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
       </Row> */}
 
       {/* 错误提示 */}
-      {hasDataError && (
+      {hasVisibleDataError && (
         <Alert
           message="数据加载失败"
           description={(
@@ -1678,7 +1695,7 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                 以下数据加载失败，请重试：
               </div>
               <ul className="m-0 pl-5">
-                {getErrorMessages().map((msg, index) => (
+                {errorMessages.map((msg, index) => (
                   <li key={index}>{msg}</li>
                 ))}
               </ul>
@@ -1690,7 +1707,7 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
             <Button
               size="small"
               icon={<ReloadOutlined />}
-              onClick={retryAll}
+              onClick={retryVisibleData}
               loading={isDataLoading}
             >
               重试
@@ -2137,6 +2154,9 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                     <Space direction="horizontal" size="middle">
                       {dataFormatOptions?.options
                         ?.filter((option) => {
+                          if (!option?.value) {
+                            return false
+                          }
                           const isImageUnderstanding = dataSource === 'image-understanding'
                           const isImageGeneration = dataSource === 'image-generation'
                           if (isImageGeneration) {
@@ -2145,7 +2165,7 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                           if (isImageUnderstanding && option.value === 'prompt-response') {
                             return false
                           }
-                          return true
+                          return ['prompt-response', 'role-based'].includes(option.value)
                         })
                         ?.map((option) => {
                           const isImageUnderstanding = dataSource === 'image-understanding'
@@ -2155,11 +2175,16 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
                             : isImageGeneration
                               ? option.value !== 'image-prompt'
                             : option.value === 'prefix-suffix-middle'
+                          const formatLabelMap: Record<string, string> = {
+                            'prompt-response': 'PROMPT_RESPONSE',
+                            'role-based': 'ROLE_BASED',
+                            'image-prompt': 'IMAGE_PROMPT',
+                          }
                           return (
                             <div key={option.value} className="create-inference-format-option">
                               <Radio value={option.value} disabled={shouldDisable}>
                                 <span className="create-inference-format-content">
-                                  <span>{option.name}</span>
+                                  <span>{option.name || formatLabelMap[option.value] || option.value}</span>
                                   {(option.value === 'role-based' || option.value === 'prompt-response') && (
                                     <Popover
                                       content={(
