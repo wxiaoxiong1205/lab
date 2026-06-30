@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Alert,
   Button,
   Card,
   DatePicker,
@@ -21,7 +20,6 @@ import {
   DatabaseOutlined,
   FileTextOutlined,
   QuestionCircleOutlined,
-  ReloadOutlined,
 } from '@ant-design/icons'
 import type { RcFile } from 'antd/es/upload'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -291,9 +289,6 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
     datasetCascaderOptions,
     setDatasetCascaderOptions,
     loading: dataLoading,
-    errors: dataErrors,
-    isLoading: isDataLoading,
-    retry,
   } = useInferenceData(projectId, datasetTypeForFilter, modelTypeForFilter)
 
   const { loadDatasetVersions } = useDatasetVersions(
@@ -1674,46 +1669,6 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
     })
   }
 
-  // 获取错误信息列表
-  const getErrorMessages = () => {
-    const errorList: string[] = []
-    const needsModels = inferenceMethod === InferenceMethod.OFFLINE
-    const needsDatasets = inferenceMethod === InferenceMethod.OFFLINE || inferenceMethod === InferenceMethod.ONLINE
-    const needsInferenceServices = inferenceMethod === InferenceMethod.ONLINE
-    const needsGpuResources = inferenceMethod === InferenceMethod.OFFLINE
-
-    if (needsModels && dataErrors.baseModels) {
-      errorList.push('基础模型列表加载失败')
-    }
-    if (needsModels && dataErrors.trainedModels) {
-      errorList.push('训练模型列表加载失败')
-    }
-    if (needsDatasets && dataErrors.datasets) {
-      errorList.push('数据集列表加载失败')
-    }
-    if (needsInferenceServices && dataErrors.inferenceServices) {
-      errorList.push('推理服务列表加载失败')
-    }
-    if (needsGpuResources && dataErrors.gpuResources) {
-      errorList.push('GPU资源列表加载失败')
-    }
-    return errorList
-  }
-  const errorMessages = getErrorMessages()
-  const hasVisibleDataError = errorMessages.length > 0
-  const retryVisibleData = () => {
-    if (inferenceMethod === InferenceMethod.OFFLINE) {
-      retry.baseModels()
-      retry.trainedModels()
-      retry.datasets()
-      retry.gpuResources()
-    }
-    else if (inferenceMethod === InferenceMethod.ONLINE) {
-      retry.datasets()
-      retry.inferenceServices()
-    }
-  }
-
   return (
     <Layout.Content className="create-inference-result-page relative !h-full">
       {/* 页面标题
@@ -1730,38 +1685,6 @@ const CreateInferenceResultSetPage: React.FC<{ usage?: string }> = ({ usage }) =
           />
         </Col>
       </Row> */}
-
-      {/* 错误提示 */}
-      {hasVisibleDataError && (
-        <Alert
-          message="数据加载失败"
-          description={(
-            <div>
-              <div className="mb-2">
-                以下数据加载失败，请重试：
-              </div>
-              <ul className="m-0 pl-5">
-                {errorMessages.map((msg, index) => (
-                  <li key={index}>{msg}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          type="error"
-          showIcon
-          action={(
-            <Button
-              size="small"
-              icon={<ReloadOutlined />}
-              onClick={retryVisibleData}
-              loading={isDataLoading}
-            >
-              重试
-            </Button>
-          )}
-          className="mb-4"
-        />
-      )}
 
       <div className="create-inference-result-card create-form-card">
         <CreateFormPageHeader
