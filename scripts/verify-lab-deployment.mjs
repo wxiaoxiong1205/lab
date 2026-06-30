@@ -16,6 +16,10 @@ const requiredMainBundleMarkers = [
     name: 'showcase preview env guard',
     pattern: 'VITE_SHOWCASE_PREVIEW',
   },
+  {
+    name: 'showcase static env guard',
+    pattern: 'VITE_SHOWCASE_STATIC',
+  },
 ]
 
 async function fetchText(url) {

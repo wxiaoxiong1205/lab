@@ -9,7 +9,7 @@
 1. 源码是正确的：本地改动、依赖解析、构建入口都和生产代码一致。
 2. 构建环境是确定的：Vercel 的 root、install command、build command、output directory、环境变量都和本地预期一致。
 3. 静态资源路径是正确的：独立域名必须使用 `/assets/...`，不能使用控制台内嵌时的 `/lab/assets/...`。
-4. API 基址是正确的：独立域名不能请求 `https://lab.aidaxiong.fun/lab-backend/...`，必须使用真实后端 `https://deepexilab-dev.deepexi.com/lab-backend/api/v1`。
+4. 演示数据模式是确定的：正式域名默认使用 `VITE_SHOWCASE_STATIC=true`，不依赖远程后端；真实后端演示只在隔离后端开启演示鉴权后使用。
 5. 认证模式是闭环的：授权链接 token、控制台内嵌 token、演示预览 token 不能互相覆盖；演示 token 触发真实后端 401 时不能清空演示登录态。
 6. 发布结果经过验证：GitHub 分支、Vercel deployment、正式域名、线上主 JS 内容必须对齐。
 
@@ -94,19 +94,27 @@ Production 环境变量必须包含：
 - `VITE_PUBLIC_PATH=/`
 - `VITE_API_BASE_URL=https://deepexilab-dev.deepexi.com/lab-backend`
 - `VITE_SHOWCASE_PREVIEW=true`
+- `VITE_SHOWCASE_STATIC=true`
 
-如果后端环境用于独立域名演示，并且该后端是隔离的演示后端，可以显式开启：
+当前正式域名对外演示使用 `VITE_SHOWCASE_STATIC=true`。该模式由前端统一请求层返回提交到仓库的演示数据，避免正式域名依赖远程后端机器、鉴权配置或公网可用性。`VITE_API_BASE_URL` 仍保留，用于关闭静态模式后的真实后端联调。
+
+如果后端环境用于独立域名真实后端演示，并且该后端是隔离的演示后端，可以显式开启：
 
 - `SHOWCASE_PREVIEW_AUTH=true`
 
 该开关只允许固定演示 token 读取后端种子数据，不允许写操作；不应在真实生产租户或共享开发后端开启。
 
+注意：当前前端仍保留真实后端地址 `https://deepexilab-dev.deepexi.com/lab-backend`，但正式域名静态演示模式不会访问它。只有切换到真实后端演示模式时，才需要确认该域名解析到公网 `139.9.233.253`，不是本地保存的 `10.201.0.20` 调试机；不要在错误机器上修改环境变量或重启容器。
+
 检查命令：
 
 ```bash
 npm run verify:vercel-preflight
+npm run verify:showcase-static
 npx vercel@52.2.0 env ls --scope wxiaoxiong1205s-projects
 ```
+
+`verify:showcase-static` 会检查静态演示适配层覆盖关键模块，并用 `VITE_SHOWCASE_STATIC=true` 做一次前端构建。`verify:showcase-backend` 保留为真实后端模式专项检查；如果它返回 401，说明后端还没有开启 `SHOWCASE_PREVIEW_AUTH=true`，或者演示 seed 没有初始化到当前后端数据库。
 
 ### 3. 部署
 
@@ -119,6 +127,7 @@ npm run deploy:lab:prod
 - CLI 输出 `status: ok`
 - `readyState` 为 `READY`
 - `Aliased: https://lab.aidaxiong.fun`
+- `npm run verify:showcase-static` 自动通过
 - `npm run verify:lab-deployment` 自动通过
 - `npm run verify:lab-browser` 自动通过
 
@@ -137,6 +146,7 @@ node scripts/verify-lab-deployment.mjs
 - 主 JS 包含真实后端地址
 - 主 JS 包含演示预览 token
 - 主 JS 包含 `VITE_SHOWCASE_PREVIEW` 构建标记
+- 主 JS 包含静态演示构建标记
 
 再做浏览器检查：
 
@@ -149,6 +159,10 @@ npm run verify:lab-browser
 - 首页项目列表渲染正常
 - 项目首页渲染正常
 - 训练数据集列表渲染正常且有 showcase 数据
+- 数据清洗、数据洞察、数据增强、数据标注入口渲染正常且有代表数据
+- 大模型训练任务、我的模型、Notebook、推理结果集、效果评估入口渲染正常且有代表数据
+- 业务效果评估、预置模型、机器学习数据、机器模型部署、机器学习标注入口渲染正常且有代表数据
+- 各页面加载期间不能出现 API 401、403、404 或 5xx
 - 右下角“需求文档 / 需求评审”入口仍可见
 
 必要时再手工打开 `https://lab.aidaxiong.fun/home` 强制刷新：`Cmd + Shift + R`。如果仍看到旧认证状态，清理该域名站点数据后重试。预期不再出现：
@@ -197,7 +211,7 @@ npm run verify:lab-browser
 1. 普通 `git push` 的认证链路已恢复：仓库本地 credential helper 会从 `.github-token.local` 读取 GitHub token，且 `npm run verify:github-push` 会在发布前验证凭据、远端读取、fetch 和 `git push --dry-run --porcelain` 写入门禁；当前仍观察到 `git ls-remote` 偶发 `Operation too slow` / timeout，这属于 GitHub Git 传输链路或本机网络问题，不应再误判为 token 权限问题。
 2. Vercel 仍会按项目创建时间默认使用 pnpm 10，仓库 lockfile 是 pnpm 9 生成；目前可构建，但长期应统一 package manager 版本策略。
 3. `VITE_SHOWCASE_PREVIEW=true` 已改为后端优先、前端兜底，但 Notebook 周边、预置模型、已发布模型选择等模块仍有前端 mock 主导路径，需后续补真实 API 或单列迁移边界。
-4. 浏览器冒烟当前覆盖首页、项目首页、训练数据集列表和需求文档入口；后续可继续扩展到创建训练、推理、评估、清洗、增强、洞察、标注入口。
+4. 浏览器冒烟已扩展到数据处理、标注、训练、模型、Notebook、推理、评估、预置模型和机器学习模块入口；后续还可继续扩展到创建表单和详情页。
 
 ## 下次发布的快速决策树
 
@@ -234,6 +248,24 @@ npx vercel@52.2.0 env ls --scope wxiaoxiong1205s-projects
 ### 认证失效
 
 优先判断是否是演示 token 被真实后端 401 清空。演示模式下不应该触发全局登出；如果复现，检查 `apiClient.ts` 的演示 401 guard 是否仍在。
+
+### 正式域名只需要演示，不需要后端
+
+确认 Vercel Production 已开启：
+
+```bash
+VITE_SHOWCASE_STATIC=true
+VITE_SHOWCASE_PREVIEW=true
+```
+
+然后运行：
+
+```bash
+npm run verify:showcase-static
+npm run verify:lab-browser
+```
+
+如果 `verify:showcase-backend` 失败但上述两项通过，说明真实后端演示模式未就绪，不影响正式域名静态演示。
 
 ### Vercel 构建失败
 

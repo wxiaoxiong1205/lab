@@ -25,6 +25,13 @@ const riskyProjectFiles = [
   'archive/1.0-demo/app/.vercel/project.json',
 ]
 
+const requiredProductionEnvNames = [
+  'VITE_API_BASE_URL',
+  'VITE_PUBLIC_PATH',
+  'VITE_SHOWCASE_PREVIEW',
+  'VITE_SHOWCASE_STATIC',
+]
+
 const run = (cmd, args, options = {}) => {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, {
@@ -87,6 +94,13 @@ const parseInspectValue = (inspectText, label) => {
   return line.replace(label, '').trim()
 }
 
+const hasProductionEnv = (envListText, name) => {
+  return envListText
+    .split('\n')
+    .map((line) => line.trim())
+    .some((line) => line.startsWith(`${name} `) && /\bProduction\b/.test(line))
+}
+
 async function main() {
   const repoRoot = (await run('git', ['rev-parse', '--show-toplevel'])).stdout.trim()
   const cwd = process.cwd()
@@ -129,6 +143,18 @@ async function main() {
   requireEqual('Vercel Output Directory', parseInspectValue(inspectText, 'Output Directory'), expected.outputDirectory)
   requireEqual('Vercel Install Command', parseInspectValue(inspectText, 'Install Command'), expected.installCommand)
 
+  const envList = await run('npx', ['vercel@52.2.0', 'env', 'ls', '--scope', expected.scope], {
+    cwd: repoRoot,
+    timeout: 90000,
+  })
+  const envListText = `${envList.stdout}\n${envList.stderr}`
+  const missingEnvNames = requiredProductionEnvNames.filter((name) => {
+    return !hasProductionEnv(envListText, name)
+  })
+  if (missingEnvNames.length > 0) {
+    throw new Error(`Vercel Production env is missing: ${missingEnvNames.join(', ')}`)
+  }
+
   console.log(JSON.stringify({
     status: 'ok',
     project: expected.projectName,
@@ -138,6 +164,7 @@ async function main() {
     outputDirectory: expected.outputDirectory,
     buildCommand: expected.buildCommand,
     installCommand: expected.installCommand,
+    productionEnv: requiredProductionEnvNames,
   }, null, 2))
 }
 

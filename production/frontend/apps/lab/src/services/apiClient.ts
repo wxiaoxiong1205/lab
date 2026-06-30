@@ -14,6 +14,7 @@ import { copyToClipboard } from '../utils/clipboard'
 import { tokenStorage, useAuthStore } from '../stores/authStore'
 import { getBackendConfig, getBackendURLFromParams, sstBackendConfig } from '../utils/getBackendURL'
 import { useIamLogin as iamLogin } from '@/hooks/use-iam-login'
+import { getShowcaseStaticResponse, showcaseStaticAdapter } from '@/showcase/staticApi'
 
 declare module 'axios' {
   interface AxiosRequestConfig {
@@ -49,8 +50,16 @@ const baseURL = import.meta.env.DEV
 const showcasePreviewToken = 'local-preview-lab-tenant-admin-token'
 const isShowcasePreview = import.meta.env.VITE_SHOWCASE_PREVIEW === 'true'
 
-const isShowcasePreviewAuth = () => {
-  return isShowcasePreview && tokenStorage.getToken() === showcasePreviewToken
+const isShowcasePreviewBackend = (value?: string) => {
+  return normalizeApiBaseURL(value) === normalizeApiBaseURL(baseURL)
+}
+
+const isShowcasePreviewAuth = (config?: InternalAxiosRequestConfig) => {
+  const authorization = config?.headers?.Authorization || config?.headers?.authorization
+  return isShowcasePreview && (
+    tokenStorage.getToken() === showcasePreviewToken
+    || authorization === `Bearer ${showcasePreviewToken}`
+  )
 }
 
 const apiClient: AxiosInstance = axios.create({
@@ -79,6 +88,10 @@ apiClient.interceptors.request.use(
       // 如果都没有，使用默认的baseURL
     }
 
+    if (getShowcaseStaticResponse(config)) {
+      config.adapter = showcaseStaticAdapter
+    }
+
     // 优先使用 qiankun 下发的 token
     let token: string | null = null
     if (window.qiankunProps?.authStorage) {
@@ -92,6 +105,10 @@ apiClient.interceptors.request.use(
         = localStorage.getItem('auth_token')
           || tokenStorage?.getToken()
           || useAuthStore?.getState()?.token
+    }
+
+    if (!token && isShowcasePreview && isShowcasePreviewBackend(config.baseURL ?? baseURL)) {
+      token = showcasePreviewToken
     }
 
     // 设置 token
@@ -116,7 +133,7 @@ const handleResponseError = (error: any) => {
 
   // 401 自动登出
   if (error?.response?.status === 401) {
-    if (isShowcasePreviewAuth()) {
+    if (isShowcasePreviewAuth(error.response.config)) {
       return Promise.reject(error)
     }
     return tryRefreshToken(error.response.config)

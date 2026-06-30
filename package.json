@@ -11,8 +11,10 @@
     "audit:demo-showcase": "python3 production/backend/scripts/audit_demo_showcase.py",
     "setup:github-proxy": "git config http.proxy http://127.0.0.1:7897",
     "verify:github-push": "node scripts/verify-github-push-readiness.mjs",
+    "verify:showcase-backend": "node scripts/verify-showcase-backend.mjs",
+    "verify:showcase-static": "node scripts/verify-showcase-static.mjs",
     "verify:vercel-preflight": "node scripts/verify-vercel-preflight.mjs",
-    "verify:release": "npm run verify:github-push && npm run verify:vercel-preflight",
+    "verify:release": "npm run verify:github-push && npm run verify:vercel-preflight && npm run verify:showcase-static",
     "verify:lab-deployment": "node scripts/verify-lab-deployment.mjs",
     "verify:lab-browser": "pnpm --dir production/frontend --filter lab verify:browser-smoke",
     "deploy:lab:prod": "node scripts/deploy-lab-production.mjs"
