@@ -16,7 +16,6 @@ import {
   Space,
   Table,
   type TableColumnsType,
-  Tag,
   Tooltip,
   Typography,
   message,
@@ -39,7 +38,6 @@ import type { BaseModel, CreateBaseModelParams, GetBaseModelsParams } from '@/ty
 import useI18n from '@/hooks/useI18n'
 import CreateBaseModelModal from '@/components/common/CreateBaseModelModal'
 import EditBaseModelModal from '@/components/common/EditBaseModelModal'
-import { ModelTypeMapping } from '@/utils/EnumMaping'
 
 import { useConfigStore } from '@/stores/configStore'
 import TableActionColumn, { type TableActionItem } from '@/components/common/TableActionColumn'
@@ -51,7 +49,6 @@ const { Text, Title } = Typography
 // 搜索表单接口定义
 interface SearchFormData {
   name?: string
-  model_type?: string
   model_provider?: string
 }
 
@@ -93,19 +90,6 @@ const BaseModelManagement: React.FC = () => {
 
   // 处理方法
   const handleSearch = (values: SearchFormData) => {
-    const modelType = values.model_type
-    if (modelType === '文本生成') {
-      values.model_type = 'text-generation'
-    }
-    if (modelType === '图像生成') {
-      values.model_type = 'image-generation'
-    }
-    if (modelType === '图像理解') {
-      values.model_type = 'image-understanding'
-    }
-    if (modelType === '多模态') {
-      values.model_type = 'multimodal'
-    }
     const newParams: GetBaseModelsParams = {
       ...searchParams,
       ...values,
@@ -135,7 +119,7 @@ const BaseModelManagement: React.FC = () => {
   const createBaseModelMutation = useMutation({
     mutationFn: (params: CreateBaseModelParams) => ModelService.CreateBaseModel(params),
     onSuccess: () => {
-      message.success('基础模型创建成功')
+      message.success('模型创建成功')
       setCreateModalVisible(false)
       queryClient.invalidateQueries({ queryKey: ['base-models'] })
     },
@@ -150,7 +134,7 @@ const BaseModelManagement: React.FC = () => {
     mutationFn: ({ id, values }: { id: string, values: Partial<CreateBaseModelParams> }) =>
       ModelService.UpdateBaseModel(id, values),
     onSuccess: () => {
-      message.success('基础模型更新成功')
+      message.success('模型更新成功')
       setEditModalVisible(false)
       setEditingModel(null)
       queryClient.invalidateQueries({ queryKey: ['base-models'] })
@@ -256,7 +240,7 @@ const BaseModelManagement: React.FC = () => {
     }
   }
 
-  // 基础模型表格列定义
+  // 模型仓库表格列定义
   const columns: TableColumnsType<BaseModel> = [
     {
       title: '模型Code',
@@ -283,74 +267,11 @@ const BaseModelManagement: React.FC = () => {
       },
     },
     {
-      title: '模型类型',
-      dataIndex: 'model_type',
-      key: 'model_type',
-      align: 'left',
-      width: 150,
-      render: (model_type: string | string[], record: BaseModel) => {
-        if (!model_type) {
-          return <div className="text-left">-</div>
-        }
-        const types = Array.isArray(model_type) ? model_type : [model_type]
-        if (types.length === 0) {
-          return <div className="text-left">-</div>
-        }
-        return (
-          <div className="flex justify-left flex-wrap gap-2">
-            {types.map((type, index) => {
-              const mapping = ModelTypeMapping(type)
-              const color = type === 'image-understanding' ? 'yellow' : 'cyan'
-              return (
-                <Tag
-                  key={`${type}-${index}`}
-                  color={color}
-                  className={`base-model-type-tag base-model-type-tag-${color}`}
-                  style={{ margin: 0 }}
-                >
-                  {mapping.text}
-                </Tag>
-              )
-            })}
-          </div>
-        )
-      },
-    },
-    {
       title: '模型提供商',
       dataIndex: 'model_provider',
       key: 'model_provider',
       align: 'left',
       width: 80,
-    },
-    {
-      title: '支持能力',
-      dataIndex: 'model_tags',
-      key: 'model_tags',
-      align: 'left',
-      width: 100,
-      render: (model_tags: string[]) => {
-        if (!model_tags || model_tags.length === 0) {
-          return <div className="text-left">-</div>
-        }
-        return (
-          <div className="flex justify-left flex-wrap gap-2">
-            {model_tags.map((tag) => {
-              // 将英文标签转换为中文显示
-              const tagMap: Record<string, string> = {
-                training: '训练',
-                inference: '推理',
-              }
-              const displayTag = tagMap[tag] || tag
-              return (
-                <Tag key={tag} color="blue">
-                  {displayTag}
-                </Tag>
-              )
-            })}
-          </div>
-        )
-      },
     },
     {
       title: '状态',
@@ -476,7 +397,7 @@ const BaseModelManagement: React.FC = () => {
   return (
     <div className="base-model-management-container lab-list-page-shell">
       <div className="flex justify-between mb-4">
-        <Title level={4} className="m-0">基础模型管理</Title>
+        <Title level={4} className="m-0">模型仓库</Title>
       </div>
 
       <Card className="mb-4">
@@ -486,14 +407,6 @@ const BaseModelManagement: React.FC = () => {
           onFinish={handleSearch}
           className="w-full flex flex-row flex-wrap gap-2"
         >
-          <Form.Item name="model_type" className="mb-2">
-            <Select className="w-[200px]" placeholder="请选择模型类型" allowClear>
-              <Option value="text-generation">文本生成</Option>
-              <Option value="image-generation">图像生成</Option>
-              <Option value="image-understanding">图像理解</Option>
-              <Option value="multimodal">多模态</Option>
-            </Select>
-          </Form.Item>
           <Form.Item name="model_provider" className="mb-2">
             <Select className="w-[250px]" placeholder="请选择模型提供商" allowClear>
               <Option value="Qwen">Qwen</Option>

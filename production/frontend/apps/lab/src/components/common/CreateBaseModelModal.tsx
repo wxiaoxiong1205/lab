@@ -7,11 +7,10 @@
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert, Checkbox, Col, DatePicker, Form, Input, Modal, Radio, Row, Select, Space, Switch, TimePicker } from 'antd'
+import { Col, DatePicker, Form, Input, Modal, Radio, Row, Select, Space, Switch, TimePicker } from 'antd'
 import dayjs from 'dayjs'
 import { useQuery } from '@tanstack/react-query'
-import type { CreateBaseModelParams, ModelProviderOption, ModelTypeOption } from '@/types/model'
-import { ModelTypeMapping } from '@/utils/EnumMaping'
+import type { CreateBaseModelParams, ModelProviderOption } from '@/types/model'
 import { ModelService } from '@/services/modelsApi'
 import { getCanUseKubernetesClusters } from '@/services/kubernetesService'
 import type { KubernetesCluster } from '@/types'
@@ -32,7 +31,6 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
 }) => {
   const [form] = Form.useForm()
   const [modelProviderEnumValues, setModelProviderEnumValues] = useState<ModelProviderOption[]>([])
-  const [modelTypeList, setModelTypeList] = useState<ModelTypeOption[]>([])
   const model_source = Form.useWatch('model_source', form)
   const scheduleEnabled = Form.useWatch('schedule_enabled', form) ?? false
   const { config, providerType } = useConfigStore()
@@ -42,18 +40,12 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
     const projectEnumValues = JSON.parse(localStorage.getItem('projectEnumValues') || '{}')
     const allEnums = Array.isArray(projectEnumValues?.all_enums) ? projectEnumValues.all_enums : []
     const modelProvider = allEnums.find((item) => item.enum_name === 'ModelProvider')
-    const modelType = allEnums.find((item) => item.enum_name === 'ModelType')
     const modelProviderOptions = Array.isArray(modelProvider?.options) ? modelProvider.options : [
       { name: 'Qwen', value: 'Qwen', description: null },
       { name: 'Llama', value: 'Llama', description: null },
     ]
-    const modelTypeOptions = Array.isArray(modelType?.options) ? modelType.options : [
-      { name: 'text-generation', value: 'text-generation', description: null },
-      { name: 'image-understanding', value: 'image-understanding', description: null },
-    ]
 
     setModelProviderEnumValues(modelProviderOptions)
-    setModelTypeList(modelTypeOptions)
   }, [])
 
   useEffect(() => {
@@ -67,16 +59,31 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
   })
 
   const modelSourceOptions = useMemo(
-    () => modelSourceEnums?.filter((item) => item.value !== 'Local'),
+    () => modelSourceEnums?.filter((item) => item.value === 'ModelScope'),
     [modelSourceEnums],
   )
 
+  const fixedModelSourceOptions = useMemo(
+    () => (modelSourceOptions?.length ? modelSourceOptions : [{ label: 'ModelScope', value: 'ModelScope' }]).map((item) => ({
+      value: item.value,
+      label: (
+        <span>
+          ModelScope
+          <a href="https://www.modelscope.cn/models" target="_blank" rel="noreferrer" className="ml-2 !underline">
+            https://www.modelscope.cn/models
+          </a>
+        </span>
+      ),
+    })),
+    [modelSourceOptions],
+  )
+
   useEffect(() => {
-    if (!visible || !modelSourceOptions?.length)
+    if (!visible)
       return
 
     if (!model_source || model_source === 'Local') {
-      form.setFieldValue('model_source', modelSourceOptions[0]?.value)
+      form.setFieldValue('model_source', 'ModelScope')
     }
 
     if (!isCurrentProvider) {
@@ -97,16 +104,15 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
     form.setFieldValue('name', undefined)
   }
 
-  // 处理模型类型变化
-  const handleModelTypeChange = () => {
-    // 清空模型名称的选择
-    form.setFieldValue('name', undefined)
-  }
-
   const handleOk = async () => {
     try {
       const values = await form.validateFields()
-      const submitValues: CreateBaseModelParams = { ...values }
+      const submitValues: CreateBaseModelParams = {
+        ...values,
+        model_source: 'ModelScope',
+        model_type: ['text-generation'],
+        model_tags: ['training', 'inference'],
+      }
       if (values.schedule_enabled && values.schedule_date && values.schedule_time) {
         submitValues.schedule_at = `${dayjs(values.schedule_date).format('YYYY-MM-DD')}T${dayjs(values.schedule_time).format('HH:mm:ss')}`
       }
@@ -127,7 +133,7 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
 
   return (
     <Modal
-      title="新增基础模型"
+      title="新增模型"
       open={visible}
       onOk={handleOk}
       onCancel={handleCancel}
@@ -141,43 +147,13 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
         form={form}
         layout="vertical"
       >
-        <Alert
-          className="mb-4"
-          type="info"
-          showIcon
-          message="本地上传已改为 CLI 上传"
-          description="页面不再提供本地上传入口。通过 CLI 上传到模型仓库后，刷新列表即可查看；ModelScope 下载方式保持不变。"
-        />
         <Form.Item
           name="model_source"
           label="模型来源"
-          initialValue={modelSourceOptions?.[0]?.value}
+          initialValue="ModelScope"
           rules={[{ required: true, message: '请选择模型来源' }]}
         >
-          <Radio.Group
-            options={modelSourceOptions?.map((item) => (item.label === 'ModelScope' ? {
-              value: item.value, label: (
-                <div>
-                  ModelScope
-                  <a href="https://www.modelscope.cn/models" target="_blank" className="ml-2 !underline">https://www.modelscope.cn/models</a>
-                </div>
-              ),
-            } : item))}
-          />
-        </Form.Item>
-
-        <Form.Item
-          name="model_type"
-          label="模型类型"
-          rules={[{ required: true, message: '请选择模型类型' }]}
-        >
-          <Select mode="multiple" placeholder="请选择模型类型" onChange={handleModelTypeChange}>
-            {modelTypeList?.filter((item) => ['text-generation', 'image-generation', 'image-understanding'].includes(item?.value)).map((item, index) => (
-              <Select.Option key={item?.name || index} value={item?.value}>
-                {item?.value && ModelTypeMapping(item.value).text}
-              </Select.Option>
-            ))}
-          </Select>
+          <Radio.Group options={fixedModelSourceOptions} />
         </Form.Item>
 
         <Form.Item
@@ -227,19 +203,6 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
             </Select>
           </Form.Item>
         )}
-
-        <Form.Item
-          name="model_tags"
-          label="支持能力"
-          rules={[
-            { required: true, message: '请选择支持能力' },
-          ]}
-        >
-          <Checkbox.Group>
-            <Checkbox value="training">训练</Checkbox>
-            <Checkbox value="inference">推理</Checkbox>
-          </Checkbox.Group>
-        </Form.Item>
 
         {/* 新增：是否定时由用户通过 enabled 开关控制 */}
         {model_source && (

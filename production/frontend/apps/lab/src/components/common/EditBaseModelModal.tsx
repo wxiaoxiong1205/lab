@@ -1,9 +1,8 @@
 import React, { useEffect } from 'react'
-import { Checkbox, Col, DatePicker, Form, Input, Modal, Radio, Row, Select, Space, Switch, TimePicker } from 'antd'
+import { Col, DatePicker, Form, Input, Modal, Radio, Row, Select, Space, Switch, TimePicker } from 'antd'
 import dayjs from 'dayjs'
 import { useQuery } from '@tanstack/react-query'
 import type { BaseModel, CreateBaseModelParams } from '@/types/model'
-import { ModelTypeMapping } from '@/utils/EnumMaping'
 import { ModelService } from '@/services/modelsApi'
 import { getCanUseKubernetesClusters } from '@/services/kubernetesService'
 import type { KubernetesCluster } from '@/types'
@@ -39,8 +38,6 @@ const EditBaseModelModal: React.FC<EditBaseModelModalProps> = ({
     queryFn: () => getCanUseKubernetesClusters(),
   })
 
-  console.log(model, 'model')
-
   useEffect(() => {
     if (visible && model) {
       const modelTypeArray = model.model_type
@@ -60,9 +57,9 @@ const EditBaseModelModal: React.FC<EditBaseModelModalProps> = ({
       form.setFieldsValue({
         id: model.id,
         name: model.name,
-        model_type: modelTypeArray,
+        model_type: modelTypeArray.length ? modelTypeArray : ['text-generation'],
         model_provider: model.model_provider,
-        model_tags: model.model_tags || [],
+        model_tags: model.model_tags?.length ? model.model_tags : ['training', 'inference'],
         description: model.description,
         k8s_id: model.k8s_id?.toString(),
         model_source: model.model_source,
@@ -86,6 +83,8 @@ const EditBaseModelModal: React.FC<EditBaseModelModalProps> = ({
         : undefined
       const submitValues: CreateBaseModelParams = {
         ...rest,
+        model_type: rest.model_type?.length ? rest.model_type : ['text-generation'],
+        model_tags: rest.model_tags?.length ? rest.model_tags : ['training', 'inference'],
         ...(model_source !== 'Local' ? { schedule_at } : {}),
       }
       onOk(submitValues)
@@ -136,25 +135,11 @@ const EditBaseModelModal: React.FC<EditBaseModelModalProps> = ({
               value: item.value, label: (
                 <div>
                   ModelScope
-                  <a href="https://www.modelscope.cn/models" target="_blank" className="ml-2 !underline">https://www.modelscope.cn/models</a>
+                  <a href="https://www.modelscope.cn/models" target="_blank" rel="noreferrer" className="ml-2 !underline">https://www.modelscope.cn/models</a>
                 </div>
               ),
             } : item))}
           />
-        </Form.Item>
-
-        <Form.Item
-          name="model_type"
-          label="模型类型"
-          rules={[{ required: true, message: '请选择模型类型' }]}
-        >
-          <Select mode="multiple" placeholder="请选择模型类型">
-            {['text-generation', 'image-generation', 'image-understanding'].map((value) => (
-              <Select.Option key={value} value={value}>
-                {ModelTypeMapping(value).text}
-              </Select.Option>
-            ))}
-          </Select>
         </Form.Item>
 
         <Form.Item
@@ -209,19 +194,6 @@ const EditBaseModelModal: React.FC<EditBaseModelModalProps> = ({
             </Select>
           </Form.Item>
         )}
-
-        <Form.Item
-          name="model_tags"
-          label="支持能力"
-          rules={[
-            { required: true, message: '请至少选择一项支持能力' },
-          ]}
-        >
-          <Checkbox.Group>
-            <Checkbox value="training">训练</Checkbox>
-            <Checkbox value="inference">推理</Checkbox>
-          </Checkbox.Group>
-        </Form.Item>
 
         {model_source !== 'Local' && (
           <Form.Item label="任务定时配置">
