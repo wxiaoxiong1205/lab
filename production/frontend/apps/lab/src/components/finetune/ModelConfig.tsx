@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { Button, Card, Col, Form, Row, Typography } from 'antd'
+import { Button, Card, Col, Form, Row, Tag, Typography } from 'antd'
 import { CheckCircleOutlined, ExperimentOutlined } from '@ant-design/icons'
 import qwen from '/public/qwen.png'
 import llama from '/public/llama.png'
@@ -16,7 +16,8 @@ interface ModelConfigProps {
 
 const ModelConfig: React.FC<ModelConfigProps> = ({ form, ModelProviderCategory, modelVersions }) => {
   useEffect(() => {
-    if (!modelVersions?.length) {
+    const downloadedVersions = modelVersions?.filter((version: any) => version.isDownloaded !== false) || []
+    if (!downloadedVersions.length) {
       form.setFieldsValue({
         base_model_id: undefined,
         base_model_name: undefined,
@@ -24,9 +25,9 @@ const ModelConfig: React.FC<ModelConfigProps> = ({ form, ModelProviderCategory, 
       return
     }
     const currentId = form.getFieldValue('base_model_id')
-    const isInList = modelVersions.some((v: any) => v.id === currentId)
+    const isInList = downloadedVersions.some((v: any) => v.id === currentId)
     if (!currentId || !isInList) {
-      const firstVersion = modelVersions[0]
+      const firstVersion = downloadedVersions[0]
       form.setFieldsValue({
         base_model_id: firstVersion.id,
         base_model_name: firstVersion.name,
@@ -109,7 +110,7 @@ const ModelConfig: React.FC<ModelConfigProps> = ({ form, ModelProviderCategory, 
                       className="rounded-[16px] h-[32px] pl-[12px] pr-[12px] text-[12px] relative"
                       key={version.id}
                       type={selectedVersion === version.id ? 'primary' : 'default'}
-                      disabled={version.isUse === true}
+                      disabled={version.isDownloaded === false}
                       size="small"
                       onClick={() => {
                         setFieldsValue({
@@ -122,10 +123,21 @@ const ModelConfig: React.FC<ModelConfigProps> = ({ form, ModelProviderCategory, 
                       }}
                     >
                       {version.name}
+                      <Tag
+                        className="ml-2 mr-0 text-[10px]"
+                        color={version.isDownloaded === false ? 'default' : 'success'}
+                      >
+                        {version.isDownloaded === false ? '未下载' : '已下载'}
+                      </Tag>
                     </Button>
                   ))}
-                  {modelVersions.length === 0 && (<Text type="secondary" className="text-[12px]">暂无可用模型版本</Text>)}
+                  {modelVersions.length === 0 && (<Text type="secondary" className="text-[12px]">暂无适配模型</Text>)}
                 </div>
+                {modelVersions.some((version: any) => version.isDownloaded === false) && (
+                  <Text type="secondary" className="text-[12px] block mt-2">
+                    当前仅展示已适配 Qwen 模型；未下载表示模型仓库中暂无该模型。
+                  </Text>
+                )}
               </>
             )
           }}

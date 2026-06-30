@@ -7,10 +7,10 @@
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 import React, { useEffect, useMemo, useState } from 'react'
-import { Checkbox, Col, DatePicker, Form, Input, Modal, Radio, Row, Select, Space, Switch, TimePicker } from 'antd'
+import { Alert, Checkbox, Col, DatePicker, Form, Input, Modal, Radio, Row, Select, Space, Switch, TimePicker } from 'antd'
 import dayjs from 'dayjs'
 import { useQuery } from '@tanstack/react-query'
-import type { CreateBaseModelParams, ModelListItem, ModelProviderOption, ModelTypeOption } from '@/types/model'
+import type { CreateBaseModelParams, ModelProviderOption, ModelTypeOption } from '@/types/model'
 import { ModelTypeMapping } from '@/utils/EnumMaping'
 import { ModelService } from '@/services/modelsApi'
 import { getCanUseKubernetesClusters } from '@/services/kubernetesService'
@@ -33,10 +33,7 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
   const [form] = Form.useForm()
   const [modelProviderEnumValues, setModelProviderEnumValues] = useState<ModelProviderOption[]>([])
   const [modelTypeList, setModelTypeList] = useState<ModelTypeOption[]>([])
-  const [modelList, setModelList] = useState<ModelListItem[]>([])
   const model_source = Form.useWatch('model_source', form)
-  const model_type = Form.useWatch('model_type', form)
-  const model_provider = Form.useWatch('model_provider', form)
   const scheduleEnabled = Form.useWatch('schedule_enabled', form) ?? false
   const { config, providerType } = useConfigStore()
   const isCurrentProvider = config?.PROVIDER_TYPE !== providerType
@@ -47,8 +44,8 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
     const modelProvider = allEnums.find((item) => item.enum_name === 'ModelProvider')
     const modelType = allEnums.find((item) => item.enum_name === 'ModelType')
     const modelProviderOptions = Array.isArray(modelProvider?.options) ? modelProvider.options : [
-      { name: 'qwen', value: 'qwen', description: null },
-      { name: 'llama', value: 'llama', description: null },
+      { name: 'Qwen', value: 'Qwen', description: null },
+      { name: 'Llama', value: 'Llama', description: null },
     ]
     const modelTypeOptions = Array.isArray(modelType?.options) ? modelType.options : [
       { name: 'text-generation', value: 'text-generation', description: null },
@@ -60,11 +57,7 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
   }, [])
 
   useEffect(() => {
-    console.log(model_source, '模型资源')
     form.setFieldValue('name', undefined)
-    if (model_source && model_source === 'Local') {
-      form.setFieldsValue({ schedule_enabled: false, schedule_date: undefined, schedule_time: undefined })
-    }
   }, [model_source])
 
   // 获取模型来源枚举值
@@ -74,15 +67,15 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
   })
 
   const modelSourceOptions = useMemo(
-    () => modelSourceEnums?.filter((item) => isCurrentProvider || item.value !== 'Local'),
-    [isCurrentProvider, modelSourceEnums],
+    () => modelSourceEnums?.filter((item) => item.value !== 'Local'),
+    [modelSourceEnums],
   )
 
   useEffect(() => {
     if (!visible || !modelSourceOptions?.length)
       return
 
-    if (!isCurrentProvider && (!model_source || model_source === 'Local')) {
+    if (!model_source || model_source === 'Local') {
       form.setFieldValue('model_source', modelSourceOptions[0]?.value)
     }
 
@@ -98,59 +91,23 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
     enabled: isCurrentProvider,
   })
 
-  // 动态获取模型列表
-  const fetchModelList = (provider: string, types?: string | string[]) => {
-    const params: any = { model_provider: provider }
-    if (types && types.length > 0) {
-      // 如果是数组，转换为逗号分隔的原始值字符串
-      if (Array.isArray(types)) {
-        params.model_type = types.join(',')
-      }
-      else {
-        params.model_type = types
-      }
-    }
-    ModelService.getModelList(params)
-      .then((response) => {
-        // 确保modelList是字符串数组
-        const models = Array.isArray(response) ? response : []
-        setModelList(models)
-      })
-      .catch((error) => {
-        console.error('获取模型列表失败:', error)
-      })
-  }
-
   // 处理模型提供商变化
-  const handleProviderChange = (value: string) => {
+  const handleProviderChange = () => {
     // 清空模型名称的选择
     form.setFieldValue('name', undefined)
-    // 根据选中的模型提供商和类型获取对应的模型列表
-    fetchModelList(value, model_type)
   }
 
   // 处理模型类型变化
-  const handleModelTypeChange = (value: string[]) => {
+  const handleModelTypeChange = () => {
     // 清空模型名称的选择
     form.setFieldValue('name', undefined)
-    // 如果已选择提供商，根据选中的模型类型重新获取模型列表
-    if (model_provider) {
-      fetchModelList(model_provider, value)
-    }
   }
-
-  // 监听模型类型和提供商变化，自动刷新模型列表
-  useEffect(() => {
-    if (model_source === 'Local' && model_provider) {
-      fetchModelList(model_provider, model_type)
-    }
-  }, [model_type, model_provider, model_source])
 
   const handleOk = async () => {
     try {
       const values = await form.validateFields()
       const submitValues: CreateBaseModelParams = { ...values }
-      if (model_source !== 'Local' && values.schedule_enabled && values.schedule_date && values.schedule_time) {
+      if (values.schedule_enabled && values.schedule_date && values.schedule_time) {
         submitValues.schedule_at = `${dayjs(values.schedule_date).format('YYYY-MM-DD')}T${dayjs(values.schedule_time).format('HH:mm:ss')}`
       }
       delete (submitValues as any).schedule_enabled
@@ -184,11 +141,18 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
         form={form}
         layout="vertical"
       >
+        <Alert
+          className="mb-4"
+          type="info"
+          showIcon
+          message="本地上传已改为 CLI 上传"
+          description="页面不再提供本地上传入口。通过 CLI 上传到模型仓库后，刷新列表即可查看；ModelScope 下载方式保持不变。"
+        />
         <Form.Item
           name="model_source"
           label="模型来源"
-          initialValue={isCurrentProvider ? 'Local' : undefined}
-          required
+          initialValue={modelSourceOptions?.[0]?.value}
+          rules={[{ required: true, message: '请选择模型来源' }]}
         >
           <Radio.Group
             options={modelSourceOptions?.map((item) => (item.label === 'ModelScope' ? {
@@ -245,28 +209,14 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
             { max: 100, message: '模型Code不能超过100个字符' },
           ]}
         >
-          {model_source === 'Local' ? (
-            <Select placeholder="请选择模型Code">
-              {modelList.map((model, index) => {
-                // 如果model是字符串，直接使用；如果是对象，使用model.name
-                const modelName = typeof model === 'string' ? model : model?.name
-                return (
-                  <Select.Option key={modelName || index} value={modelName}>
-                    {modelName}
-                  </Select.Option>
-                )
-              })}
-            </Select>
-          ) : (
-            <Input placeholder="请输入模型code" />
-          )}
+          <Input placeholder="请输入模型code" />
         </Form.Item>
 
-        {(isCurrentProvider && model_source && model_source !== 'Local') && (
+        {(isCurrentProvider && model_source) && (
           <Form.Item
             name="k8s_id"
             label="集群"
-            required
+            rules={[{ required: true, message: '请选择集群' }]}
           >
             <Select placeholder="请选择集群，用于模型下载">
               {k8sClusterList?.map((item: KubernetesCluster, index) => (
@@ -292,7 +242,7 @@ const CreateBaseModelModal: React.FC<CreateBaseModelModalProps> = ({
         </Form.Item>
 
         {/* 新增：是否定时由用户通过 enabled 开关控制 */}
-        {model_source !== 'Local' && (
+        {model_source && (
           <Form.Item label="任务定时配置">
             <Space direction="vertical" className="w-full">
               <Form.Item name="schedule_enabled" valuePropName="checked" className="mb-0" initialValue={false}>

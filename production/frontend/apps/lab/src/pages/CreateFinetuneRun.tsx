@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   Button,
   Form,
@@ -11,6 +11,7 @@ import dayjs from 'dayjs'
 import './styles/finetune.scss'
 import { useQueryClient } from '@tanstack/react-query'
 import { ModelService } from '@/services/modelsApi'
+import { ADAPTED_QWEN_BASE_MODELS, normalizeBaseModelName } from '@/config/adaptedBaseModels'
 import type { FormValues, LocalTrainingDataset, LocalValidationDataset } from '@/types/createFinetuneRun'
 import type { DataConfigValue } from '@/components/finetune/EnhancedDataConfig'
 import EnhancedDataConfig from '@/components/finetune/EnhancedDataConfig'
@@ -262,6 +263,7 @@ const CreateFinetuneRun: React.FC = () => {
   const [taskInfo, setTaskInfo] = useState<any>(null)
   const [allocatableResources, setAllocatableResources] = useState<any>(undefined)
   const { config, providerType } = useConfigStore()
+  const modelVersionsRequestRef = useRef(0)
   const effectiveTrainingMethod = watchedTrainingMethod || forcedTrainingMethodType || getTrainingMethodType(taskInfo?.training_type)
   const isGrpoResourceMode = normalizeTrainingMethodType(effectiveTrainingMethod) === 'grpo' || effectiveTrainingMethod === 'rft'
   useEffect(() => {
@@ -287,23 +289,49 @@ const CreateFinetuneRun: React.FC = () => {
     fetchProjectEnumValues()
   }, [])
   const fetchModelVersions = async () => {
+    const requestId = modelVersionsRequestRef.current + 1
+    modelVersionsRequestRef.current = requestId
+    const requestedProvider = baseProvider
+    const requestedTrainType = trainTypeCategory
+    setModelVersions([])
     try {
       const data = await ModelService.getBaseModels({
-        model_provider: baseProvider,
-        model_type: trainTypeCategory,
         is_available: true,
-        model_tags: 'training',
+        size: 1000,
       })
-      if (trainTypeCategory === 'image-understanding') {
-        const baseModels = data.items.filter((model: any) => model.model_provider === baseProvider).map((item) => item.name === 'Qwen3-VL-30B-A3B-Instruct' ? { ...item, isUse: true } : item)
-        setModelVersions(baseModels)
+      if (
+        requestId !== modelVersionsRequestRef.current
+        || requestedProvider !== form.getFieldValue('base_provider')
+        || requestedTrainType !== form.getFieldValue('train_type_category')
+      ) {
         return
       }
-      const baseModels = data.items.filter((model) => model.model_provider === baseProvider)
-      setModelVersions(baseModels)
+      const downloadedModelMap = new Map(
+        (data.items || [])
+          .filter((model) => (model.model_provider || '').toLowerCase() === String(requestedProvider || '').toLowerCase())
+          .map((model) => [normalizeBaseModelName(model.name), model]),
+      )
+      const adaptedModels = ADAPTED_QWEN_BASE_MODELS
+        .filter((model) => model.provider === requestedProvider && model.modelType === requestedTrainType)
+        .map((model) => {
+          const downloadedModel = downloadedModelMap.get(normalizeBaseModelName(model.name))
+          return {
+            ...(downloadedModel || {}),
+            id: downloadedModel?.id || `adapted-${model.name}`,
+            name: model.name,
+            description: downloadedModel?.description || model.description,
+            model_provider: model.provider,
+            model_type: [model.modelType],
+            isDownloaded: Boolean(downloadedModel),
+          }
+        })
+      setModelVersions(adaptedModels)
     }
     catch (error) {
       console.error('Failed to fetch model versions:', error)
+      if (requestId === modelVersionsRequestRef.current) {
+        setModelVersions([])
+      }
     }
     finally {
     }

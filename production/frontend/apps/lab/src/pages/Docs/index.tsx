@@ -1,7 +1,7 @@
 import React from 'react'
 import { Card, List, Typography } from 'antd'
 import { Link } from 'react-router-dom'
-import { ApiOutlined, AppstoreOutlined, BulbOutlined, FileTextOutlined } from '@ant-design/icons'
+import { ApiOutlined, AppstoreOutlined, BulbOutlined, FileTextOutlined, ProfileOutlined } from '@ant-design/icons'
 import '../../styles/docs.css'
 
 const { Title, Paragraph } = Typography
@@ -21,9 +21,16 @@ const docsList = [
     available: false,
   },
   {
+    title: '模型适配名单',
+    description: '大模型训练当前可展示的 Qwen 系列适配模型',
+    icon: <ProfileOutlined className="text-[24px] text-[var(--lab-color-success)]" />,
+    link: '/docs/adapted-models',
+    available: true,
+  },
+  {
     title: '用户指南',
     description: '平台功能使用说明和最佳实践',
-    icon: <FileTextOutlined className="text-[24px] text-[var(--lab-color-success)]" />,
+    icon: <FileTextOutlined className="text-[24px] text-[var(--lab-color-brand-primary)]" />,
     link: '/docs/user-guide',
     available: false,
   },

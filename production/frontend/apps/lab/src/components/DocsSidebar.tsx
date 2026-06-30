@@ -1,7 +1,7 @@
 import React from 'react'
 import { Menu, Typography } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ApiOutlined, AppstoreOutlined, BulbOutlined, FileTextOutlined, HomeOutlined } from '@ant-design/icons'
+import { ApiOutlined, AppstoreOutlined, BulbOutlined, FileTextOutlined, HomeOutlined, ProfileOutlined } from '@ant-design/icons'
 import '../styles/docs.css'
 
 const { Title } = Typography
@@ -25,6 +25,12 @@ const DocsSidebar: React.FC = () => {
       icon: <AppstoreOutlined />,
       label: '产品规划',
       title: '模型训练平台产品架构、功能和发展路线图',
+    },
+    {
+      key: '/docs/adapted-models',
+      icon: <ProfileOutlined />,
+      label: '模型适配名单',
+      title: '大模型训练当前已适配的基础模型清单',
     },
     {
       key: '/docs/api',
