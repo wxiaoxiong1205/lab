@@ -15,6 +15,28 @@
 
 ## 标准发布流程
 
+### 0. 固定发布路径
+
+本仓库当前最稳发布路径固定为：
+
+- GitHub：HTTPS remote + 仓库本地 `http.proxy=http://127.0.0.1:7897`。
+- Vercel：只从仓库根目录发布正式项目 `wxiaoxiong1205s-projects/lab`。
+- 不把 SSH、GitHub API 推送、子目录 Vercel 部署作为常规路径；它们只用于诊断或应急。
+
+首次或代理配置被改动后，在仓库根目录执行：
+
+```bash
+npm run setup:github-proxy
+```
+
+一键正式发布入口：
+
+```bash
+npm run deploy:lab:prod
+```
+
+该命令会按顺序执行 GitHub 推送门禁、Vercel 项目防误发门禁、正式部署和正式域名验收。除非正在排查某一步，否则优先使用该命令。
+
 ### 1. 发布前检查
 
 在仓库根目录执行：
@@ -22,6 +44,7 @@
 ```bash
 git status --short --branch
 npm run verify:github-push
+npm run verify:vercel-preflight
 ```
 
 确认只包含本次要发布的文件。不要提交：
@@ -32,6 +55,20 @@ npm run verify:github-push
 - 本地数据库、运行态缓存
 - `.playwright-cli/`
 - `Project/`
+
+`npm run verify:github-push` 会强制检查：
+
+- `origin=https://github.com/wxiaoxiong1205/lab.git`
+- `git http.proxy=http://127.0.0.1:7897`
+- GitHub credential helper 可读取本地 token，且输出只显示 `password=<redacted>`
+- 远端分支可读、`fetch` 可用、`git push --dry-run` 可用
+
+`npm run verify:vercel-preflight` 会强制检查：
+
+- 当前执行目录是仓库根目录
+- 根目录、`production/frontend`、`production/frontend/apps/lab` 的本地 Vercel 绑定指向同一个正式 `lab` 项目
+- Vercel 线上项目 ID、Root Directory、Build Command、Output Directory、Install Command 都与正式配置一致
+- 归档目录如果仍有指向正式 `lab` 的 `.vercel` 绑定，会打印风险警告
 
 在 `production/frontend` 执行本地构建。当前生产基线存在 React 18 与 `@types/react@19` 混装导致的 TypeScript JSX 类型冲突，`pnpm --filter lab build` 会在 `tsc -b` 阶段失败；发布门禁暂时使用与 Vercel 一致的 Vite 构建，TypeScript 门禁需作为独立依赖治理项恢复：
 
@@ -67,14 +104,14 @@ Production 环境变量必须包含：
 检查命令：
 
 ```bash
-npx vercel@52.2.0 project inspect lab --scope wxiaoxiong1205s-projects
+npm run verify:vercel-preflight
 npx vercel@52.2.0 env ls --scope wxiaoxiong1205s-projects
 ```
 
 ### 3. 部署
 
 ```bash
-npx vercel@52.2.0 --prod --yes --scope wxiaoxiong1205s-projects
+npm run deploy:lab:prod
 ```
 
 成功标准：
@@ -82,6 +119,7 @@ npx vercel@52.2.0 --prod --yes --scope wxiaoxiong1205s-projects
 - CLI 输出 `status: ok`
 - `readyState` 为 `READY`
 - `Aliased: https://lab.aidaxiong.fun`
+- `npm run verify:lab-deployment` 自动通过
 
 ### 4. 部署后检查
 
@@ -129,6 +167,7 @@ node scripts/verify-lab-deployment.mjs
 4. 构建配置依赖 pnpm 私有目录结构，破坏了跨环境可复现性。
 5. GitHub 推送链路没有提前验证，导致发布阶段临时切换 API 推送方案。
 6. 每修一个症状就部署一次，缺少一次性覆盖静态资源、API、认证、构建标记的验证矩阵。
+7. 从 `production/frontend` 临场执行 Vercel 部署时，CLI 曾误建并发布到 `frontend` 项目，说明缺少“必须从仓库根目录发布”和“部署前核对项目 ID”的硬门禁。
 
 ### 已完成修复
 
@@ -138,6 +177,9 @@ node scripts/verify-lab-deployment.mjs
 - `vite.config.ts` 不再硬编码 `@antv/util` 的 `.pnpm` 安装路径，改为从实际安装包解析。
 - 演示预览 token 收到真实后端 401 时，不触发全局登出。
 - 新增 `scripts/verify-lab-deployment.mjs` 做部署后静态验收。
+- 新增 `scripts/verify-vercel-preflight.mjs`，发布前校验正式 Vercel 项目、Root Directory、构建配置和本地绑定，降低误发到 `frontend` 或归档目录的风险。
+- 新增 `scripts/deploy-lab-production.mjs` 和 `npm run deploy:lab:prod`，把 GitHub 门禁、Vercel 门禁、正式部署、正式域名验收串成固定入口。
+- `.github-token.local`、`.playwright-cli/`、`Project/` 已加入仓库级忽略规则，降低误提交本地 token、浏览器调试产物和外部项目副本的风险。
 
 ### 仍未解决的问题
 
@@ -202,6 +244,7 @@ npx vercel@52.2.0 env ls --scope wxiaoxiong1205s-projects
 固定检查入口：
 
 ```bash
+npm run setup:github-proxy
 npm run verify:github-push
 ```
 
@@ -213,7 +256,8 @@ npm run verify:github-push
 
 1. 本地构建通过。
 2. GitHub 远端分支 HEAD 已确认。
-3. Vercel deployment 为 Ready。
-4. `lab.aidaxiong.fun` alias 指向最新 deployment。
-5. `node scripts/verify-lab-deployment.mjs` 通过。
-6. 浏览器强刷后首页不再出现白屏、404、未授权、认证失效。
+3. `npm run verify:vercel-preflight` 通过，确认 Vercel 正式项目不是 `frontend`。
+4. Vercel deployment 为 Ready。
+5. `lab.aidaxiong.fun` alias 指向最新 deployment。
+6. `npm run verify:lab-deployment` 通过。
+7. 浏览器强刷后首页不再出现白屏、404、未授权、认证失效。

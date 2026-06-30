@@ -53,6 +53,8 @@ const forbiddenPathPrefixes = [
   '.playwright-cli/',
   'Project/',
 ]
+const expectedRemote = 'https://github.com/wxiaoxiong1205/lab.git'
+const expectedHttpProxy = process.env.GITHUB_HTTP_PROXY ?? 'http://127.0.0.1:7897'
 
 const parseStatusLines = (status) => {
   return status
@@ -94,10 +96,16 @@ async function main() {
   }
 
   const remote = (await run('git', ['remote', 'get-url', 'origin'])).stdout.trim()
-  if (!remote.includes('github.com')) {
-    throw new Error(`origin 不是 GitHub 地址：${remote}`)
+  if (remote !== expectedRemote) {
+    throw new Error(`origin 必须使用稳定 HTTPS 地址：${expectedRemote}。当前：${remote}`)
   }
   console.log(`origin=${remote.replace(/\/\/.*@/, '//<redacted>@')}`)
+
+  const httpProxy = (await run('git', ['config', '--get', 'http.proxy']).catch(() => ({ stdout: '' }))).stdout.trim()
+  if (httpProxy !== expectedHttpProxy) {
+    throw new Error(`git http.proxy 必须固定为 ${expectedHttpProxy}。当前：${httpProxy || '<empty>'}`)
+  }
+  console.log(`http.proxy=${httpProxy}`)
 
   const helper = (await run('git', ['config', '--get-all', 'credential.helper']).catch(() => ({ stdout: '' }))).stdout.trim()
   if (!helper) {
