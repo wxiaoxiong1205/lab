@@ -22,11 +22,6 @@ const COMMON_MODEL_PROVIDERS = [
   'Llama',
   'Baichuan',
   'ChatGLM',
-  'Yi',
-  'InternLM',
-  'Mistral',
-  'Gemma',
-  'Phi',
 ]
 
 interface CreateBaseModelModalProps {
