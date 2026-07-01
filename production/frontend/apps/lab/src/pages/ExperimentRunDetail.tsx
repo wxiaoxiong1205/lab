@@ -5,7 +5,7 @@ import { ArrowLeftOutlined, ClearOutlined, CodeOutlined, DatabaseOutlined, Downl
 import type { ColumnsType } from 'antd/es/table'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { finetuneTaskService } from '@/services/FinetuneTrainingServices'
-import { TrainingTaskStatusMapping } from '@/utils/EnumMaping'
+import { ModelTypeMapping, TrainingMethodTypeMapping, TrainingTaskStatusMapping } from '@/utils/EnumMaping'
 import MLflowInfo from '@/components/MLflowInfo'
 import { formatDuration } from '@/utils/timeProcessing'
 import { useConfigStore } from '@/stores/configStore'
@@ -119,14 +119,25 @@ const ExperimentRunDetail: React.FC = () => {
     const TypeList = projectEnumValues?.enums_by_module?.training_task?.find((item) => item.enum_name === 'LRSchedulerType')?.options || []
     setFineTuningType(TypeList)
   }, [])
-  const getFineTuningTypeName = (value: string) => {
+  const getFineTuningTypeName = (value?: string) => {
     switch (value) {
       case 'full':
         return '全参微调'
       case 'lora':
         return 'Lora微调'
-      default: '-'
+      case 'freeze':
+        return '冻结微调'
+      default:
+        return value || '-'
     }
+  }
+  const getTrainingMethodName = (trainingType?: any) => {
+    const method = trainingType?.train_method_type || trainingType?.training_method_type || ''
+    return TrainingMethodTypeMapping(method).text || method || '-'
+  }
+  const getTrainingTypeName = (trainingType?: any) => {
+    const category = trainingType?.train_type_category || trainingType?.training_type_category || ''
+    return ModelTypeMapping(category).text || category || '-'
   }
   const normalizeTrainingMethodType = (value?: unknown) => {
     if (typeof value !== 'string')
@@ -730,20 +741,29 @@ const ExperimentRunDetail: React.FC = () => {
                     </Tag>
                   )}
                 </Descriptions.Item>
+                <Descriptions.Item label="基础模型">
+                  {runDetail.base_model?.base_model_name || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="训练类型">
+                  {getTrainingTypeName(runDetail.training_type)}
+                </Descriptions.Item>
+                <Descriptions.Item label="训练方法">
+                  {getTrainingMethodName(runDetail.training_type)}
+                </Descriptions.Item>
+                <Descriptions.Item label="微调类型">
+                  {getFineTuningTypeName(runDetail.training_type?.fine_tuning_type)}
+                </Descriptions.Item>
                 <Descriptions.Item label="开始时间">
                   {formatTime(runDetail.started_at)}
                 </Descriptions.Item>
                 <Descriptions.Item label="结束时间">
                   {runDetail.finished_at ? formatTime(runDetail.finished_at) : '-'}
                 </Descriptions.Item>
-                <Descriptions.Item label="微调类型" span={2}>
-                  {getFineTuningTypeName(runDetail.training_type?.fine_tuning_type)}
+                <Descriptions.Item label="运行时长" span={2}>
+                  {formatDuration(runDetail.estimated_duration || 0)}
                 </Descriptions.Item>
                 <Descriptions.Item label="任务描述" span={2}>
                   <p className="whitespace-pre-wrap">{runDetail.description}</p>
-                </Descriptions.Item>
-                <Descriptions.Item label="运行时长" span={2}>
-                  {formatDuration(runDetail.estimated_duration || 0)}
                 </Descriptions.Item>
                 <Descriptions.Item label="训练加速配置" span={2}>
                   <p className="whitespace-pre-wrap">{runDetail.deepspeed || '-'}</p>
