@@ -2,89 +2,185 @@
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from app.schemas.menu import MenuItem
+
+
+class MenuSeed(TypedDict, total=False):
+    code: str
+    name: str
+    sort: int
+    path: str
+    icon: str
+    children: list["MenuSeed"]
+    item_type: int
 
 
 def build_showcase_menu() -> list[MenuItem]:
     next_id = 1442200000000000
 
-    def item(code: str, name: str, sort: int, path: str = "", icon: str = "", children: list[MenuItem] | None = None, item_type: int = 0) -> MenuItem:
+    def item(seed: MenuSeed, parent_id: int = 0, id_path: str = "/") -> MenuItem:
         nonlocal next_id
         current_id = next_id
         next_id += 1
+        current_path = f"{id_path}{current_id}/"
+
         return MenuItem(
             id=current_id,
-            code=code,
-            name=name,
-            type=item_type,
-            sort=sort,
-            parentId=0,
-            idPath=f"/{current_id}/",
-            children=children or [],
+            code=seed["code"],
+            name=seed["name"],
+            type=seed.get("item_type", 0),
+            sort=seed["sort"],
+            parentId=parent_id,
+            idPath=current_path,
+            children=[item(child, current_id, current_path) for child in seed.get("children", [])],
             description="showcase preview menu",
             elementResourceId=current_id,
             elementStatus=0,
             highLightIconUrl=None,
-            iconUrl=icon,
-            pathUrl=path,
+            iconUrl=seed.get("icon", ""),
+            pathUrl=seed.get("path", ""),
             remark=None,
             secretLevel=9999,
         )
 
-    return [
-        item("home", "首页", 10, "/home", "home"),
-        item(
-            "large_model",
-            "大模型",
-            20,
-            icon="RobotOutlined",
-            children=[
-                item("task_overview", "任务概览", 10, "/task-overview", "DatabaseOutlined"),
-                item("training_management", "训练数据管理", 20, "/datasets"),
-                item("test_management", "测试数据管理", 30, "/measurement"),
-                item("Inference_result", "推理结果集", 40, "/Inference"),
-                item("file_management", "文件管理", 50, "/file-management"),
-                item("data_annotation", "数据标注", 60, "/data-annotation"),
-                item("data_cleaning", "数据清洗", 70, "/data-cleaning"),
-                item("data_augmentation", "数据增强", 80, "/data-augmentation"),
-                item("data_insight", "数据洞察", 90, "/data-insight"),
-                item("online_notebook", "在线Notebook", 100, "/finetune/notebooks", "CloudServerOutlined"),
-                item("large_model_training", "大模型训练", 110, "/training", "ThunderboltOutlined"),
-                item("model_management", "我的模型", 120, "/model", "AppstoreOutlined"),
-                item("effect_evaluation", "效果评估", 130, "/effect-evaluation", "RadarChartOutlined"),
-                item("evaluation_indicator", "评估指标", 140, "/evaluation-indicator", "BoxPlotOutlined"),
-                item("service_inference_hosted", "大模型部署", 150, "/service/inference/hosted", "DeploymentUnitOutlined"),
-                item("service_inference_external", "在线推理服务", 160, "/service/inference/external"),
+    menu_seeds: list[MenuSeed] = [
+        {"code": "home", "name": "首页", "sort": 10, "path": "/home", "icon": "home"},
+        {
+            "code": "large_model",
+            "name": "大模型",
+            "sort": 20,
+            "icon": "RobotOutlined",
+            "children": [
+                {"code": "task_overview", "name": "任务概览", "sort": 10, "path": "/task-overview", "icon": "DatabaseOutlined"},
+                {
+                    "code": "data_services",
+                    "name": "数据服务",
+                    "sort": 20,
+                    "icon": "DatabaseOutlined",
+                    "children": [
+                        {
+                            "code": "data_management",
+                            "name": "数据管理",
+                            "sort": 10,
+                            "icon": "DatabaseOutlined",
+                            "children": [
+                                {"code": "training_management", "name": "训练数据管理", "sort": 10, "path": "/datasets"},
+                                {"code": "test_management", "name": "测试数据管理", "sort": 20, "path": "/measurement"},
+                                {"code": "Inference_result", "name": "推理结果集", "sort": 30, "path": "/Inference"},
+                                {"code": "file_management", "name": "文件管理", "sort": 40, "path": "/file-management"},
+                            ],
+                        },
+                        {
+                            "code": "data_processing",
+                            "name": "数据处理",
+                            "sort": 20,
+                            "icon": "BarcodeOutlined",
+                            "children": [
+                                {"code": "data_annotation", "name": "数据标注", "sort": 10, "path": "/data-annotation"},
+                                {"code": "data_cleaning", "name": "数据清洗", "sort": 20, "path": "/data-cleaning"},
+                                {"code": "data_augmentation", "name": "数据增强", "sort": 30, "path": "/data-augmentation"},
+                                {"code": "data_insight", "name": "数据洞察", "sort": 40, "path": "/data-insight"},
+                            ],
+                        },
+                    ],
+                },
+                {
+                    "code": "model_training",
+                    "name": "模型训练",
+                    "sort": 30,
+                    "icon": "CloudServerOutlined",
+                    "children": [
+                        {
+                            "code": "online_notebook",
+                            "name": "在线Notebook",
+                            "sort": 10,
+                            "path": "/finetune/notebooks",
+                            "icon": "CloudServerOutlined",
+                            "children": [
+                                {
+                                    "code": "custom_image",
+                                    "name": "自定义镜像",
+                                    "sort": 10,
+                                    "path": "/finetune/notebooks/custom-image",
+                                    "item_type": 1,
+                                },
+                            ],
+                        },
+                        {"code": "large_model_training", "name": "大模型训练", "sort": 20, "path": "/training", "icon": "ThunderboltOutlined"},
+                        {"code": "model_management", "name": "我的模型", "sort": 30, "path": "/model", "icon": "AppstoreOutlined"},
+                    ],
+                },
+                {
+                    "code": "evaluation_management",
+                    "name": "模型评估",
+                    "sort": 40,
+                    "icon": "BoxPlotOutlined",
+                    "children": [
+                        {"code": "effect_evaluation", "name": "效果评估", "sort": 10, "path": "/effect-evaluation", "icon": "RadarChartOutlined"},
+                        {"code": "evaluation_indicator", "name": "评估指标", "sort": 20, "path": "/evaluation-indicator", "icon": "BoxPlotOutlined"},
+                    ],
+                },
+                {
+                    "code": "model_service",
+                    "name": "模型服务",
+                    "sort": 50,
+                    "icon": "DeploymentUnitOutlined",
+                    "children": [
+                        {"code": "service_inference_hosted", "name": "大模型部署", "sort": 10, "path": "/service/inference/hosted", "icon": "DeploymentUnitOutlined"},
+                        {"code": "service_inference_external", "name": "在线推理服务", "sort": 20, "path": "/service/inference/external"},
+                    ],
+                },
             ],
-        ),
-        item(
-            "machine_learn",
-            "机器学习",
-            30,
-            icon="RobotOutlined",
-            children=[
-                item("machine_task_overview", "任务概览", 10, "/machine-task-overview", "DatabaseOutlined"),
-                item("machine_data_management", "数据管理", 20, "/machine-data-management", "DatabaseOutlined"),
-                item("MACHINE_ANNOTATION", "数据标注", 30, "/machine-annotation", "DeploymentUnitOutlined"),
-                item("MACHINE_MODEL_MANAGER", "我的模型", 40, "/michine-model-manager", "AppstoreOutlined"),
-                item("MACHINE_MODEL_DEPLOYMENT", "模型部署", 50, "/machine-model-deployment", "DeploymentUnitOutlined"),
-                item("MACHINE_NOTEBOOK", "在线Notebook", 60, "/machine-notebook", "CloudServerOutlined"),
-                item("ONLINE_ANNOTATION_SERVICE", "在线标注服务", 70, "/machine-online-annotation-service", "DeploymentUnitOutlined"),
+        },
+        {
+            "code": "machine_learn",
+            "name": "机器学习",
+            "sort": 30,
+            "icon": "RobotOutlined",
+            "children": [
+                {"code": "machine_task_overview", "name": "任务概览", "sort": 10, "path": "/machine-task-overview", "icon": "DatabaseOutlined"},
+                {"code": "machine_data_management", "name": "数据管理", "sort": 20, "path": "/machine-data-management", "icon": "DatabaseOutlined"},
+                {"code": "MACHINE_ANNOTATION", "name": "数据标注", "sort": 30, "path": "/machine-annotation", "icon": "DeploymentUnitOutlined"},
+                {"code": "MACHINE_MODEL_MANAGER", "name": "我的模型", "sort": 40, "path": "/michine-model-manager", "icon": "AppstoreOutlined"},
+                {"code": "MACHINE_MODEL_DEPLOYMENT", "name": "模型部署", "sort": 50, "path": "/machine-model-deployment", "icon": "DeploymentUnitOutlined"},
+                {
+                    "code": "MACHINE_NOTEBOOK",
+                    "name": "在线Notebook",
+                    "sort": 60,
+                    "path": "/machine-notebook",
+                    "icon": "CloudServerOutlined",
+                    "children": [
+                        {"code": "MIRROR", "name": "自定义镜像", "sort": 10, "path": "/machine-notebook/mirror", "item_type": 1},
+                    ],
+                },
+                {"code": "ONLINE_ANNOTATION_SERVICE", "name": "在线标注服务", "sort": 70, "path": "/machine-online-annotation-service", "icon": "DeploymentUnitOutlined"},
             ],
-        ),
-        item(
-            "admin",
-            "系统管理",
-            40,
-            icon="AppstoreOutlined",
-            children=[
-                item("admin_project", "项目管理", 10, "/admin/projects", "ProjectOutlined"),
-                item("kubernetes", "集群管理", 20, "/admin/kubernetes", "CloudServerOutlined"),
-                item("storage_config", "存储配置", 30, "/admin/storage", "HddOutlined"),
-                item("mirror_list", "镜像列表", 40, "/admin/registry/list"),
-                item("mirror_repository", "镜像仓库", 50, "/admin/registry"),
-                item("basic_model", "模型仓库", 60, "/admin/base-model", "AppstoreOutlined"),
-                item("admin_settings", "系统配置", 70, "/admin/settings", "SettingOutlined"),
+        },
+        {
+            "code": "admin",
+            "name": "系统管理",
+            "sort": 40,
+            "icon": "AppstoreOutlined",
+            "children": [
+                {"code": "admin_project", "name": "项目管理", "sort": 10, "path": "/admin/projects", "icon": "ProjectOutlined"},
+                {"code": "kubernetes", "name": "集群管理", "sort": 20, "path": "/admin/kubernetes", "icon": "CloudServerOutlined"},
+                {"code": "storage_config", "name": "存储配置", "sort": 30, "path": "/admin/storage", "icon": "HddOutlined"},
+                {
+                    "code": "mirror_management",
+                    "name": "镜像管理",
+                    "sort": 40,
+                    "icon": "ContainerOutlined",
+                    "children": [
+                        {"code": "mirror_list", "name": "镜像列表", "sort": 10, "path": "/admin/registry/list"},
+                        {"code": "mirror_repository", "name": "镜像仓库", "sort": 20, "path": "/admin/registry"},
+                    ],
+                },
+                {"code": "basic_model", "name": "模型仓库", "sort": 50, "path": "/admin/base-model", "icon": "AppstoreOutlined"},
+                {"code": "admin_settings", "name": "系统配置", "sort": 60, "path": "/admin/settings", "icon": "SettingOutlined"},
             ],
-        ),
+        },
     ]
+
+    return [item(seed) for seed in menu_seeds]
