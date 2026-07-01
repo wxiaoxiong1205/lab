@@ -48,6 +48,11 @@ export interface LatestComputeTask {
   source?: TaskOverviewSourceRef
   detail_ref?: TaskOverviewSourceRef
   list_filter?: Record<string, unknown>
+  gpu_type?: string
+  gpu_cards?: number
+  gpu_memory?: number
+  cpu?: number
+  memory?: number
 }
 
 export interface LatestTaskStatusGroup {

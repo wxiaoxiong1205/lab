@@ -1336,6 +1336,8 @@ const normalizeOverviewStatus = (status?: string) => {
     pending: { code: 'created', name: '已创建' },
     created: { code: 'created', name: '已创建' },
     '已创建': { code: 'created', name: '已创建' },
+    scheduled: { code: 'scheduled', name: '定时待启动' },
+    '定时待启动': { code: 'scheduled', name: '定时待启动' },
     starting: { code: 'starting', name: '启动中' },
     '启动中': { code: 'starting', name: '启动中' },
     queued: { code: 'queued', name: '排队中' },
@@ -1366,6 +1368,9 @@ const overviewTask = (
   },
 ) => {
   const status = normalizeOverviewStatus(item.status_display || item.status)
+  const gpuCards = asNumber(item.gpu_cards ?? item.gpu ?? item.card_count ?? item.replicas, item.inference_engine_type === 'LLM' ? 2 : 1)
+  const cpu = asNumber(item.cpu ?? item.cpu_cores, item.inference_engine_type === 'ML' ? 8 : 16)
+  const memory = asNumber(item.memory ?? item.memory_gb, item.inference_engine_type === 'ML' ? 32 : 64)
   return {
     task_id: Number(item.task_id ?? item.id ?? item.notebook_id ?? item.dataset_id ?? item.service_id),
     task_name: String(item.task_name || item.name || item.dataset_name || item.service_name || options.fallbackName || 'showcase-演示任务'),
@@ -1388,6 +1393,11 @@ const overviewTask = (
       source_id: Number(item.id ?? item.task_id ?? item.dataset_id ?? item.service_id),
       source_table: `showcase_${options.type}`,
     },
+    gpu_type: item.gpu_type || item.resource_card_model || (options.scope === 'machine_learning' ? 'T4' : 'A800'),
+    gpu_cards: gpuCards,
+    gpu_memory: asNumber(item.gpu_memory ?? item.gpu_memory_gb, gpuCards * 48),
+    cpu,
+    memory,
   }
 }
 
@@ -1457,9 +1467,12 @@ const overviewLatestTasks = (params: Record<string, any>) => {
   const statusFilter = typeof params.statuses === 'string' && params.statuses
     ? params.statuses.split(',').filter(Boolean)
     : []
+  const latestStatusOrder = ['scheduled', 'starting', 'queued', 'running', 'failed']
   const sourceTasks = filterOverviewTasksByScope(params.task_scope)
     .filter((item) => statusFilter.length === 0 || statusFilter.includes(item.status))
-  const groupedStatuses = Array.from(new Set(sourceTasks.map((item) => item.status)))
+  const groupedStatuses = statusFilter.length
+    ? statusFilter
+    : latestStatusOrder
   const groups = groupedStatuses.map((status) => {
     const items = sourceTasks.filter((item) => item.status === status)
     const pageItems = items.slice((page - 1) * pageSize, page * pageSize)

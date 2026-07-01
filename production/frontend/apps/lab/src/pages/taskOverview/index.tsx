@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Empty, Spin, Typography } from 'antd'
-import { useQueries, useQuery } from '@tanstack/react-query'
-import { useParams } from 'react-router-dom'
+import { Button, Empty, Spin, Tag, Typography, message } from 'antd'
+import { FolderOpenOutlined, ReloadOutlined } from '@ant-design/icons'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useParams } from 'react-router-dom'
 import ComputeResourceCard, { type ResourceMetric } from './components/ComputeResourceCard'
 import LatestTaskGroups, { type LatestTaskGroup } from './components/LatestTaskGroups'
 import TaskScopeFilter, { type TaskScope } from './components/TaskScopeFilter'
@@ -36,6 +37,18 @@ const scopeLabelMap: Record<TaskScope, string> = {
   ml: '机器学习任务',
 }
 
+const scopeTitleMap: Record<TaskScope, string> = {
+  all: '项目算力任务总览',
+  llm: '大模型算力任务总览',
+  ml: '机器学习算力任务总览',
+}
+
+const scopeDescriptionMap: Record<TaskScope, string> = {
+  all: '统计当前项目下大模型与机器学习中需要配置算力资源的任务。',
+  llm: '统计当前项目下大模型训练、推理、评估、Notebook 等算力任务。',
+  ml: '统计当前项目下机器学习训练、部署、Notebook 等算力任务。',
+}
+
 const domainScopeOptions: Record<Extract<TaskScope, 'llm' | 'ml'>, TaskScope[]> = {
   llm: ['all', 'llm', 'ml'],
   ml: ['all', 'llm', 'ml'],
@@ -58,6 +71,15 @@ const statusVisualMap: Record<string, Pick<LatestTaskGroup, 'color' | 'tagColor'
   terminated: { color: '#64748b', tagColor: 'default' },
   completed: { color: '#16a34a', tagColor: 'success' },
   failed: { color: '#dc2626', tagColor: 'red' },
+}
+
+const latestTaskStatusOrder = ['scheduled', 'starting', 'queued', 'running', 'failed']
+const latestTaskStatusNames: Record<string, string> = {
+  scheduled: '定时待启动',
+  starting: '启动中',
+  queued: '排队中',
+  running: '运行中',
+  failed: '失败',
 }
 
 const normalizeTaskStatus = (status?: string) => {
@@ -124,6 +146,8 @@ const getLatestTaskGroups = (data: Awaited<ReturnType<typeof taskOverviewService
 }
 
 const TaskOverview = ({ domain = 'llm' }: TaskOverviewProps) => {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { currentProject, setCurrentProject } = useProjectStore()
   const { user } = useAuthStore()
   const { projectId: routeProjectId } = useParams<{ projectId: string }>()
@@ -132,6 +156,7 @@ const TaskOverview = ({ domain = 'llm' }: TaskOverviewProps) => {
   )
   const [scope, setScope] = useState<TaskScope>(domain)
   const [latestGroupPages, setLatestGroupPages] = useState<Record<string, number>>({})
+  const [lastRefreshedAt, setLastRefreshedAt] = useState(() => new Date())
 
   useEffect(() => {
     setScope(domain)
@@ -261,23 +286,28 @@ const TaskOverview = ({ domain = 'llm' }: TaskOverviewProps) => {
       latestGroupQueries
         .map((query) => getLatestTaskGroups(query.data)[0])
         .filter((group) => !!group)
-        .map((group) => [group.status, group]),
+        .map((group) => [normalizeTaskStatus(group.status), group]),
+    )
+    const baseGroupMap = new Map(
+      latestStatusGroups
+        .filter((group) => latestTaskStatusOrder.includes(normalizeTaskStatus(group.status)))
+        .map((group) => [normalizeTaskStatus(group.status), group]),
     )
 
-    return latestStatusGroups.map((baseGroup) => {
-      const group = pagedGroupMap.get(baseGroup.status) || baseGroup
-      const key = normalizeTaskStatus(group.status)
+    return latestTaskStatusOrder.map((key) => {
+      const baseGroup = baseGroupMap.get(key)
+      const group = pagedGroupMap.get(key) || baseGroup
       const visual = statusVisualMap[key] || { color: '#2563eb', tagColor: 'processing' }
 
       return {
-        key: group.status,
-        label: group.status_name || group.status,
+        key,
+        label: latestTaskStatusNames[key] || group?.status_name || key,
         color: visual.color,
         tagColor: visual.tagColor,
-        totalCount: group.total_count,
-        page: group.page || latestGroupPages[group.status] || 1,
-        pageSize: group.page_size || 4,
-        tasks: group.items || [],
+        totalCount: group?.total_count || 0,
+        page: group?.page || latestGroupPages[key] || 1,
+        pageSize: group?.page_size || 4,
+        tasks: group?.items || [],
       }
     })
   }, [latestGroupPages, latestGroupQueries, latestStatusGroups])
@@ -301,6 +331,18 @@ const TaskOverview = ({ domain = 'llm' }: TaskOverviewProps) => {
     || isProjectResourceFetching
     || isClusterResourceFetching
 
+  const handleRefreshOverview = () => {
+    setLatestGroupPages({})
+    setLastRefreshedAt(new Date())
+    queryClient.invalidateQueries({ queryKey: ['task-overview-task-type-stats', selectedProjectId] })
+    queryClient.invalidateQueries({ queryKey: ['task-overview-status-stats', selectedProjectId] })
+    queryClient.invalidateQueries({ queryKey: ['task-overview-latest-tasks', selectedProjectId] })
+    queryClient.invalidateQueries({ queryKey: ['task-overview-latest-task-group', selectedProjectId] })
+    queryClient.invalidateQueries({ queryKey: ['task-overview-project-resources', selectedProjectId] })
+    queryClient.invalidateQueries({ queryKey: ['task-overview-cluster-resources', selectedProjectId] })
+    message.success('任务概览已刷新')
+  }
+
   if (projectLoading) {
     return (
       <div className="task-overview-page lab-list-page-shell task-overview-page--center">
@@ -319,22 +361,50 @@ const TaskOverview = ({ domain = 'llm' }: TaskOverviewProps) => {
 
   return (
     <div className="task-overview-page lab-list-page-shell">
-      <div className="task-overview-title-row">
-        <Title level={2}>任务概览</Title>
-      </div>
-
-      <div className="task-overview-filter-row">
+      <section className="task-overview-hero">
+        <div className="task-overview-hero__copy">
+          <Tag color="blue" className="task-overview-hero__tag">任务概览</Tag>
+          <Title level={1} className="task-overview-hero__title">任务概览</Title>
+          <div className="task-overview-context-line">
+            <span>当前项目</span>
+            <strong>{selectedProject?.name || currentProject?.name || '未选择项目'}</strong>
+            <Button
+              size="small"
+              icon={<ReloadOutlined />}
+              className="task-overview-refresh-button"
+              onClick={handleRefreshOverview}
+            >
+              刷新
+            </Button>
+            <Button
+              type="link"
+              size="small"
+              icon={<FolderOpenOutlined />}
+              className="task-overview-back-link"
+              onClick={() => navigate('/home')}
+            >
+              返回项目空间
+            </Button>
+            <span className="task-overview-refresh-time">
+              最近刷新
+              {' '}
+              {lastRefreshedAt.toLocaleTimeString('zh-CN', { hour12: false })}
+            </span>
+          </div>
+        </div>
         <TaskScopeFilter
           value={scope}
           counts={scopeCounts}
           options={domainScopeOptions[domain]}
           onChange={setScope}
         />
-      </div>
+      </section>
 
       <Spin spinning={isFetching}>
         <TaskStatusSummary
           scopeLabel={scopeLabelMap[scope]}
+          title={scopeTitleMap[scope]}
+          description={scopeDescriptionMap[scope]}
           total={statusStats?.total || scopeCounts[scope] || 0}
           items={statusItems}
         />
@@ -349,6 +419,7 @@ const TaskOverview = ({ domain = 'llm' }: TaskOverviewProps) => {
 
         <LatestTaskGroups
           groups={latestGroups}
+          scopeLabel={scopeLabelMap[scope]}
           projectId={selectedProjectId}
           currentUsername={user?.username}
           onPageChange={(status, page) => {

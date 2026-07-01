@@ -11,20 +11,22 @@ export interface StatusSummaryItem {
 
 interface TaskStatusSummaryProps {
   scopeLabel: string
+  title: string
+  description: string
   total: number
   items: StatusSummaryItem[]
 }
 
 const { Text, Title } = Typography
 
-const TaskStatusSummary = ({ scopeLabel, total, items }: TaskStatusSummaryProps) => {
+const TaskStatusSummary = ({ scopeLabel, title, description, total, items }: TaskStatusSummaryProps) => {
   return (
     <Card className="task-overview-section-card" bodyStyle={{ padding: 20 }}>
       <div className="task-overview-section-head">
         <div>
           <Text type="secondary" className="text-[12px]">当前视图</Text>
-          <Title level={3} className="!mt-1 !mb-1 !text-[18px]">项目算力任务总览</Title>
-          <Text type="secondary">统计当前项目下大模型与机器学习中需要配置算力资源的任务。</Text>
+          <Title level={3} className="!mt-1 !mb-1 !text-[18px]">{title}</Title>
+          <Text type="secondary">{description}</Text>
         </div>
         <Tag className="task-overview-pill" color="blue">
           {scopeLabel}
