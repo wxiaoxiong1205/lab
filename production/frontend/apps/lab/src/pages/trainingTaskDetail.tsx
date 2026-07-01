@@ -63,6 +63,19 @@ const STARTABLE_STATUSES = ['已创建']
 const STOPPABLE_STATUSES = ['排队中', '运行中']
 const CAN_DELETE_STATUSES = ['已创建', '定时待启动', '已完成', '失败', '已终止', '终止']
 const RUNNING_STATUSES = ['running', '运行中']
+
+const getTrainingMethodText = (trainingType?: any) => {
+  const method = trainingType?.train_method_type || trainingType?.training_method_type || ''
+  return TrainingMethodTypeMapping(method).text || method || '-'
+}
+
+const getFineTuneTypeText = (trainingType?: any) => {
+  const fineTuningType = trainingType?.fine_tuning_type || trainingType?.finetuning_type || ''
+  if (fineTuningType === 'full') return '全参微调'
+  if (fineTuningType === 'lora') return 'LoRA微调'
+  if (fineTuningType === 'freeze') return '冻结微调'
+  return fineTuningType || '-'
+}
 /**
  * 训练任务详情页面
  * 显示任务基本信息和版本管理
@@ -81,7 +94,6 @@ const TrainingTaskDetail: React.FC = () => {
     name: '',
     baseModel: '',
     trainType: '',
-    trainMethod: '',
     description: '',
     version: '',
   })
@@ -165,10 +177,18 @@ const TrainingTaskDetail: React.FC = () => {
       },
     },
     {
+      title: '训练方法',
+      dataIndex: 'trainingMethod',
+      key: 'trainingMethod',
+      align: 'center',
+      width: 160,
+    },
+    {
       title: '微调类型',
       dataIndex: 'fineType',
       key: 'fineType',
       align: 'center',
+      width: 160,
     },
     {
       title: '运行时长',
@@ -364,7 +384,6 @@ const TrainingTaskDetail: React.FC = () => {
         name: taskData.name || '',
         baseModel: taskData.base_model?.base_model_name || '',
         trainType: taskData.training_type?.train_type_category || '',
-        trainMethod: taskData.training_type?.train_method_type || '',
         description: taskData.description || '',
         version: taskData.version || '',
       })
@@ -392,10 +411,6 @@ const TrainingTaskDetail: React.FC = () => {
           const date = new Date(dateString)
           return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`
         }
-        const trainingType = (type: string) => {
-          if (type === 'full') return '全参微调'
-          if (type === 'lora') return 'Lora微调'
-        }
         return {
           id: item.id,
           key: item.id?.toString() || index.toString(),
@@ -409,7 +424,8 @@ const TrainingTaskDetail: React.FC = () => {
           estimated_duration: getDurationSeconds(),
           gpuCount: item.graphics_card_resource?.count || '--',
           schedule_at: item.schedule_at || '',
-          fineType: trainingType(item.training_type.fine_tuning_type),
+          trainingMethod: getTrainingMethodText(item.training_type),
+          fineType: getFineTuneTypeText(item.training_type),
         }
       })
       setTaskVersions(versions)
@@ -480,9 +496,6 @@ const TrainingTaskDetail: React.FC = () => {
           <Descriptions.Item label="训练类型">
             <Text>{ModelTypeMapping(taskInfo.trainType).text || ''}</Text>
           </Descriptions.Item>
-          <Descriptions.Item label="训练方法">
-            <Text>{TrainingMethodTypeMapping(taskInfo.trainMethod).text || ''}</Text>
-          </Descriptions.Item>
         </Descriptions>
       </Card>
       <Card
@@ -504,7 +517,15 @@ const TrainingTaskDetail: React.FC = () => {
             </Button>
           </div>
         </div>
-        <Table columns={versionColumns as any} dataSource={taskVersions} pagination={false} size="middle" loading={isLoading} className="border border-gray-200 rounded-md" />
+        <Table
+          columns={versionColumns as any}
+          dataSource={taskVersions}
+          pagination={false}
+          size="middle"
+          loading={isLoading}
+          scroll={{ x: 1180 }}
+          className="border border-gray-200 rounded-md"
+        />
       </Card>
     </div>
   )

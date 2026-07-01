@@ -88,6 +88,7 @@ Main route evidence:
 
 V1.14 checks:
 
+- `partial-conflict`: training method is version-scoped. The backend already returns `training_type.train_method_type` per training task version; `trainingTaskDetail.tsx` now shows a per-version training method column instead of relying on a task-level display that can be overwritten by the first/latest version.
 - `partial-conflict`: GRPO / RFT-GRPO data purpose, parameters, template management, reward function upload, and version-detail YAML display.
 - `partial-conflict`: inference data selection split by SFT, DPO, RFT-GRPO, image understanding, and business inference scenarios. Import sample downloads now include DPO alpaca, DPO role-based, and RFT-GRPO completion-reward assets under the production `sample_datasets/inference_result` directory.
 - `partial-conflict`: model/service reference protection before deletion has been migrated into production backend guards. `DefaultModelService` blocks deletion of base models, trained models, and machine-learning models when referenced by training tasks, trained-model outputs, deployment tasks, inference result datasets, evaluation tasks, evaluation reports, or benchmark tasks. `DefaultInferenceServiceService.delete` blocks online inference service deletion when referenced by inference result datasets, evaluation tasks, evaluation reports, benchmark tasks, or automatic annotation configuration. The Demo localStorage reference table was not migrated.

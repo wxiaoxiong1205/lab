@@ -202,8 +202,11 @@ const trainingTasks = [
     name: 'showcase-Qwen客服SFT成功',
     task_name: 'showcase-Qwen客服SFT成功',
     version: 'V3',
+    version_count: 3,
     status: 'SUCCESS',
     status_display: '已完成',
+    training_type: 'text-generation',
+    training_type_category: 'text-generation',
     model_name: 'Qwen2.5-7B-Instruct',
     base_model_name: 'Qwen2.5-7B-Instruct',
     dataset_name: 'showcase-客服SFT多状态数据',
@@ -219,8 +222,11 @@ const trainingTasks = [
     name: 'showcase-多轮对话训练运行中',
     task_name: 'showcase-多轮对话训练运行中',
     version: 'V1',
+    version_count: 1,
     status: 'RUNNING',
     status_display: '运行中',
+    training_type: 'text-generation',
+    training_type_category: 'text-generation',
     model_name: 'Qwen2.5-7B-Instruct',
     base_model_name: 'Qwen2.5-7B-Instruct',
     dataset_name: 'showcase-多轮对话洞察SFT',
@@ -236,8 +242,11 @@ const trainingTasks = [
     name: 'showcase-DPO偏好对齐完成',
     task_name: 'showcase-DPO偏好对齐完成',
     version: 'V1',
+    version_count: 1,
     status: 'SUCCESS',
     status_display: '已完成',
+    training_type: 'text-generation',
+    training_type_category: 'text-generation',
     model_name: 'Qwen2.5-7B-Instruct-DPO',
     base_model_name: 'Qwen2.5-7B-Instruct',
     dataset_name: 'showcase-DPO客服偏好数据',
@@ -253,8 +262,11 @@ const trainingTasks = [
     name: 'showcase-GRPO数学推理失败',
     task_name: 'showcase-GRPO数学推理失败',
     version: 'V1',
+    version_count: 1,
     status: 'FAILED',
     status_display: '失败',
+    training_type: 'text-generation',
+    training_type_category: 'text-generation',
     model_name: 'Qwen2.5-7B-Instruct-GRPO',
     base_model_name: 'Qwen2.5-7B-Instruct',
     dataset_name: 'showcase-GRPO推理奖励数据',
@@ -271,12 +283,14 @@ const trainingTasks = [
     name: 'showcase-图像生成SFT训练完成',
     task_name: 'showcase-图像生成SFT训练完成',
     version: 'V2',
+    version_count: 2,
     status: 'SUCCESS',
     status_display: '已完成',
     model_name: 'showcase-imagegen-sft-poster',
     base_model_name: 'Stable-Diffusion-XL',
     dataset_name: 'showcase-图像生成海报SFT',
     training_type: 'image-generation',
+    training_type_category: 'image-generation',
     training_method_type: 'sft',
     dataset_format: 'image-prompt',
     project_id: 1001,
@@ -285,6 +299,272 @@ const trainingTasks = [
     created_by: 'showcase_admin',
   },
 ]
+
+const trainingTaskSummaries = trainingTasks.map((task) => ({
+  ...task,
+  training_type_category: task.training_type_category || task.training_type || 'text-generation',
+  version_count: task.version_count || 1,
+}))
+
+const trainingStatusForDetail = (status?: string, display?: string) => {
+  const value = String(display || status || '')
+  const normalized = String(status || '').toUpperCase()
+  if (value.includes('运行中') || normalized === 'RUNNING')
+    return '运行中'
+  if (value.includes('失败') || normalized === 'FAILED')
+    return '失败'
+  if (value.includes('排队') || normalized === 'QUEUED')
+    return '排队中'
+  if (value.includes('启动') || normalized === 'STARTING')
+    return '启动中'
+  if (value.includes('定时') || normalized === 'SCHEDULED')
+    return '定时待启动'
+  if (value.includes('完成') || normalized === 'SUCCESS' || normalized === 'COMPLETED')
+    return '已完成'
+  return value || '已创建'
+}
+
+const trainingDatasetItem = (name: string, version: string, sampleCount: number, characterCount: number, weight = 100, samplingRate = 1) => ({
+  name,
+  version,
+  dataset_path: `/showcase/datasets/${name}/${version}`,
+  sample_count: sampleCount,
+  character_count: characterCount,
+  weight_in_total: weight,
+  sampling_rate: samplingRate,
+})
+
+const defaultTrainingBasic = {
+  learning_rate: 0.00002,
+  num_train_epochs: 3,
+  per_device_train_batch_size: 4,
+  gradient_accumulation_steps: 4,
+  warmup_ratio: 0.03,
+  lr_scheduler_type: 'cosine',
+  bf16: true,
+}
+
+const defaultTrainingAdvanced = {
+  max_seq_length: 4096,
+  save_steps: 200,
+  logging_steps: 10,
+  eval_steps: 100,
+  gradient_checkpointing: true,
+}
+
+const defaultGraphicsCardResource = {
+  card_type: 'NVIDIA',
+  card_model: 'A800',
+  count: 2,
+  cpu_request: 16,
+  cpu_limit: 32,
+  memory_request: 128,
+  memory_limit: 256,
+}
+
+const makeTrainingVersion = (
+  task: typeof trainingTaskSummaries[number],
+  override: Record<string, any>,
+) => {
+  const method = override.training_method_type || task.training_method_type || 'sft'
+  const category = override.training_type_category || task.training_type_category || task.training_type || 'text-generation'
+  return {
+    id: override.id,
+    task_id: override.id,
+    name: task.task_name,
+    task_name: task.task_name,
+    version: override.version,
+    description: override.description || (task as any).description || `${task.task_name} ${override.version} 演示版本`,
+    status: override.status || trainingStatusForDetail(task.status, task.status_display),
+    progress: override.progress ?? (trainingStatusForDetail(task.status, task.status_display) === '运行中' ? 68 : 100),
+    project_id: task.project_id,
+    created_at: override.created_at || task.created_at,
+    updated_at: override.updated_at || task.updated_at,
+    started_at: override.started_at,
+    finished_at: override.finished_at,
+    schedule_at: override.schedule_at,
+    estimated_duration: override.estimated_duration ?? 0,
+    created_by: task.created_by || 'showcase_admin',
+    dataset_name: override.dataset_name || task.dataset_name,
+    model_output_path: override.model_output_path || `/showcase/models/${task.task_name}/${override.version}`,
+    deepspeed: override.deepspeed || 'ZeRO-2',
+    base_model: {
+      base_model_name: override.base_model_name || task.base_model_name || task.model_name,
+      template: override.template || 'qwen-chat',
+    },
+    training_type: {
+      train_type_category: category,
+      train_method_type: method,
+      training_method_type: method,
+      fine_tuning_type: override.fine_tuning_type || (method === 'sft' ? 'lora' : 'full'),
+    },
+    graphics_card_resource: override.graphics_card_resource || defaultGraphicsCardResource,
+    ray_resource_config: override.ray_resource_config,
+    dataset_items: override.dataset_items || [trainingDatasetItem(task.dataset_name || 'showcase-训练数据集', 'V1', 2400, 386000)],
+    eval_dataset_items: override.eval_dataset_items || [],
+    effective_evaluation_items: override.effective_evaluation_items || [trainingDatasetItem(`${task.dataset_name || 'showcase-训练数据集'}-验证抽样`, 'auto', 240, 38200, 10, 0.1)],
+    basic: override.basic || defaultTrainingBasic,
+    advanced: override.advanced || defaultTrainingAdvanced,
+    data_processing: override.data_processing || { max_prompt_length: 2048, max_response_length: 2048, truncation: 'right' },
+    lora_config: override.lora_config || (method === 'sft'
+      ? { lora_rank: 16, lora_alpha: 32, lora_dropout: 0.05, target_modules: 'q_proj,v_proj,k_proj,o_proj' }
+      : undefined),
+    dpo_config: override.dpo_config,
+    save: override.save || { save_strategy: 'steps', save_total_limit: 3 },
+    evaluation: override.evaluation || { eval_strategy: 'steps', eval_steps: 100, eval_split_ratio: 0.1 },
+    monitor: override.monitor || { report_to: 'mlflow', logging_steps: 10 },
+    additional_params: override.additional_params || {},
+    error_message: override.error_message || task.error_message,
+  }
+}
+
+const trainingTaskVersions = trainingTaskSummaries.flatMap((task) => {
+  const baseCreated = task.created_at || now
+  switch (task.task_name) {
+    case 'showcase-Qwen客服SFT成功':
+      return [
+        makeTrainingVersion(task, {
+          id: 17201,
+          version: 'V3',
+          status: '已完成',
+          description: '引入数据洞察筛选后的客服问答样本，优化拒答边界和售后多轮承接。',
+          created_at: baseCreated,
+          started_at: '2026-06-30T10:10:00+08:00',
+          finished_at: '2026-06-30T12:48:00+08:00',
+          estimated_duration: 9480,
+          dataset_items: [
+            trainingDatasetItem('showcase-客服SFT多状态数据', 'V3', 3680, 592400, 80),
+            trainingDatasetItem('showcase-多轮对话洞察SFT', 'V2', 920, 186200, 20),
+          ],
+        }),
+        makeTrainingVersion(task, {
+          id: 17202,
+          version: 'V2',
+          status: '已完成',
+          description: '补充物流、退款、地址修改等高频场景增强样本。',
+          created_at: '2026-06-28T14:20:00+08:00',
+          started_at: '2026-06-28T14:30:00+08:00',
+          finished_at: '2026-06-28T16:12:00+08:00',
+          estimated_duration: 6120,
+          dataset_items: [trainingDatasetItem('showcase-客服SFT多状态数据', 'V2', 2860, 451000)],
+        }),
+        makeTrainingVersion(task, {
+          id: 17203,
+          version: 'V1',
+          status: '已完成',
+          description: '客服问答基础 SFT 版本，用于演示训练详情、指标、日志和产物。',
+          created_at: '2026-06-25T09:00:00+08:00',
+          started_at: '2026-06-25T09:20:00+08:00',
+          finished_at: '2026-06-25T10:55:00+08:00',
+          estimated_duration: 5700,
+          dataset_items: [trainingDatasetItem('showcase-客服SFT多状态数据', 'V1', 2100, 326000)],
+        }),
+      ]
+    case 'showcase-多轮对话训练运行中':
+      return [makeTrainingVersion(task, {
+        id: 17211,
+        version: 'V1',
+        status: '运行中',
+        progress: 72,
+        description: '多轮客服会话训练中，覆盖第 1/2 轮 User 与 Assistant 响应稳定性。',
+        started_at: '2026-06-30T09:40:00+08:00',
+        estimated_duration: 0,
+        dataset_items: [trainingDatasetItem('showcase-多轮对话洞察SFT', 'V2', 1480, 408000)],
+      })]
+    case 'showcase-DPO偏好对齐完成':
+      return [makeTrainingVersion(task, {
+        id: 17221,
+        version: 'V1',
+        status: '已完成',
+        training_method_type: 'dpo',
+        fine_tuning_type: 'full',
+        description: '使用客服偏好对数据完成 DPO 对齐，提升答案完整度与拒答一致性。',
+        started_at: '2026-06-29T13:00:00+08:00',
+        finished_at: '2026-06-29T15:20:00+08:00',
+        estimated_duration: 8400,
+        dataset_items: [trainingDatasetItem('showcase-DPO客服偏好数据', 'V1', 1260, 298000)],
+        dpo_config: { beta: 0.1, loss_type: 'sigmoid', max_prompt_length: 2048, max_length: 4096 },
+        lora_config: undefined,
+      })]
+    case 'showcase-GRPO数学推理失败':
+      return [makeTrainingVersion(task, {
+        id: 17231,
+        version: 'V1',
+        status: '失败',
+        training_method_type: 'grpo',
+        fine_tuning_type: 'full',
+        description: 'GRPO 数学推理奖励函数演示任务，失败态用于验证异常展示。',
+        started_at: '2026-06-29T16:10:00+08:00',
+        finished_at: '2026-06-29T16:36:00+08:00',
+        estimated_duration: 1560,
+        dataset_items: [trainingDatasetItem('showcase-GRPO推理奖励数据', 'V1', 640, 174000)],
+        lora_config: undefined,
+        ray_resource_config: {
+          submit_graphics_card_resource: { ...defaultGraphicsCardResource, count: 1 },
+          head_graphics_card_resource: { ...defaultGraphicsCardResource, count: 1 },
+          worker_graphics_card_resource: { ...defaultGraphicsCardResource, count: 4 },
+          worker_replicas: 2,
+        },
+        additional_params: {
+          'data.train_batch_size': 128,
+          'actor_rollout_ref.rollout.n': 8,
+          'algorithm.adv_estimator': 'grpo',
+          'reward.score_clip': 5,
+          'trainer.total_epochs': 1,
+        },
+        error_message: '奖励函数返回格式不符合约束，请检查 score 字段。',
+      })]
+    case 'showcase-图像生成SFT训练完成':
+      return [
+        makeTrainingVersion(task, {
+          id: 17241,
+          version: 'V2',
+          status: '已完成',
+          training_type_category: 'image-generation',
+          description: '图像生成海报 Prompt 数据 SFT 版本，覆盖电商海报、商品白底图和室内设计场景。',
+          started_at: '2026-06-30T08:30:00+08:00',
+          finished_at: '2026-06-30T11:05:00+08:00',
+          estimated_duration: 9300,
+          base_model_name: 'Stable-Diffusion-XL',
+          template: 'image-prompt',
+          dataset_items: [trainingDatasetItem('showcase-图像生成海报SFT', 'V2', 820, 98000)],
+          basic: {
+            learning_rate: 0.00001,
+            num_train_epochs: 4,
+            per_device_train_batch_size: 2,
+            gradient_accumulation_steps: 8,
+            resolution: 1024,
+            noise_scheduler: 'ddpm',
+            bf16: true,
+          },
+          advanced: {
+            train_text_encoder: false,
+            center_crop: true,
+            random_flip: true,
+            checkpointing_steps: 250,
+          },
+        }),
+        makeTrainingVersion(task, {
+          id: 17242,
+          version: 'V1',
+          status: '已完成',
+          training_type_category: 'image-generation',
+          description: '图像生成 SFT 首版，验证 image-prompt ZIP 数据链路。',
+          started_at: '2026-06-27T10:00:00+08:00',
+          finished_at: '2026-06-27T12:10:00+08:00',
+          estimated_duration: 7800,
+          base_model_name: 'Stable-Diffusion-XL',
+          dataset_items: [trainingDatasetItem('showcase-图像生成海报SFT', 'V1', 560, 67200)],
+        }),
+      ]
+    default:
+      return [makeTrainingVersion(task, {
+        id: Number(task.id) + 10000,
+        version: task.version || 'V1',
+        status: trainingStatusForDetail(task.status, task.status_display),
+      })]
+  }
+})
 
 const trainedModels = [
   {
@@ -1532,6 +1812,118 @@ const filteredInferenceResultDatasets = (params: Record<string, any>) => {
   return pageOf(items, asNumber(params.page, 1), asNumber(params.size, 10))
 }
 
+const compareTrainingVersionDesc = (a: any, b: any) => {
+  const versionNumber = (version?: string) => Number(String(version || '').match(/\d+/)?.[0] || 0)
+  return versionNumber(b.version) - versionNumber(a.version)
+}
+
+const previewTrainingTaskVersions = (taskName: string, status?: string) => {
+  const decodedTaskName = decodeURIComponent(taskName)
+  const normalizedStatus = status ? trainingStatusForDetail(status, status) : ''
+  return trainingTaskVersions
+    .filter((item) => item.task_name === decodedTaskName || item.name === decodedTaskName)
+    .filter((item) => !normalizedStatus || item.status === normalizedStatus || item.status === status)
+    .sort(compareTrainingVersionDesc)
+}
+
+const previewTrainingTaskLogs = (taskId: number) => {
+  const version = trainingTaskVersions.find((item) => Number(item.id) === Number(taskId))
+  const taskName = version?.task_name || 'showcase-训练任务'
+  const isFailed = version?.status === '失败'
+  const isRunning = version?.status === '运行中'
+  const logs = [
+    `[INFO] ${taskName} ${version?.version || 'V1'} 已提交到训练队列`,
+    `[INFO] 加载基础模型: ${version?.base_model?.base_model_name || 'Qwen2.5-7B-Instruct'}`,
+    `[INFO] 加载训练数据集: ${(version?.dataset_items || []).map((item: any) => `${item.name}/${item.version}`).join(', ') || '-'}`,
+    '[INFO] 初始化分布式训练环境与显卡资源',
+    '[INFO] step=100 loss=1.824 eval_loss=1.736 learning_rate=1.8e-5',
+    '[INFO] step=200 loss=1.426 eval_loss=1.384 learning_rate=1.5e-5',
+    isFailed
+      ? `[ERROR] ${version?.error_message || '训练任务执行失败，请检查配置'}`
+      : isRunning
+        ? '[INFO] step=360 loss=1.118 eval_loss=1.204 learning_rate=1.1e-5，任务仍在运行'
+        : '[INFO] 训练完成，模型产物与指标已保存',
+  ]
+  return {
+    archived: !isRunning,
+    logs: logs.map((message, index) => ({ number: index + 1, message })),
+  }
+}
+
+const previewTrainingTaskMlflow = (taskName: string, version: string) => {
+  const decodedTaskName = decodeURIComponent(taskName)
+  const decodedVersion = decodeURIComponent(version)
+  const taskVersion = trainingTaskVersions.find((item) => item.task_name === decodedTaskName && item.version === decodedVersion)
+  const startTime = Math.floor(new Date(taskVersion?.started_at || now).getTime() / 1000)
+  const endTime = taskVersion?.finished_at ? Math.floor(new Date(taskVersion.finished_at).getTime() / 1000) : 0
+  const failed = taskVersion?.status === '失败'
+  const running = taskVersion?.status === '运行中'
+  const lossPoints = failed
+    ? [1.9, 1.66, 1.58]
+    : running
+      ? [1.9, 1.62, 1.36, 1.18]
+      : [1.9, 1.52, 1.21, 0.98, 0.86]
+  const evalLossPoints = lossPoints.map((loss, index) => Number((loss + 0.08 + index * 0.01).toFixed(3)))
+  const metricSeries = (values: number[]) => values.map((value, index) => ({
+    value,
+    timestamp: startTime + index * 600,
+    step: (index + 1) * 100,
+  }))
+  return {
+    task_id: taskVersion?.id || 0,
+    task_name: decodedTaskName,
+    version: decodedVersion,
+    project_name: '演示项目 - 大模型训练',
+    experiment_name: `${decodedTaskName}-experiment`,
+    run_name: `${decodedTaskName}-${decodedVersion}`,
+    run_info: {
+      run_uuid: `showcase-${taskVersion?.id || 0}`,
+      experiment_id: `exp-${taskVersion?.id || 0}`,
+      name: `${decodedTaskName}-${decodedVersion}`,
+      status: failed ? 'FAILED' : running ? 'RUNNING' : 'FINISHED',
+      start_time: startTime,
+      end_time: endTime,
+      user_id: taskVersion?.created_by || 'showcase_admin',
+      artifact_uri: taskVersion?.model_output_path || `/showcase/models/${decodedTaskName}/${decodedVersion}`,
+    },
+    params: {
+      learning_rate: String(taskVersion?.basic?.learning_rate || 0.00002),
+      train_method: taskVersion?.training_type?.train_method_type || 'sft',
+      fine_tuning_type: taskVersion?.training_type?.fine_tuning_type || 'lora',
+    },
+    metrics: {
+      loss: metricSeries(lossPoints),
+      eval_loss: metricSeries(evalLossPoints),
+      learning_rate: metricSeries(lossPoints.map((_, index) => Number((0.00002 * (1 - index / Math.max(lossPoints.length, 1))).toFixed(8)))),
+    },
+    latest_metrics: {
+      loss: lossPoints[lossPoints.length - 1],
+      eval_loss: evalLossPoints[evalLossPoints.length - 1],
+    },
+    tags: {
+      dataset_type: taskVersion?.training_type?.train_type_category || 'text-generation',
+      training_method_type: taskVersion?.training_type?.train_method_type || 'sft',
+    },
+    mlflow_available: true,
+  }
+}
+
+const previewTrainingTaskCheckpoints = (taskId: number) => {
+  const taskVersion = trainingTaskVersions.find((item) => Number(item.id) === Number(taskId))
+  const isGrpo = taskVersion?.training_type?.train_method_type === 'grpo'
+  if (isGrpo) {
+    return [
+      { name: 'global_step_100', epoch: 0.2, train_loss: null, eval_loss: null, step: 100, metrics: { reward_mean: 0.42, kl: 0.08, pass_rate: 0.61 } },
+      { name: 'global_step_200', epoch: 0.4, train_loss: null, eval_loss: null, step: 200, metrics: { reward_mean: 0.51, kl: 0.11, pass_rate: 0.66 } },
+    ]
+  }
+  return [
+    { name: 'checkpoint-100', epoch: 0.5, train_loss: 1.824, eval_loss: 1.736, step: 100 },
+    { name: 'checkpoint-200', epoch: 1.0, train_loss: 1.426, eval_loss: 1.384, step: 200 },
+    { name: 'checkpoint-300', epoch: 1.5, train_loss: 1.118, eval_loss: 1.204, step: 300 },
+  ]
+}
+
 const staticHandlers: Array<[RegExp, StaticHandler]> = [
   [/^\/menu$/, () => mockMenuData],
   [/^\/users\/me$/, () => previewTenantAdminUser],
@@ -1560,7 +1952,27 @@ const staticHandlers: Array<[RegExp, StaticHandler]> = [
     return previewTrainingDatasetPreview(decodeURIComponent(parts[5] || ''), decodeURIComponent(parts[7] || 'V1'), asNumber(params.page, 1), asNumber(params.size, 10), params.usage)
   }],
   [/^\/data_cleaning\/1001\/tasks$/, ({ params }) => pageOf(taskPage, asNumber(params.page, 1), asNumber(params.size, 10))],
-  [/^\/training_tasks\/project\/1001$/, ({ params }) => pageOf(trainingTasks, asNumber(params.page, 1), asNumber(params.size, 10))],
+  [/^\/training_tasks\/project\/1001$/, ({ params }) => pageOf(trainingTaskSummaries, asNumber(params.page, 1), asNumber(params.size, 10))],
+  [/^\/training_tasks\/project\/1001\/task\/\d+\/logs$/, ({ path }) => {
+    const taskId = Number(path.split('/')[5])
+    return previewTrainingTaskLogs(taskId)
+  }],
+  [/^\/training_tasks\/project\/1001\/task\/\d+\/logs\/range$/, ({ path }) => {
+    const taskId = Number(path.split('/')[5])
+    return previewTrainingTaskLogs(taskId)
+  }],
+  [/^\/training_tasks\/project\/1001\/task\/([^/]+)\/version\/([^/]+)\/mlflow$/, ({ path }) => {
+    const parts = path.split('/')
+    return previewTrainingTaskMlflow(parts[5] || '', parts[7] || '')
+  }],
+  [/^\/training_tasks\/project\/1001\/task\/\d+\/checkpoints$/, ({ path }) => {
+    const taskId = Number(path.split('/')[5])
+    return previewTrainingTaskCheckpoints(taskId)
+  }],
+  [/^\/training_tasks\/project\/1001\/task\/([^/]+)$/, ({ path, params }) => {
+    const taskName = path.split('/').pop() || ''
+    return previewTrainingTaskVersions(taskName, params.status)
+  }],
   [/^\/notebooks\/1001\/list$/, ({ params }) => pageOf(notebooks, asNumber(params.page, 1), asNumber(params.size, 10))],
   [/^\/inference-result-datasets\/project\/1001\/list$/, ({ params }) => pageOf(filterByDatasetType(inferenceResultDatasets, params.dataset_type), asNumber(params.page, 1), asNumber(params.size, 10))],
   [/^\/inference-result-datasets\/project\/1001\/stats$/, () => inferenceResultStats],

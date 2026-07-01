@@ -28,6 +28,56 @@ import './DesignDoc.css'
 
 const { Header } = Layout
 
+const DESIGN_DOC_ROUTE_ALIASES: Array<[RegExp, string]> = [
+  [/^\/home$/, '/workspace'],
+  [/^\/api-access-key(?:\/|$)/, '/open-platform/api-keys'],
+  [/^\/machine-task-overview(?:\/|$)/, '/task-overview'],
+  [/^\/Inference(?:\/|$)/i, '/inference'],
+  [/^\/business-inference(?:\/|$)/, '/inference'],
+  [/^\/datasets\/validation(?:\/|$)/, '/measurement'],
+  [/^\/measurement(?:\/|$)/, '/measurement'],
+  [/^\/business-test(?:\/|$)/, '/measurement'],
+  [/^\/datasets(?:\/|$)/, '/datasets'],
+  [/^\/file-management(?:\/|$)/, '/file-management'],
+  [/^\/data-cleaning(?:\/|$)/, '/data-cleaning'],
+  [/^\/data-insight(?:\/|$)/, '/data-insight'],
+  [/^\/data-augmentation(?:\/|$)/, '/data-augmentation'],
+  [/^\/data-annotation(?:\/|$)/, '/data-annotation'],
+  [/^\/training(?:\/|$)/, '/training'],
+  [/^\/finetune\/tasks(?:\/|$)/, '/training'],
+  [/^\/finetune\/notebooks(?:\/|$)/, '/finetune/notebooks'],
+  [/^\/model(?:\/|$)/, '/model'],
+  [/^\/effect-evaluation(?:\/|$)/, '/effect-evaluation'],
+  [/^\/business-effect-evaluation(?:\/|$)/, '/effect-evaluation'],
+  [/^\/evaluation-indicator(?:\/|$)/, '/evaluation-indicator'],
+  [/^\/service\/inference\/hosted(?:\/|$)/, '/service/inference/hosted'],
+  [/^\/service\/inference\/external(?:\/|$)/, '/service/inference/external'],
+  [/^\/online-inference(?:\/|$)/, '/service/inference/external'],
+  [/^\/machine-data-management(?:\/|$)/, '/machine-data-management'],
+  [/^\/machine-model-management(?:\/|$)/, '/machine-model-management'],
+  [/^\/machine-model-deployment(?:\/|$)/, '/machine-model-deployment'],
+  [/^\/machine-annotation(?:\/|$)/, '/machine-annotation'],
+  [/^\/machine-online-annotation-service(?:\/|$)/, '/machine-annotation-service'],
+  [/^\/machine-annotation-service(?:\/|$)/, '/machine-annotation-service'],
+  [/^\/machine-notebook(?:\/|$)/, '/machine-notebook'],
+  [/^\/admin\/projects(?:\/|$)/, '/admin/projects'],
+  [/^\/admin\/members(?:\/|$)/, '/admin/permissions'],
+  [/^\/admin\/users(?:\/|$)/, '/admin/permissions'],
+  [/^\/admin\/permissions(?:\/|$)/, '/admin/permissions'],
+  [/^\/admin\/base-model(?:\/|$)/, '/admin/base-model'],
+  [/^\/admin\/kubernetes(?:\/|$)/, '/admin/kubernetes'],
+  [/^\/admin\/storage(?:\/|$)/, '/admin/storage'],
+  [/^\/admin\/image-list(?:\/|$)/, '/admin/image-list'],
+  [/^\/admin\/registry(?:\/|$)/, '/admin/registry'],
+  [/^\/admin\/settings(?:\/|$)/, '/admin/settings'],
+  [/^\/docs(?:\/|$)/, '/docs'],
+]
+
+function canonicalizeDesignDocPath(pathname: string): string {
+  const alias = DESIGN_DOC_ROUTE_ALIASES.find(([pattern]) => pattern.test(pathname))
+  return alias?.[1] ?? pathname
+}
+
 function normalizeDesignDocPath(pathname: string): string {
   const cleanPath = pathname.replace(/\/+$/, '') || '/'
 
@@ -36,19 +86,19 @@ function normalizeDesignDocPath(pathname: string): string {
   }
 
   if (cleanPath.startsWith('/project/admin')) {
-    return cleanPath.replace('/project', '') || '/admin'
+    return canonicalizeDesignDocPath(cleanPath.replace('/project', '') || '/admin')
   }
 
   const projectDetailMatch = cleanPath.match(/^\/project\/([^/]+)(\/.*)?$/)
   if (projectDetailMatch) {
-    return projectDetailMatch[2] || '/workspace'
+    return canonicalizeDesignDocPath(projectDetailMatch[2] || '/workspace')
   }
 
   if (cleanPath === '/project') {
     return '/workspace'
   }
 
-  return cleanPath
+  return canonicalizeDesignDocPath(cleanPath)
 }
 
 function getCurrentProjectRouteBase(pathname: string): string {

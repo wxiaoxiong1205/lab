@@ -312,7 +312,10 @@ const CleaningTaskDetail: React.FC = () => {
     // 处理预览数据：优先使用taskDetail.preview_samples，如果没有则使用previewData
     const formatPreviewData = () => {
       // 优先使用 comparisons 格式（新格式）
-      const comparisons = (taskDetail as any)?.comparisons || (previewData as any)?.comparisons
+      const comparisons = (taskDetail as any)?.comparisons || (previewData as any)?.comparisons || (taskDetail as any)?.preview_samples || []
+      if (!Array.isArray(comparisons)) {
+        return []
+      }
       return comparisons.map((item: any, index: number) => {
         let before = ''
         let after = ''

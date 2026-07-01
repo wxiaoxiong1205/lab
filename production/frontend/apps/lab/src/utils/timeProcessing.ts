@@ -25,6 +25,8 @@ export function formatDateTime(dateString: string): string {
 export function trainType(type: string): string {
   if (type === 'text-generation') return '文本生成'
   if (type === 'image-understanding') return '图像理解'
+  if (type === 'image-generation') return '图像生成'
+  return type || ''
 }
 
 // 将秒数格式化为xx小时xx分xx秒

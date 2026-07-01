@@ -27,6 +27,7 @@ Completed production-aligned migrations include:
 
 - Dataset version merge for training, validation, test, and machine-learning datasets.
 - Dataset deletion reference protection through production backend checks and frontend pre-checks.
+- Large-model training detail now treats training method as a version-scoped field and shows it per task version.
 - GRPO / RFT-GRPO training method, parameters, templates, reward function upload, template snapshots, and staged Hand/Work/Submit resources.
 - Inference import usage split for SFT, DPO, RFT-GRPO, and image understanding.
 - Inference import samples for DPO alpaca, DPO role-based, and RFT-GRPO completion-reward.
