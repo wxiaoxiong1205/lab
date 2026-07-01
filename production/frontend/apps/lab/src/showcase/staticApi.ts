@@ -1321,6 +1321,189 @@ const filterBenchmarkDatasets = (params: Record<string, any>) => {
   })
 }
 
+const normalizeOverviewStatus = (status?: string) => {
+  const value = String(status || '').toLowerCase()
+  const statusMap: Record<string, { code: string, name: string }> = {
+    success: { code: 'completed', name: '已完成' },
+    completed: { code: 'completed', name: '已完成' },
+    '已完成': { code: 'completed', name: '已完成' },
+    running: { code: 'running', name: '运行中' },
+    processing: { code: 'running', name: '运行中' },
+    '运行中': { code: 'running', name: '运行中' },
+    failed: { code: 'failed', name: '失败' },
+    error: { code: 'failed', name: '失败' },
+    '失败': { code: 'failed', name: '失败' },
+    pending: { code: 'created', name: '已创建' },
+    created: { code: 'created', name: '已创建' },
+    '已创建': { code: 'created', name: '已创建' },
+    starting: { code: 'starting', name: '启动中' },
+    '启动中': { code: 'starting', name: '启动中' },
+    queued: { code: 'queued', name: '排队中' },
+    queue: { code: 'queued', name: '排队中' },
+    '排队中': { code: 'queued', name: '排队中' },
+    stopped: { code: 'terminated', name: '已终止' },
+    terminated: { code: 'terminated', name: '已终止' },
+    '已停止': { code: 'terminated', name: '已终止' },
+    '已终止': { code: 'terminated', name: '已终止' },
+    '部署中': { code: 'starting', name: '启动中' },
+    '生成中': { code: 'running', name: '运行中' },
+    '评估中': { code: 'running', name: '运行中' },
+    '待审核': { code: 'running', name: '运行中' },
+    '进行中': { code: 'running', name: '运行中' },
+    '启动失败': { code: 'failed', name: '失败' },
+  }
+  return statusMap[value] || statusMap[String(status || '')] || { code: value || 'created', name: status || '已创建' }
+}
+
+const overviewTask = (
+  item: Record<string, any>,
+  options: {
+    scope: 'llm' | 'machine_learning'
+    scopeName: string
+    type: string
+    typeName: string
+    fallbackName?: string
+  },
+) => {
+  const status = normalizeOverviewStatus(item.status_display || item.status)
+  return {
+    task_id: Number(item.task_id ?? item.id ?? item.notebook_id ?? item.dataset_id ?? item.service_id),
+    task_name: String(item.task_name || item.name || item.dataset_name || item.service_name || options.fallbackName || 'showcase-演示任务'),
+    task_scope: options.scope,
+    task_scope_name: options.scopeName,
+    task_type: options.type,
+    task_type_name: options.typeName,
+    status: status.code,
+    status_name: status.name,
+    created_by: item.created_by || 'showcase_admin',
+    created_at: item.created_at || now,
+    status_updated_at: item.updated_at || item.finished_at || now,
+    source: {
+      source_type: options.type,
+      source_id: Number(item.id ?? item.task_id ?? item.dataset_id ?? item.service_id),
+      source_table: `showcase_${options.type}`,
+    },
+    detail_ref: {
+      source_type: options.type,
+      source_id: Number(item.id ?? item.task_id ?? item.dataset_id ?? item.service_id),
+      source_table: `showcase_${options.type}`,
+    },
+  }
+}
+
+const overviewTasks = [
+  ...taskPage.map((item) => overviewTask(item, { scope: 'llm', scopeName: '大模型任务', type: 'data_cleaning', typeName: '数据清洗' })),
+  ...trainingTasks.map((item) => overviewTask(item, { scope: 'llm', scopeName: '大模型任务', type: 'llm_training', typeName: '大模型训练' })),
+  ...notebooks.map((item) => overviewTask(item, { scope: 'llm', scopeName: '大模型任务', type: 'notebook', typeName: '在线 Notebook' })),
+  ...inferenceResultDatasets.map((item) => overviewTask(item, { scope: 'llm', scopeName: '大模型任务', type: 'inference_result', typeName: '推理结果集' })),
+  ...evaluationTasks.map((item) => overviewTask(item, { scope: 'llm', scopeName: '大模型任务', type: 'evaluation_auto', typeName: '自动评估' })),
+  ...manualEvaluationTasks.map((item) => overviewTask(item, { scope: 'llm', scopeName: '大模型任务', type: 'evaluation_manual', typeName: '人工评估' })),
+  ...benchmarkTasks.map((item) => overviewTask(item, { scope: 'llm', scopeName: '大模型任务', type: 'evaluation_benchmark', typeName: '基准评估' })),
+  ...insightTasks.map((item) => overviewTask(item, { scope: 'llm', scopeName: '大模型任务', type: 'data_insight', typeName: '数据洞察' })),
+  ...augmentationTasks.map((item) => overviewTask(item, { scope: 'llm', scopeName: '大模型任务', type: 'data_augmentation', typeName: '数据增强' })),
+  ...inferenceTasks.map((item) => overviewTask(item, { scope: item.inference_engine_type === 'ML' ? 'machine_learning' : 'llm', scopeName: item.inference_engine_type === 'ML' ? '机器学习任务' : '大模型任务', type: 'online_service', typeName: '在线推理服务' })),
+  ...machineDatasets.map((item) => overviewTask(item, { scope: 'machine_learning', scopeName: '机器学习任务', type: 'machine_dataset', typeName: '机器学习数据管理' })),
+  ...annotationTasks.map((item) => overviewTask(item, { scope: item.dataset_type === 'machine-learning' ? 'machine_learning' : 'llm', scopeName: item.dataset_type === 'machine-learning' ? '机器学习任务' : '大模型任务', type: 'annotation', typeName: '数据标注' })),
+].sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+
+const filterOverviewTasksByScope = (taskScope?: string) => {
+  if (!taskScope || taskScope === 'total' || taskScope === 'all') {
+    return overviewTasks
+  }
+  return overviewTasks.filter((item) => item.task_scope === taskScope)
+}
+
+const overviewTaskTypeStats = () => {
+  const llm = overviewTasks.filter((item) => item.task_scope === 'llm').length
+  const ml = overviewTasks.filter((item) => item.task_scope === 'machine_learning').length
+  return {
+    project_id: 1001,
+    items: [
+      { task_scope: 'total', task_scope_name: '全部算力型任务', count: overviewTasks.length },
+      { task_scope: 'llm', task_scope_name: '大模型任务', count: llm },
+      { task_scope: 'machine_learning', task_scope_name: '机器学习任务', count: ml },
+    ],
+  }
+}
+
+const overviewStatusStats = (taskScope?: string) => {
+  const items = filterOverviewTasksByScope(taskScope)
+  const order = ['created', 'scheduled', 'starting', 'queued', 'running', 'terminated', 'completed', 'failed']
+  const labelMap: Record<string, string> = {
+    created: '已创建',
+    scheduled: '定时待启动',
+    starting: '启动中',
+    queued: '排队中',
+    running: '运行中',
+    terminated: '已终止',
+    completed: '已完成',
+    failed: '失败',
+  }
+  return {
+    project_id: 1001,
+    task_scope: taskScope || 'total',
+    total: items.length,
+    statuses: order.map((status) => ({
+      status_code: status,
+      status_name: labelMap[status],
+      count: items.filter((item) => item.status === status).length,
+    })),
+  }
+}
+
+const overviewLatestTasks = (params: Record<string, any>) => {
+  const page = asNumber(params.page, 1)
+  const pageSize = asNumber(params.page_size, 4)
+  const statusFilter = typeof params.statuses === 'string' && params.statuses
+    ? params.statuses.split(',').filter(Boolean)
+    : []
+  const sourceTasks = filterOverviewTasksByScope(params.task_scope)
+    .filter((item) => statusFilter.length === 0 || statusFilter.includes(item.status))
+  const groupedStatuses = Array.from(new Set(sourceTasks.map((item) => item.status)))
+  const groups = groupedStatuses.map((status) => {
+    const items = sourceTasks.filter((item) => item.status === status)
+    const pageItems = items.slice((page - 1) * pageSize, page * pageSize)
+    const statusMeta = normalizeOverviewStatus(status)
+    return {
+      status,
+      status_name: statusMeta.name,
+      total_count: items.length,
+      page,
+      page_size: pageSize,
+      total_pages: Math.max(1, Math.ceil(items.length / pageSize)),
+      has_more: page * pageSize < items.length,
+      items: pageItems,
+    }
+  })
+  return {
+    project_id: 1001,
+    task_scope: params.task_scope || 'total',
+    limit_per_status: pageSize,
+    page,
+    page_size: pageSize,
+    sort_by: 'status_updated_at',
+    sort_order: 'desc',
+    groups,
+  }
+}
+
+const overviewResource = (taskScope?: string) => {
+  const isMl = taskScope === 'machine_learning'
+  const usedGpu = isMl ? 3 : 9
+  return {
+    project_id: 1001,
+    cluster_id: 1,
+    cluster_name: 'showcase-gpu-cluster',
+    resource_type: 'GPU',
+    resource_card_model: isMl ? 'T4 / A10' : 'A800 / L40S',
+    scope: taskScope || 'total',
+    gpu_cards: { used: usedGpu, total: 16, unit: '卡' },
+    gpu_memory: { used: usedGpu * 48, total: 1280, unit: 'GB' },
+    cpu: { used: isMl ? 48 : 168, total: 512, unit: '核' },
+    memory: { used: isMl ? 192 : 640, total: 2048, unit: 'GB' },
+  }
+}
+
 const filteredInferenceResultDatasets = (params: Record<string, any>) => {
   const datasetType = params.dataset_type || ''
   const datasetFormat = params.dataset_format || ''
@@ -1345,6 +1528,11 @@ const staticHandlers: Array<[RegExp, StaticHandler]> = [
   [/^\/k8s\/available-clusters$/, ({ params }) => pageOf(previewKubernetesClusters, asNumber(params.page, 1), asNumber(params.size, 50))],
   [/^\/projects\/list$/, ({ params }) => previewProjectList(asNumber(params.page, 1), asNumber(params.size, 100))],
   [/^\/projects\/1001\/user\/list$/, ({ params }) => pageOf([previewTenantAdminUser], asNumber(params.page, 1), asNumber(params.size, 100))],
+  [/^\/projects\/1001\/compute-task-overview\/task-type-stats$/, () => overviewTaskTypeStats()],
+  [/^\/projects\/1001\/compute-task-overview\/status-stats$/, ({ params }) => overviewStatusStats(params.task_scope)],
+  [/^\/projects\/1001\/compute-task-overview\/latest-tasks$/, ({ params }) => overviewLatestTasks(params)],
+  [/^\/projects\/1001\/compute-task-overview\/project-resources$/, ({ params }) => overviewResource(params.task_scope)],
+  [/^\/projects\/1001\/compute-task-overview\/cluster-resources$/, () => overviewResource('total')],
   [/^\/models\/base\/list$/, ({ params }) => previewBaseModelList(params)],
   [/^\/models\/trained\/project\/1001$/, ({ params }) => pageOf(trainedModels, asNumber(params.page, 1), asNumber(params.size, 10))],
   [/^\/training-datasets\/project\/1001$/, ({ params }) => previewTrainingDatasetList(params)],
