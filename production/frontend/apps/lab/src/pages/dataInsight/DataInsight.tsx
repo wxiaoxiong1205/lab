@@ -17,6 +17,13 @@ const steps = [
   { icon: <SaveOutlined />, title: '保存数据', description: '另存为新的训练数据集版本' },
 ]
 
+const insightStatusMap: Record<string, { text: string, color: string }> = {
+  completed: { text: '已完成', color: 'green' },
+  running: { text: '运行中', color: 'blue' },
+  pending: { text: '待运行', color: 'default' },
+  failed: { text: '失败', color: 'red' },
+}
+
 export default function DataInsight() {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
@@ -47,6 +54,15 @@ export default function DataInsight() {
 
   const columns: ColumnsType<DataInsightTask> = [
     { title: '数据集名称', dataIndex: 'source_dataset_name', ellipsis: true },
+    {
+      title: '任务状态',
+      dataIndex: 'status',
+      width: 110,
+      render: (value, record) => {
+        const status = insightStatusMap[value] || { text: record.status_display || value || '-', color: 'default' }
+        return <Tag color={status.color}>{status.text}</Tag>
+      },
+    },
     { title: '数据格式', dataIndex: 'dataset_format', width: 150, render: (value) => <Tag color="blue">{value}</Tag> },
     { title: '样本数', width: 120, render: (_, record) => record.result_summary?.total_samples ?? '-' },
     { title: '洞察时间', dataIndex: 'created_at', width: 180, render: (value) => value ? formatDateTime(value) : '-' },

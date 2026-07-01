@@ -73,6 +73,7 @@ const createDefaultGraphicsCardResource = () => ({
 })
 
 const defaultValues = {
+  base_model_source: 'repository',
   base_provider: 'Qwen', // 默认选择Qwen
   training_type: 'sft',
   num_train_epochs: 3, // 对应num_train_epochs
@@ -215,6 +216,13 @@ const normalizeTrainingMethodType = (value?: unknown) => {
   return normalized
 }
 
+const normalizeModelProvider = (value?: unknown) => {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  if (normalized === 'qwen' || normalized.includes('通义千问'))
+    return 'Qwen'
+  return typeof value === 'string' && value.trim() ? value.trim() : 'Qwen'
+}
+
 const getTrainingMethodType = (trainingType?: any) => {
   return normalizeTrainingMethodType(trainingType?.train_method_type || trainingType?.training_method_type)
 }
@@ -235,6 +243,7 @@ const CreateFinetuneRun: React.FC = () => {
   const [resourceConfigLoading, setResourceConfigLoading] = useState(Boolean(taskName && !isEditMode))
   const [currentStep, setCurrentStep] = useState(0)
   const [modelVersions, setModelVersions] = useState([])
+  const [trainedModels, setTrainedModels] = useState<any[]>([])
   const [dataConfigResetKey, setDataConfigResetKey] = useState(0)
   const [forcedTrainingMethodType, setForcedTrainingMethodType] = useState<string | undefined>()
   const baseProvider = Form.useWatch('base_provider', form)
@@ -291,8 +300,8 @@ const CreateFinetuneRun: React.FC = () => {
   const fetchModelVersions = async () => {
     const requestId = modelVersionsRequestRef.current + 1
     modelVersionsRequestRef.current = requestId
-    const requestedProvider = baseProvider
-    const requestedTrainType = trainTypeCategory
+    const requestedProvider = baseProvider || form.getFieldValue('base_provider') || defaultValues.base_provider
+    const requestedTrainType = trainTypeCategory || form.getFieldValue('train_type_category') || defaultValues.train_type_category
     setModelVersions([])
     try {
       const data = await ModelService.getBaseModels({
@@ -306,13 +315,14 @@ const CreateFinetuneRun: React.FC = () => {
       ) {
         return
       }
+      const normalizedProvider = normalizeModelProvider(requestedProvider)
       const downloadedModelMap = new Map(
         (data.items || [])
-          .filter((model) => (model.model_provider || '').toLowerCase() === String(requestedProvider || '').toLowerCase())
+          .filter((model) => normalizeModelProvider(model.model_provider) === normalizedProvider)
           .map((model) => [normalizeBaseModelName(model.name), model]),
       )
       const adaptedModels = ADAPTED_QWEN_BASE_MODELS
-        .filter((model) => model.provider === requestedProvider && model.modelType === requestedTrainType)
+        .filter((model) => model.provider === normalizedProvider && model.modelType === requestedTrainType)
         .map((model) => {
           const downloadedModel = downloadedModelMap.get(normalizeBaseModelName(model.name))
           return {
@@ -337,15 +347,33 @@ const CreateFinetuneRun: React.FC = () => {
     }
   }
   useEffect(() => {
-    if (baseProvider && trainTypeCategory) {
+    if ((baseProvider || form.getFieldValue('base_provider')) && (trainTypeCategory || form.getFieldValue('train_type_category'))) {
       fetchModelVersions()
     }
   }, [baseProvider, trainTypeCategory])
 
   useEffect(() => {
-    // 回显
-    if (taskName) {
-      const taskInfo = JSON.parse(localStorage.getItem('taskInfo') || '{}')
+    let cancelled = false
+    const loadTaskInfo = async () => {
+      // 回显：优先使用详情页带入的版本数据；直接访问新增版本 URL 时按 taskName 拉取最新版本兜底。
+      let taskInfo = JSON.parse(localStorage.getItem('taskInfo') || '{}')
+      if (taskName && projectId && !taskInfo?.training_type) {
+        try {
+          const versions = await finetuneTaskService.getTaskVersions(Number(projectId), taskName)
+          const getVersionNumber = (version: string) => {
+            const match = version?.match(/V?(\d+)/)
+            return match ? parseInt(match[1], 10) : 0
+          }
+          taskInfo = [...(versions || [])].sort((a: any, b: any) => getVersionNumber(b.version) - getVersionNumber(a.version))[0] || {}
+        }
+        catch (error) {
+          console.error('Failed to fetch task info for version creation:', error)
+          taskInfo = {}
+        }
+      }
+      if (cancelled)
+        return
+      if (taskName && taskInfo?.training_type) {
       if (!isEditMode) {
         const currentVersion = taskInfo.version || 'V1'
         const versionNumber = parseInt(currentVersion.replace('V', '')) || 1
@@ -353,7 +381,7 @@ const CreateFinetuneRun: React.FC = () => {
       }
       setTaskInfo(taskInfo)
       const taskTrainingMethod = getTrainingMethodType(taskInfo?.training_type)
-      setForcedTrainingMethodType(taskTrainingMethod)
+      setForcedTrainingMethodType(undefined)
       const trainCategory = taskInfo?.training_type?.train_type_category as string | undefined
 
       const trainingItems = Array.isArray(taskInfo?.dataset_items) ? [...taskInfo.dataset_items] : []
@@ -422,6 +450,10 @@ const CreateFinetuneRun: React.FC = () => {
         num_train_epochs: taskInfo.basic.num_train_epochs,
         per_device_train_batch_size: taskInfo.basic.per_device_train_batch_size,
         template: taskInfo?.template,
+        base_model_source: taskInfo?.base_model?.model_provider === 'trained_model' ? 'trained' : 'repository',
+        base_provider: normalizeModelProvider(taskInfo?.base_model?.model_provider),
+        base_model_id: taskInfo?.base_model?.base_model_id,
+        base_model_name: taskInfo?.base_model?.base_model_name,
         warmup_ratio: taskInfo.basic.warmup_ratio,
 
         // 高级参数
@@ -502,17 +534,24 @@ const CreateFinetuneRun: React.FC = () => {
       setDataConfig(data_config)
       setDataConfigResetKey((key) => key + 1)
       form.setFieldsValue(taskValues)
+      fetchModelVersions()
       if (rewardRuleUploadId) {
         form.setFields([
           { name: 'reward_rule_upload_id', value: rewardRuleUploadId, errors: [] },
         ])
       }
-    }
-    else {
+      }
+      else {
       setForcedTrainingMethodType(undefined)
       form.setFieldsValue(defaultValues)
+      fetchModelVersions()
+      }
     }
-  }, [experimentId, form])
+    loadTaskInfo()
+    return () => {
+      cancelled = true
+    }
+  }, [experimentId, form, isEditMode, projectId, taskName])
   useEffect(() => {
     if (datasetName === 'training') {
       const datasetInfo = JSON.parse(localStorage.getItem('datasetInfo') || '{}')
@@ -632,9 +671,7 @@ const CreateFinetuneRun: React.FC = () => {
       const scheduleTime = scheduleEnabled ? dayjs(values.schedule_time).format('HH:mm:ss') : undefined
       const scheduleAt = scheduleEnabled && scheduleDate && scheduleTime ? `${scheduleDate}T${scheduleTime}` : undefined
 
-      const trainMethodType = taskName
-        ? getTrainingMethodType(taskInfo?.training_type)
-        : values.training_type
+      const trainMethodType = values.training_type
       const normalizedTrainMethodType = normalizeTrainingMethodType(trainMethodType)
       const isGrpoTraining = normalizedTrainMethodType === 'grpo' || trainMethodType === 'rft'
       const isImageGenerationTraining = values.train_type_category === 'image-generation'
@@ -804,9 +841,7 @@ const CreateFinetuneRun: React.FC = () => {
           }
 
       if (taskName) {
-        backendData.base_model = taskInfo.base_model
         backendData.training_type.train_type_category = taskInfo.training_type.train_type_category
-        backendData.training_type.train_method_type = getTrainingMethodType(taskInfo.training_type)
         backendData.name = taskName
         backendData.version = taskInfo.version
       }
@@ -856,15 +891,14 @@ const CreateFinetuneRun: React.FC = () => {
 
   const getStepIndexByField = (name: (string | number)[]) => {
     const firstName = String(name[0] ?? '')
-    const isModelStepVisible = !taskName
-    const trainingStepIndex = isModelStepVisible ? 2 : 1
-    const dataStepIndex = isModelStepVisible ? 3 : 2
-    const resourceStepIndex = isModelStepVisible ? 4 : 3
+    const trainingStepIndex = 2
+    const dataStepIndex = 3
+    const resourceStepIndex = 4
 
     if (['name', 'version', 'schedule_enabled', 'schedule_date', 'schedule_time', 'description'].includes(firstName))
       return 0
-    if (['base_provider', 'base_model_id', 'base_model_name'].includes(firstName))
-      return isModelStepVisible ? 1 : 0
+    if (['base_model_source', 'base_provider', 'base_model_id', 'base_model_name'].includes(firstName))
+      return 1
     if (firstName === 'data_config')
       return dataStepIndex
     if (
@@ -894,6 +928,25 @@ const CreateFinetuneRun: React.FC = () => {
     setDataConfigResetKey((key) => key + 1)
     form.setFieldsValue({ data_config: emptyDataConfig })
   }
+
+  useEffect(() => {
+    const fetchTrainedModels = async () => {
+      if (!projectId)
+        return
+      try {
+        const response = await ModelService.getBaseModelsByProjectId(Number(projectId), {
+          page: 1,
+          size: 1000,
+        })
+        setTrainedModels(response.items || [])
+      }
+      catch (error) {
+        console.error('Failed to fetch trained models:', error)
+        setTrainedModels([])
+      }
+    }
+    fetchTrainedModels()
+  }, [projectId])
 
   const dataConfigContent = (
     <>
@@ -936,7 +989,7 @@ const CreateFinetuneRun: React.FC = () => {
           projectId={projectId ? parseInt(projectId) : undefined}
           dataConfig={dataConfig}
           trainTypeCategoryFromTask={taskName ? taskInfo?.training_type?.train_type_category : undefined}
-          trainingMethodTypeFromTask={forcedTrainingMethodType || getTrainingMethodType(taskInfo?.training_type)}
+          trainingMethodTypeFromTask={watchedTrainingMethod || forcedTrainingMethodType || getTrainingMethodType(taskInfo?.training_type)}
         />
       </Form.Item>
       <Form.Item noStyle shouldUpdate>
@@ -971,19 +1024,18 @@ const CreateFinetuneRun: React.FC = () => {
       validateFields: ['name', 'version', 'schedule_date', 'schedule_time'],
       content: <BasicConfig form={form} datainfo={taskInfo} taskName={taskName} />,
     },
-    ...(!taskName
-      ? [{
-          title: '模型配置',
-          validateFields: ['base_provider', 'base_model_id', 'base_model_name'],
-          content: (
-            <ModelConfig
-              form={form}
-              ModelProviderCategory={ModelProviderCategory}
-              modelVersions={modelVersions}
-            />
-          ),
-        }]
-      : []),
+    {
+      title: '模型配置',
+      validateFields: ['base_model_source', 'base_provider', 'base_model_id', 'base_model_name'],
+      content: (
+        <ModelConfig
+          form={form}
+          ModelProviderCategory={ModelProviderCategory}
+          modelVersions={modelVersions}
+          trainedModels={trainedModels}
+        />
+      ),
+    },
     {
       title: '训练配置',
       validateFields: [
@@ -1004,7 +1056,7 @@ const CreateFinetuneRun: React.FC = () => {
           LrSchedulerTypeCategory={LrSchedulerTypeCategory}
           SaveStrategyCategory={SaveStrategyCategory}
           taskName={taskName}
-          trainingMethodType={forcedTrainingMethodType || getTrainingMethodType(taskInfo?.training_type)}
+          trainingMethodType={forcedTrainingMethodType}
           onTrainingMethodChange={resetSelectedDatasets}
         />
       ),

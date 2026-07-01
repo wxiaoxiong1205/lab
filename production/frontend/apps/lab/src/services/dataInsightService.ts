@@ -31,6 +31,7 @@ export interface DataInsightTask {
   training_method_type: string
   dataset_format: string
   status: string
+  status_display?: string
   config?: Record<string, unknown>
   result_summary?: Record<string, any>
   result_samples?: { items?: any[], total?: number }
@@ -326,6 +327,10 @@ function isLocalPreviewEnabled() {
   return import.meta.env.VITE_SHOWCASE_PREVIEW === 'true' || import.meta.env.VITE_LOCAL_PREVIEW === 'true'
 }
 
+function shouldUseShowcaseFallback(projectId: number) {
+  return projectId === 1001 || isLocalPreviewEnabled()
+}
+
 function mergeFallbackTasks(pageData: DataInsightTaskPage, params?: { name?: string, status?: string, page?: number, size?: number }): DataInsightTaskPage {
   const existingIds = new Set((pageData.items || []).map((item) => item.id))
   const merged = [
@@ -351,10 +356,10 @@ export const dataInsightService = {
   list: async (projectId: number, params?: { name?: string, status?: string, page?: number, size?: number }): Promise<DataInsightTaskPage> => {
     try {
       const response = await apiClient.get<DataInsightTaskPage>(`/data-insights/project/${projectId}/tasks`, { params })
-      return isLocalPreviewEnabled() ? mergeFallbackTasks(response.data, params) : response.data
+      return shouldUseShowcaseFallback(projectId) ? mergeFallbackTasks(response.data, params) : response.data
     }
     catch (error) {
-      if (!isLocalPreviewEnabled()) throw error
+      if (!shouldUseShowcaseFallback(projectId)) throw error
       return mergeFallbackTasks({ items: [], total: 0, page: params?.page ?? 1, size: params?.size ?? 10 }, params)
     }
   },
@@ -366,13 +371,13 @@ export const dataInsightService = {
     const fallbackTask = fallbackInsightTasks.find((item) => item.id === taskId)
     try {
       const response = await apiClient.get<DataInsightTask>(`/data-insights/project/${projectId}/tasks/${taskId}`)
-      if (isLocalPreviewEnabled() && !response.data?.id) {
+      if (shouldUseShowcaseFallback(projectId) && !response.data?.id) {
         return fallbackTask || fallbackInsightTasks[0]
       }
       return response.data
     }
     catch (error) {
-      if (!isLocalPreviewEnabled()) throw error
+      if (!shouldUseShowcaseFallback(projectId)) throw error
       return fallbackTask || fallbackInsightTasks[0]
     }
   },

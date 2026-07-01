@@ -26,6 +26,10 @@ const getTrainingMethodType = (task: any) => String(
 ).toLowerCase()
 const isLoraTrainingTask = (task: any) => task?.training_type?.fine_tuning_type?.toLowerCase() === 'lora'
 const needsResourceConfig = (task: any) => isLoraTrainingTask(task) || getTrainingMethodType(task) === 'grpo'
+const getTrainingMethodText = (task: any) => {
+  const method = getTrainingMethodType(task)
+  return TrainingMethodTypeMapping(method).text || method || '-'
+}
 
 interface ModelSource {
   id: string
@@ -259,7 +263,7 @@ const CreateModelPage: React.FC = () => {
       else {
         // 设置子选项
         targetOption.children = options.map((item: any) => ({
-          label: item.version,
+          label: `${item.version} / ${getTrainingMethodText(item)} / ${item.base_model?.base_model_name || item.base_model_name || '-'} / ${item.status || '-'}`,
           value: item.version,
           isLeaf: true,
         }))
@@ -335,6 +339,7 @@ const CreateModelPage: React.FC = () => {
       // 设置模型路径
       form.setFieldsValue({
         model_path: selectedVersion.model_output_path,
+        training_method_type: getTrainingMethodType(selectedVersion),
       })
       // 创建模型时资源配置不从训练任务默认反填，用户需要重新选择。
       form.setFieldsValue({
@@ -519,6 +524,10 @@ const CreateModelPage: React.FC = () => {
 
             {model_source === 'training' && (
               <>
+                <Form.Item name="trainingTask" label="训练任务" rules={[{ required: true, message: '请选择训练任务' }]} tooltip="可选已运行成功的任务版本">
+                  <Cascader className="w-[400px]" options={cascaderOptions} showCheckedStrategy={Cascader.SHOW_CHILD} placeholder="请选择训练任务" loadData={loadData} onChange={handleTrainingTaskChange} changeOnSelect loading={isLoading} />
+                </Form.Item>
+
                 <Form.Item name="training_method_type" label="模型训练方法" rules={[{ required: true, message: '请选择模型训练方式' }]}>
                   <Select placeholder="请选择模型训练方式" className="w-[400px]" onChange={handleTrainingMethodTypeChange}>
                     {TrainingMethodCategory?.options.map((item: any) => (!TrainingMethodTypeMapping(item.value).disabled && (
@@ -528,10 +537,6 @@ const CreateModelPage: React.FC = () => {
                       </Option>
                     )))}
                   </Select>
-                </Form.Item>
-
-                <Form.Item name="trainingTask" label="训练任务" rules={[{ required: true, message: '请选择训练任务' }]} tooltip="可选已运行成功的任务版本">
-                  <Cascader className="w-[400px]" options={cascaderOptions} showCheckedStrategy={Cascader.SHOW_CHILD} placeholder="请选择训练任务" loadData={loadData} onChange={handleTrainingTaskChange} changeOnSelect loading={isLoading} />
                 </Form.Item>
 
                 {taskNeedsResourceConfig && (

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { Button, Card, Col, Form, Row, Tag, Typography } from 'antd'
+import { Button, Card, Col, Form, Radio, Row, Select, Tag, Typography } from 'antd'
 import { CheckCircleOutlined, ExperimentOutlined } from '@ant-design/icons'
 import qwen from '/public/qwen.png'
 import llama from '/public/llama.png'
@@ -12,10 +12,14 @@ interface ModelConfigProps {
   form: any
   ModelProviderCategory: any
   modelVersions: any[]
+  trainedModels?: any[]
 }
 
-const ModelConfig: React.FC<ModelConfigProps> = ({ form, ModelProviderCategory, modelVersions }) => {
+const ModelConfig: React.FC<ModelConfigProps> = ({ form, ModelProviderCategory, modelVersions, trainedModels = [] }) => {
+  const baseModelSource = Form.useWatch('base_model_source', form) || 'repository'
   useEffect(() => {
+    if (baseModelSource !== 'repository')
+      return
     const downloadedVersions = modelVersions?.filter((version: any) => version.isDownloaded !== false) || []
     if (!downloadedVersions.length) {
       form.setFieldsValue({
@@ -33,7 +37,22 @@ const ModelConfig: React.FC<ModelConfigProps> = ({ form, ModelProviderCategory, 
         base_model_name: firstVersion.name,
       })
     }
-  }, [modelVersions, form])
+  }, [baseModelSource, modelVersions, form])
+
+  useEffect(() => {
+    if (baseModelSource !== 'trained')
+      return
+    const currentId = form.getFieldValue('base_model_id')
+    const isInList = trainedModels.some((model: any) => String(model.id ?? model.model_name) === String(currentId))
+    if (!currentId || !isInList) {
+      const firstModel = trainedModels[0]
+      form.setFieldsValue({
+        base_model_id: firstModel ? (firstModel.id ?? firstModel.model_name) : undefined,
+        base_model_name: firstModel?.model_name || firstModel?.name,
+        base_provider: 'trained_model',
+      })
+    }
+  }, [baseModelSource, form, trainedModels])
 
   return (
     <Card
@@ -46,7 +65,25 @@ const ModelConfig: React.FC<ModelConfigProps> = ({ form, ModelProviderCategory, 
       className="mb-4 rounded-[8px]"
       size="small"
     >
-      <Form.Item name="base_provider" label="选择基础模型" rules={[{ required: true, message: '请选择基础模型' }]}>
+      <Form.Item name="base_model_source" label="模型来源" initialValue="repository" rules={[{ required: true, message: '请选择模型来源' }]}>
+        <Radio.Group
+          onChange={(event) => {
+            const nextSource = event.target.value
+            form.setFieldsValue({
+              base_model_id: undefined,
+              base_model_name: undefined,
+              base_provider: nextSource === 'trained' ? 'trained_model' : MODEL_QWEN,
+            })
+          }}
+        >
+          <Radio.Button value="repository">模型仓库</Radio.Button>
+          <Radio.Button value="trained">我的模型</Radio.Button>
+        </Radio.Group>
+      </Form.Item>
+
+      {baseModelSource === 'repository' && (
+        <>
+          <Form.Item name="base_provider" label="选择基础模型" rules={[{ required: true, message: '请选择基础模型' }]}>
         <Form.Item noStyle shouldUpdate>
           {({ getFieldValue, setFieldsValue }) => {
             const selectedProvider = getFieldValue('base_provider')
@@ -143,6 +180,29 @@ const ModelConfig: React.FC<ModelConfigProps> = ({ form, ModelProviderCategory, 
           }}
         </Form.Item>
       </Form.Item>
+        </>
+      )}
+
+      {baseModelSource === 'trained' && (
+        <Form.Item name="base_model_id" label="我的模型版本" rules={[{ required: true, message: '请选择我的模型版本' }]}>
+          <Select
+            className="max-w-[560px]"
+            placeholder="请选择我的模型版本"
+            options={trainedModels.map((model: any) => ({
+              value: model.id ?? model.model_name,
+              label: `${model.model_name || model.name}${model.latest_version ? ` / ${model.latest_version}` : ''}`,
+            }))}
+            onChange={(value) => {
+              const model = trainedModels.find((item: any) => String(item.id ?? item.model_name) === String(value))
+              form.setFieldsValue({
+                base_model_id: value,
+                base_model_name: model?.model_name || model?.name,
+                base_provider: 'trained_model',
+              })
+            }}
+          />
+        </Form.Item>
+      )}
     </Card>
   )
 }

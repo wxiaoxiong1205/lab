@@ -1,4 +1,3 @@
-import { config } from 'node:process'
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { ColumnsType } from 'antd/es/table'
@@ -9,7 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ModelService } from '@/services/modelsApi'
 import { taskExecutionService } from '@/services/taskExecutionService'
 import type { ModelVersionListResponse } from '@/types/model'
-import { ModelTypeMapping, TrainingTaskStatusMapping } from '@/utils/EnumMaping'
+import { ModelTypeMapping, TrainingMethodTypeMapping, TrainingTaskStatusMapping } from '@/utils/EnumMaping'
 import TableActionColumn, { type TableActionItem } from '@/components/common/TableActionColumn'
 import { useConfigStore } from '@/stores/configStore'
 
@@ -99,7 +98,7 @@ const TrainingTaskDetail: React.FC = () => {
       render: (description: string) => <Text>{description || '-'}</Text>,
     },
     {
-      title: '版本来源',
+      title: '关联任务',
       dataIndex: 'base_model_name',
       key: 'base_model_name',
       width: 200,
@@ -114,6 +113,29 @@ const TrainingTaskDetail: React.FC = () => {
             <Text>{taskInfo?.model_source === 'training' ? '大模型训练' : '在线Notebook'}</Text>
           </Tooltip>
         )
+      },
+    },
+    {
+      title: '基础模型',
+      dataIndex: 'base_model_name',
+      key: 'base_model_name',
+      width: 200,
+      align: 'left' as const,
+      ellipsis: true,
+      render: (baseModelName: string, record: ModelVersionListResponse) => {
+        const source = record.model_source_type === 'training' ? '模型仓库' : '-'
+        return baseModelName ? `${baseModelName} / ${source}` : '-'
+      },
+    },
+    {
+      title: '训练方法',
+      dataIndex: 'training_method_type',
+      key: 'training_method_type',
+      width: 120,
+      align: 'left' as const,
+      render: (_: unknown, record: ModelVersionListResponse) => {
+        const method = getTrainingMethodType(record)
+        return TrainingMethodTypeMapping(method).text || method || '-'
       },
     },
     {
@@ -353,9 +375,8 @@ const TrainingTaskDetail: React.FC = () => {
   useEffect(() => {
     if (data && data.length > 0) {
       const taskData = data[0]
-      console.log(taskData)
       setTaskInfo({
-        name: taskData.name || '',
+        name: taskData.name || (taskData as any).model_name || modelName || '',
         modalType: taskData.model_type || '',
         modalNAme: taskData.base_model_name || '',
         description: taskData.description || '',
@@ -372,7 +393,21 @@ const TrainingTaskDetail: React.FC = () => {
       }))
       setTaskVersions(versions)
     }
-  }, [data])
+    else {
+      setTaskInfo({
+        name: modelName || '',
+        modalType: '',
+        modalNAme: '',
+        description: '',
+        version: '',
+        task_name: '',
+        task_version: '',
+        training_type: '',
+        model_source: '',
+      })
+      setTaskVersions([])
+    }
+  }, [data, modelName])
   // 刷新版本列表
   const handleRefresh = async () => {
     await refetch()
@@ -431,11 +466,6 @@ const TrainingTaskDetail: React.FC = () => {
           <Descriptions.Item label="模型名称">
             <Text strong>{taskInfo.name || ''}</Text>
           </Descriptions.Item>
-          {taskInfo.model_source === 'training' && (
-            <Descriptions.Item label="基础模型">
-              <Text>{taskInfo.modalNAme || ''}</Text>
-            </Descriptions.Item>
-          )}
           <Descriptions.Item label="模型类型">
             <Text>{ModelTypeMapping(taskInfo.modalType || '').text}</Text>
           </Descriptions.Item>

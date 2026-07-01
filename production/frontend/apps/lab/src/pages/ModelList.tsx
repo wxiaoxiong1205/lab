@@ -118,13 +118,6 @@ const ModelList: React.FC = () => {
       },
     },
     {
-      title: '基础模型',
-      dataIndex: 'base_model_name',
-      key: 'base_model_name',
-      align: 'left',
-      width: 240,
-    },
-    {
       title: '版本数量',
       dataIndex: 'version_count',
       key: 'version_count',

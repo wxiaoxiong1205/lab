@@ -206,30 +206,28 @@ const TrainingConfig: React.FC<TrainingConfigProps> = ({
       )}
 
       <div className="max-w-[760px]">
-        {!taskName && (
-          <Form.Item name="training_type" label="训练方法" rules={[{ required: true, message: '请选择训练方法' }]}>
-            <Select
-              className="w-full"
-              placeholder="选择训练方法"
-              onChange={handleTrainingMethodChange}
-              labelRender={({ value }) => {
-                return TrainingMethodCategory?.options.find((item: any) => item.value === value)?.name
-              }}
-            >
-              {trainingMethodOptions
-                .map((type: any) => (
-                  <Option key={type.value} value={type.value}>
-                    <div>
-                      <div>{TrainingMethodTypeMapping(type.value).text}</div>
-                      <Text type="secondary" className="text-[12px]">
-                        {type.description}
-                      </Text>
-                    </div>
-                  </Option>
-                ))}
-            </Select>
-          </Form.Item>
-        )}
+        <Form.Item name="training_type" label="训练方法" rules={[{ required: true, message: '请选择训练方法' }]}>
+          <Select
+            className="w-full"
+            placeholder="选择训练方法"
+            onChange={handleTrainingMethodChange}
+            labelRender={({ value }) => {
+              return TrainingMethodCategory?.options.find((item: any) => item.value === value)?.name
+            }}
+          >
+            {trainingMethodOptions
+              .map((type: any) => (
+                <Option key={type.value} value={type.value}>
+                  <div>
+                    <div>{TrainingMethodTypeMapping(type.value).text}</div>
+                    <Text type="secondary" className="text-[12px]">
+                      {type.description}
+                    </Text>
+                  </div>
+                </Option>
+              ))}
+          </Select>
+        </Form.Item>
       </div>
 
       {isGrpoTraining && (

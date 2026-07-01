@@ -160,8 +160,8 @@ export function hydrateVersionsFromGlobalMetas(
   const pageById = new Map(pageVersions.map(version => [version.id, version]))
   const pageByName = new Map(pageVersions.map(version => [version.name.trim().toLowerCase(), version]))
 
-  return globalMetas.map((meta, index) => {
-    const matchedPageVersion = pageById.get(meta.id) ?? pageByName.get(meta.name.trim().toLowerCase()) ?? pageVersions[index]
+  return globalMetas.map((meta) => {
+    const matchedPageVersion = pageById.get(meta.id) ?? pageByName.get(meta.name.trim().toLowerCase())
 
     return {
       ...meta,

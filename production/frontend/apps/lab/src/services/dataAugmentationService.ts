@@ -66,6 +66,13 @@ export interface CreateDataAugmentationTaskRequest {
 }
 
 const now = new Date().toISOString()
+const defaultPromptDirections: PromptDirectionConfig[] = [
+  { direction: '同类泛化', sample_count: 70, enabled: true, description: '问题类型不变，变换发生场景和业务情境' },
+  { direction: '同义泛化', sample_count: 80, enabled: true, description: '保持原始语义不变，调整表达方式和措辞' },
+  { direction: '增加约束', sample_count: 40, enabled: true, description: '补充时间、金额、权限、渠道等限制条件' },
+  { direction: '复杂场景变换', sample_count: 45, enabled: true, description: '加入多条件、多角色或异常状态，提升样本覆盖度' },
+  { direction: '前提条件变换', sample_count: 15, enabled: true, description: '改变订单状态、用户身份或业务前置条件' },
+]
 const fallbackAugmentationTasks: DataAugmentationTask[] = [
   {
     id: 92001,
@@ -81,7 +88,13 @@ const fallbackAugmentationTasks: DataAugmentationTask[] = [
     dataset_format: 'prompt-response',
     status: 'completed',
     config: {
-      prompt_generation: { enabled: true },
+      prompt_generation: {
+        enabled: true,
+        service_type: 'deployment',
+        service_name: 'Qwen2.5-7B-Instruct-部署服务',
+        scene_description: '电商评论情感分类与客服回复样本增强',
+        directions: defaultPromptDirections,
+      },
       response_generation: { enabled: true, target_scope: 'missing-only', output_format: 'text' },
     },
     result_summary: {
@@ -236,6 +249,10 @@ function isLocalPreviewEnabled() {
   return import.meta.env.VITE_SHOWCASE_PREVIEW === 'true' || import.meta.env.VITE_LOCAL_PREVIEW === 'true'
 }
 
+function shouldUseShowcaseFallback(projectId: number) {
+  return projectId === 1001 || isLocalPreviewEnabled()
+}
+
 function mergeFallbackTasks(pageData: DataAugmentationTaskPage, params?: { name?: string, status?: string, page?: number, size?: number }): DataAugmentationTaskPage {
   const existingIds = new Set((pageData.items || []).map((item) => item.id))
   const merged = [
@@ -257,14 +274,52 @@ function mergeFallbackTasks(pageData: DataAugmentationTaskPage, params?: { name?
   }
 }
 
+function completePromptDirections(task: DataAugmentationTask): DataAugmentationTask {
+  const existingDirections = task.config?.prompt_generation?.directions
+  if (Array.isArray(existingDirections) && existingDirections.length > 0) {
+    return task
+  }
+
+  const fallbackTask = fallbackAugmentationTasks.find((item) => item.id === task.id)
+  const fallbackDirections = fallbackTask?.config?.prompt_generation?.directions
+  const sampleDirections = Array.from(new Set((task.result_samples?.items || [])
+    .map(item => item?.direction)
+    .filter((value): value is string => Boolean(value) && value !== 'Response 生成')))
+
+  const directions = Array.isArray(fallbackDirections) && fallbackDirections.length > 0
+    ? fallbackDirections
+    : sampleDirections.map(direction => ({
+        direction,
+        sample_count: (task.result_samples?.items || []).filter(item => item?.direction === direction).length,
+        enabled: true,
+        description: '根据增强样本明细自动汇总的 Prompt 增强方向',
+      }))
+
+  if (!directions.length) {
+    return task
+  }
+
+  return {
+    ...task,
+    config: {
+      ...(task.config || {}),
+      prompt_generation: {
+        ...(task.config?.prompt_generation || {}),
+        enabled: task.config?.prompt_generation?.enabled ?? true,
+        directions,
+      },
+    },
+  }
+}
+
 export const dataAugmentationService = {
   list: async (projectId: number, params?: { name?: string, status?: string, page?: number, size?: number }): Promise<DataAugmentationTaskPage> => {
     try {
       const response = await apiClient.get<DataAugmentationTaskPage>(`/data-augmentations/project/${projectId}/tasks`, { params })
-      return isLocalPreviewEnabled() ? mergeFallbackTasks(response.data, params) : response.data
+      return shouldUseShowcaseFallback(projectId) ? mergeFallbackTasks(response.data, params) : response.data
     }
     catch (error) {
-      if (!isLocalPreviewEnabled()) throw error
+      if (!shouldUseShowcaseFallback(projectId)) throw error
       return mergeFallbackTasks({ items: [], total: 0, page: params?.page ?? 1, size: params?.size ?? 10 }, params)
     }
   },
@@ -276,14 +331,14 @@ export const dataAugmentationService = {
     const fallbackTask = fallbackAugmentationTasks.find((item) => item.id === taskId)
     try {
       const response = await apiClient.get<DataAugmentationTask>(`/data-augmentations/project/${projectId}/tasks/${taskId}`)
-      if (isLocalPreviewEnabled() && !response.data?.id) {
+      if (shouldUseShowcaseFallback(projectId) && !response.data?.id) {
         return fallbackTask || fallbackAugmentationTasks[0]
       }
-      return response.data
+      return completePromptDirections(response.data)
     }
     catch (error) {
-      if (!isLocalPreviewEnabled()) throw error
-      return fallbackTask || fallbackAugmentationTasks[0]
+      if (!shouldUseShowcaseFallback(projectId)) throw error
+      return completePromptDirections(fallbackTask || fallbackAugmentationTasks[0])
     }
   },
   delete: async (projectId: number, taskId: number) => {

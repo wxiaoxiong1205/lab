@@ -92,7 +92,6 @@ const TrainingTaskDetail: React.FC = () => {
   }>()
   const [taskInfo, setTaskInfo] = useState({
     name: '',
-    baseModel: '',
     trainType: '',
     description: '',
     version: '',
@@ -382,7 +381,6 @@ const TrainingTaskDetail: React.FC = () => {
       const taskData = data[0]
       setTaskInfo({
         name: taskData.name || '',
-        baseModel: taskData.base_model?.base_model_name || '',
         trainType: taskData.training_type?.train_type_category || '',
         description: taskData.description || '',
         version: taskData.version || '',
@@ -489,9 +487,6 @@ const TrainingTaskDetail: React.FC = () => {
         <Descriptions column={1} size="middle" className="p-0">
           <Descriptions.Item label="任务名称">
             <Text strong>{taskInfo.name || ''}</Text>
-          </Descriptions.Item>
-          <Descriptions.Item label="基础模型">
-            <Text>{taskInfo.baseModel || ''}</Text>
           </Descriptions.Item>
           <Descriptions.Item label="训练类型">
             <Text>{ModelTypeMapping(taskInfo.trainType).text || ''}</Text>

@@ -61,7 +61,6 @@ export default function DataAugmentationDetail() {
           columns={[
             { title: '增强方向', dataIndex: 'direction' },
             { title: '生成样本数', dataIndex: 'sample_count' },
-            { title: '是否应用', dataIndex: 'enabled', render: (value) => value ? '是' : '否' },
             { title: '说明', dataIndex: 'description' },
           ]}
         />
